@@ -376,6 +376,24 @@ public class AuditChainTests
     }
 
     /// <summary>
+    ///     Test that a valid chain reports the hash of its last entry as the head hash.
+    /// </summary>
+    [Fact]
+    public void AuditChain_Verify_ValidChain_ReportsLastEntryHashAsHead()
+    {
+        // Arrange
+        var entries = Chain(3);
+
+        // Act
+        var result = AuditChain.Verify(entries);
+
+        // Assert: the head is the hash of the last entry, not of the first one and not the genesis hash
+        Assert.Equal(entries[^1].Hash, result.HeadHash);
+        Assert.NotEqual(entries[0].Hash, result.HeadHash);
+        Assert.NotEqual(AuditChain.GenesisHash, result.HeadHash);
+    }
+
+    /// <summary>
     ///     Test that editing any field of any entry, without fixing the hash, breaks the chain at that entry.
     /// </summary>
     [Theory]
@@ -599,6 +617,35 @@ public class AuditChainTests
         // Assert
         Assert.Equal(2, result.FirstBadSequence);
         Assert.Equal(2, read);
+    }
+
+    /// <summary>
+    ///     Test that verification takes the entries one at a time in a single pass over the sequence.
+    /// </summary>
+    [Fact]
+    public void AuditChain_Verify_Sequence_IsEnumeratedOnceOneEntryAtATime()
+    {
+        // Arrange: a source that counts the enumerations and the entries it hands out
+        var entries = Chain(4);
+        var enumerations = 0;
+        var handedOut = 0;
+        IEnumerable<AuditEntry> Stream()
+        {
+            enumerations++;
+            foreach (var entry in entries)
+            {
+                handedOut++;
+                yield return entry;
+            }
+        }
+
+        // Act
+        var result = AuditChain.Verify(Stream());
+
+        // Assert: one pass, every entry handed out once, and the chain is intact
+        Assert.True(result.IsIntact);
+        Assert.Equal(1, enumerations);
+        Assert.Equal(4, handedOut);
     }
 
     /// <summary>

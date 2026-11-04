@@ -70,8 +70,8 @@ state that is not a count are not lowered. This scenario is tested by
 **Kind of an item**: The kind of a state is the part before the first colon, so a state with a count of waiting replies
 has the kind without the count, and a state without a colon is its own kind. A question and a standing item to answer
 of one review have different keys. These scenarios are tested by `NotificationComposer_KindOf_StateWithCount_WithoutCount`,
-`NotificationComposer_KindOf_StateWithoutCount_TheState`, and
-`NotificationComposer_Classify_QuestionAndStanding_DifferentKeys`.
+`NotificationComposer_KindOf_StateWithoutCount_TheState`, `NotificationComposer_KindOf_StateWithTwoColons_PartBeforeFirstColon`,
+and `NotificationComposer_Classify_QuestionAndStanding_DifferentKeys`.
 
 **No detail and no outcome**: A sentinel detail sentence of an inbox row is in neither part, the words Approved and
 Rejected are nowhere in a message about updates, a concluded review reads "the review was concluded", a reopened review
@@ -92,10 +92,12 @@ tested by `NotificationComposer_Compose_Item_LinkMatchesReviewLinks`,
 `NotificationComposer_Compose_Item_LinkStartsWithBaseUrl`, `NotificationComposer_Compose_BaseUrlTrailingSlash_SingleSlash`,
 `NotificationComposer_Compose_ReviewIdWithSpecialChars_LinkEscaped`, and `NotificationComposer_Compose_Item_LinkHasNoQuery`.
 
-**Text of a user**: A title with a line break stays on one line in the plain text part, the Unicode line and paragraph
+**Text of a user**: A title, a project name, and a review id with a line break stay on one line in the plain text part,
+the Unicode line and paragraph
 separators in a title become spaces in both parts, markup in a title is encoded in the HTML part, and a quote in a
 review id cannot leave the href attribute. These scenarios are tested by
 `NotificationComposer_Compose_TitleWithLineBreak_TextPartSingleLine`,
+`NotificationComposer_Compose_ProjectNameAndReviewIdWithLineBreak_TextPartSingleLine`,
 `NotificationComposer_Compose_TitleWithUnicodeLineSeparators_BecomeSpaces`,
 `NotificationComposer_Compose_TitleWithMarkup_HtmlEncoded`, and
 `NotificationComposer_Compose_ReviewIdWithQuote_HrefEncoded`.

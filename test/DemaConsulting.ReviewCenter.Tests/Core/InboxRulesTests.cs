@@ -421,6 +421,48 @@ public class InboxRulesTests
     }
 
     /// <summary>
+    ///     Test that the sentence of the Disputed row names the first five disputed checks and no more.
+    /// </summary>
+    [Fact]
+    public void InboxRules_DisputedText_MoreThanFiveChecks_NamesOnlyTheFirstFive()
+    {
+        // Arrange
+        var five = new[] { "R1", "R2", "R3", "R4", "R5" };
+        var seven = new[] { "R1", "R2", "R3", "R4", "R5", "R6", "R7" };
+
+        // Act
+        var all = InboxRules.DisputedText(five, true);
+        var cut = InboxRules.DisputedText(seven, true);
+
+        // Assert: five checks are all named; of seven checks the first five are named and the others are not
+        Assert.Equal("Change your answers to R1, R2, R3, R4 and R5 or discuss them.", all);
+        Assert.Contains("R1, R2, R3, R4, R5", cut, StringComparison.Ordinal);
+        Assert.DoesNotContain("R6", cut, StringComparison.Ordinal);
+        Assert.DoesNotContain("R7", cut, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the sentence of the Disputed row says how many checks more than five are disputed, and says
+    ///     nothing of the kind for five or fewer.
+    /// </summary>
+    [Fact]
+    public void InboxRules_DisputedText_MoreThanFiveChecks_SaysHowManyMore()
+    {
+        // Arrange
+        var checks = new[] { "R1", "R2", "R3", "R4", "R5", "R6", "R7" };
+
+        // Act
+        var five = InboxRules.DisputedText(checks[..5], false);
+        var six = InboxRules.DisputedText(checks[..6], false);
+        var seven = InboxRules.DisputedText(checks, false);
+
+        // Assert
+        Assert.DoesNotContain("more", five, StringComparison.Ordinal);
+        Assert.Equal("The reviewers answered R1, R2, R3, R4, R5 and 1 more differently. Discuss it with them.", six);
+        Assert.Equal("The reviewers answered R1, R2, R3, R4, R5 and 2 more differently. Discuss it with them.", seven);
+    }
+
+    /// <summary>
     ///     Test that the author rule of the inbox is the rule of the checklist service for every combination.
     /// </summary>
     [Fact]

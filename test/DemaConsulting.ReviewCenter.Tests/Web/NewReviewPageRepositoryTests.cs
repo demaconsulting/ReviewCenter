@@ -22,6 +22,7 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using TestContext = Xunit.TestContext;
 
@@ -244,6 +245,28 @@ public class NewReviewPageRepositoryTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the form offers the optional due date field and states next to it that the date is a calendar
+    ///     day in UTC.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc()
+    {
+        // Arrange: a project
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderPage(project.Id);
+
+        // Assert: the date field exists, is empty, and its field text names the time basis
+        var input = cut.Find("[data-testid='due-date-input']");
+        Assert.Equal("date", input.GetAttribute("type"));
+        Assert.Equal(string.Empty, input.GetAttribute("value") ?? string.Empty);
+        var field = input.ParentElement!.TextContent;
+        Assert.Contains("Due date (optional)", field, StringComparison.Ordinal);
+        Assert.Contains("A calendar day in UTC", field, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a due date in the past is refused with a message and creates nothing, and that an empty field
     ///     means no due date.
     /// </summary>
@@ -271,6 +294,74 @@ public class NewReviewPageRepositoryTests : PageTestBase
         var review = await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
         Assert.NotNull(review);
         Assert.Null(review.DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a selection that breaks the file-count limit, the per-file limit or the total limit by its
+    ///     declared sizes is refused before the content of any file is read.
+    /// </summary>
+    /// <param name="scenario">The limit that is broken: <c>TooManyFiles</c>, <c>FileTooLarge</c> or <c>TotalTooLarge</c>.</param>
+    [Theory]
+    [InlineData("TooManyFiles")]
+    [InlineData("FileTooLarge")]
+    [InlineData("TotalTooLarge")]
+    public async Task NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream(string scenario)
+    {
+        // Arrange: a project and files that report sizes breaking one limit and record when they are read
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(project.Id);
+        var totalCount = (int)(ReviewLimits.MaxTotalSizeBytes / ReviewLimits.MaxFileSizeBytes) + 1;
+        var files = scenario switch
+        {
+            "TooManyFiles" => Enumerable.Range(0, ReviewLimits.MaxFileCount + 1)
+                .Select(i => new RecordingBrowserFile($"file-{i}.txt", 1))
+                .ToArray(),
+            "FileTooLarge" => new[] { new RecordingBrowserFile("big.bin", ReviewLimits.MaxFileSizeBytes + 1) },
+            _ => Enumerable.Range(0, totalCount)
+                .Select(i => new RecordingBrowserFile($"part-{i}.bin", ReviewLimits.MaxFileSizeBytes))
+                .ToArray(),
+        };
+        IReadOnlyList<IBrowserFile> selection = files;
+
+        // Act: deliver the selection to the file input's change callback
+        await cut.InvokeAsync(() => cut.FindComponent<InputFile>().Instance.OnChange.InvokeAsync(new InputFileChangeEventArgs(selection)));
+
+        // Assert: the refusal is shown, nothing is kept, and no file was opened for reading
+        Assert.Single(cut.FindAll("[data-testid='review-error']"));
+        Assert.Empty(cut.FindAll("[data-testid='selected-files-list']"));
+        Assert.All(files, file => Assert.Equal(0, file.OpenCount));
+    }
+
+    /// <summary>
+    ///     A browser file that reports a given size and counts how often its content is opened for reading.
+    /// </summary>
+    /// <param name="name">The file name.</param>
+    /// <param name="size">The size the file reports.</param>
+    private sealed class RecordingBrowserFile(string name, long size) : IBrowserFile
+    {
+        /// <summary>
+        ///     Gets how often the content was opened for reading.
+        /// </summary>
+        public int OpenCount { get; private set; }
+
+        /// <inheritdoc />
+        public string Name { get; } = name;
+
+        /// <inheritdoc />
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UnixEpoch;
+
+        /// <inheritdoc />
+        public long Size { get; } = size;
+
+        /// <inheritdoc />
+        public string ContentType => "application/octet-stream";
+
+        /// <inheritdoc />
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            OpenCount++;
+            return new MemoryStream();
+        }
     }
 
     /// <summary>
@@ -373,7 +464,7 @@ public class NewReviewPageRepositoryTests : PageTestBase
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
         // Assert: an error is shown and nothing was created
-        Assert.NotEmpty(cut.Find("[data-testid='review-error']").TextContent);
+        Assert.Equal("The repository 'main-repo' is disabled.", cut.Find("[data-testid='review-error']").TextContent);
         Assert.Empty(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken));
     }
 

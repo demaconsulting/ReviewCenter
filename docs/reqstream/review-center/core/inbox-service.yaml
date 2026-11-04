@@ -12,289 +12,1238 @@ sections:
     requirements:
       - id: ReviewCenter-InboxService-ToAnswer
         title: >-
-          The InboxService class shall list as to answer every review that is not concluded and has a checklist, in
-          which the user is the primary or the alternate reviewer of a slot and has not handed in the ballot, with the
-          chip Not started when the user has no ballot and the chip Draft with the number of checks answered when the
-          user has one, shall list a review again when a handed-in ballot is reverted to a draft, shall link the row to
-          the checklist, shall list nothing to a user who is not allowed to answer the checks of the review, as the
-          author of a review when the project requires the answers of somebody else, and shall list nothing for a
-          review without a checklist.
+          The InboxService class shall list as to answer a review that is not concluded and has a checklist, in which
+          the user is the primary reviewer of a slot and has not handed in the ballot.
         justification: |
           The ballot comes first: nothing else about a review can be judged before the own answers are in. A person
-          who holds a slot must find the ballots they still owe, and must not be asked for what the rules refuse.
+          who holds a slot must find the ballots they still owe.
+        tests:
+          - InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+
+      - id: ReviewCenter-InboxService-ToAnswer-Alternate
+        title: >-
+          The InboxService class shall list as to answer a review in which the user is the alternate reviewer of a slot
+          and has not handed in the ballot.
+        justification: |
+          An alternate takes over the slot, so the ballot that is owed is the alternate's as much as the primary
+          reviewer's.
+        tests:
+          - InboxService_GetInboxAsync_AlternateHolder_ShowsToAnswer
+
+      - id: ReviewCenter-InboxService-ToAnswer-NotStarted
+        title: >-
+          The InboxService class shall give the to answer row of a user who has no ballot the chip Not started.
+        justification: |
+          The chip tells at a glance that nothing is answered yet.
+        tests:
+          - InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted
+
+      - id: ReviewCenter-InboxService-ToAnswer-Draft
+        title: >-
+          The InboxService class shall give the to answer row of a user whose ballot is a draft the chip Draft.
+        justification: |
+          The chip tells at a glance that the work is begun and not handed in.
+        tests:
+          - InboxService_GetInboxAsync_DraftBallot_ShowsToAnswerDraftWithProgressText
+
+      - id: ReviewCenter-InboxService-ToAnswer-Progress
+        title: >-
+          The InboxService class shall give the to answer row a text that tells how many checks are answered.
+        justification: |
+          The number shows how much of the ballot is left, without opening the review.
         tests:
           - InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted
           - InboxService_GetInboxAsync_DraftBallot_ShowsToAnswerDraftWithProgressText
-          - InboxService_GetInboxAsync_AlternateHolder_ShowsToAnswer
-          - InboxService_GetInboxAsync_AuthorBlockedViewer_ShowsNoToAnswer
-          - InboxService_GetInboxAsync_NoChecklist_ShowsNoToAnswer
-          - InboxService_GetInboxAsync_RevertedToDraft_ReturnsToToAnswer
-          - InboxRules_ReviewerStanding_Facts_DecideTheSection
-          - InboxRules_AuthorBlocked_ParityWithChecklistService
           - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-ToAnswer-RevertedToDraft
+        title: >-
+          The InboxService class shall list a review as to answer again when the handed-in ballot of the user is
+          reverted to a draft.
+        justification: |
+          A ballot that is a draft again is owed again, and the reviewer must find it.
+        tests:
+          - InboxService_GetInboxAsync_RevertedToDraft_ReturnsToToAnswer
+
+      - id: ReviewCenter-InboxService-ToAnswer-Link
+        title: >-
+          The InboxService class shall link the to answer row of a ballot to the checklist of the review, not to the
+          review page.
+        justification: |
+          The reviewer who owes a ballot goes straight to the place where the checks are answered.
+        tests:
+          - InboxService_GetInboxAsync_ToAnswerRow_LinksToTheChecklist
+
+      - id: ReviewCenter-InboxService-ToAnswer-AuthorBlocked
+        title: >-
+          The InboxService class shall list nothing as to answer for the author of a review when the project requires
+          the checklist answers of somebody else.
+        justification: |
+          A person must not be asked for what the rules refuse. The inbox applies the rule of the checklist service.
+        tests:
+          - InboxService_GetInboxAsync_AuthorBlockedViewer_ShowsNoToAnswer
+          - InboxRules_AuthorBlocked_ParityWithChecklistService
+
+      - id: ReviewCenter-InboxService-ToAnswer-NoChecklist
+        title: >-
+          The InboxService class shall list nothing as to answer for a review that has no checklist.
+        justification: |
+          A review without a checklist has no ballot to hand in.
+        tests:
+          - InboxService_GetInboxAsync_NoChecklist_ShowsNoToAnswer
 
       - id: ReviewCenter-InboxService-Disputed
         title: >-
-          The InboxService class shall list as disputed every review that is not concluded and in which the ballots
-          that were handed in differ on some checks, to a user who has handed in the own ballot or who may see the
-          other ballots anyway (the creator of the review), with a chip that gives the number of disputed checks and a
-          sentence that names the disputed checks (up to five),
-          shall mark the row as unread only when another reviewer
-          handed in a ballot after the user last saw the review, shall drop the row when the dispute is settled, and
-          shall list no disputed row, count or text to a user who has not handed in the own ballot.
+          The InboxService class shall list as disputed a review that is not concluded and in which the ballots that
+          were handed in differ on some checks, to a user who has handed in the own ballot.
         justification: |
-          Reviewers answer independently. What the others answered, and whether it differs, must not reach a person
-          before that person has answered, or the first answer would shape the others. Once the ballots are in, a
-          difference is work that waits for the people who gave it.
+          Reviewers answer independently. Once the ballots are in, a difference is work that waits for the people who
+          gave it.
         tests:
-          - InboxService_GetInboxAsync_HiddenViewerWithDispute_ShowsNoDisputedRowOrCount
+          - InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+
+      - id: ReviewCenter-InboxService-Disputed-Author
+        title: >-
+          The InboxService class shall list as disputed a review whose ballots differ to the creator of the review,
+          who may see the other ballots anyway.
+        justification: |
+          The creator answers for the review and sees every ballot, so the creator must learn of a dispute as well.
+        tests:
+          - InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed
+
+      - id: ReviewCenter-InboxService-Disputed-Chip
+        title: >-
+          The InboxService class shall give the disputed row a chip that gives the number of disputed checks.
+        justification: |
+          The number shows how much there is to settle.
+        tests:
           - InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount
           - InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed
-          - InboxService_GetInboxAsync_DisputeResolved_RowDisappears
-          - InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission
-          - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
-          - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
-          - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
+
+      - id: ReviewCenter-InboxService-Disputed-NamesChecks
+        title: >-
+          The InboxService class shall give the disputed row a sentence that names the disputed checks.
+        justification: |
+          The names tell what to discuss without opening the review.
+        tests:
+          - InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount
+          - InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed
           - InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn
+
+      - id: ReviewCenter-InboxService-Disputed-NamesAtMostFive
+        title: >-
+          The InboxService class shall name at most five disputed checks in the sentence of the disputed row.
+        justification: |
+          A long list would make the row unreadable, so the sentence names only the first five checks.
+        tests:
+          - InboxRules_DisputedText_MoreThanFiveChecks_NamesOnlyTheFirstFive
           - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-Disputed-NamesAtMostFive-MoreCount
+        title: >-
+          The InboxService class shall say in the sentence of the disputed row how many more checks are disputed when
+          more than five are.
+        justification: |
+          The count of the rest keeps the sentence true when it names only five of the disputed checks.
+        tests:
+          - InboxRules_DisputedText_MoreThanFiveChecks_SaysHowManyMore
+
+      - id: ReviewCenter-InboxService-Disputed-Unread
+        title: >-
+          The InboxService class shall mark the disputed row as unread only when another reviewer handed in a ballot
+          after the user last saw the review.
+        justification: |
+          The row is new only when somebody else changed the dispute, not when the user looks again.
+        tests:
+          - InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission
+
+      - id: ReviewCenter-InboxService-Disputed-Settled
+        title: >-
+          The InboxService class shall drop the disputed row when the dispute is settled.
+        justification: |
+          A dispute that is settled is no work, and the reviewer goes on to the signature.
+        tests:
+          - InboxService_GetInboxAsync_DisputeResolved_RowDisappears
+
+      - id: ReviewCenter-InboxService-Disputed-HiddenViewer
+        title: >-
+          The InboxService class shall list no disputed row, count, or text to a user who has not handed in the own
+          ballot.
+        justification: |
+          What the others answered, and whether it differs, must not reach a person before that person has answered,
+          or the first answer would shape the others.
+        tests:
+          - InboxService_GetInboxAsync_HiddenViewerWithDispute_ShowsNoDisputedRowOrCount
+          - InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
 
       - id: ReviewCenter-InboxService-QuestionForYou
         title: >-
-          The InboxService class shall list as to answer, with the chip Question for you and a link to the review page,
-          every review that is not concluded in which an open question (not a finding) was started by someone else and
-          the user, a holder of a slot who may work in the project, has not written, shall name only the
-          person who asked, shall read the threads of the review through the list that a user who may not see the
-          other ballots does not get check threads from, shall list nothing for the author, the asker, a user who
-          answered, an auditor, a stranger or an API token, and shall count the review as action.
+          The InboxService class shall list as to answer a review that is not concluded, in which an open question
+          (not a finding) was started by someone else and the user, a holder of a slot who may work in the project,
+          has not written.
         justification: |
           A question that nobody answers stops a review, and a person who does not open the review never learns that
-          it was asked. A thread has no addressee, so the row is a heuristic: every other slot holder sees
-          it. The row never quotes the question and never reads a ballot, so it cannot show what the others answered.
+          it was asked. A thread has no addressee, so the row is a heuristic: every other slot holder sees it.
         tests:
           - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+          - InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Chip
+        title: >-
+          The InboxService class shall give the row of a question for the user the chip Question for you.
+        justification: |
+          The chip tells that the review waits for an answer to a question, not for a ballot.
+        tests:
+          - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-OpensReview
+        title: >-
+          The InboxService class shall link the row of a question for the user to the review page.
+        justification: |
+          A question is answered in the thread of the review, not in the checklist.
+        tests:
+          - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-NamesAsker
+        title: >-
+          The InboxService class shall name only the person who asked in the text of the row of a question, and not
+          quote the question.
+        justification: |
+          The row tells who is waiting for an answer and never reads the question, so it cannot show more than the
+          thread shows to the user anyway.
+        tests:
+          - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-QuestionForYou-NoBallotData
+        title: >-
+          The InboxService class shall name no check, verdict, or dispute in the row of a question for a user who has
+          not handed in the own ballot.
+        justification: |
+          The row must not become a way to learn what the other reviewers answered.
+        tests:
+          - InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData
+
+      - id: ReviewCenter-InboxService-QuestionForYou-CheckThreadsHidden
+        title: >-
+          The InboxService class shall list no question that was started on a check to a user who may not see the
+          other ballots yet.
+        justification: |
+          A discussion about a check shows what was answered. The threads are read through the list that does not give
+          a masked user the check threads.
+        tests:
+          - InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Count
+        title: >-
+          The InboxService class shall count a review with a row of a question for the user as action.
+        justification: |
+          A question that waits for the user is work, so it must raise the number on the home page.
+        tests:
+          - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Author
+        title: >-
+          The InboxService class shall list no question for the author of the review.
+        justification: |
+          The author is no reviewer, and the thread is a matter for the reviewers.
+        tests:
           - InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Asker
+        title: >-
+          The InboxService class shall list no question for the user who asked it.
+        justification: |
+          A person does not wait for the answer to the own question as work to do.
+        tests:
+          - InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Answered
+        title: >-
+          The InboxService class shall list no question for a user who wrote in its thread.
+        justification: |
+          A user who answered has done the part that was asked.
+        tests:
+          - InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Auditor
+        title: >-
+          The InboxService class shall list no question and count no action for an auditor, also one who holds a slot.
+        justification: |
+          An auditor may only read, and must not be asked for an answer that the rules refuse.
+        tests:
           - InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing
           - InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount
+
+      - id: ReviewCenter-InboxService-QuestionForYou-NonMember
+        title: >-
+          The InboxService class shall list no question and count no action for a slot holder who is no member of the
+          project.
+        justification: |
+          Only a member who may work in the project can answer, so a system administrator without membership is not
+          asked.
+        tests:
+          - InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount
+
+      - id: ReviewCenter-InboxService-QuestionForYou-Stranger
+        title: >-
+          The InboxService class shall list no question and count no action for a user who is not part of the review.
+        justification: |
+          A user who is not part of the review must learn nothing about its threads.
+        tests:
+          - InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing
+
+      - id: ReviewCenter-InboxService-QuestionForYou-ApiToken
+        title: >-
+          The InboxService class shall list no question for an API token of a slot holder.
+        justification: |
+          A token is a limited key of its owner, and the question is a matter for the person.
+        tests:
           - InboxService_GetInboxAsync_QuestionForApiToken_ShowsNoQuestionForYouRow
-          - InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData
-          - InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView
-          - InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered
-          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
 
       - id: ReviewCenter-InboxService-SignatureLost
         title: >-
-          The InboxService class shall list as signature lost, with the chip The review changed, your signature no
-          longer counts, every review that is not concluded in which a slot of the user has a signature that no longer
-          covers the record and a new signature is not possible yet, also while the review cannot be signed, with a
-          sentence that says what blocks it and that the user shall look at the changes and sign again afterwards,
-          shall turn the row into ready to sign when nothing blocks the signature, shall tell the other signers in
-          their row that waits for others that the signature no longer counts (naming the person who actually signed,
-          which is the alternate when the alternate signed the slot), shall count the row as action, and
-          shall list it to nobody else.
+          The InboxService class shall list as signature lost a review that is not concluded and in which a slot of
+          the user has a signature that no longer covers the record and a new signature is not possible yet.
         justification: |
           A signer whose signature was withdrawn because the review changed must learn it, also while the review is
           still blocked, or the review waits for a signature that nobody knows is missing.
         tests:
           - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
-          - InboxService_GetInboxAsync_SignatureLost_NotShownToOthers
+          - InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection
+
+      - id: ReviewCenter-InboxService-SignatureLost-Chip
+        title: >-
+          The InboxService class shall give the signature lost row the chip The review changed, your signature no
+          longer counts.
+        justification: |
+          The chip tells why the row is there.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+
+      - id: ReviewCenter-InboxService-SignatureLost-BlockedText
+        title: >-
+          The InboxService class shall give the signature lost row a sentence that says what blocks the signature and
+          that the user shall look at the changes and sign again afterwards.
+        justification: |
+          The user must know why signing is not possible yet and what to do when it is.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-SignatureLost-ReadyToSign
+        title: >-
+          The InboxService class shall turn the signature lost row into a ready to sign row when nothing blocks the
+          signature.
+        justification: |
+          Once nothing blocks it, the signature is the work to do, and the row must say so.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+          - InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection
+
+      - id: ReviewCenter-InboxService-SignatureLost-WaitingRow
+        title: >-
+          The InboxService class shall tell the other signers in their waiting for others row that the signature of the
+          user no longer counts.
+        justification: |
+          The others must know why the review waits and who has to sign again.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-SignatureLost-WaitingNamesSigner
+        title: >-
+          The InboxService class shall name in the waiting row the person who actually signed the slot, which is the
+          alternate when the alternate signed.
+        justification: |
+          The person who must sign again is the one who signed, not the one who holds the slot.
+        tests:
           - InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner
           - InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate
-          - InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection
+
+      - id: ReviewCenter-InboxService-SignatureLost-Count
+        title: >-
+          The InboxService class shall count a review with a signature lost row as action.
+        justification: |
+          A signature that must be given again is work, so it must raise the number on the home page.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+
+      - id: ReviewCenter-InboxService-SignatureLost-NobodyElse
+        title: >-
+          The InboxService class shall list a signature lost row to nobody but the user who holds the slot.
+        justification: |
+          Another user must not be asked to act on a signature that is not theirs.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLost_NotShownToOthers
           - InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone
-          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-SignatureLost-Concluded
+        title: >-
+          The InboxService class shall list no signature lost row for a review that is concluded.
+        justification: |
+          A concluded review needs no signature, so a lost one is no work.
+        tests:
+          - InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone
 
       - id: ReviewCenter-InboxService-ToSign
         title: >-
-          The InboxService class shall list as ready to sign every review that is not concluded in which the user is
-          the primary or the alternate reviewer of a slot that has no current signature, has handed in the own ballot,
-          and nothing blocks the signature (no unanswered check, no open thread, no dispute and, for a rejection, the
-          conclusion text), with the chip Not signed when nothing was signed and the chip The review changed, sign
-          again when the signature no longer covers the record, shall list nothing for a slot that is signed or for a
-          user whose ballot is not in, shall keep a review whose slots are all signed but that still has an open thread
-          out of the concluded reviews, and shall give the item the due date, and the Overdue mark when the date is
-          past, while the review is not concluded, shall tell in the row, when other reviewers have not handed in a
-          ballot,
-          that they have not and who they
-          are (the sentence of the review approval, so that signing early may mean signing again), and shall give the
-          sentence that the review changed and the signature no longer counts when a slot is out of date.
+          The InboxService class shall list as ready to sign a review in which the user is the primary reviewer of a
+          slot that has no current signature, has handed in the own ballot, and nothing blocks the signature.
         justification: |
-          A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
-          the review changed is as much work as one that was never given. The state of a slot is decided as the
-          approval of the review decides it, so the inbox and the status of the review never disagree.
+          A reviewer must find the signatures that are theirs to give. The state of a slot is decided as the approval
+          of the review decides it, so the inbox and the status of the review never disagree.
         tests:
           - InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem
-          - InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem
-          - InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip
-          - InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem
-          - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
-          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
           - InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign
-          - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
-          - InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings
-          - InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn
-          - InboxRules_SlotState_MatchesSigningServiceApproval
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+
+      - id: ReviewCenter-InboxService-ToSign-Alternate
+        title: >-
+          The InboxService class shall list as ready to sign a review in which the user is the alternate reviewer of a
+          slot that has no current signature, has handed in the own ballot, and nothing blocks the signature.
+        justification: |
+          An alternate may sign the slot, so the signature is the alternate's work as much as the primary reviewer's.
+        tests:
+          - InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem
           - InboxRules_IsAssigned_PrimaryAndAlternate_AreAssigned
-          - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
+
+      - id: ReviewCenter-InboxService-ToSign-BallotNotIn
+        title: >-
+          The InboxService class shall list nothing as ready to sign for a user whose ballot is not handed in.
+        justification: |
+          The ballot comes first, so a user who owes one is asked for it and not for a signature.
+        tests:
+          - InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+
+      - id: ReviewCenter-InboxService-ToSign-OpenThreadBlocks
+        title: >-
+          The InboxService class shall list nothing as ready to sign while a thread of the review is open.
+        justification: |
+          A review with an open thread cannot be signed, and a row that asked for it would ask for the impossible.
+        tests:
+          - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
+
+      - id: ReviewCenter-InboxService-ToSign-UnansweredBlocks
+        title: >-
+          The InboxService class shall list nothing as ready to sign while a check of the review is unanswered.
+        justification: |
+          A review with an unanswered check cannot be signed, so the reviewer waits for the answer and a row that
+          asked for the signature would ask for the impossible.
+        tests:
+          - InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign
+
+      - id: ReviewCenter-InboxService-ToSign-DisputeBlocks
+        title: >-
+          The InboxService class shall list nothing as ready to sign while the ballots that were handed in differ.
+        justification: |
+          A dispute comes first, so the reviewer is asked to settle it before being asked for a signature.
+        tests:
+          - InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount
+
+      - id: ReviewCenter-InboxService-ToSign-DisputeSettled
+        title: >-
+          The InboxService class shall list a review as ready to sign once the dispute between the ballots is settled.
+        justification: |
+          The row to sign comes back when the reviewers agree, because nothing blocks the signature any more.
+        tests:
+          - InboxService_GetInboxAsync_DisputeSettled_ShowsReadyToSignRow
+
+      - id: ReviewCenter-InboxService-ToSign-ConclusionTextBlocks
+        title: >-
+          The InboxService class shall list nothing as ready to sign for a rejection while the conclusion text of the
+          review is not written.
+        justification: |
+          A rejection cannot be signed without its reasons, so the reviewer waits until they are written down.
+        tests:
+          - InboxService_GetInboxAsync_RejectionWithoutConclusionText_ShowsWaitingNotToSign
+
+      - id: ReviewCenter-InboxService-ToSign-ConclusionTextWritten
+        title: >-
+          The InboxService class shall list a rejected review as ready to sign once the conclusion text of the review
+          is written.
+        justification: |
+          With the reasons written down, the signature is the work that remains, so the reviewer must be asked for it.
+        tests:
+          - InboxService_GetInboxAsync_RejectionWithConclusionText_ShowsToSign
+
+      - id: ReviewCenter-InboxService-ToSign-NotSignedChip
+        title: >-
+          The InboxService class shall give the ready to sign row the chip Not signed when no signature was given.
+        justification: |
+          The chip tells that the signature was never given.
+        tests:
+          - InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem
+          - InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign
+
+      - id: ReviewCenter-InboxService-ToSign-SignAgainChip
+        title: >-
+          The InboxService class shall give the ready to sign row the chip The review changed, sign again when the
+          signature no longer covers the record.
+        justification: |
+          A signature that went out of date because the review changed is as much work as one that was never given,
+          and the chip tells which of the two it is.
+        tests:
+          - InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip
+
+      - id: ReviewCenter-InboxService-ToSign-SignAgainText
+        title: >-
+          The InboxService class shall give the ready to sign row of a slot that is out of date the sentence that the
+          review changed, that the signature no longer counts, and that the user shall look at the changes.
+        justification: |
+          The user must know why the signature is asked again.
+        tests:
+          - InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-ToSign-SignedSlot
+        title: >-
+          The InboxService class shall list nothing as ready to sign for a slot that has a current signature.
+        justification: |
+          A slot that is signed needs nothing more from its reviewer.
+        tests:
+          - InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem
+
+      - id: ReviewCenter-InboxService-ToSign-SlotState
+        title: >-
+          The InboxService class shall decide whether a slot is signed, out of date, or not signed as the approval of
+          the review does.
+        justification: |
+          The inbox and the status of the review must never disagree about a signature.
+        tests:
+          - InboxRules_SlotState_MatchesSigningServiceApproval
+
+      - id: ReviewCenter-InboxService-ToSign-MatchesStatus
+        title: >-
+          The InboxService class shall list a review of a reviewer in the section that the next action of the status of
+          the review names.
+        justification: |
+          The inbox and the status page tell the same user what to do next, so they must name the same step.
+        tests:
+          - InboxService_GetInboxAsync_EachStandingOfReviewer_PutsRowInSectionOfReviewStatusNextAction
+
+      - id: ReviewCenter-InboxService-ToSign-OpenThreadNotConcluded
+        title: >-
+          The InboxService class shall treat a review whose slots are all signed but that has an open thread as not
+          concluded.
+        justification: |
+          A review is finished only when nothing is open, so nobody is told that it was approved while a thread waits.
+        tests:
+          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsNoApprovedUpdate
+
+      - id: ReviewCenter-InboxService-ToSign-OpenThreadNotConcluded-RepliesWaiting
+        title: >-
+          The InboxService class shall list the open thread of a review whose slots are all signed as replies waiting.
+        justification: |
+          The thread must still reach the people who are expected to answer it, though every slot is signed.
+        tests:
+          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
+
+      - id: ReviewCenter-InboxService-ToSign-DueDate
+        title: >-
+          The InboxService class shall give the ready to sign row the due date of the review while it is not concluded.
+        justification: |
+          The due date tells when the signature is wanted.
+        tests:
+          - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
+
+      - id: ReviewCenter-InboxService-ToSign-Overdue
+        title: >-
+          The InboxService class shall mark the ready to sign row as overdue when the due date of the review is past.
+        justification: |
+          A row that is late must stand out from one that is not.
+        tests:
+          - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
+
+      - id: ReviewCenter-InboxService-ToSign-ConcludedNoDueDate
+        title: >-
+          The InboxService class shall give a row of a concluded review no due date.
+        justification: |
+          A concluded review has nothing left to be due, so the row shows no date.
+        tests:
+          - InboxService_GetInboxAsync_ConcludedReviewPastDue_RowShowsNoDueDate
+
+      - id: ReviewCenter-InboxService-ToSign-ConcludedNotOverdue
+        title: >-
+          The InboxService class shall give a row of a concluded review no overdue mark.
+        justification: |
+          A concluded review cannot be late, even when its due date is past.
+        tests:
+          - InboxService_GetInboxAsync_ConcludedReviewPastDue_RowIsNotMarkedOverdue
+
+      - id: ReviewCenter-InboxService-ToSign-MissingBallots
+        title: >-
+          The InboxService class shall tell in the ready to sign row, when other reviewers have not handed in a ballot,
+          that they have not and who they are.
+        justification: |
+          Signing early may mean signing again, and the sentence of the review approval tells who is still missing.
+        tests:
+          - InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn
 
       - id: ReviewCenter-InboxService-WaitingForOthers
         title: >-
-          The InboxService class shall list as waiting for others, for information and never counted as action, every
-          review that is not concluded in which the user holds a slot and has done their part (the slot is signed, or
-          the ballot is in and something that is not the user's to do blocks the signature), with a chip that names the
-          number of reviewers waited for, or the open items when no reviewer is waited for, and a text that names
-          them, and shall never name a verdict or a dispute count of a ballot the user may not see, and shall show no
-          due date and no Overdue mark on that row.
+          The InboxService class shall list as waiting for others a review that is not concluded and in which the user
+          holds a slot that is signed.
         justification: |
           A person who has done their part wants to know why the review is still open and who is holding it, without
-          being asked for work that is not theirs. The names say who has not handed in; they say nothing about what
-          was answered. A due date or an Overdue mark would make the row look like work.
+          being asked for work that is not theirs.
         tests:
           - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
-          - InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-BallotInBlocked
+        title: >-
+          The InboxService class shall list as waiting for others a review in which the ballot of the user is in and
+          something that is not the user's to do blocks the signature.
+        justification: |
+          The user has done their part and has nothing to sign yet, so the review is shown as waiting.
+        tests:
           - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
-          - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-NotAction
+        title: >-
+          The InboxService class shall not count a review that waits for others as action.
+        justification: |
+          The row is information, and counting it would make the number on the home page say more work than there is.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
+          - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-ChipCount
+        title: >-
+          The InboxService class shall give the waiting row a chip that names the number of reviewers waited for.
+        justification: |
+          The number tells how many people hold the review.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
           - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-ChipOpenItems
+        title: >-
+          The InboxService class shall give the waiting row the chip Open items remain when no reviewer is waited for.
+        justification: |
+          When nobody is missing, the open items are what holds the review.
+        tests:
+          - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
+          - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-NamesReviewers
+        title: >-
+          The InboxService class shall give the waiting row a text that names the reviewers waited for.
+        justification: |
+          The names say who has not handed in or signed yet.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
+          - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-NoVerdict
+        title: >-
+          The InboxService class shall word the text of the waiting row from the names of the reviewers only, so that
+          no verdict or dispute count of another ballot is in it.
+        justification: |
+          The names say who has not handed in; they say nothing about what was answered.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
+          - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-NoDueDate
+        title: >-
+          The InboxService class shall show no due date and no overdue mark on the waiting row.
+        justification: |
+          A due date or an overdue mark would make the row look like work.
+        tests:
+          - InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue
+
+      - id: ReviewCenter-InboxService-WaitingForOthers-NeverUnread
+        title: >-
+          The InboxService class shall never mark the waiting row as unread.
+        justification: |
+          The row is information about others, and a mark that asks to be read would make it look like news.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
 
       - id: ReviewCenter-InboxService-RepliesWaiting
         title: >-
-          The InboxService class shall list as replies waiting every review that is not concluded and has an open
-          thread, chat or included in the report, whose last comment is by someone else, a comment of the system
-          counting as someone else, in which the
-          user wrote a comment while holding a slot of the review, or whose review the user created, with a chip that
-          gives the number of such threads, and
-          shall list nothing for a thread that is resolved or whose last comment is the user's own.
+          The InboxService class shall list as replies waiting a review that is not concluded and has an open thread,
+          chat, or included in the report, whose last comment is by someone else and in which the user wrote a comment
+          while holding a slot of the review.
         justification: |
           A discussion stops when the person who was asked does not see the question. The inbox shows the threads in
-          which the user is the one expected to answer, and never the ones that wait for somebody else.
+          which the user is the one expected to answer.
         tests:
           - InboxService_GetInboxAsync_LatestCommentByOther_IAnswered_ShowsRepliesWaiting
-          - InboxService_GetInboxAsync_LatestCommentByMe_HasNoRepliesWaiting
-          - InboxService_GetInboxAsync_ResolvedThread_HasNoRepliesWaiting
-          - InboxService_GetInboxAsync_AuthorOfReview_ThreadByOther_ShowsRepliesWaiting
-          - InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther
           - InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting
+
+      - id: ReviewCenter-InboxService-RepliesWaiting-Author
+        title: >-
+          The InboxService class shall list as replies waiting an open thread whose last comment is by someone else to
+          the user who created the review.
+        justification: |
+          The creator answers for the review, so the threads of others reach the creator even without a comment of the
+          creator in them.
+        tests:
+          - InboxService_GetInboxAsync_AuthorOfReview_ThreadByOther_ShowsRepliesWaiting
           - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
+          - InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting
+
+      - id: ReviewCenter-InboxService-RepliesWaiting-SystemComment
+        title: >-
+          The InboxService class shall treat a last comment of the system as a comment of someone else.
+        justification: |
+          The system writes in a thread when something happens, and the user is expected to react to it.
+        tests:
+          - InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther
+
+      - id: ReviewCenter-InboxService-RepliesWaiting-Chip
+        title: >-
+          The InboxService class shall give the replies waiting row a chip that gives the number of such threads.
+        justification: |
+          The number shows how many discussions wait for the user.
+        tests:
+          - InboxService_GetInboxAsync_LatestCommentByOther_IAnswered_ShowsRepliesWaiting
+          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
+
+      - id: ReviewCenter-InboxService-RepliesWaiting-Resolved
+        title: >-
+          The InboxService class shall list no replies waiting for a thread that is resolved.
+        justification: |
+          A thread that is settled waits for nobody.
+        tests:
+          - InboxService_GetInboxAsync_ResolvedThread_HasNoRepliesWaiting
+
+      - id: ReviewCenter-InboxService-RepliesWaiting-OwnLast
+        title: >-
+          The InboxService class shall list no replies waiting for a thread whose last comment is the user's own.
+        justification: |
+          The inbox never shows the threads that wait for somebody else.
+        tests:
+          - InboxService_GetInboxAsync_LatestCommentByMe_HasNoRepliesWaiting
 
       - id: ReviewCenter-InboxService-FailedChecks
         title: >-
-          The InboxService class shall list as failed checks every review that is not concluded and was created by the
-          user and has at least one check that the ballots agree is Fail (the consolidated standing of the submitted
-          ballots; the sole ballot of a review with a single slot is included before its hand-in) in a
-          section that applies, with a chip that gives the number of failed checks and a text that says the reviewers
-          marked the checks as Fail so far and that, if that stands, the review will be rejected and its reasons must be
-          written down, shall ignore a Fail in
-          a section that is marked not applicable, and shall list no failed checks and nothing to sign for a concluded
-          review.
+          The InboxService class shall list as failed checks a review that is not concluded and was created by the
+          user, and in which the submitted ballots agree that at least one check is Fail.
         justification: |
           The creator of a review answers for it. A failed check is the signal that the content must change, or that
-          the review will end as rejected, and a check of a section that does not apply to the review is not a
-          finding. Only what the reviewers have handed in and agree on is a finding: a draft ballot is unfinished work
-          (except the sole ballot of a single-slot review, which counts as it is answered), and a check on which the
-          ballots disagree is a Disputed row instead, so neither is a failure yet.
+          the review will end as rejected.
+        tests:
+          - InboxService_GetInboxAsync_AllSubmittedBallotsAgreeOnFail_ShowsFailedCheckOfAuthor
+          - InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound
+
+      - id: ReviewCenter-InboxService-FailedChecks-SingleSlotDraft
+        title: >-
+          The InboxService class shall count a Fail in the sole ballot of a review with a single slot before the ballot
+          is handed in.
+        justification: |
+          The sole ballot counts as it is answered, because no other ballot can disagree with it.
         tests:
           - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
-          - InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored
-          - InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound
+
+      - id: ReviewCenter-InboxService-FailedChecks-DraftNotCounted
+        title: >-
+          The InboxService class shall not count a Fail in a draft ballot of a review with several slots as a failed
+          check.
+        justification: |
+          A draft ballot is unfinished work and not yet a finding.
+        tests:
+          - InboxService_GetInboxAsync_FailInDraftBallotOfSeveralSlots_IsNotAFailedCheck
+
+      - id: ReviewCenter-InboxService-FailedChecks-Disputed
+        title: >-
+          The InboxService class shall not count a check on which the submitted ballots disagree as a failed check.
+        justification: |
+          A check on which the ballots disagree is a disputed row instead.
+        tests:
+          - InboxService_GetInboxAsync_DisputedCheck_IsNotAFailedCheck
+
+      - id: ReviewCenter-InboxService-FailedChecks-Chip
+        title: >-
+          The InboxService class shall give the failed checks row a chip that gives the number of failed checks.
+        justification: |
+          The number shows how much is wrong.
+        tests:
+          - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
+
+      - id: ReviewCenter-InboxService-FailedChecks-Text
+        title: >-
+          The InboxService class shall give the failed checks row a text that says the reviewers marked the checks as
+          Fail so far and that, if that stands, the review will be rejected and its reasons must be written down.
+        justification: |
+          The text promises nothing certain: the failures may still change, but a rejection needs its reasons.
+        tests:
           - InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons
+
+      - id: ReviewCenter-InboxService-FailedChecks-NotCreator
+        title: >-
+          The InboxService class shall list no failed checks to a user who did not create the review.
+        justification: |
+          The creator answers for the review, and a reviewer has no use for the failures of the others.
+        tests:
+          - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
+
+      - id: ReviewCenter-InboxService-FailedChecks-NotApplicableSection
+        title: >-
+          The InboxService class shall ignore a Fail in a section that is marked not applicable.
+        justification: |
+          A check of a section that does not apply to the review is not a finding.
+        tests:
+          - InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored
+
+      - id: ReviewCenter-InboxService-FailedChecks-Concluded
+        title: >-
+          The InboxService class shall list no failed checks for a concluded review.
+        justification: |
+          A concluded review is told as an update, and the failures are no work any more.
+        tests:
+          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
+
+      - id: ReviewCenter-InboxService-FailedChecks-ApiToken
+        title: >-
+          The InboxService class shall list no failed checks to an API token of the creator.
+        justification: |
+          A token never gets the full view of the creator, so it is masked like any other viewer.
+        tests:
+          - InboxService_GetInboxAsync_CreatorViaApiToken_ShowsNoFailedChecks
 
       - id: ReviewCenter-InboxService-Updates
         title: >-
-          The InboxService class shall list as updates, for information and never counted as action, a review of which
-          the user is a reviewer or the creator when it was approved or rejected by a signature of somebody else or was
-          reopened by somebody else after the user last saw it, with the chip Approved, Rejected, or Reopened and the
-          name of that person,
-          and shall list no update for a signature or a reopening of the user's own, nor for a review that was seen
-          since.
+          The InboxService class shall list as an update, with the chip Approved, a review of which the user is a
+          reviewer or the creator when it was approved by a signature of somebody else after the user last saw it.
         justification: |
-          A person who waited for a review wants to learn that it is finished, and the creator wants to learn that an
-          administrator reopened it. These facts need no work, so they are shown apart from the work and do not raise
-          the count that the home page shows.
+          A person who waited for a review wants to learn that it is finished. The fact needs no work, so it is shown
+          apart from the work.
         tests:
           - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
-          - InboxService_GetInboxAsync_ReopenedByOther_ShowsUpdate
-          - InboxService_GetInboxAsync_ReopenedByMe_ShowsNoUpdate
-          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
           - InboxRules_CompletingSignature_LatestOfCurrentDigest_IsFound
+
+      - id: ReviewCenter-InboxService-Updates-Names
+        title: >-
+          The InboxService class shall name the signer who completed the approval in the approved update.
+        justification: |
+          The reader of an approval wants to know whose signature finished the review.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedByOther_UpdateNamesTheSigner
+
+      - id: ReviewCenter-InboxService-Updates-Rejected
+        title: >-
+          The InboxService class shall list as an update, with the chip Rejected, a review that was rejected by a
+          signature of somebody else after the user last saw it.
+        justification: |
+          A reviewer wants to learn that the review ended as rejected.
+        tests:
+          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
+
+      - id: ReviewCenter-InboxService-Updates-Rejected-Names
+        title: >-
+          The InboxService class shall name the signer who concluded the review in the rejected update.
+        justification: |
+          The reader of a rejection wants to know whose signature ended the review.
+        tests:
+          - InboxService_GetInboxAsync_RejectedByOther_UpdateNamesTheSigner
+
+      - id: ReviewCenter-InboxService-Updates-Reopened
+        title: >-
+          The InboxService class shall list as an update, with the chip Reopened, a review that somebody else reopened
+          after the user last saw it.
+        justification: |
+          The creator wants to learn that an administrator reopened the review.
+        tests:
+          - InboxService_GetInboxAsync_ReopenedByOther_ShowsUpdate
+
+      - id: ReviewCenter-InboxService-Updates-Reopened-Names
+        title: >-
+          The InboxService class shall name the person who reopened the review in the reopened update.
+        justification: |
+          The reader of a reopening wants to know who put the review back to work.
+        tests:
+          - InboxService_GetInboxAsync_ReopenedByOther_UpdateNamesThePersonWhoReopened
+
+      - id: ReviewCenter-InboxService-Updates-NotAction
+        title: >-
+          The InboxService class shall not count an update as action.
+        justification: |
+          These facts need no work, so they do not raise the count that the home page shows.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
+          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
+          - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
+
+      - id: ReviewCenter-InboxService-Updates-OwnSignature
+        title: >-
+          The InboxService class shall list no update for a conclusion that the own signature of the user completed.
+        justification: |
+          A user who signed and so completed the approval knows it, and a row about it would tell nothing new.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
+
+      - id: ReviewCenter-InboxService-Updates-OwnReopen
+        title: >-
+          The InboxService class shall list no update for a reopening by the user.
+        justification: |
+          A user who reopened the review knows it, and a row about it would tell nothing new.
+        tests:
+          - InboxService_GetInboxAsync_ReopenedByMe_ShowsNoUpdate
+
+      - id: ReviewCenter-InboxService-Updates-Seen
+        title: >-
+          The InboxService class shall list no update for a review that the user has seen since.
+        justification: |
+          The news is gone once the user looked at it.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
+
+      - id: ReviewCenter-InboxService-Updates-Creator
+        title: >-
+          The InboxService class shall list the update of an approved review to the creator of the review too.
+        justification: |
+          The creator waits for the end of the review as much as its reviewers.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems
 
       - id: ReviewCenter-InboxService-Access
         title: >-
-          The InboxService class shall consider only reviews of the projects the user may see, at the time of the
-          call, shall offer a signature to give and a reply only to a user who may work in the project and, for a
-          signature, is a member of it, so that an auditor gets none of them, shall give a user who is disabled, has a
-          temporary password, is unknown, or is anonymous an empty inbox and a count of zero without an error, shall
-          show a review that is concluded no action, and shall give a system administrator only the reviews in which
-          the administrator is a reviewer or the creator.
+          The InboxService class shall consider only reviews of the projects the user may see.
         justification: |
-          The inbox must never reveal a project to somebody who may not see it, nor ask a read-only member for work
-          that the rules would refuse. Deciding on the current access means that a removed member stops seeing the
-          reviews of the project at once.
+          The inbox must never reveal a project to somebody who may not see it.
+        tests:
+          - InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-CurrentAccess
+        title: >-
+          The InboxService class shall decide on the access of the user at the time of the call, so that a removed
+          member stops seeing the reviews of the project at once.
+        justification: |
+          Access that is checked once and remembered would show the reviews of a project to a person who was removed.
+        tests:
+          - InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-AuditorNoSign
+        title: >-
+          The InboxService class shall offer no signature to give to an auditor.
+        justification: |
+          An auditor may only read, and must not be asked for work that the rules would refuse.
         tests:
           - InboxService_GetInboxAsync_Auditor_GetsNoSignOrReplyItems
-          - InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-AuditorNoReply
+        title: >-
+          The InboxService class shall offer no reply to give to an auditor.
+        justification: |
+          An auditor may only read, and must not be asked to reply.
+        tests:
+          - InboxService_GetInboxAsync_Auditor_GetsNoSignOrReplyItems
+
+      - id: ReviewCenter-InboxService-Access-Disabled
+        title: >-
+          The InboxService class shall give a user who is disabled an empty inbox without an error.
+        justification: |
+          A disabled account may not use the service, and the inbox must not fail because of it.
+        tests:
           - InboxService_GetInboxAsync_DisabledUser_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-Disabled-CountZero
+        title: >-
+          The InboxService class shall give a user who is disabled a count of zero.
+        justification: |
+          The number on the home page must not tell a disabled account that work waits for it.
+        tests:
+          - InboxService_CountAsync_DisabledUser_ReturnsZero
+
+      - id: ReviewCenter-InboxService-Access-TemporaryPassword
+        title: >-
+          The InboxService class shall give a user who has a temporary password an empty inbox without an error.
+        justification: |
+          The user must first choose a password, and shows nothing until then.
+        tests:
           - InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-Unknown
+        title: >-
+          The InboxService class shall give a name that is no user an empty inbox without an error.
+        justification: |
+          A name that is no user has no reviews.
+        tests:
           - InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-Unknown-CountZero
+        title: >-
+          The InboxService class shall give a name that is no user a count of zero.
+        justification: |
+          A name that is no user has no work, so the number on the home page must be zero.
+        tests:
+          - InboxService_CountAsync_UnknownUser_ReturnsZero
+
+      - id: ReviewCenter-InboxService-Access-Anonymous
+        title: >-
+          The InboxService class shall give no actor, or the command line actor, an empty inbox without an error.
+        justification: |
+          An anonymous caller has no reviews, and the call must not fail.
+        tests:
+          - InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView
+
+      - id: ReviewCenter-InboxService-Access-Anonymous-CountZero
+        title: >-
+          The InboxService class shall give no actor, or the command line actor, a count of zero.
+        justification: |
+          An anonymous caller has no work, so the number on the home page must be zero.
+        tests:
+          - InboxService_CountAsync_NoActorOrCommandLine_ReturnsZero
+
+      - id: ReviewCenter-InboxService-Access-ConcludedNoAction
+        title: >-
+          The InboxService class shall show a review that is concluded to nobody as action.
+        justification: |
+          A concluded review needs no work, so no action row and no action count remain for it.
+        tests:
           - InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems
           - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
+
+      - id: ReviewCenter-InboxService-Access-Sysadmin
+        title: >-
+          The InboxService class shall give a system administrator who is no member of the project rows only for the
+          reviews in which the administrator is a reviewer or the creator.
+        justification: |
+          A system administrator sees every project but is not a reviewer of it, so the inbox is limited to the
+          reviews in which the administrator has a part of their own.
+        tests:
+          - InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator
+
+      - id: ReviewCenter-InboxService-Access-Sysadmin-SlotOnly
+        title: >-
+          The InboxService class shall give a system administrator who is no member of the project no row other than an
+          update for a review in which the administrator only holds a slot.
+        justification: |
+          A reviewer must be a member of the project, so a slot without membership is no work that the administrator
+          may do, and a row that asked for it would ask for the impossible.
+        tests:
           - InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews
 
       - id: ReviewCenter-InboxService-Count
         title: >-
           The InboxService class shall count the reviews that need the action of the user as the number of distinct
-          reviews in the groups to answer, disputed, ready to sign, signature lost, replies waiting and failed checks,
-          so that a review
-          in several groups counts once and neither an update nor a review that waits for others is counted, and shall
-          show a review that is in several groups in each of them.
+          reviews in the groups to answer, disputed, ready to sign, signature lost, replies waiting and failed checks.
         justification: |
           The number on the home page says how many reviews wait, which is what a person can act on. Counting a review
-          twice, or counting information, would inflate it.
+          twice would inflate it.
         tests:
           - InboxService_CountAsync_EqualsDistinctActionReviews
           - InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting
-          - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
+
+      - id: ReviewCenter-InboxService-Count-UpdatesNotCounted
+        title: >-
+          The InboxService class shall not count an update in the number of reviews that need action.
+        justification: |
+          An update is information, and counting it would inflate the number.
+        tests:
+          - InboxService_CountAsync_EqualsDistinctActionReviews
           - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
+
+      - id: ReviewCenter-InboxService-Count-WaitingNotCounted
+        title: >-
+          The InboxService class shall not count a review that waits for others in the number of reviews that need
+          action.
+        justification: |
+          A review that waits for others is information, and counting it would inflate the number.
+        tests:
+          - InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting
+          - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
+
+      - id: ReviewCenter-InboxService-Count-EachGroup
+        title: >-
+          The InboxService class shall show a review that is in several groups in each of them.
+        justification: |
+          Each group says a different thing about what waits, so none may hide the other.
+        tests:
+          - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
 
       - id: ReviewCenter-InboxService-Unread
         title: >-
           The InboxService class shall treat a comment as unread when it was written by somebody else and is newer than
-          the last comment the user has seen, compare the user names without regard to case, treat every comment of
-          somebody else as unread when the user has never seen the review, never treat a comment of the user as unread,
-          and mark an item of the inbox as unread when it holds an unread comment or a change after the time the user
-          last saw the review, also an item to sign of a review the user has seen before. A change is a signature, a
-          reopen, a comment, or an answer of another reviewer in a submitted ballot (the draft of another slot is not
-          news, because it is not part of the record).
+          the last comment the user has seen.
         justification: |
-          The user wants to see what is new, and the own words are never news. Comment identities grow with time, so
-          one number per review is enough to tell what has been seen. A review that waits for a signature must show
-          what happened to it after the last visit, not only before the first one. A reviewer who is still working on
-          a draft has not said anything yet.
+          The user wants to see what is new. Comment identities grow with time, so one number per review is enough to
+          tell what has been seen.
         tests:
-          - InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread
-          - InboxService_GetInboxAsync_OwnComments_AreNeverUnread
           - InboxService_GetInboxAsync_CommentsAfterLastSeen_AreUnread
-          - InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread
-          - InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread
-          - InboxService_Unread_DraftBallotOfOtherSlot_Ignored
-          - InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread
-          - InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments
+          - InboxRules_IsUnread_OtherAndNewer_IsTheOnlyUnread
+
+      - id: ReviewCenter-InboxService-Unread-CaseInsensitive
+        title: >-
+          The InboxService class shall compare the user names of comments without regard to case.
+        justification: |
+          The same person must not turn into somebody else by the way the name was typed.
+        tests:
           - InboxRules_SameUser_IgnoresCase
           - InboxRules_IsUnread_OtherAndNewer_IsTheOnlyUnread
+
+      - id: ReviewCenter-InboxService-Unread-NeverSeen
+        title: >-
+          The InboxService class shall treat every comment of somebody else as unread when the user has never seen the
+          review.
+        justification: |
+          A user who never looked has seen nothing.
+        tests:
+          - InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread
+
+      - id: ReviewCenter-InboxService-Unread-OwnComment
+        title: >-
+          The InboxService class shall never treat a comment of the user as unread.
+        justification: |
+          The own words are never news.
+        tests:
+          - InboxService_GetInboxAsync_OwnComments_AreNeverUnread
+          - InboxRules_IsUnread_OtherAndNewer_IsTheOnlyUnread
+
+      - id: ReviewCenter-InboxService-Unread-ItemComment
+        title: >-
+          The InboxService class shall mark an item of the inbox as unread when it holds an unread comment.
+        justification: |
+          The user wants to see in the list which items have news.
+        tests:
+          - InboxService_GetInboxAsync_CommentsAfterLastSeen_AreUnread
+
+      - id: ReviewCenter-InboxService-Unread-Signature
+        title: >-
+          The InboxService class shall mark a ready to sign item of a review the user has seen before as unread when
+          somebody else signed after the user last saw it.
+        justification: |
+          A review that waits for a signature must show what happened to it after the last visit, not only before the
+          first one.
+        tests:
+          - InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-SignatureLost
+        title: >-
+          The InboxService class shall mark a signature lost item of a review the user has seen before as unread when
+          somebody else commented after the user last saw it.
+        justification: |
+          A user whose signature was withdrawn waits for the open items to be settled, so a comment after the last
+          visit is news for that item as it is for an item to sign.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-CommentChange
+        title: >-
+          The InboxService class shall mark a ready to sign item of a review the user has seen before as unread when
+          somebody else commented after the user last saw it.
+        justification: |
+          A comment after the last visit is news, also for a review that waits for a signature.
+        tests:
+          - InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-Reopen
+        title: >-
+          The InboxService class shall mark a ready to sign item of a review the user has seen before as unread when
+          somebody else reopened the review after the user last saw it.
+        justification: |
+          A reopening changes what must be signed, so it is news.
+        tests:
+          - InboxService_Unread_ReopenAfterLastSeen_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-SubmittedBallot
+        title: >-
+          The InboxService class shall mark a ready to sign item as unread when another reviewer handed in a ballot
+          after the user last saw the review.
+        justification: |
+          A ballot that is handed in is part of the record, so it is news.
+        tests:
+          - InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-DraftIgnored
+        title: >-
+          The InboxService class shall not mark an item as unread because of a draft ballot of another slot.
+        justification: |
+          A reviewer who is still working on a draft has not said anything yet, and the draft is not part of the
+          record.
+        tests:
+          - InboxService_Unread_DraftBallotOfOtherSlot_Ignored
+
+      - id: ReviewCenter-InboxService-Unread-HiddenCheckThread
+        title: >-
+          The InboxService class shall not mark an item as unread because of a thread on a check for a user who may not
+          see the other ballots.
+        justification: |
+          A change in a discussion about a check would show that the others answered.
+        tests:
+          - InboxService_GetInboxAsync_ThreadOnCheck_ForViewerWhoMayNotSeeBallots_IsNotUnread
+
+      - id: ReviewCenter-InboxService-Unread-CommentCount
+        title: >-
+          The InboxService class shall count the unread comments of all threads of a review for a user.
+        justification: |
+          The number shows how much is new on the review page.
+        tests:
+          - InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted
+
+      - id: ReviewCenter-InboxService-Unread-NewestComment
+        title: >-
+          The InboxService class shall find the newest comment of all threads of a review.
+        justification: |
+          One number per review is enough to tell what has been seen.
+        tests:
           - InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted
 
       - id: ReviewCenter-InboxService-MarkSeen
         title: >-
-          The InboxService class shall store the newest comment and the time a user has seen of a review, never move
-          either back, store nothing for a user who may not see the review or for a review that does not exist, mark
-          every review of the inbox as seen on request, with the time read before the inbox was read and only the
-          comments written up to that time, and refuse a missing user.
+          The InboxService class shall store the newest comment and the time a user has seen of a review.
         justification: |
-          What a user has seen must only grow, or an old page that is opened late would bring old news back. A user
-          who may not see a review must leave no trace of it, and a change or comment that happens while the inbox is
-          read must stay new.
+          What a user has seen decides what is new the next time the inbox is read.
+        tests:
+          - InboxService_MarkSeenAsync_FirstCall_StoresCommentAndTime
+
+      - id: ReviewCenter-InboxService-MarkSeen-NeverBackwards
+        title: >-
+          The InboxService class shall never move the stored comment or time of a review back.
+        justification: |
+          What a user has seen must only grow, or an old page that is opened late would bring old news back.
         tests:
           - InboxService_MarkSeenAsync_NeverMovesBackwards
+
+      - id: ReviewCenter-InboxService-MarkSeen-MayNotSee
+        title: >-
+          The InboxService class shall store nothing for a user who may not see the review.
+        justification: |
+          A user who may not see a review must leave no trace of it.
+        tests:
+          - InboxService_MarkSeenAsync_NeverMovesBackwards
+
+      - id: ReviewCenter-InboxService-MarkSeen-NoSuchReview
+        title: >-
+          The InboxService class shall store nothing for a review that does not exist.
+        justification: |
+          A trace of a review that does not exist would be a lie and a leak.
+        tests:
+          - InboxService_MarkSeenAsync_NeverMovesBackwards
+
+      - id: ReviewCenter-InboxService-MarkSeen-MarkAll
+        title: >-
+          The InboxService class shall mark every review of the inbox of the user as seen on request.
+        justification: |
+          A user who has read the whole inbox wants to clear it in one step.
+        tests:
           - InboxService_MarkAllReadAsync_UpsertsEveryListedReview
+
+      - id: ReviewCenter-InboxService-MarkSeen-MarkAllUpToStart
+        title: >-
+          The InboxService class shall mark as seen on request only the comments written up to the time that was read
+          before the inbox was read.
+        justification: |
+          A change or comment that happens while the inbox is read must stay new.
+        tests:
           - InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread
+          - InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments
+
+      - id: ReviewCenter-InboxService-MarkSeen-MissingUser
+        title: >-
+          The InboxService class shall refuse a missing user when it marks a review as seen.
+        justification: |
+          A call without a user cannot say whose state to store.
+        tests:
           - InboxService_NullArguments_Throw
 
       - id: ReviewCenter-InboxService-KindWording

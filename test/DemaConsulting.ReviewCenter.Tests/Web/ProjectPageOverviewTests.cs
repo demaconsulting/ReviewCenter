@@ -431,6 +431,56 @@ public class ProjectPageOverviewTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a review whose checklist has no answers shows the number of unanswered checks as its blocker
+    ///     and is listed by the blocked filter.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker()
+    {
+        // Arrange: the seeded project, whose review REV-D has an unsigned slot and no answers at all
+        var projectId = await SeedAsync();
+        var checks = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).Count();
+
+        // Act
+        var cut = RenderAt(projectId);
+        var text = cut.Find("[data-testid='review-blockers-REV-D']").TextContent;
+        var blocked = RowsAt(projectId, "?blocked=1");
+
+        // Assert: every check of the default checklist is counted, and the review is blocked
+        Assert.Equal($"{checks} unanswered", text);
+        Assert.Contains("REV-D", blocked);
+    }
+
+    /// <summary>
+    ///     Test that the last activity column shows the time of the newest audit entry of a review, and the creation
+    ///     time of a review that has no entry.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity()
+    {
+        // Arrange: a review without audit entries, and an older review with one entry stamped by the clock
+        var token = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-QUIET", Title = "Quiet", Created = new DateTimeOffset(2025, 2, 1, 8, 30, 0, TimeSpan.Zero) },
+            token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-BUSY", Title = "Busy", Created = new DateTimeOffset(2025, 2, 2, 9, 45, 0, TimeSpan.Zero) },
+            token);
+        await AuditStore.AppendAsync(AuditDraft.By(TestActors.Ann, "review.test", "Something happened", project.Id, "REV-BUSY"), token);
+
+        // Act
+        var cut = RenderAt(project.Id);
+
+        // Assert: the quiet review shows its creation time, the busy one the time of the entry (the clock is fixed)
+        var quiet = cut.Find("[data-testid='review-activity-REV-QUIET']");
+        var busy = cut.Find("[data-testid='review-activity-REV-BUSY']");
+        Assert.Equal("2025-02-01 08:30", quiet.TextContent);
+        Assert.Equal("2025-03-04 05:06", busy.TextContent);
+        Assert.Equal("2025-03-04T05:06:07.0000000Z", busy.GetAttribute("datetime"));
+    }
+
+    /// <summary>
     ///     Test that the stage, overdue, blocked and text filters of the query string narrow the table, separately
     ///     and together, while the summary strip keeps counting the whole project.
     /// </summary>
@@ -512,6 +562,38 @@ public class ProjectPageOverviewTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the activity sort orders the reviews by the time of their last activity, the newest first by
+    ///     default, and the oldest first with the ascending direction.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_QuerySortActivity_OrdersByLastActivity()
+    {
+        // Arrange: two reviews without audit entries (their creation times count) and an old one with a new entry
+        var token = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-A", Title = "A", Created = new DateTimeOffset(2025, 2, 1, 8, 0, 0, TimeSpan.Zero) },
+            token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-B", Title = "B", Created = new DateTimeOffset(2025, 2, 3, 8, 0, 0, TimeSpan.Zero) },
+            token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-C", Title = "C", Created = new DateTimeOffset(2025, 1, 1, 8, 0, 0, TimeSpan.Zero) },
+            token);
+        await AuditStore.AppendAsync(AuditDraft.By(TestActors.Ann, "review.test", "Something happened", project.Id, "REV-C"), token);
+
+        // Act: render once per query and read the rows at once
+        var byDefault = RowsAt(project.Id, "?sort=activity");
+        var newestFirst = RowsAt(project.Id, "?sort=activity&dir=desc");
+        var oldestFirst = RowsAt(project.Id, "?sort=activity&dir=asc");
+
+        // Assert: REV-C was active last, then REV-B (created later than REV-A)
+        Assert.Equal(["REV-C", "REV-B", "REV-A"], byDefault);
+        Assert.Equal(["REV-C", "REV-B", "REV-A"], newestFirst);
+        Assert.Equal(["REV-A", "REV-B", "REV-C"], oldestFirst);
+    }
+
+    /// <summary>
     ///     Test that the table shows 25 reviews per page, that the page query value selects the page, that a page
     ///     beyond the end shows the last one, and that the links keep the filters.
     /// </summary>
@@ -557,6 +639,40 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Equal(["R-26", "R-27"], filteredRows);
         Assert.Contains("q=bulk", filteredNext, StringComparison.Ordinal);
         Assert.Contains("page=2", filteredNext, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the header links and the paging links of a filtered and sorted table keep the other state: the
+    ///     header links keep the filters, and the paging links keep the filters, the sort column and the direction.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState()
+    {
+        // Arrange: 30 reviews, 27 of them with the word "bulk" in the title
+        var token = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        for (var i = 1; i <= 30; i++)
+        {
+            await Reviews.CreateDraftAsync(
+                project.Id, $"R-{i:00}", i <= 27 ? $"Bulk {i}" : $"Other {i}", [new("a.txt", TestContent.A)], token);
+        }
+
+        // Act: render the first and the second page of the filtered, sorted table, reading the links at once
+        const string state = "?stage=setup&q=bulk&sort=signatures&dir=desc";
+        var first = RenderAt(project.Id, state);
+        var next = first.Find("[data-testid='reviews-next']").GetAttribute("href");
+        var headerOnFirst = first.Find("[data-testid='sort-due']").GetAttribute("href");
+        var second = RenderAt(project.Id, state + "&page=2");
+        var previous = second.Find("[data-testid='reviews-prev']").GetAttribute("href");
+        var headerOnSecond = second.Find("[data-testid='sort-id']").GetAttribute("href");
+
+        // Assert: the paging links keep the filters, the column and the direction
+        Assert.Equal($"/projects/{project.Id}?stage=setup&sort=signatures&dir=desc&q=bulk&page=2", next);
+        Assert.Equal($"/projects/{project.Id}?stage=setup&sort=signatures&dir=desc&q=bulk", previous);
+
+        // Assert: the header links keep the filters and start at the first page
+        Assert.Equal($"/projects/{project.Id}?stage=setup&sort=due&q=bulk", headerOnFirst);
+        Assert.Equal($"/projects/{project.Id}?stage=setup&q=bulk", headerOnSecond);
     }
 
     /// <summary>
@@ -677,12 +793,14 @@ public class ProjectPageOverviewTests : PageTestBase
         var auditorOverdue = asAuditor.Find("[data-testid='project-summary-overdue']").TextContent;
         var auditorNewReview = asAuditor.FindAll("[data-testid='new-review-button']").Count;
         var auditorPlanHint = asAuditor.FindAll("[data-testid='plan-reviews-unavailable']").Count;
+        var auditorFilter = asAuditor.FindAll("[data-testid='review-filter']").Count;
         SignInAs("str", "Str", false);
         var asStranger = RenderAt(projectId);
 
         // Assert
         Assert.Equal(reference, auditorRows);
         Assert.Equal(0, auditorNewReview + auditorPlanHint);
+        Assert.Equal(1, auditorFilter);
         Assert.Equal("Ann, Bob", auditorWaiting);
         Assert.Equal("1 overdue", auditorOverdue);
         Assert.NotEmpty(asStranger.FindAll("[data-testid='project-not-found']"));

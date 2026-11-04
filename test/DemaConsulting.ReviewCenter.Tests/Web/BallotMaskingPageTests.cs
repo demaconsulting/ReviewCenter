@@ -76,6 +76,34 @@ public class BallotMaskingPageTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that a slot owner who has not handed in a ballot sees only the progress of the own checklist, with no
+    ///     count of failed checks, although the other reviewers handed in ballots that differ.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly()
+    {
+        // Arrange: ann passes and cyd fails the first check; bob, the viewer, has answered only the first check
+        var projectId = await CreateReviewAsync("ann", "cyd", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "cyd", ChecklistOutcome.Fail);
+        await Checklists.SetAnswerAsync(
+            projectId, ReviewKey, FirstItemId, ChecklistOutcome.Pass, null, new Actor("bob", "Bob"), TestContext.Current.CancellationToken);
+        SignInAs("bob", "Bob", false);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var total = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).Count();
+
+        // Act
+        var cut = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, ReviewKey));
+
+        // Assert: the own progress is shown, and nothing about the failed check of cyd
+        var progress = cut.Find("[data-testid='checklist-progress-summary']").TextContent;
+        Assert.Equal($"1 of {total} checks answered", progress);
+        Assert.DoesNotContain("failed", progress, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Test that the review page of a member without a slot says the checklist standing is hidden.
     /// </summary>
     [Fact]
@@ -169,6 +197,31 @@ public class BallotMaskingPageTests : BallotPageTestBase
         Assert.Contains(AuditMasking.HiddenAnswerDetail, details);
         Assert.Contains(AuditMasking.HiddenDiscussionDetail, details);
         Assert.DoesNotContain(details, detail => detail.Contains("REQ-01", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that the history of a viewer without a handed-in ballot still shows the action, the actor, and the
+    ///     time of an entry whose detail is hidden.
+    /// </summary>
+    [Fact]
+    public async Task HistoryPage_HiddenViewer_KeepsActionActorAndTimeOfHiddenEntries()
+    {
+        // Arrange: an answer entry by an actor of its own, so that its row can be told from the others
+        var projectId = await ArrangeDisputedReviewWithDraftViewerAsync();
+        await Audit.RecordAsync(
+            AuditDraft.By(new Actor("zed", "Zed"), "checklist.answered", "item REQ-01: Fail", projectId, ReviewKey),
+            TestContext.Current.CancellationToken);
+
+        // Act
+        var cut = RenderHistory(projectId);
+
+        // Assert: the row of that entry shows who, what, and when, and only the detail is replaced
+        var row = Assert.Single(
+            cut.FindAll("[data-testid='history-row']"),
+            r => r.QuerySelector("[data-testid='history-actor']")!.TextContent == "Zed (zed)");
+        Assert.Equal("checklist.answered", row.QuerySelector("[data-testid='history-action']")!.TextContent);
+        Assert.Equal("2025-03-04 05:06:07", row.QuerySelector("[data-testid='history-time']")!.TextContent);
+        Assert.Equal(AuditMasking.HiddenAnswerDetail, row.QuerySelector("[data-testid='history-detail']")!.TextContent);
     }
 
     /// <summary>

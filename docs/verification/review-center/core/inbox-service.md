@@ -86,14 +86,16 @@ finds the review under Ready to sign with the chip "Not signed", and the row is 
 review under Ready to sign. This scenario is tested by `InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem`.
 
 **InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip**: After a signature the record changes (a new
-answer); the signature no longer covers the record and the reviewer finds the chip "The review changed, sign again". This
+answer); the signature no longer covers the record and the reviewer finds the chip "The review changed, sign again" and
+the sentence `InboxRules.SignAgainText`. This
 scenario is tested by `InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip`.
 
 **InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem**: A slot with a current signature gives its reviewer no Ready
 to sign row. This scenario is tested by `InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem`.
 
 **InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems**: When every slot is signed and the review is approved,
-no reviewer has an action row; the other people get only an information row. This scenario is tested by
+no reviewer has an action row; the signer who did not complete the approval and the author get exactly one information
+row, and the signer who completed it gets none. This scenario is tested by
 `InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems`.
 
 **InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded**: Every slot is signed and a thread
@@ -197,6 +199,12 @@ waits for others and does not find the review under Ready to sign; the open ques
 Question for you row, which is the only action. This scenario is tested by
 `InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign`.
 
+**InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign**: Ann handed in a full ballot and bob has a
+draft with one answer, so ann finds the review under Ready to sign. Bob's ballot is then handed in in the store although
+it leaves checks unanswered; ann finds a single Waiting for others row with the chip "Waiting for 1 reviewer" and the
+detail "Waiting for Bob.", no Ready to sign row, and an action count of zero. This scenario is tested by
+`InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign`.
+
 **InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow**: A slot holder who has not written in a question
 that bob started finds a To answer row with the chip "Question for you", `OpensReview`, unread, with the name of bob and
 without the text of the question, counted as action. This scenario is tested by
@@ -226,6 +234,11 @@ ann finds a Signature lost row with the chip, the reason "open items remain", un
 or Waiting for others row; bob reads in his waiting row that the signature of ann no longer counts; when the finding is
 settled the row becomes Ready to sign with the chip "The review changed, sign again" and the sentence of the inbox. This
 scenario is tested by `InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow`.
+
+**InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread**: Ann signs, bob opens a finding that
+takes her signature, and ann sees the review. Her Signature lost row is read; when bob then adds a comment to the open
+finding, the same row is unread. This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread`.
 
 **InboxService_GetInboxAsync_SignatureLost_NotShownToOthers**: Bob, the author, a stranger and an auditor get no
 Signature lost row for the signature of ann. This scenario is tested by
@@ -270,7 +283,8 @@ far. If that stands, the review will be rejected and its reasons must be written
 `InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons`.
 
 **InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction**: Both slots reject and sign, ann first and
-bob five minutes later. The inbox of ann has one row, in Updates, with `InboxService.RejectedChip`, no action is
+bob five minutes later. The inbox of ann has one row, in Updates, with `InboxService.RejectedChip` and the detail
+"Signed by Bob.", no action is
 counted, and the review has no failed-checks row of the author and no to-sign row of bob. This scenario is tested by
 `InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction`.
 
@@ -326,9 +340,16 @@ when another reviewer hands in a ballot after the last seen time. This scenario 
 not the number of rows and not the information rows. This scenario is tested by
 `InboxService_CountAsync_EqualsDistinctActionReviews`.
 
-**InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews**: A system administrator who is no member gets
-rows only for what is their own: the review they authored, and no sign row for a slot without membership. This scenario
-is tested by `InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews`.
+**InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews**: A system administrator who is no member
+holds a slot of a review and authored another review. The authored review gives a Failed checks row, and the review with
+only a slot gives no row other than an update. This scenario is tested by
+`InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews`.
+
+**InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator**: A system administrator who is no member
+holds a slot of one review and authored a second one, which has a failed check; a third review, with a slot of ann and
+a thread of bob that nobody answered, is none of the administrator's. Every row of the administrator is of the first or
+the second review, the second gives its Failed checks row, and no row is of the third. This scenario is tested by
+`InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator`.
 
 **InboxService_MarkSeenAsync_NeverMovesBackwards**: Marking a review as seen never moves the state backwards, keeps the
 later time, and stores nothing for a user who may not see the review. This scenario is tested by
@@ -344,6 +365,40 @@ not stored as seen, so the review stays unread. This scenario is tested by
 
 **InboxService_NullArguments_Throw**: Null arguments are refused where a value is required. This scenario is tested by
 `InboxService_NullArguments_Throw`.
+
+**InboxService_GetInboxAsync_ToAnswerRow_LinksToTheChecklist**: Ann has no ballot and bob has a draft; the To answer row
+of each is not marked as opening the review page, so it links to the checklist. This scenario is tested by
+`InboxService_GetInboxAsync_ToAnswerRow_LinksToTheChecklist`.
+
+**InboxService_GetInboxAsync_RejectionWithoutConclusionText_ShowsWaitingNotToSign**: Ann holds the only slot and hands
+in a ballot with a Fail, which is a rejection without conclusion text; her inbox has a Waiting for others row, no Ready
+to sign row and no action. This scenario is tested by
+`InboxService_GetInboxAsync_RejectionWithoutConclusionText_ShowsWaitingNotToSign`.
+
+**InboxService_GetInboxAsync_RejectionWithConclusionText_ShowsToSign**: Ann holds the only slot and hands in a ballot
+with a Fail, then the conclusion text is written; her inbox has one Ready to sign row with the chip "Not signed", no
+Waiting for others row, and the action count is one. This scenario is tested by
+`InboxService_GetInboxAsync_RejectionWithConclusionText_ShowsToSign`.
+
+**InboxService_GetInboxAsync_AllSubmittedBallotsAgreeOnFail_ShowsFailedCheckOfAuthor**: Ann and bob each hand in a
+ballot whose first check is Fail; the author finds one failed-checks row with the chip "1 failed". This scenario is
+tested by `InboxService_GetInboxAsync_AllSubmittedBallotsAgreeOnFail_ShowsFailedCheckOfAuthor`.
+
+**InboxService_GetInboxAsync_FailInDraftBallotOfSeveralSlots_IsNotAFailedCheck**: Ann hands in a ballot of Pass answers
+and bob answers a check Fail and keeps the ballot a draft; the author has no failed-checks row. This scenario is tested
+by `InboxService_GetInboxAsync_FailInDraftBallotOfSeveralSlots_IsNotAFailedCheck`.
+
+**InboxService_GetInboxAsync_DisputedCheck_IsNotAFailedCheck**: Ann answers Pass and bob answers Fail on the first check
+and both ballots are in; the author has no failed-checks row, because the check is disputed. This scenario is tested by
+`InboxService_GetInboxAsync_DisputedCheck_IsNotAFailedCheck`.
+
+**InboxService_Unread_ReopenAfterLastSeen_IsUnread**: Ann has seen an approved review after the approval; cyd reopens
+it, and the Ready to sign row of ann for the review is unread. This scenario is tested by
+`InboxService_Unread_ReopenAfterLastSeen_IsUnread`.
+
+**InboxService_MarkSeenAsync_FirstCall_StoresCommentAndTime**: The first mark of a review as seen stores one state with
+the user, the project, the review, the given newest comment, and the time of the clock. This scenario is tested by
+`InboxService_MarkSeenAsync_FirstCall_StoresCommentAndTime`.
 
 **InboxRules_SlotState_MatchesSigningServiceApproval**: The slot state is the one the signing service reports for a slot
 that was never signed, a slot with a current signature, and a slot whose signature is out of date. This scenario is
@@ -400,6 +455,66 @@ only the open question of another user without a comment of the user is found. T
 asker, several, none named), of the lost signature, of the waiting row that says whose signature no longer counts, and
 of the Disputed row that names one, two or more than five checks, for a slot holder and for the author, are worded as in
 the help. This scenario is tested by `InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded`.
+
+**InboxRules_DisputedText_MoreThanFiveChecks_NamesOnlyTheFirstFive**: Five disputed checks are all named in the
+sentence; of seven disputed checks the first five are named and the sixth and seventh are not. This scenario is tested
+by `InboxRules_DisputedText_MoreThanFiveChecks_NamesOnlyTheFirstFive`.
+
+**InboxRules_DisputedText_MoreThanFiveChecks_SaysHowManyMore**: Five disputed checks give no count of more; six give
+"and 1 more" and seven give "and 2 more". This scenario is tested by
+`InboxRules_DisputedText_MoreThanFiveChecks_SaysHowManyMore`.
+
+**InboxService_GetInboxAsync_CreatorViaApiToken_ShowsNoFailedChecks**: Ann and bob hand in ballots that fail the same
+check; the creator signed in as a person finds a failed-checks row and the same creator with an API token does not. This
+scenario is tested by `InboxService_GetInboxAsync_CreatorViaApiToken_ShowsNoFailedChecks`.
+
+**InboxService_GetInboxAsync_ThreadOnCheck_ForViewerWhoMayNotSeeBallots_IsNotUnread**: A reviewer who has not handed in
+and has seen the review finds no row unread after another reviewer starts a discussion on a check, and finds an unread
+row after a discussion on a file. This scenario is tested by
+`InboxService_GetInboxAsync_ThreadOnCheck_ForViewerWhoMayNotSeeBallots_IsNotUnread`.
+
+**InboxService_GetInboxAsync_EachStandingOfReviewer_PutsRowInSectionOfReviewStatusNextAction**: For a review in which
+nothing is answered, two ballots are in, two ballots in that differ, or one signature is in, the single standing row of
+each of the three reviewers is in the section that the next action of the review status names. This scenario is tested
+by `InboxService_GetInboxAsync_EachStandingOfReviewer_PutsRowInSectionOfReviewStatusNextAction`.
+
+**InboxService_GetInboxAsync_DisputeSettled_ShowsReadyToSignRow**: A dispute gives no Ready to sign row; after the
+second reviewer hands in a ballot that agrees, the first reviewer finds one Ready to sign row with the chip "Not
+signed". This scenario is tested by `InboxService_GetInboxAsync_DisputeSettled_ShowsReadyToSignRow`.
+
+**InboxService_GetInboxAsync_AllSignedOpenThread_ShowsNoApprovedUpdate**: Every slot is signed and a thread is open;
+neither the signer nor the author is told that the review was approved, because it is not concluded. This scenario is
+tested by `InboxService_GetInboxAsync_AllSignedOpenThread_ShowsNoApprovedUpdate`.
+
+**InboxService_GetInboxAsync_ConcludedReviewPastDue_RowShowsNoDueDate**: The row of an approved review three days past
+its due date is an update row without a due date. This scenario is tested by
+`InboxService_GetInboxAsync_ConcludedReviewPastDue_RowShowsNoDueDate`.
+
+**InboxService_GetInboxAsync_ConcludedReviewPastDue_RowIsNotMarkedOverdue**: The row of an approved review three days
+past its due date is an update row that is not marked overdue. This scenario is tested by
+`InboxService_GetInboxAsync_ConcludedReviewPastDue_RowIsNotMarkedOverdue`.
+
+**InboxService_GetInboxAsync_ApprovedByOther_UpdateNamesTheSigner**: The approved update of the signer who signed first
+reads "Signed by Bob." when bob completed the approval. This scenario is tested by
+`InboxService_GetInboxAsync_ApprovedByOther_UpdateNamesTheSigner`.
+
+**InboxService_GetInboxAsync_RejectedByOther_UpdateNamesTheSigner**: The rejected update of the signer who signed first
+reads "Signed by Bob." when bob concluded the review. This scenario is tested by
+`InboxService_GetInboxAsync_RejectedByOther_UpdateNamesTheSigner`.
+
+**InboxService_GetInboxAsync_ReopenedByOther_UpdateNamesThePersonWhoReopened**: The reopened update reads "Reopened by
+Cyd." when cyd reopened the approved review. This scenario is tested by
+`InboxService_GetInboxAsync_ReopenedByOther_UpdateNamesThePersonWhoReopened`.
+
+**InboxService_CountAsync_DisabledUser_ReturnsZero**: A user with work has a count of one; after the account is
+disabled the count is zero. This scenario is tested by `InboxService_CountAsync_DisabledUser_ReturnsZero`.
+
+**InboxService_CountAsync_UnknownUser_ReturnsZero**: A name that is no user has a count of zero while a user with work
+has a count of one. This scenario is tested by `InboxService_CountAsync_UnknownUser_ReturnsZero`.
+
+**InboxService_CountAsync_NoActorOrCommandLine_ReturnsZero**: No actor and the command line have a count of zero while
+a user with work has a count of one. This scenario is tested by
+`InboxService_CountAsync_NoActorOrCommandLine_ReturnsZero`.
 
 **InboxRules_AuthorBlocked_ParityWithChecklistService**: The rule that forbids the author to answer gives the same
 answer as `ChecklistService` for a project with and without the rule, for the creator, for another user and for a

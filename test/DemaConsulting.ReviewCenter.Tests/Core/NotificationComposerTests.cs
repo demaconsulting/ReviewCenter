@@ -106,7 +106,7 @@ public class NotificationComposerTests
         // Assert
         Assert.DoesNotContain('\r', mail.Subject);
         Assert.DoesNotContain('\n', mail.Subject);
-        Assert.StartsWith("Evil", mail.Subject, StringComparison.Ordinal);
+        Assert.Equal("Evil  Bcc: x@example.com: there is news for you", mail.Subject);
     }
 
     /// <summary>
@@ -236,6 +236,19 @@ public class NotificationComposerTests
 
         // Assert
         Assert.Equal("question", kind);
+    }
+
+    /// <summary>
+    ///     Test that the kind of a state with two colons is the part before the first colon.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_KindOf_StateWithTwoColons_PartBeforeFirstColon()
+    {
+        // Arrange, Act
+        var kind = NotificationComposer.KindOf("replies:3:extra");
+
+        // Assert
+        Assert.Equal("replies", kind);
     }
 
     /// <summary>
@@ -414,6 +427,7 @@ public class NotificationComposerTests
 
         // Assert
         Assert.DoesNotContain("7", mail.Text.Replace("r-dispute", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.DoesNotContain("7", mail.Html.Replace("r-dispute", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
         Assert.DoesNotContain("disputed", mail.Text, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -575,9 +589,10 @@ public class NotificationComposerTests
         // Act
         var mail = composer.Compose([Candidate(InboxSection.ToAnswer, "r1", NotificationComposer.StateToAnswer)], 0, NotificationMode.Every);
 
-        // Assert: no question mark in the whole text, because every link and sentence has none
+        // Assert: no question mark in either part, because every link and sentence has none
         Assert.DoesNotContain('?', mail.Text);
-        Assert.DoesNotContain("token", mail.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain('?', mail.Html);
+        Assert.DoesNotContain("token", mail.Text + mail.Html, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -596,6 +611,23 @@ public class NotificationComposerTests
         var line = mail.Text.Split('\n').Single(l => l.Contains("Bcc:", StringComparison.Ordinal));
         Assert.StartsWith("- ", line, StringComparison.Ordinal);
         Assert.Contains("one  Bcc: evil@example.com", line, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a project name and a review id with a line break stay on one line in the text part.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_Compose_ProjectNameAndReviewIdWithLineBreak_TextPartSingleLine()
+    {
+        // Arrange
+        var composer = new NotificationComposer("Test Center", BaseUrl, false);
+
+        // Act
+        var mail = composer.Compose([Candidate(InboxSection.ToAnswer, "r\n1", NotificationComposer.StateToAnswer, "T", "Alpha\r\n Beta")], 0, NotificationMode.Every);
+
+        // Assert
+        var line = mail.Text.Split('\n').Single(l => l.StartsWith("- ", StringComparison.Ordinal));
+        Assert.Equal("- Alpha   Beta / r 1: your answers are needed", line);
     }
 
     /// <summary>
@@ -695,7 +727,8 @@ public class NotificationComposerTests
         // Assert
         var item = mail.Text.IndexOf("r1", StringComparison.Ordinal);
         var outstanding = mail.Text.IndexOf("3 more items you were told about earlier are still waiting for you.", StringComparison.Ordinal);
-        Assert.True(item >= 0 && outstanding > item);
+        Assert.True(item >= 0);
+        Assert.True(outstanding > item);
     }
 
     /// <summary>
@@ -748,7 +781,7 @@ public class NotificationComposerTests
 
         // Assert
         Assert.Equal(NotificationComposer.MaxListedItems, CountOccurrences(mail.Text, "/projects/"));
-        Assert.Contains("... and 10 more.", mail.Text, StringComparison.Ordinal);
+        Assert.Equal(NotificationComposer.MaxListedItems, CountOccurrences(mail.Html, "/projects/"));
     }
 
     /// <summary>
@@ -789,7 +822,7 @@ public class NotificationComposerTests
     }
 
     /// <summary>
-    ///     Test that the footer says why the mail was sent and links to the Account page.
+    ///     Test that the footer ends the mail with a link to the Account page.
     /// </summary>
     [Fact]
     public void NotificationComposer_Compose_Footer_LinksToAccount()
@@ -801,9 +834,8 @@ public class NotificationComposerTests
         var mail = composer.Compose([Candidate(InboxSection.ToAnswer, "r1", NotificationComposer.StateToAnswer)], 0, NotificationMode.Every);
 
         // Assert
-        Assert.Contains("You get this message because you chose to be notified", mail.Text, StringComparison.Ordinal);
         Assert.EndsWith(BaseUrl + "/account\n", mail.Text, StringComparison.Ordinal);
-        Assert.Contains("href=\"" + BaseUrl + "/account\"", mail.Html, StringComparison.Ordinal);
+        Assert.EndsWith("<a href=\"" + BaseUrl + "/account\">" + BaseUrl + "/account</a></p>\n", mail.Html, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -884,6 +916,7 @@ public class NotificationComposerTests
     public void NotificationComposer_Constructor_EmptyBaseUrl_Throws()
     {
         // Arrange, Act and Assert
+        Assert.Throws<ArgumentException>(() => new NotificationComposer("Test Center", string.Empty, true));
         Assert.Throws<ArgumentException>(() => new NotificationComposer("Test Center", " ", true));
     }
 

@@ -122,7 +122,7 @@ N/A - standard test environment.
 - The file, line and thread addresses open the review page at that place with the highlight and the scroll request;
   an address that names nothing gives a message with a link back to the file list; choosing a file or a thread asks
   the browser to replace its address by the matching link without navigating; every thread has a plain,
-  unobtrusive link (not styled as a button); links
+  unobtrusive link (in plain link style); links
   from `ReviewLinks` return the same file path through the router, whatever its characters.
 - An approved review offers "Download attestation (PDF)", whose address is the attestation address of `ReviewLinks`
   and whose file name follows the project and the review, with a note that a self-signed key is not an organization key
@@ -198,6 +198,11 @@ N/A - standard test environment.
 reviewers answered and started a discussion about a check; no discussion, no count, and no conclusion text is shown,
 and the note says it stays hidden. This scenario is tested by
 `ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads`.
+
+**ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly**: A reviewer who holds a slot has answered one check
+and not handed in a ballot, while two other reviewers handed in ballots that differ; the checklist cell shows "1 of N
+checks answered" and no count of failed checks. This scenario is tested by
+`ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly`.
 
 **ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden**: A member without a slot sees "Hidden until you answer" in
 place of the checklist standing. This scenario is tested by `ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden`.
@@ -289,6 +294,15 @@ the added and removed rows. This scenario is tested by
 share one row, left and right; an unchanged line shows on both sides with its own ids; a line that is only added has
 a muted, hidden-from-assistive-technology empty placeholder on the left. This scenario is tested by
 `ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders`.
+
+**ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles**: The modified file is opened; the removed row has
+the minus sign and the removed class only, the added row has the plus sign and the added class only, and the unchanged
+row has no sign and the context class only. This scenario is tested by
+`ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles`.
+
+**ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText**: A modified file whose removed, added and unchanged lines
+contain markup is opened; every cell shows the characters of its line and none of the markup became an element of the
+diff. This scenario is tested by `ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText`.
 
 **ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange**: Opening a modified file whose first change follows
 collapsed lines asks the browser to scroll that row to the middle of the window (the bUnit stand-in records the
@@ -384,13 +398,17 @@ line, the files, and the thread index come before the Details section, which has
 identifier, state, fingerprint, and file hashes, while the file list holds no hash. This scenario is tested by
 `ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata`.
 
+**ReviewPage_Render_UploadedReview_DetailsShowNoSource**: An uploaded review is rendered next to a repository review;
+the Details section of the uploaded review is there, and none of the repository name, commit identifier and selection
+rows is. This scenario is tested by `ReviewPage_Render_UploadedReview_DetailsShowNoSource`.
+
 **ReviewPage_Render_NextStep_FollowsThreadState**: With no threads the line names the 58 unanswered checks; after a
 thread is started it names the checks and "1 open question to resolve" in one sentence; after the thread is resolved
 only the checks are named again. This scenario is tested by `ReviewPage_Render_NextStep_FollowsThreadState`.
 
 **ReviewPage_Render_NextStep_IncludesChecklistProgress**: A check is answered and a section is marked not
 applicable; the line counts the remaining unanswered checks (52). When everything that applies is answered and the
-thread is resolved, no reviewer slot exists and the line is "Add a reviewer slot.". This scenario is tested by
+thread is resolved, the line is one sentence that says the review is ready for signatures. This scenario is tested by
 `ReviewPage_Render_NextStep_IncludesChecklistProgress`.
 
 **ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink**: A review with two answered checks is rendered; the
@@ -406,10 +424,26 @@ slots or threads is rendered; the summary strip contains the checklist progress 
 the review, the text "No reviewer slots yet", and the thread counts "0 open" and "0 resolved". This scenario is
 tested by `ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads`.
 
+**ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles**: A review of one file is rendered; the
+next-step line comes first, then the summary strip, then the file list. This scenario is tested by
+`ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles`.
+
+**ReviewPage_Render_SignedSlot_SummaryShowsSignedCount**: A review has one slot that ann has signed; the reviewers
+cell of the summary strip counts the signed slot. This scenario is tested by
+`ReviewPage_Render_SignedSlot_SummaryShowsSignedCount`.
+
 **ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc**: A review without a due date says "No due date" and
 shows no Overdue badge. A system administrator types a date in the future and saves it; the header shows "Due
 2025-04-01 (UTC)" without a badge and the date is stored. Clear removes it again. This scenario is tested by
 `ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`.
+
+**ReviewPage_DueDate_ProjectAdministrator_ShowsTheForm**: An administrator of the project who is neither a system
+administrator nor the creator of the review renders the page; the due date form is shown. This scenario is tested by
+`ReviewPage_DueDate_ProjectAdministrator_ShowsTheForm`.
+
+**ReviewPage_DueDate_TodayOrLater_ShowsNoOverdueBadge**: The due date is set to today and, in a second case, to
+tomorrow; the date is shown in the header and no Overdue badge is. This scenario is tested by
+`ReviewPage_DueDate_TodayOrLater_ShowsNoOverdueBadge`.
 
 **ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused**: Text that is not a date is refused with a message
 about the due date and nothing is stored; yesterday is accepted on edit, is shown with the Overdue badge, and the
@@ -447,12 +481,24 @@ and collapses when resolved. This scenario is tested by `ReviewPage_ResolvedThre
 the owning project is labeled with the project name and only the selected file's row is highlighted. This scenario
 is tested by `ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow`.
 
+**ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject**: A review of the project named "Apollo" is rendered
+without a selected file; the breadcrumb link goes to the project and is labeled with its name. This scenario is tested
+by `ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject`.
+
 **ReviewPage_Render_NoFileSelected_ShowsNoContent**: Before a file is selected neither content nor the binary
 notice is shown. This scenario is tested by `ReviewPage_Render_NoFileSelected_ShowsNoContent`.
 
 **ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText**: A text file is selected; its lines are shown
 with numbers and their exact text, with the selected path, and no binary notice. This scenario is tested by
 `ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText`.
+
+**ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept**: A file whose last line ends in a lone carriage return,
+not in a line terminator, is selected; the carriage return is dropped only as part of a CRLF terminator, so it is kept
+at the very end of the file. This scenario is tested by `ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept`.
+
+**ReviewPage_Render_FileSelected_ShowsContentBeforeDetails**: A review of one file is rendered and the file is
+selected; the numbered lines of the file come before the Details section in the page. This scenario is tested by
+`ReviewPage_Render_FileSelected_ShowsContentBeforeDetails`.
 
 **ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent**: A binary file is selected; the binary notice
 is shown and no content. This scenario is tested by `ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent`.
@@ -481,6 +527,10 @@ resolved threads and "0 open threads" for every file. This scenario is tested by
 threads on two files; the summary, the per-file counts, the anchor labels, the anchored-line markers, and the
 comments with author, time, and text are shown for the selected file. This scenario is tested by
 `ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments`.
+
+**ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder**: Three threads on one file are created in an order
+that differs from the order of their lines; the list of the file shows them in the order of creation. This scenario is
+tested by `ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder`.
 
 **ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage**: A file without threads shows an empty-state message.
 This scenario is tested by `ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage`.
@@ -538,6 +588,19 @@ label "Check discussion" in place of a file path, the card of check discussions 
 and a review without such a thread has no card. This scenario is tested by
 `ReviewPage_CheckThread_ListedInIndexWithCheckLabel`.
 
+**ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList**: A review has a thread on a file and a thread
+about a check; after the file is selected, the list of the file holds only the thread of the file and the thread about
+the check stays in the card of check discussions. This scenario is tested by
+`ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList`.
+
+**ReviewPage_CheckThread_CommentText_IsShownAsPlainText**: A comment of a thread about a check that holds markup is
+shown as the literal text and creates no element. This scenario is tested by
+`ReviewPage_CheckThread_CommentText_IsShownAsPlainText`.
+
+**ReviewPage_CheckThread_Card_OffersNoFormToStartThread**: With a file selected, so that the page has a form to start a
+thread, the card of check discussions holds no form, no text field, no start button and no kind choice. This scenario
+is tested by `ReviewPage_CheckThread_Card_OffersNoFormToStartThread`.
+
 **ReviewPage_CheckThread_ReplyAndResolve_Work**: With no file chosen, a reply in the card is stored, and resolving the
 thread moves it to the resolved count and collapses it. This scenario is tested by
 `ReviewPage_CheckThread_ReplyAndResolve_Work`.
@@ -545,6 +608,9 @@ thread moves it to the resolved count and collapses it. This scenario is tested 
 **ReviewPage_CheckThreadDeepLink_ShowsCheckCard**: The address of a thread about a check focuses the thread in its card
 and shows no message, although the thread has no file. This scenario is tested by
 `ReviewPage_CheckThreadDeepLink_ShowsCheckCard`.
+
+**ReviewPage_CheckThreadDeepLink_SelectsNoFile**: The address of a thread about a check selects no file: no file is
+marked as selected and no code is shown. This scenario is tested by `ReviewPage_CheckThreadDeepLink_SelectsNoFile`.
 
 **ReviewPage_CheckThread_DoesNotSelectFile**: Choosing a thread about a check in the index shows the thread without
 choosing a file and keeps a file that was chosen before. This scenario is tested by
@@ -559,13 +625,21 @@ tested by `ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId`.
 
 **ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls**: An approved review is rendered. The
 Locked badge (`review-locked`) next to the Approved badge and the banner (`review-locked-banner`) that says the review
-is locked and that an administrator can reopen it are shown; the controls that would change the review by one click (the
-resolve and reopen thread buttons) are disabled and marked `data-locked="true"`, the controls that change the reviewers
+is locked and that an administrator can reopen it are shown; the controls that change the reviewers
 (the add slot form, the slot edit controls, Remove) are not rendered, only the hint `slots-locked-hint` is, while the
 whole-file new-thread form (`new-thread-form`, `thread-text-input`, `start-thread-button`) is not rendered at all, and
 reading the files and the download of the attestation still work.
-A review that is not approved shows none of these and has `data-locked="false"` controls. This scenario is tested by
+A review that is not approved shows none of these. This scenario is tested by
 `ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls`.
+
+**ReviewPage_Render_ApprovedReview_DisablesTheLineCommentButtons**: An approved review is rendered with its file
+selected; the file has line comment buttons, and each of them is disabled and marked `data-locked="true"`. This
+scenario is tested by `ReviewPage_Render_ApprovedReview_DisablesTheLineCommentButtons`.
+
+**ReviewPage_Render_ApprovedReviewWithThread_OffersNoResolveOrReopen**: A review with a resolved thread is rendered
+while it is open, and the thread offers its toggle control. After the review is signed and approved, the page is
+rendered again; the thread is shown as Resolved and has no control to resolve or reopen it. This scenario is tested by
+`ReviewPage_Render_ApprovedReviewWithThread_OffersNoResolveOrReopen`.
 
 **ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll**: A review with a resolved thread is approved and rendered; the
 All filter is chosen, the resolved thread is listed rather than "No open threads.", and the add-slot form and the slot
@@ -592,6 +666,10 @@ blocker and no sign form, and sees the conclusion editor. This scenario is teste
 through the card; the text is stored and shown in the card, the blocker is gone, and the sign form for the rejection is
 offered. This scenario is tested by `ReviewPage_ConclusionCard_SlotOwnerSavesText_ShowsInCard`.
 
+**ReviewPage_ConclusionCard_AlternateSavesText_ShowsInCard**: The alternate reviewer of a slot types the conclusion
+text and saves it through the card; the text is stored and shown in the editor. This scenario is tested by
+`ReviewPage_ConclusionCard_AlternateSavesText_ShowsInCard`.
+
 **ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation**: A slot has signed and the conclusion text is
 changed through the card; the page asks for a confirmation that names the slot and stores nothing, and the confirmation
 stores the text. This scenario is tested by `ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation`.
@@ -599,6 +677,11 @@ stores the text. This scenario is tested by `ReviewPage_ConclusionCard_ChangeAft
 **ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor**: A project member who owns no slot opens the page; the
 conclusion text is shown and there is no editor. This scenario is tested by
 `ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor`.
+
+**ReviewPage_ConclusionCard_ServiceRefuses_ShowsRuleMessage**: The form of the card is open for the slot owner while
+the review is concluded through the service; saving a text is refused, the message of the rule is shown in the card,
+and the stored conclusion text is unchanged. This scenario is tested by
+`ReviewPage_ConclusionCard_ServiceRefuses_ShowsRuleMessage`.
 
 **ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState**: A project member who owns no slot opens the page of
 a review whose conclusion text is blank; the card is shown with "No conclusion written.", and neither an editor nor a
@@ -618,9 +701,19 @@ attestation is missing. This scenario is tested by
 text, even to the slot owner who wrote it, without the form. This scenario is tested by
 `ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly`.
 
+**ReviewPage_DueDate_RejectedConcluded_ShowsNoOverdueBadge**: A review with a due date in the past is concluded as
+rejected and rendered; the header shows "Due 2025-03-03 (UTC)" and no Overdue badge. This scenario is tested by
+`ReviewPage_DueDate_RejectedConcluded_ShowsNoOverdueBadge`.
+
 **ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked**: A diff is rendered with `CommentsDisabled`; the hint
 reads "This review is locked; comments are read-only." and every `+` button is disabled. This scenario is tested by
 `ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked`.
+
+**ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments**: The diff of a file of an open review
+offers enabled comment buttons for its lines. After the review is signed and approved, the diff shows the hint that
+the review is locked and comments are read-only, and every line comment button is disabled and marked
+`data-locked="true"`. This scenario is tested by
+`ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments`.
 
 **ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton**: The new-thread field and the reply field of a thread
 carry `data-ctrl-enter-submits` with the test id of their submit button, each submit button exists, and the hints
@@ -636,6 +729,11 @@ disabled afterwards is rendered; each change list has an extra, labeled option f
 selected one, so the select is not blank. This scenario is tested by
 `ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists`.
 
+**ReviewPage_EditSlot_NonMemberReviewers_KeepCurrentChoiceInTheLists**: A slot whose primary and alternate users left
+the project afterwards is rendered for an administrator; each change list has an extra, labeled option for the stored
+user, which is the selected one, so the select is not blank. This scenario is tested by
+`ReviewPage_EditSlot_NonMemberReviewers_KeepCurrentChoiceInTheLists`.
+
 **ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption**: A slot of enabled members has no `unavailable` option in
 either list, and each current reviewer is a regular option of its list.
 This scenario is tested by `ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption`.
@@ -650,22 +748,44 @@ offered, has no extra option. This scenario is tested by
 is not an administrator; the banner is shown, but neither the reopen form (reason field and button) nor its error is
 rendered. This scenario is tested by `ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm`.
 
+**ReviewPage_Render_ApprovedReviewProjectAdmin_ShowsReopenForm**: The approved review is rendered for an administrator
+of the project who is not a system administrator; the banner holds the reopen form with the reason field and the
+button. This scenario is tested by `ReviewPage_Render_ApprovedReviewProjectAdmin_ShowsReopenForm`.
+
+**ReviewPage_Render_ReopenForm_LimitsTheReasonLength**: The reopen form of the approved review is rendered for an
+administrator; the reason field carries a `maxlength` of 250. This scenario is tested by
+`ReviewPage_Render_ReopenForm_LimitsTheReasonLength`.
+
 **ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory**: For an administrator the banner holds the
 reopen form. A reason is typed and the button pressed; the badge reads "In review", the Locked badge and banner are
 gone, the controls are enabled again, the old signature shows "Signed, then the review changed", and the reopen history
-(`reopen-history`) lists the administrator, the time, the reason, and the shortened previous digest. This scenario is
+(`reopen-history`) lists the administrator, the time, the reason, and the shortened previous digest; the time is not
+empty and the digest has 16 characters. This scenario is
 tested by `ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory`.
 
 **ReviewPage_Reopen_EmptyReason_ShowsError**: The button is pressed with an empty reason; the message of the rule
 (`reopen-error`) is shown, the review is still approved and locked, and no reopen is stored. This scenario is tested by
 `ReviewPage_Reopen_EmptyReason_ShowsError`.
 
+**ReviewPage_Reopen_TwoReopenings_ListsOldestFirst**: A review is approved, reopened, approved again and reopened
+again; the history lists two entries, the first reopening first, each with the administrator and the time (the fixed
+clock of the test gives "2025-03-04 05:06 UTC" for both). This scenario is tested by
+`ReviewPage_Reopen_TwoReopenings_ListsOldestFirst`.
+
 **ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates**: With the project at its default of requiring
 independent reviewers, a review created by one member is rendered for the author: the author is not offered in the
-primary and alternate lists of the add form, the other members are, and the hint `author-independence-hint` ("You
-created this review, so a different project member has to review and sign it.") is shown. For another member the
-hint is not shown, and with the rule switched off the author is offered again. This scenario is tested by
+primary and the alternate list of the add form, the other members are, and the hint `author-independence-hint` ("You
+created this review, so a different project member has to review and sign it.") is shown. This scenario is tested by
 `ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates`.
+
+**ReviewPage_Render_IndependenceOn_OtherMemberSeesNoHint**: The same review is rendered for another member of the
+project; the hint `author-independence-hint` is not shown. This scenario is tested by
+`ReviewPage_Render_IndependenceOn_OtherMemberSeesNoHint`.
+
+**ReviewPage_Render_IndependenceOff_OffersTheAuthorAndShowsNoHint**: The project does not require independent
+reviewers and the author renders the review; the author is offered in the primary and the alternate list again, with
+every other user, and the hint is not shown. This scenario is tested by
+`ReviewPage_Render_IndependenceOff_OffersTheAuthorAndShowsNoHint`.
 
 **ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm**: A slot of two reviewers is signed and the review
 is reopened by the alternate. While the rule is on, the reopener sees `reopener-cannot-sign-{id}` and no sign form for
@@ -690,9 +810,19 @@ message is gone. This scenario is tested by `ReviewPage_AddSlot_PrimaryAndAltern
 then with the same user as primary and alternate; each time a message is shown and no slot is stored. This scenario
 is tested by `ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing`.
 
+**ReviewPage_Render_DisabledUser_IsNotOfferedInTheAddForm**: One member of a signable review is disabled afterwards and
+the page is rendered; the primary and the alternate list of the add form offer the enabled members and not the
+disabled one. This scenario is tested by `ReviewPage_Render_DisabledUser_IsNotOfferedInTheAddForm`.
+
 **ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves**: The primary of an unsigned slot is changed and its
 alternate dropped, and Save shows the change ("None" for the alternate); Remove then removes the slot and the empty
 message returns. This scenario is tested by `ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves`.
+
+**ReviewPage_EditSlot_InvalidChoices_ShowsErrorNextToTheSlot**: The same user is chosen as primary and as alternate
+of an
+unsigned slot and Save is pressed; the reason is shown next to the slot (`slot-error-{id}`, which was not there before)
+and the stored slot still holds the original primary and alternate. This scenario is tested by
+`ReviewPage_EditSlot_InvalidChoices_ShowsErrorNextToTheSlot`.
 
 **ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm**: The alternate of the first slot has
 handed in a ballot that disagrees, and the second slot holds a signature of that record. Dropping the alternate would
@@ -762,6 +892,35 @@ confirmation whose `auth_time` is 600 seconds old says that the sign-in was not 
 shows its first 16 characters, and its title holds the full 64-character digest computed by the service. This
 scenario is tested by `ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle`.
 
+**ReviewPage_Render_SignableReview_OccupantsSeeSignFormWithApprovedOutcome**: A signable review with ann as primary and
+bob as alternate is rendered for each of them; each sees the sign form, a password field of type password, the outcome
+"You are signing: APPROVED" and the approval meaning text of the signing service. This scenario is tested by
+`ReviewPage_Render_SignableReview_OccupantsSeeSignFormWithApprovedOutcome`.
+
+**ReviewPage_Render_ProviderUser_OffersConfirmationButtonInsteadOfPassword**: The identity provider is configured and
+the occupant of a signable slot is a user of that provider. The slot offers the button "Confirm identity with Provider"
+in a form that posts to `/auth/oidc/reauth`, and has neither a password field nor a sign form. This scenario is tested
+by `ReviewPage_Render_ProviderUser_OffersConfirmationButtonInsteadOfPassword`.
+
+**ReviewPage_Render_ProviderUserWithConfirmation_OffersSignButton**: As above, with a confirmation of identity issued
+for the user, the review and the slot. The slot shows the note that the identity is confirmed and the Sign button, and
+neither the confirmation button nor a password field. This scenario is tested by
+`ReviewPage_Render_ProviderUserWithConfirmation_OffersSignButton`.
+
+**ReviewPage_Render_ProviderUserMissingAuthTime_NamesTheCause**: The page is opened after a confirmation that failed
+because the provider reported no usable sign-in time (`reauth=missing-auth-time`). The error of the slot says that the
+provider did not report a usable sign-in time, names `auth_time` and tells an administrator what to check. This
+scenario is tested by `ReviewPage_Render_ProviderUserMissingAuthTime_NamesTheCause`.
+
+**ReviewPage_Render_ProviderUserStaleAuthTime_NamesTheCause**: The page is opened after a confirmation that failed
+because the sign-in was too old (`reauth=stale-auth-time`). The error of the slot says that the sign-in at the provider
+was not recent enough. This scenario is tested by `ReviewPage_Render_ProviderUserStaleAuthTime_NamesTheCause`.
+
+**ReviewPage_Render_ProviderUserFailedConfirmation_ShowsGeneralMessage**: The page is opened after any other failed
+confirmation (`reauth=failed`); the error of the slot gives the general message. A value that is none of the known ones
+puts no error on the page. This scenario is tested by
+`ReviewPage_Render_ProviderUserFailedConfirmation_ShowsGeneralMessage`.
+
 **ReviewPage_Render_SlotDisplayName_IsShownAsPlainText**: A user whose display name is `<b>Eve</b>` is the primary
 of a slot; the card shows the literal text and creates no element. This scenario is tested by
 `ReviewPage_Render_SlotDisplayName_IsShownAsPlainText`.
@@ -786,6 +945,11 @@ starts the handler finds no signed-in user, so the not-found message replaces th
 no thread exists. This scenario is tested by
 `ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing`.
 
+**ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing**: A member has a file selected and has typed
+the text of a new thread, and the membership is removed in the store; the new thread is submitted. Only the not-found
+message is shown, and the review still has only its original thread. This scenario is tested by
+`ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing`.
+
 **ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: An open thread and a
 resolved thread are shown, and the sign-in state ends without the page being told; resolving the open thread is
 attempted. The not-found message replaces the page, no thread control remains, and both threads keep their stored
@@ -802,6 +966,16 @@ file names, file content, comment, reviewer name or checklist progress is in the
 `readonly-notice`, the comments and the status, and none of the slot, sign, comment, reply, and resolve controls and no
 reopen form. This scenario is tested by `ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls`.
 
+**ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls**: A review has a file with a thread. An
+Auditor and a user who may work both select the file. The Auditor reads the comment of the thread and has no new
+comment form, no reply box and no resolve toggle; the user who may work has all three, so the absence is not an
+artifact of the arrangement. This scenario is tested by
+`ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls`.
+
+**ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm**: Bob is the alternate of a slot and sees the sign form;
+he becomes an Auditor of the project and the page is drawn again. Bob still holds the slot, sees the read-only notice
+and gets no sign form. This scenario is tested by `ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm`.
+
 **ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked**: An Auditor opens a file of an open review; the diff
 hint says that the access is read-only and does not say that the review is locked. This scenario is tested by
 `ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked`.
@@ -813,6 +987,10 @@ new-comment line selection; the page still renders no `new-thread-form`. This sc
 **ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member has a comment draft open, the
 role changes to Auditor, and the page reloads; the composer and the draft are gone. This scenario is tested by
 `ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft`.
+
+**ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton**: An Auditor opens the modified file and
+switches to the Head version; the numbered head lines have a comment button each, and every one is disabled. This
+scenario is tested by `ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton`.
 
 **ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the review open, and the membership is
 removed in the store; choosing a file shows the not-found message, and nothing that the page had loaded (names, file
@@ -975,9 +1153,11 @@ password nor the code remains in the page; this is tested by
 `ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields`. A theory over an empty and a wrong code
 shows "The password or the code is incorrect.", stores no signature, and leaves both fields empty; this is tested by
 `ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing`. The code of the step in which the user
-enrolled is refused, and after the clock moves on the code of the next step signs; this is tested by
-`ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode`. A recovery code typed in place of the code is
-refused and nothing is signed, which is tested by `ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused`.
+enrolled is refused with "The password or the code is incorrect.", and after the clock moves on the code of the next
+step
+signs; this is tested by `ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode`. A recovery code typed in
+place of the code is refused with the same message and nothing is signed, which is tested by
+`ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused`.
 
 **ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark**: A review that follows another shows a link to
 it and "0 answers and 1 thread carried"; the carried thread is marked with a link to the earlier review and a thread of
@@ -986,6 +1166,11 @@ the review's own is not. This scenario is tested by `ReviewPage_Render_FollowUp_
 **ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine**: The followed review lists its follow-ups with
 links and shows no follows line, and a follow-up that nothing follows shows no list. This scenario is tested by
 `ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine`.
+
+**ReviewPage_Render_StandaloneReview_ShowsNoFollowUpInformation**: A review with a thread that follows no review and is
+followed by none is rendered with its file selected; there is no follows line, no carried counts, no followed-by list,
+and the thread has neither a carried mark nor a link to a review it came from. This scenario is tested by
+`ReviewPage_Render_StandaloneReview_ShowsNoFollowUpInformation`.
 
 **ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers**: A viewer without a stored read state opens a review
 with comments of others; the summary, the index of the threads, and the thread carry the New marker. This scenario is
@@ -1075,7 +1260,8 @@ render the component and the page with bUnit, and in two Puppet scenarios that r
 
 **ReviewStatusPanel_ShowsReviewerBallotAndSignedStates**, **ReviewStatusPanel_ShowsQuestionAndFindingCounts**,
 **ReviewStatusPanel_ShowsExactlyOneNextActionButton**, and **ReviewStatusPanel_DisputedCheck_DiscussStartsThread**: The
-panel lists each reviewer with the words for the ballot and the signature, shows the open questions and findings as
+panel, headed "Where are we?", lists each reviewer with the words for the ballot and the signature, shows the open
+questions and findings as
 icon and text, renders exactly one `next-action` element, and a Discuss button on a disputed check starts the check
 thread. These scenarios are tested by the tests of the same names.
 
@@ -1125,9 +1311,12 @@ with "Hand in your ballot" and does not repeat that the answers stay hidden; the
 tested by `ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce`.
 
 **ReviewPage_SignedThenChanged_ExplainsWhatChanged**: After a slot signed and a Finding then went into the report, the
-slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time, with
-the note that the list explains and does not prove. This scenario is tested by
-`ReviewPage_SignedThenChanged_ExplainsWhatChanged`.
+slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time. This
+scenario is tested by `ReviewPage_SignedThenChanged_ExplainsWhatChanged`.
+
+**ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain**: For the same slot the note above the list reads
+when the slot signed and that the reviewer needs to look again and sign again. This scenario is tested by
+`ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain`.
 
 **ReviewPage_NoJargonOutOfDateText** and **SignatureWarning_UsesPlainLanguage**: No text of the page and no warning
 contains "out of date"; the warning says that signed reviewers will need to look again and sign again, because the

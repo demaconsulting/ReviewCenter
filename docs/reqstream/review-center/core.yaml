@@ -188,6 +188,10 @@ sections:
           - ReviewCenter-RepositoryService-Ownership-Listing
           - ReviewCenter-RepositoryService-Ownership-ListingProject
           - ReviewCenter-ThreadService-Access
+          - ReviewCenter-ThreadService-Access-CommandLine
+          - ReviewCenter-ThreadService-Access-Auditor
+          - ReviewCenter-ThreadService-Access-NothingStored
+          - ReviewCenter-ThreadService-Access-Required
           - ReviewCenter-ChecklistService-Access
           - ReviewCenter-ChecklistService-Access-Section
           - ReviewCenter-ChecklistService-Arguments
@@ -221,13 +225,37 @@ sections:
           simultaneous change, and must be traceable in the history of the project.
         children:
           - ReviewCenter-EvidenceSettingsService-Defaults
+          - ReviewCenter-EvidenceSettingsService-Defaults-Complete
+          - ReviewCenter-EvidenceSettingsService-Defaults-NewProject
           - ReviewCenter-EvidenceSettingsService-Describe
+          - ReviewCenter-EvidenceSettingsService-Describe-Order
+          - ReviewCenter-EvidenceSettingsService-Describe-Anonymous
+          - ReviewCenter-EvidenceSettingsService-Describe-Changes
+          - ReviewCenter-EvidenceSettingsService-Describe-ChangesOrder
           - ReviewCenter-EvidenceSettingsService-Access
+          - ReviewCenter-EvidenceSettingsService-Access-Change
+          - ReviewCenter-EvidenceSettingsService-Access-Rechecked
+          - ReviewCenter-EvidenceSettingsService-Access-Member
+          - ReviewCenter-EvidenceSettingsService-Access-Hidden
+          - ReviewCenter-EvidenceSettingsService-Access-StoresNothing
+          - ReviewCenter-EvidenceSettingsService-Access-RecordsNothing
           - ReviewCenter-EvidenceSettingsService-Change
+          - ReviewCenter-EvidenceSettingsService-Change-OtherProjects
+          - ReviewCenter-EvidenceSettingsService-Change-Reported
           - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-EvidenceSettingsService-Audit-Atomic
+          - ReviewCenter-EvidenceSettingsService-Audit-Actor
+          - ReviewCenter-EvidenceSettingsService-Audit-Keys
+          - ReviewCenter-EvidenceSettingsService-Audit-KeyValues
           - ReviewCenter-EvidenceSettingsService-NoChange
+          - ReviewCenter-EvidenceSettingsService-NoChange-Stored
+          - ReviewCenter-EvidenceSettingsService-NoChange-RecordsNothing
           - ReviewCenter-EvidenceSettingsService-Conflict
+          - ReviewCenter-EvidenceSettingsService-Conflict-StoresNothing
+          - ReviewCenter-EvidenceSettingsService-Conflict-RecordsNothing
           - ReviewCenter-EvidenceSettingsService-Effective
+          - ReviewCenter-EvidenceSettingsService-Effective-UnknownProject
+          - ReviewCenter-EvidenceSettingsService-Effective-ChangeNotFound
           - ReviewCenter-EvidenceSettingsService-Arguments
         tests:
           - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
@@ -410,7 +438,22 @@ sections:
           - ReviewCenter-ReviewService-Limits-FileCount
           - ReviewCenter-ReviewService-Limits-TotalSize
           - ReviewCenter-ThreadService-Anchor
+          - ReviewCenter-ThreadService-Anchor-UnknownReview
+          - ReviewCenter-ThreadService-Anchor-HalfRange
+          - ReviewCenter-ThreadService-Anchor-StartBelowOne
+          - ReviewCenter-ThreadService-Anchor-EndBeforeStart
+          - ReviewCenter-ThreadService-Anchor-EndBeyondFile
+          - ReviewCenter-ThreadService-Anchor-BinaryOrEmptyRange
+          - ReviewCenter-ThreadService-Anchor-WholeFile
+          - ReviewCenter-ThreadService-Anchor-LastLine
+          - ReviewCenter-ThreadService-Anchor-LineEndings
+          - ReviewCenter-ThreadService-Anchor-FinalLineEnding
           - ReviewCenter-ThreadService-Comment
+          - ReviewCenter-ThreadService-Comment-Blank
+          - ReviewCenter-ThreadService-Comment-TooLong
+          - ReviewCenter-ThreadService-Comment-LongestAccepted
+          - ReviewCenter-ThreadService-Comment-Trimmed
+          - ReviewCenter-ThreadService-Comment-NothingStored
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
 
@@ -427,18 +470,134 @@ sections:
           reliable record of what was said and in which order.
         children:
           - ReviewCenter-ThreadService-Start
+          - ReviewCenter-ThreadService-Start-WholeFile
+          - ReviewCenter-ThreadService-Start-LineRange
+          - ReviewCenter-ThreadService-Start-FirstComment
+          - ReviewCenter-ThreadService-Start-Created
           - ReviewCenter-ThreadService-Reply
+          - ReviewCenter-ThreadService-Reply-Created
+          - ReviewCenter-ThreadService-Reply-EarlierUnchanged
+          - ReviewCenter-ThreadService-Reply-Order
+          - ReviewCenter-ThreadService-Reply-StateUnchanged
+          - ReviewCenter-ThreadService-Reply-ThreadNotFound
+          - ReviewCenter-ThreadService-Reply-OtherReview
           - ReviewCenter-ThreadService-State
+          - ReviewCenter-ThreadService-State-Reopen
+          - ReviewCenter-ThreadService-State-CommentsKept
+          - ReviewCenter-ThreadService-State-ResolveRepeated
+          - ReviewCenter-ThreadService-State-ReopenRepeated
+          - ReviewCenter-ThreadService-State-ThreadNotFound
+          - ReviewCenter-ThreadService-State-OtherReview
           - ReviewCenter-ThreadService-Read
+          - ReviewCenter-ThreadService-Read-ThreadOrder
+          - ReviewCenter-ThreadService-Read-CommentOrder
+          - ReviewCenter-ThreadService-Read-Empty
           - ReviewCenter-ThreadService-Index
+          - ReviewCenter-ThreadService-Index-All
+          - ReviewCenter-ThreadService-Index-StateFilter
+          - ReviewCenter-ThreadService-Index-Order
+          - ReviewCenter-ThreadService-Index-InputUnchanged
           - ReviewCenter-ThreadService-NextStep
+          - ReviewCenter-ThreadService-NextStep-StartDiscussion
+          - ReviewCenter-ThreadService-NextStep-AllResolved
+          - ReviewCenter-ThreadService-NextStep-Unanswered
+          - ReviewCenter-ThreadService-NextStep-Disputed
+          - ReviewCenter-ThreadService-NextStep-Failed
+          - ReviewCenter-ThreadService-NextStep-FailNotBlocking
+          - ReviewCenter-ThreadService-NextStep-ChecklistComplete
+          - ReviewCenter-ThreadService-NextStep-Combined
+          - ReviewCenter-ThreadService-NextStep-Order
+          - ReviewCenter-ThreadService-NextStep-Conclusion
+          - ReviewCenter-ThreadService-NextStep-ExplicitUnanswered
+          - ReviewCenter-ThreadService-NextStep-DisputedOnce
           - ReviewCenter-ThreadService-IncludedComment
+          - ReviewCenter-ThreadService-IncludedComment-Reply
+          - ReviewCenter-ThreadService-IncludedComment-Chat
+          - ReviewCenter-ThreadService-IncludedComment-Finding
+          - ReviewCenter-ThreadService-IncludedComment-Question
+          - ReviewCenter-ThreadService-IncludedComment-List
+          - ReviewCenter-ThreadService-IncludedComment-List-Kind
           - ReviewCenter-ThreadService-ResolutionNote
+          - ReviewCenter-ThreadService-ResolutionNote-Blank
+          - ReviewCenter-ThreadService-ResolutionNote-NothingStored
+          - ReviewCenter-ThreadService-ResolutionNote-TooLong
+          - ReviewCenter-ThreadService-ResolutionNote-TooLong-StaysOpen
+          - ReviewCenter-ThreadService-ResolutionNote-Question
+          - ReviewCenter-ThreadService-ResolutionNote-NoteStored
+          - ReviewCenter-ThreadService-ResolutionNote-NoteWithState
+          - ReviewCenter-ThreadService-ResolutionNote-NoteTrimmed
+          - ReviewCenter-ThreadService-ResolutionNote-FindingNoteIncluded
+          - ReviewCenter-ThreadService-ResolutionNote-QuestionNoteExcluded
+          - ReviewCenter-ThreadService-ResolutionNote-BlankNoteIgnored
+          - ReviewCenter-ThreadService-ResolutionNote-AlreadyResolved
+          - ReviewCenter-ThreadService-ResolutionNote-AlreadyResolved-NoAudit
+          - ReviewCenter-ThreadService-ResolutionNote-ReopenKeepsNotes
+          - ReviewCenter-ThreadService-ResolutionNote-ResolveAgain
+          - ReviewCenter-ThreadService-ResolutionNote-RecordChanged
+          - ReviewCenter-ThreadService-ResolutionNote-RecordChangedNothingStored
           - ReviewCenter-ThreadService-Promote
+          - ReviewCenter-ThreadService-Promote-AlternateSlotOwner
+          - ReviewCenter-ThreadService-Promote-SlotOwnerApiToken
+          - ReviewCenter-ThreadService-Promote-NotSlotOwner
+          - ReviewCenter-ThreadService-Promote-Refused
+          - ReviewCenter-ThreadService-Promote-Lead
+          - ReviewCenter-ThreadService-Promote-LeadCreatorCase
+          - ReviewCenter-ThreadService-Promote-LeadNotApiToken
+          - ReviewCenter-ThreadService-Promote-CreatorMadeAuditor
+          - ReviewCenter-ThreadService-Promote-NotLead
+          - ReviewCenter-ThreadService-Promote-NoCreatorLead
+          - ReviewCenter-ThreadService-Promote-Auditor
+          - ReviewCenter-ThreadService-Promote-ResolutionIncluded
+          - ReviewCenter-ThreadService-Promote-ResolvedNeedsNote
+          - ReviewCenter-ThreadService-Promote-AlreadyFinding
+          - ReviewCenter-ThreadService-Promote-Demote
+          - ReviewCenter-ThreadService-Promote-DemoteSlotOwnerRefused
+          - ReviewCenter-ThreadService-Promote-DemoteResolutionExcluded
+          - ReviewCenter-ThreadService-Promote-DemoteReplyFlagsKept
+          - ReviewCenter-ThreadService-Promote-AlreadyQuestion
           - ReviewCenter-ThreadService-CommentToggle
+          - ReviewCenter-ThreadService-CommentToggle-Lead
+          - ReviewCenter-ThreadService-CommentToggle-Refused
+          - ReviewCenter-ThreadService-CommentToggle-LeadNotApiToken
+          - ReviewCenter-ThreadService-CommentToggle-StartingOrResolution
+          - ReviewCenter-ThreadService-CommentToggle-UnknownComment
+          - ReviewCenter-ThreadService-CommentToggle-SameValue
           - ReviewCenter-ThreadService-CheckThreads
+          - ReviewCenter-ThreadService-CheckThreads-MixedAnchor
+          - ReviewCenter-ThreadService-CheckThreads-Lines
+          - ReviewCenter-ThreadService-CheckThreads-BaselineSide
+          - ReviewCenter-ThreadService-CheckThreads-EmptyCheck
+          - ReviewCenter-ThreadService-CheckThreads-NoChecklist
+          - ReviewCenter-ThreadService-CheckThreads-UnknownCheck
+          - ReviewCenter-ThreadService-CheckThreads-NothingStored
+          - ReviewCenter-ThreadService-CheckThreads-Reply
+          - ReviewCenter-ThreadService-CheckThreads-Resolve
+          - ReviewCenter-ThreadService-CheckThreads-Reopen
           - ReviewCenter-ThreadService-CheckThreadStart
+          - ReviewCenter-ThreadService-CheckThreadStart-SubmittedReviewer
+          - ReviewCenter-ThreadService-CheckThreadStart-SoleReviewer
+          - ReviewCenter-ThreadService-CheckThreadStart-DraftReviewer
+          - ReviewCenter-ThreadService-CheckThreadStart-Refused
+          - ReviewCenter-ThreadService-CheckThreadStart-Locked
+          - ReviewCenter-ThreadService-CheckThreadStart-Acknowledgement
+          - ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgement
+          - ReviewCenter-ThreadService-CheckThreadStart-ChatKeepsSignature
           - ReviewCenter-ThreadService-Capabilities
+          - ReviewCenter-ThreadService-Capabilities-Demote
+          - ReviewCenter-ThreadService-Capabilities-ResolvedQuestion
+          - ReviewCenter-ThreadService-Capabilities-Resolve
+          - ReviewCenter-ThreadService-Capabilities-UnknownThread
+          - ReviewCenter-ThreadService-Capabilities-ToggleReply
+          - ReviewCenter-ThreadService-Capabilities-StartingComment
+          - ReviewCenter-ThreadService-Capabilities-Auditor
+          - ReviewCenter-ThreadService-Capabilities-Concluded
+          - ReviewCenter-ThreadService-Capabilities-ApiToken
+          - ReviewCenter-ThreadService-Capabilities-ApiTokenNotLead
+          - ReviewCenter-ThreadService-Capabilities-Equality
+          - ReviewCenter-ThreadService-Capabilities-Counts
+          - ReviewCenter-ThreadService-Capabilities-CountsPhrase
+          - ReviewCenter-ThreadService-Capabilities-CountsPhrase-ZeroOneMany
+          - ReviewCenter-ThreadService-Capabilities-CountsArguments
           - ReviewCenter-RecordDigest-CheckThread
           - ReviewCenter-RecordDigest-CheckThread-Comments
           - ReviewCenter-RecordDigest-CheckThread-Chat
@@ -511,6 +670,13 @@ sections:
           - ReviewCenter-ReviewService-Diff-LineEndings
           - ReviewCenter-ReviewService-Diff-NotFound
           - ReviewCenter-ThreadService-Side
+          - ReviewCenter-ThreadService-Side-Default
+          - ReviewCenter-ThreadService-Side-Lines
+          - ReviewCenter-ThreadService-Side-BaselineCommit
+          - ReviewCenter-ThreadService-Side-BaselineFile
+          - ReviewCenter-ThreadService-Side-WholeFile
+          - ReviewCenter-ThreadService-Side-WholeFileBaseline
+          - ReviewCenter-ThreadService-Side-Undefined
           - ReviewCenter-RecordDigest-ThreadSide
           - ReviewCenter-RecordDigest-ThreadSide-Change
         tests:
@@ -955,6 +1121,27 @@ sections:
           - ReviewCenter-SigningService-RejectedOutcome-Reopen
           - ReviewCenter-SigningService-RejectedOutcome-AuditOutcome
           - ReviewCenter-ThreadService-SignatureImpact
+          - ReviewCenter-ThreadService-SignatureImpact-Reply
+          - ReviewCenter-ThreadService-SignatureImpact-Promote
+          - ReviewCenter-ThreadService-SignatureImpact-Demote
+          - ReviewCenter-ThreadService-SignatureImpact-CommentToggle
+          - ReviewCenter-ThreadService-SignatureImpact-Resolve
+          - ReviewCenter-ThreadService-SignatureImpact-NamesSlots
+          - ReviewCenter-ThreadService-SignatureImpact-NamesSlots-OnlySigned
+          - ReviewCenter-ThreadService-SignatureImpact-Acknowledged
+          - ReviewCenter-ThreadService-SignatureImpact-Acknowledged-OutOfDate
+          - ReviewCenter-ThreadService-SignatureImpact-NothingStored
+          - ReviewCenter-ThreadService-SignatureImpact-AfterValidation
+          - ReviewCenter-ThreadService-SignatureImpact-ThreadNotFound
+          - ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain
+          - ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain-SignaturesCurrent
+          - ReviewCenter-ThreadService-SignatureImpact-ChatThread
+          - ReviewCenter-ThreadService-SignatureImpact-ChatThread-SignaturesCurrent
+          - ReviewCenter-ThreadService-SignatureImpact-ChatReply
+          - ReviewCenter-ThreadService-SignatureImpact-ChatReply-SignaturesCurrent
+          - ReviewCenter-ThreadService-SignatureImpact-ResolveQuestion
+          - ReviewCenter-ThreadService-SignatureImpact-Reopen
+          - ReviewCenter-ThreadService-SignatureImpact-Restored
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
           - CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement
@@ -1006,7 +1193,13 @@ sections:
           - ReviewCenter-SigningService-Reopen-BallotsStay
           - ReviewCenter-SigningService-Reopen-CountInvalidates
           - ReviewCenter-ThreadService-ApprovalLock
+          - ReviewCenter-ThreadService-ApprovalLock-Report
+          - ReviewCenter-ThreadService-ApprovalLock-AfterAccess
+          - ReviewCenter-ThreadService-ApprovalLock-BeforeFileLookup
+          - ReviewCenter-ThreadService-ApprovalLock-OpenThread
+          - ReviewCenter-ThreadService-ApprovalLock-ReviewNotFound
           - ReviewCenter-ThreadService-ConcludedRefusal
+          - ReviewCenter-ThreadService-ConcludedRefusal-NothingChanged
           - ReviewCenter-SigningService-OpenThreadRule
           - ReviewCenter-SigningService-OpenThreadRule-OpenThreadBlocks
           - ReviewCenter-SigningService-OpenThreadRule-NotApproved
@@ -1143,18 +1336,170 @@ sections:
           was recorded elsewhere.
         children:
           - ReviewCenter-AuditChain-Hash
+          - ReviewCenter-AuditChain-Hash-LowercaseHex
+          - ReviewCenter-AuditChain-Hash-IgnoresStoredHash
+          - ReviewCenter-AuditChain-Hash-UtcTime
+          - ReviewCenter-AuditChain-Hash-EachField
+          - ReviewCenter-AuditChain-Hash-AbsentReview
+          - ReviewCenter-AuditChain-Hash-NoTextMoves
+          - ReviewCenter-AuditChain-Hash-Unicode
+          - ReviewCenter-AuditChain-Hash-NullEntry
           - ReviewCenter-AuditChain-Verify
+          - ReviewCenter-AuditChain-Verify-Head
+          - ReviewCenter-AuditChain-Verify-Empty
+          - ReviewCenter-AuditChain-Verify-OneByOne
+          - ReviewCenter-AuditChain-Verify-Edited
+          - ReviewCenter-AuditChain-Verify-EditedRehashed
+          - ReviewCenter-AuditChain-Verify-Missing
+          - ReviewCenter-AuditChain-Verify-MissingFirst
+          - ReviewCenter-AuditChain-Verify-FirstOtherSequence
+          - ReviewCenter-AuditChain-Verify-Inserted
+          - ReviewCenter-AuditChain-Verify-Duplicated
+          - ReviewCenter-AuditChain-Verify-OutOfOrder
+          - ReviewCenter-AuditChain-Verify-WrongPredecessor
+          - ReviewCenter-AuditChain-Verify-FirstOfTwo
+          - ReviewCenter-AuditChain-Verify-StopsReading
+          - ReviewCenter-AuditChain-Verify-HeadOfLastGood
+          - ReviewCenter-AuditChain-Verify-StaysFailed
           - ReviewCenter-AuditChain-Text
+          - ReviewCenter-AuditChain-Text-Plain
+          - ReviewCenter-AuditChain-Text-Trim
+          - ReviewCenter-AuditChain-Text-Null
+          - ReviewCenter-AuditChain-Text-LoneSurrogate
+          - ReviewCenter-AuditChain-Text-SurrogatePair
+          - ReviewCenter-AuditChain-Text-LimitCut
+          - ReviewCenter-AuditChain-Text-LimitKept
+          - ReviewCenter-AuditChain-Text-NoPairSplit
+          - ReviewCenter-AuditChain-Text-LimitBelowFour
+          - ReviewCenter-AuditChain-Text-ShortHash
+          - ReviewCenter-AuditChain-Text-ShortHashNull
+          - ReviewCenter-AuditChain-Text-ShortHashDiffers
+          - ReviewCenter-AuditChain-Text-ActorSignedIn
+          - ReviewCenter-AuditChain-Text-ActorCommandLine
           - ReviewCenter-AuditService-Record
+          - ReviewCenter-AuditService-Record-Parallel
+          - ReviewCenter-AuditService-Record-StrictFailure
+          - ReviewCenter-AuditService-Record-BestEffort
+          - ReviewCenter-AuditService-Record-BestEffortReturnsTrue
+          - ReviewCenter-AuditService-Record-BestEffortFailure
+          - ReviewCenter-AuditService-Record-ErrorHook
+          - ReviewCenter-AuditService-Record-HookFailure
+          - ReviewCenter-AuditService-Record-Cancellation
+          - ReviewCenter-AuditService-Record-Arguments
           - ReviewCenter-AuditService-Coalesce
+          - ReviewCenter-AuditService-Coalesce-Repeats
+          - ReviewCenter-AuditService-Coalesce-NextWindow
+          - ReviewCenter-AuditService-Coalesce-DifferentKeys
+          - ReviewCenter-AuditService-Coalesce-KeyLimit
+          - ReviewCenter-AuditService-Coalesce-KeyLimitRecovery
+          - ReviewCenter-AuditService-Coalesce-CancelledRepeat
+          - ReviewCenter-AuditService-Coalesce-CancelledFirst
+          - ReviewCenter-AuditService-Coalesce-Cancellation
+          - ReviewCenter-AuditService-Coalesce-StoreFailure
+          - ReviewCenter-AuditService-Coalesce-StoreFailureReported
+          - ReviewCenter-AuditService-Coalesce-Arguments
           - ReviewCenter-AuditService-CoalesceOverflow
+          - ReviewCenter-AuditService-CoalesceOverflow-OneEntry
+          - ReviewCenter-AuditService-CoalesceOverflow-PreviousCount
+          - ReviewCenter-AuditService-CoalesceOverflow-Reported
+          - ReviewCenter-AuditService-CoalesceOverflow-NeverThrows
           - ReviewCenter-AuditService-List
+          - ReviewCenter-AuditService-List-DefaultPageSize
+          - ReviewCenter-AuditService-List-PageSizeAsked
+          - ReviewCenter-AuditService-List-PageSizeCap
+          - ReviewCenter-AuditService-List-Project
+          - ReviewCenter-AuditService-List-ProjectScope
+          - ReviewCenter-AuditService-List-Review
+          - ReviewCenter-AuditService-List-Older
+          - ReviewCenter-AuditService-List-Newer
+          - ReviewCenter-AuditService-List-PagingOnce
+          - ReviewCenter-AuditService-List-PagingNewer
+          - ReviewCenter-AuditService-List-EmptyTrail
+          - ReviewCenter-AuditService-List-BeforeWins
           - ReviewCenter-AuditService-Filter
+          - ReviewCenter-AuditService-Filter-Project
+          - ReviewCenter-AuditService-Filter-Review
+          - ReviewCenter-AuditService-Filter-ActorText
+          - ReviewCenter-AuditService-Filter-ActorIdentity
+          - ReviewCenter-AuditService-Filter-Action
+          - ReviewCenter-AuditService-Filter-ActionGroup
+          - ReviewCenter-AuditService-Filter-DayRange
+          - ReviewCenter-AuditService-Filter-Paging
+          - ReviewCenter-AuditService-Filter-Trim
+          - ReviewCenter-AuditService-Filter-EmptyText
+          - ReviewCenter-AuditService-Filter-None
+          - ReviewCenter-AuditService-Filter-TextTooLong
+          - ReviewCenter-AuditService-Filter-ReversedRange
+          - ReviewCenter-AuditService-Filter-SingleDay
+          - ReviewCenter-AuditService-Filter-ActionList
+          - ReviewCenter-AuditService-Filter-ActionListOrder
+          - ReviewCenter-AuditService-Filter-ActionListForm
+          - ReviewCenter-AuditService-Filter-ActionGroups
+          - ReviewCenter-AuditService-Filter-ActionLookup
           - ReviewCenter-AuditService-Verify
+          - ReviewCenter-AuditService-Verify-Intact
+          - ReviewCenter-AuditService-Verify-Empty
+          - ReviewCenter-AuditService-Verify-Broken
           - ReviewCenter-AuditService-Export
+          - ReviewCenter-AuditService-Export-Ascending
+          - ReviewCenter-AuditService-Export-Batches
+          - ReviewCenter-AuditService-Export-Streamed
+          - ReviewCenter-AuditService-Export-Snapshot
+          - ReviewCenter-AuditService-Export-OwnEntry
+          - ReviewCenter-AuditService-Export-Project
+          - ReviewCenter-AuditService-Export-Global
+          - ReviewCenter-AuditService-Export-Empty
+          - ReviewCenter-AuditService-Export-Cancelled
+          - ReviewCenter-AuditService-Export-InvalidFilter
+          - ReviewCenter-AuditService-Export-Arguments
           - ReviewCenter-AuditService-ExportChainStatus
+          - ReviewCenter-AuditService-ExportChainStatus-Intact
+          - ReviewCenter-AuditService-ExportChainStatus-Broken
+          - ReviewCenter-AuditService-ExportChainStatus-WholeChain
+          - ReviewCenter-AuditService-ExportChainStatus-Once
+          - ReviewCenter-AuditService-ExportChainStatus-SnapshotFirst
+          - ReviewCenter-AuditService-ExportChainStatus-BrokenExported
+          - ReviewCenter-AuditService-ExportChainStatus-FileName
+          - ReviewCenter-AuditService-ExportChainStatus-ContentType
+          - ReviewCenter-AuditService-ExportChainStatus-NoCounts
+          - ReviewCenter-AuditService-ExportChainStatus-NoOtherProjects
           - ReviewCenter-AuditService-ExportAudited
+          - ReviewCenter-AuditService-ExportAudited-User
+          - ReviewCenter-AuditService-ExportAudited-Project
+          - ReviewCenter-AuditService-ExportAudited-NoProject
+          - ReviewCenter-AuditService-ExportAudited-Detail
+          - ReviewCenter-AuditService-ExportAudited-FilterSummary
+          - ReviewCenter-AuditService-ExportAudited-SummaryBounded
+          - ReviewCenter-AuditService-ExportAudited-SummaryKeepsCount
+          - ReviewCenter-AuditService-ExportAudited-Cancelled
+          - ReviewCenter-AuditService-ExportAudited-Failed
+          - ReviewCenter-AuditService-ExportAudited-FailureRethrown
+          - ReviewCenter-AuditService-ExportAudited-AppendFailureReported
+          - ReviewCenter-AuditService-ExportAudited-AppendFailureCompletes
+          - ReviewCenter-AuditService-ExportAudited-Catalog
           - ReviewCenter-AuditService-ExportFormat
+          - ReviewCenter-AuditService-ExportFormat-CsvEncoding
+          - ReviewCenter-AuditService-ExportFormat-CsvLineEnds
+          - ReviewCenter-AuditService-ExportFormat-CsvQuoting
+          - ReviewCenter-AuditService-ExportFormat-CsvTimestamp
+          - ReviewCenter-AuditService-ExportFormat-CsvNoProject
+          - ReviewCenter-AuditService-ExportFormat-CsvEmpty
+          - ReviewCenter-AuditService-ExportFormat-CsvNeutralized
+          - ReviewCenter-AuditService-ExportFormat-CsvGenerated
+          - ReviewCenter-AuditService-ExportFormat-JsonExport
+          - ReviewCenter-AuditService-ExportFormat-JsonChain
+          - ReviewCenter-AuditService-ExportFormat-JsonEntries
+          - ReviewCenter-AuditService-ExportFormat-JsonEntryFields
+          - ReviewCenter-AuditService-ExportFormat-JsonEscaped
+          - ReviewCenter-AuditService-ExportFormat-JsonFormulaUnchanged
+          - ReviewCenter-AuditService-ExportFormat-JsonEmpty
+          - ReviewCenter-AuditService-ExportFormat-JsonBroken
+          - ReviewCenter-AuditService-ExportFormat-JsonNoCounts
+          - ReviewCenter-AuditService-ExportFormat-Flush
+          - ReviewCenter-AuditService-ExportFormat-FlushEmptied
+          - ReviewCenter-AuditService-ExportFormat-Dispose
+          - ReviewCenter-AuditService-ExportFormat-DisposeRepeatable
+          - ReviewCenter-AuditService-ExportFormat-Arguments
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-ProjectService-MemberAudit-RoleChange
@@ -1165,6 +1510,10 @@ sections:
           - ReviewCenter-ProjectService-MemberAudit-FailedAccount
           - ReviewCenter-ProjectService-MemberAudit-FailedSystemAdmin
           - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-EvidenceSettingsService-Audit-Atomic
+          - ReviewCenter-EvidenceSettingsService-Audit-Actor
+          - ReviewCenter-EvidenceSettingsService-Audit-Keys
+          - ReviewCenter-EvidenceSettingsService-Audit-KeyValues
           - ReviewCenter-ProjectChecklistService-Audit
           - ReviewCenter-ProjectChecklistService-Audit-ResetActor
           - ReviewCenter-ProjectChecklistService-Audit-Reset
@@ -1177,8 +1526,25 @@ sections:
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ReviewService-Audit-FileCount
           - ReviewCenter-ThreadService-Audit
+          - ReviewCenter-ThreadService-Audit-Atomic
+          - ReviewCenter-ThreadService-Audit-Reply
+          - ReviewCenter-ThreadService-Audit-Resolve
+          - ReviewCenter-ThreadService-Audit-Reopen
+          - ReviewCenter-ThreadService-Audit-BaselineSide
+          - ReviewCenter-ThreadService-Audit-NoText
+          - ReviewCenter-ThreadService-Audit-MissingThread
           - ReviewCenter-ThreadService-ReportAudit
+          - ReviewCenter-ThreadService-ReportAudit-Atomic
+          - ReviewCenter-ThreadService-ReportAudit-CommentToggle
+          - ReviewCenter-ThreadService-ReportAudit-ResolutionNoteHash
+          - ReviewCenter-ThreadService-ReportAudit-ResolutionNoteNoText
+          - ReviewCenter-ThreadService-ReportAudit-StartedInReport
+          - ReviewCenter-ThreadService-ReportAudit-ReplyInReport
+          - ReviewCenter-ThreadService-ReportAudit-ReplyInReport-ChatNotMarked
+          - ReviewCenter-ThreadService-ReportAudit-NoOp
           - ReviewCenter-ThreadService-CheckThreadAudit
+          - ReviewCenter-ThreadService-CheckThreadAudit-Atomic
+          - ReviewCenter-ThreadService-CheckThreadAudit-NoText
           - ReviewCenter-ChecklistService-Audit
           - ReviewCenter-ChecklistService-Audit-Section
           - ReviewCenter-ChecklistService-Audit-Hash
@@ -1453,6 +1819,9 @@ sections:
           - ReviewCenter-ReviewService-ReviewSet-Length
           - ReviewCenter-ReviewService-ReviewSet-None
           - ReviewCenter-ThreadService-DeletedFile
+          - ReviewCenter-ThreadService-DeletedFile-WholeFile
+          - ReviewCenter-ThreadService-DeletedFile-BaselineLines
+          - ReviewCenter-ThreadService-DeletedFile-HeadLines
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
           - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
@@ -1700,8 +2069,26 @@ sections:
           check already use, and it is limited to those who run projects and to the projects they run.
         children:
           - ReviewCenter-UserImpactService-OpenWork
+          - ReviewCenter-UserImpactService-OpenWork-Fields
+          - ReviewCenter-UserImpactService-OpenWork-NotSigned
+          - ReviewCenter-UserImpactService-OpenWork-OutOfDate
+          - ReviewCenter-UserImpactService-OpenWork-SignedLeftOut
+          - ReviewCenter-UserImpactService-OpenWork-ApprovedLeftOut
+          - ReviewCenter-UserImpactService-OpenWork-Ordering
+          - ReviewCenter-UserImpactService-OpenWork-Ordering-Slot
+          - ReviewCenter-UserImpactService-OpenWork-BatchRead
+          - ReviewCenter-UserImpactService-OpenWork-DisabledUser
           - ReviewCenter-UserImpactService-SoleAdmin
+          - ReviewCenter-UserImpactService-SoleAdmin-OtherAdmin
+          - ReviewCenter-UserImpactService-SoleAdmin-DisabledNotCounted
+          - ReviewCenter-UserImpactService-SoleAdmin-MemberNotCounted
+          - ReviewCenter-UserImpactService-SoleAdmin-SystemAdminNotCounted
           - ReviewCenter-UserImpactService-Scope
+          - ReviewCenter-UserImpactService-Scope-ProjectAdmin
+          - ReviewCenter-UserImpactService-Scope-Refused
+          - ReviewCenter-UserImpactService-Scope-DisabledAdmin
+          - ReviewCenter-UserImpactService-Scope-UserNotFound
+          - ReviewCenter-UserImpactService-Scope-NoLeak
           - ReviewCenter-UserImpactService-Arguments
         tests:
           - UserImpactService_GetImpactAsync_PrimaryAndAlternateSlots_AreOpenWork
@@ -2070,22 +2457,148 @@ sections:
           show the same list, and the same rules of access apply to it as to the reviews themselves.
         children:
           - ReviewCenter-InboxService-ToAnswer
+          - ReviewCenter-InboxService-ToAnswer-Alternate
+          - ReviewCenter-InboxService-ToAnswer-NotStarted
+          - ReviewCenter-InboxService-ToAnswer-Draft
+          - ReviewCenter-InboxService-ToAnswer-Progress
+          - ReviewCenter-InboxService-ToAnswer-RevertedToDraft
+          - ReviewCenter-InboxService-ToAnswer-Link
+          - ReviewCenter-InboxService-ToAnswer-AuthorBlocked
+          - ReviewCenter-InboxService-ToAnswer-NoChecklist
           - ReviewCenter-InboxService-Disputed
+          - ReviewCenter-InboxService-Disputed-Author
+          - ReviewCenter-InboxService-Disputed-Chip
+          - ReviewCenter-InboxService-Disputed-NamesChecks
+          - ReviewCenter-InboxService-Disputed-NamesAtMostFive
+          - ReviewCenter-InboxService-Disputed-NamesAtMostFive-MoreCount
+          - ReviewCenter-InboxService-Disputed-Unread
+          - ReviewCenter-InboxService-Disputed-Settled
+          - ReviewCenter-InboxService-Disputed-HiddenViewer
           - ReviewCenter-InboxService-ToSign
+          - ReviewCenter-InboxService-ToSign-Alternate
+          - ReviewCenter-InboxService-ToSign-BallotNotIn
+          - ReviewCenter-InboxService-ToSign-OpenThreadBlocks
+          - ReviewCenter-InboxService-ToSign-UnansweredBlocks
+          - ReviewCenter-InboxService-ToSign-DisputeBlocks
+          - ReviewCenter-InboxService-ToSign-DisputeSettled
+          - ReviewCenter-InboxService-ToSign-ConclusionTextBlocks
+          - ReviewCenter-InboxService-ToSign-ConclusionTextWritten
+          - ReviewCenter-InboxService-ToSign-NotSignedChip
+          - ReviewCenter-InboxService-ToSign-SignAgainChip
+          - ReviewCenter-InboxService-ToSign-SignAgainText
+          - ReviewCenter-InboxService-ToSign-SignedSlot
+          - ReviewCenter-InboxService-ToSign-SlotState
+          - ReviewCenter-InboxService-ToSign-MatchesStatus
+          - ReviewCenter-InboxService-ToSign-OpenThreadNotConcluded
+          - ReviewCenter-InboxService-ToSign-OpenThreadNotConcluded-RepliesWaiting
+          - ReviewCenter-InboxService-ToSign-DueDate
+          - ReviewCenter-InboxService-ToSign-Overdue
+          - ReviewCenter-InboxService-ToSign-ConcludedNoDueDate
+          - ReviewCenter-InboxService-ToSign-ConcludedNotOverdue
+          - ReviewCenter-InboxService-ToSign-MissingBallots
           - ReviewCenter-InboxService-QuestionForYou
+          - ReviewCenter-InboxService-QuestionForYou-Chip
+          - ReviewCenter-InboxService-QuestionForYou-OpensReview
+          - ReviewCenter-InboxService-QuestionForYou-NamesAsker
+          - ReviewCenter-InboxService-QuestionForYou-NoBallotData
+          - ReviewCenter-InboxService-QuestionForYou-CheckThreadsHidden
+          - ReviewCenter-InboxService-QuestionForYou-Count
+          - ReviewCenter-InboxService-QuestionForYou-Author
+          - ReviewCenter-InboxService-QuestionForYou-Asker
+          - ReviewCenter-InboxService-QuestionForYou-Answered
+          - ReviewCenter-InboxService-QuestionForYou-Auditor
+          - ReviewCenter-InboxService-QuestionForYou-NonMember
+          - ReviewCenter-InboxService-QuestionForYou-Stranger
+          - ReviewCenter-InboxService-QuestionForYou-ApiToken
           - ReviewCenter-InboxService-SignatureLost
+          - ReviewCenter-InboxService-SignatureLost-Chip
+          - ReviewCenter-InboxService-SignatureLost-BlockedText
+          - ReviewCenter-InboxService-SignatureLost-ReadyToSign
+          - ReviewCenter-InboxService-SignatureLost-WaitingRow
+          - ReviewCenter-InboxService-SignatureLost-WaitingNamesSigner
+          - ReviewCenter-InboxService-SignatureLost-Count
+          - ReviewCenter-InboxService-SignatureLost-NobodyElse
+          - ReviewCenter-InboxService-SignatureLost-Concluded
           - ReviewCenter-InboxService-RepliesWaiting
+          - ReviewCenter-InboxService-RepliesWaiting-Author
+          - ReviewCenter-InboxService-RepliesWaiting-SystemComment
+          - ReviewCenter-InboxService-RepliesWaiting-Chip
+          - ReviewCenter-InboxService-RepliesWaiting-Resolved
+          - ReviewCenter-InboxService-RepliesWaiting-OwnLast
           - ReviewCenter-InboxService-FailedChecks
+          - ReviewCenter-InboxService-FailedChecks-SingleSlotDraft
+          - ReviewCenter-InboxService-FailedChecks-DraftNotCounted
+          - ReviewCenter-InboxService-FailedChecks-Disputed
+          - ReviewCenter-InboxService-FailedChecks-Chip
+          - ReviewCenter-InboxService-FailedChecks-Text
+          - ReviewCenter-InboxService-FailedChecks-NotCreator
+          - ReviewCenter-InboxService-FailedChecks-NotApplicableSection
+          - ReviewCenter-InboxService-FailedChecks-Concluded
+          - ReviewCenter-InboxService-FailedChecks-ApiToken
           - ReviewCenter-InboxService-WaitingForOthers
+          - ReviewCenter-InboxService-WaitingForOthers-BallotInBlocked
+          - ReviewCenter-InboxService-WaitingForOthers-NotAction
+          - ReviewCenter-InboxService-WaitingForOthers-ChipCount
+          - ReviewCenter-InboxService-WaitingForOthers-ChipOpenItems
+          - ReviewCenter-InboxService-WaitingForOthers-NamesReviewers
+          - ReviewCenter-InboxService-WaitingForOthers-NoVerdict
+          - ReviewCenter-InboxService-WaitingForOthers-NoDueDate
+          - ReviewCenter-InboxService-WaitingForOthers-NeverUnread
           - ReviewCenter-InboxService-Updates
+          - ReviewCenter-InboxService-Updates-Names
+          - ReviewCenter-InboxService-Updates-Rejected
+          - ReviewCenter-InboxService-Updates-Rejected-Names
+          - ReviewCenter-InboxService-Updates-Reopened
+          - ReviewCenter-InboxService-Updates-Reopened-Names
+          - ReviewCenter-InboxService-Updates-NotAction
+          - ReviewCenter-InboxService-Updates-OwnSignature
+          - ReviewCenter-InboxService-Updates-OwnReopen
+          - ReviewCenter-InboxService-Updates-Seen
+          - ReviewCenter-InboxService-Updates-Creator
           - ReviewCenter-InboxService-Access
+          - ReviewCenter-InboxService-Access-CurrentAccess
+          - ReviewCenter-InboxService-Access-AuditorNoSign
+          - ReviewCenter-InboxService-Access-AuditorNoReply
+          - ReviewCenter-InboxService-Access-Disabled
+          - ReviewCenter-InboxService-Access-Disabled-CountZero
+          - ReviewCenter-InboxService-Access-TemporaryPassword
+          - ReviewCenter-InboxService-Access-Unknown
+          - ReviewCenter-InboxService-Access-Unknown-CountZero
+          - ReviewCenter-InboxService-Access-Anonymous
+          - ReviewCenter-InboxService-Access-Anonymous-CountZero
+          - ReviewCenter-InboxService-Access-ConcludedNoAction
+          - ReviewCenter-InboxService-Access-Sysadmin
+          - ReviewCenter-InboxService-Access-Sysadmin-SlotOnly
           - ReviewCenter-InboxService-Count
+          - ReviewCenter-InboxService-Count-UpdatesNotCounted
+          - ReviewCenter-InboxService-Count-WaitingNotCounted
+          - ReviewCenter-InboxService-Count-EachGroup
           - ReviewCenter-InboxService-Unread
+          - ReviewCenter-InboxService-Unread-CaseInsensitive
+          - ReviewCenter-InboxService-Unread-NeverSeen
+          - ReviewCenter-InboxService-Unread-OwnComment
+          - ReviewCenter-InboxService-Unread-ItemComment
+          - ReviewCenter-InboxService-Unread-Signature
+          - ReviewCenter-InboxService-Unread-SignatureLost
+          - ReviewCenter-InboxService-Unread-CommentChange
+          - ReviewCenter-InboxService-Unread-Reopen
+          - ReviewCenter-InboxService-Unread-SubmittedBallot
+          - ReviewCenter-InboxService-Unread-DraftIgnored
+          - ReviewCenter-InboxService-Unread-HiddenCheckThread
+          - ReviewCenter-InboxService-Unread-CommentCount
+          - ReviewCenter-InboxService-Unread-NewestComment
           - ReviewCenter-InboxService-MarkSeen
+          - ReviewCenter-InboxService-MarkSeen-NeverBackwards
+          - ReviewCenter-InboxService-MarkSeen-MayNotSee
+          - ReviewCenter-InboxService-MarkSeen-NoSuchReview
+          - ReviewCenter-InboxService-MarkSeen-MarkAll
+          - ReviewCenter-InboxService-MarkSeen-MarkAllUpToStart
+          - ReviewCenter-InboxService-MarkSeen-MissingUser
           - ReviewCenter-InboxService-KindWording
         tests:
           - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
           - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
+          - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
 
       - id: ReviewCenter-Core-AccessTokens
         title: >-
@@ -2589,6 +3102,7 @@ sections:
           - ReviewCenter-NotificationMessage-RefuseSubjectControlCharacter
           - ReviewCenter-NotificationMessage-HideInvalidSubject
           - ReviewCenter-NotificationMessage-RefuseEmptySubject
+          - ReviewCenter-NotificationMessage-RefuseBlankSubject
           - ReviewCenter-NotificationMessage-RefuseLongSubject
           - ReviewCenter-NotificationMessage-RefuseBlankBody
           - ReviewCenter-NotificationMessage-RefuseEmptyBody

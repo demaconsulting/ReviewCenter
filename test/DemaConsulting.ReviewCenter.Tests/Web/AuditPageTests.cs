@@ -157,6 +157,33 @@ public class AuditPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a reviewer who gets the component anyway makes the page read nothing from the trail.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_NonAdmin_ReadsNothingFromTheTrail()
+    {
+        // Arrange: the page reads through a store that counts every read; a reviewer is signed in
+        var store = new CountingAuditStore(AuditStore);
+        Services.AddSingleton(new AuditService(store));
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        SignInAs("ann", "Ann", UserRole.Reviewer);
+        await RecordAsync(2);
+
+        // Act
+        var cut = Render<AuditPage>();
+
+        // Assert: the page is refused and nothing was read
+        Assert.NotNull(cut.Find("[data-testid='audit-error']"));
+        Assert.Equal(0, store.Reads);
+
+        // Control: the same store counts the reads of an administrator's page, so the zero above is not vacuous
+        await DisposeComponentsAsync();
+        await SignInAsAdminAsync();
+        Render<AuditPage>();
+        Assert.True(store.Reads > 0);
+    }
+
+    /// <summary>
     ///     Test that a user whose claims say administrator but who is a reviewer (or disabled) in the store is refused.
     /// </summary>
     /// <param name="disabled">Whether the user is disabled instead of demoted.</param>
@@ -575,5 +602,102 @@ public class AuditPageTests : PageTestBase
         // Assert
         Assert.Contains("ignored", cut.Find("[data-testid='audit-filter-message']").TextContent, StringComparison.Ordinal);
         Assert.Equal(2, cut.FindAll("[data-testid='audit-row']").Count);
+    }
+
+    /// <summary>
+    ///     Test that a range of UTC days in the address limits the entries to those of the range, both days included.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_DateRangeQuery_LimitsTheEntries()
+    {
+        // Arrange: a trail whose entries are stamped at noon on three consecutive days
+        var clock = new ManualTimeProvider(new DateTimeOffset(2025, 3, 1, 12, 0, 0, TimeSpan.Zero));
+        var dated = new AuditService(new FakeAuditStore(clock));
+        Services.AddSingleton(dated);
+        await SignInAsAdminAsync();
+        var token = TestContext.Current.CancellationToken;
+        for (var day = 1; day <= 3; day++)
+        {
+            await dated.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", $"day {day}", 1), token);
+            clock.Advance(TimeSpan.FromDays(1));
+        }
+
+        // Act: read each view right after it is rendered, because the next navigation re-renders the earlier ones
+        var middleDay = RenderAt("/audit?from=2025-03-02&to=2025-03-02")
+            .FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList();
+        var lastTwoDays = RenderAt("/audit?from=2025-03-02&to=2025-03-03")
+            .FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList();
+
+        // Assert
+        Assert.Equal(["day 2"], middleDay);
+        Assert.Equal(["day 3", "day 2"], lastTwoDays);
+    }
+
+    /// <summary>
+    ///     An audit store that counts every read and passes all calls on to a real one.
+    /// </summary>
+    /// <param name="inner">The store that does the work.</param>
+    private sealed class CountingAuditStore(IAuditStore inner) : IAuditStore
+    {
+        /// <summary>
+        ///     Gets the number of reads so far.
+        /// </summary>
+        public int Reads { get; private set; }
+
+        /// <inheritdoc />
+        public Task<AuditEntry> AppendAsync(AuditDraft draft, CancellationToken cancellationToken = default)
+        {
+            return inner.AppendAsync(draft, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<AuditEntry>> ListAsync(
+            AuditFilter filter,
+            long? beforeSequence,
+            long? afterSequence,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return inner.ListAsync(filter, beforeSequence, afterSequence, take, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<AuditEntry>> ReadAfterAsync(
+            long afterSequence,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return inner.ReadAfterAsync(afterSequence, count, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<AuditEntry>> ReadMatchingAsync(
+            AuditFilter filter,
+            long afterSequence,
+            long upToSequence,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return inner.ReadMatchingAsync(filter, afterSequence, upToSequence, count, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<long> LatestSequenceAsync(CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return inner.LatestSequenceAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyDictionary<string, DateTimeOffset>> LastActivityAsync(
+            int projectId,
+            CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return inner.LastActivityAsync(projectId, cancellationToken);
+        }
     }
 }

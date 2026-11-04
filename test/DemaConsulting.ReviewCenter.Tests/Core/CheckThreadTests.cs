@@ -202,6 +202,7 @@ public class CheckThreadTests
 
         // Assert
         Assert.Equal(DomainRule.ChecklistNotFound, ex.Rule);
+        Assert.Empty(await world.Threads.ListAsync(world.Project, PlainReviewId, cancellationToken));
     }
 
     /// <summary>
@@ -251,6 +252,46 @@ public class CheckThreadTests
     }
 
     /// <summary>
+    ///     Test that a check anchor that names the baseline side is refused and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_CheckAnchorWithBaselineSide_ThrowsThreadAnchorInvalid()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var anchor = new ThreadAnchor(string.Empty, null, null, ThreadSide.Baseline, _checkId);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
+            world.Project, ReviewId, anchor, Who("creator"), "Text", cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+        Assert.Empty(await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an anchor with an empty check identifier and no file is refused and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_CheckAnchorWithoutCheckId_ThrowsThreadAnchorInvalid()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var anchor = new ThreadAnchor(string.Empty, null, null, ThreadSide.Head, string.Empty);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
+            world.Project, ReviewId, anchor, Who("creator"), "Text", cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+        Assert.Empty(await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a check thread can be replied to, resolved with a note when it is a Finding, resolved and
     ///     reopened like any thread.
     /// </summary>
@@ -284,6 +325,56 @@ public class CheckThreadTests
         var done = (await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken)).Single(t => t.Id == finding.Id);
         Assert.Equal(ReviewThreadState.Resolved, done.State);
         Assert.Equal(ReviewCommentKind.Resolution, done.Comments[^1].Kind);
+    }
+
+    /// <summary>
+    ///     Test that a check thread of the kind Finding needs a resolution note and one of the kind Question does not.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ResolveAsync_OnCheckThread_FindingNeedsNoteQuestionDoesNot()
+    {
+        // Arrange: a Question (the starting comment is not included) and a Finding about the check
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var question = await StartCheckAsync(world);
+        var finding = await StartCheckAsync(world, include: true);
+
+        // Act
+        await world.Threads.ResolveAsync(world.Project, ReviewId, question.Id, Who("creator"), cancellationToken);
+        var needsNote = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Threads.ResolveAsync(world.Project, ReviewId, finding.Id, Who("creator"), cancellationToken));
+        await world.Threads.ResolveAsync(
+            world.Project, ReviewId, finding.Id, Who("creator"), cancellationToken, resolutionNote: "Fixed in the checklist");
+
+        // Assert
+        Assert.Equal(DomainRule.ResolutionNoteRequired, needsNote.Rule);
+        var threads = await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken);
+        Assert.Equal(ReviewThreadState.Resolved, threads.Single(t => t.Id == question.Id).State);
+        var done = threads.Single(t => t.Id == finding.Id);
+        Assert.Equal(ReviewThreadState.Resolved, done.State);
+        Assert.Equal(ReviewCommentKind.Resolution, done.Comments[^1].Kind);
+    }
+
+    /// <summary>
+    ///     Test that a resolved check thread can be reopened and keeps its check and its comments.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReopenAsync_OnCheckThread_ReopensResolvedThread()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var chat = await StartCheckAsync(world);
+        await world.Threads.ResolveAsync(world.Project, ReviewId, chat.Id, Who("creator"), cancellationToken);
+
+        // Act
+        await world.Threads.ReopenAsync(world.Project, ReviewId, chat.Id, Who("creator"), cancellationToken);
+
+        // Assert
+        var reopened = Assert.Single(await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken));
+        Assert.Equal(ReviewThreadState.Open, reopened.State);
+        Assert.Equal(_checkId, reopened.CheckItemId);
+        Assert.Equal("Is this check right?", Assert.Single(reopened.Comments).Text);
     }
 
     /// <summary>
@@ -398,6 +489,34 @@ public class CheckThreadTests
         Assert.Equal(2, world.Store.Threads.Count);
         Assert.Equal(SignedReviewWorld.FirstItemId, chat.CheckItemId);
         Assert.Empty(await world.SignedSlotIdsAsync());
+    }
+
+    /// <summary>
+    ///     Test that a chat check thread, whose starting comment is not included in the report, leaves a current
+    ///     signature current.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_CheckAnchorChatThread_KeepsSignatureCurrent()
+    {
+        // Arrange: slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        var signedBefore = await world.SignedSlotIdsAsync();
+
+        // Act
+        await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            SignedReviewWorld.ReviewId,
+            ThreadAnchor.ForCheck(SignedReviewWorld.FirstItemId),
+            TestActors.Ann,
+            "Chat",
+            cancellationToken);
+
+        // Assert
+        Assert.Single(signedBefore);
+        Assert.Equal(signedBefore, await world.SignedSlotIdsAsync());
+        Assert.Single(world.Store.Threads);
     }
 
     /// <summary>

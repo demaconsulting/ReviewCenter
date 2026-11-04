@@ -326,6 +326,31 @@ public class AuditExportWriterTests
     }
 
     /// <summary>
+    ///     Test that text which starts with a formula character is written to JSON unchanged (JSON is no spreadsheet).
+    /// </summary>
+    [Fact]
+    public async Task AuditExportWriter_Json_FormulaCharacters_AreNotChanged()
+    {
+        // Arrange
+        string[] formulas = ["=1+1", "+1", "-1", "@SUM(A1)"];
+
+        // Act
+        var bytes = await WriteAsync(
+            Export(AuditExportFormat.Json),
+            Entry(1, actor: formulas[0], detail: formulas[1], action: formulas[2]),
+            Entry(2, actor: formulas[3], detail: formulas[0]));
+
+        // Assert
+        using var document = JsonDocument.Parse(bytes);
+        var entries = document.RootElement.GetProperty("entries");
+        Assert.Equal(formulas[0], entries[0].GetProperty("actor").GetString());
+        Assert.Equal(formulas[1], entries[0].GetProperty("detail").GetString());
+        Assert.Equal(formulas[2], entries[0].GetProperty("action").GetString());
+        Assert.Equal(formulas[3], entries[1].GetProperty("actor").GetString());
+        Assert.Equal(formulas[0], entries[1].GetProperty("detail").GetString());
+    }
+
+    /// <summary>
     ///     Test that an empty result is a valid JSON document with an empty entries array.
     /// </summary>
     [Fact]

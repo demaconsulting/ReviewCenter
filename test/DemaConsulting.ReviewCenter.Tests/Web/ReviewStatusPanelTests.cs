@@ -172,6 +172,7 @@ public class ReviewStatusPanelTests : BallotPageTestBase
 
         // Assert
         Assert.NotNull(cut.Find("[data-testid='status-panel']"));
+        Assert.Equal("Where are we?", cut.Find("[data-testid='status-panel'] h2").TextContent);
         Assert.Equal("Handed in", cut.Find($"[data-testid='status-ballot-{slots[0]}']").TextContent);
         Assert.Equal("Draft", cut.Find($"[data-testid='status-ballot-{slots[1]}']").TextContent);
         Assert.Equal("Not started", cut.Find($"[data-testid='status-ballot-{slots[2]}']").TextContent);
@@ -526,6 +527,8 @@ public class ReviewStatusPanelTests : BallotPageTestBase
 
         // Assert
         Assert.Equal("You have signed. Waiting for Bob to sign.", cut.Find("[data-testid='next-action']").TextContent);
+        Assert.Equal("Signed", cut.Find($"[data-testid='status-signature-{slots[0]}']").TextContent);
+        Assert.Equal("Not signed", cut.Find($"[data-testid='status-signature-{slots[1]}']").TextContent);
         var nextStep = cut.Find("[data-testid='next-step']").TextContent;
         Assert.Contains("Waiting for the signature of Bob", nextStep, StringComparison.Ordinal);
     }
@@ -573,6 +576,27 @@ public class ReviewStatusPanelTests : BallotPageTestBase
             "What changed since Bob signed", cut.Find($"[data-testid='status-changes-summary-{slotId}']").TextContent);
         var change = cut.Find($"[data-testid='status-change-{slotId}-0']").TextContent;
         Assert.Contains("Cyd (cyd): Changed the review conclusion", change, StringComparison.Ordinal);
+        Assert.Contains("2025-03-04 05:06 UTC", change, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the note above the list of changes says when the reviewer signed and that the reviewer needs to
+    ///     look again and sign again.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain()
+    {
+        // Arrange: bob signed on 2025-03-03, then the conclusion changed
+        var (projectId, slotId) = await ArrangeSignedThenChangedAsync();
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert: the note names the signer, the time of the signature and the way forward
+        var note = cut.Find($"[data-testid='status-changes-note-{slotId}']").TextContent;
+        Assert.Contains("Signed 2025-03-03 05:06 UTC", note, StringComparison.Ordinal);
+        Assert.Contains("Bob needs to look", note, StringComparison.Ordinal);
+        Assert.Contains("again and sign again", note, StringComparison.Ordinal);
     }
 
     /// <summary>
