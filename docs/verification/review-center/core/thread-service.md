@@ -240,6 +240,13 @@ includes a disputed check, and an explicit `unanswered` count: the explicit coun
 is named once, as disputed, and a count of 0 leaves the unanswered part out. This scenario is tested by
 `ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount`.
 
+**ThreadService_NextStep_AllParts_AreNamedInFixedOrder**: Two open threads, four unanswered checks, two disputed
+checks, three checks answered Fail, and a needed conclusion are given together. The sentence names the unanswered
+checks first, then the disputed checks, then the checks answered Fail, then the open threads, and ends with the
+conclusion hint, exactly as `4 checklist checks unanswered, 2 checks disputed between the ballots, 3 checks answered
+Fail, 2 open questions to resolve, a conclusion stating the reasons is needed.` This scenario is tested by
+`ThreadService_NextStep_AllParts_AreNamedInFixedOrder`.
+
 **ThreadService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the four changes of a thread (start, reply,
 resolve, and reopen) on a concluded review, that is a review whose every slot holds a current signature and that has no
 open thread; each is refused with `ReviewLocked`, the
@@ -546,6 +553,28 @@ member of the project and acts through the real access rules; each is refused wi
 an open thread is not concluded, so the thread actions still work. This scenario is tested by
 `ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned`.
 
+**ThreadService_AllThreadActions_OpenThreadReview_AreAcceptedWhenAllSigned**: A theory over every thread action (start,
+reply, resolve, reopen, promote, demote, and toggle) on a review whose slots are all signed but that has an open thread,
+so it is not approved. Each action is accepted and records exactly one more audit entry with the action that belongs to
+it. This scenario is tested by `ThreadService_AllThreadActions_OpenThreadReview_AreAcceptedWhenAllSigned`.
+
+**ThreadService_ThreadActions_GiveTheStoreEntryAndChangeInOneCall**: A thread is started, replied to, resolved, and
+reopened. The fake store received one call for each action, in that order, each naming the thread and carrying the audit
+draft of the action (`thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`), and each draft is the
+very entry that the store saved. This scenario is tested by
+`ThreadService_ThreadActions_GiveTheStoreEntryAndChangeInOneCall`.
+
+**ThreadService_ReportMutations_GiveTheStoreEntryAndChangeInOneCall**: A thread is promoted, demoted, and a reply is
+included in the report. The fake store received one call for each change, naming the thread and carrying the audit draft
+(`thread.kind-changed` twice, then `thread.comment-report-changed`), and each draft is the very entry that the store
+saved. This scenario is tested by `ThreadService_ReportMutations_GiveTheStoreEntryAndChangeInOneCall`.
+
+**ThreadService_ResolveAsync_FindingWithNote_GivesTheStoreNoteAndNewStateInOneCall**: A Finding is resolved with a note
+that has white space around it. The fake store received exactly one call to resolve the thread; that call names the
+thread and carries the trimmed note as a Resolution comment and the audit draft `thread.resolved`. The thread is then
+resolved and its last comment is the note. This scenario is tested by
+`ThreadService_ResolveAsync_FindingWithNote_GivesTheStoreNoteAndNewStateInOneCall`.
+
 **ThreadService_PromoteAndDemoteAsync_Audit_NamesKindChange**: The entries `thread.kind-changed` read
 `thread N: question -> finding` and the reverse. This scenario is tested by
 `ThreadService_PromoteAndDemoteAsync_Audit_NamesKindChange`.
@@ -634,6 +663,11 @@ scenario is tested by `ThreadService_StartThreadAsync_CheckAnchorChatThread_Keep
 **ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck**: The entry `thread.started` names the thread,
 the check, and the hash of the text but not the text. This scenario is tested by
 `ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck`.
+
+**ThreadService_StartThreadAsync_CheckAnchor_GivesTheStoreEntryAndThreadInOneCall**: A thread about a check is started.
+The fake store received exactly one call to add the thread; that call names the thread, which is stored on the check,
+and carries the audit draft `thread.started` that names the check, and the draft is the very entry that the store
+saved. This scenario is tested by `ThreadService_StartThreadAsync_CheckAnchor_GivesTheStoreEntryAndThreadInOneCall`.
 
 **CheckThreadRules_CanStart_SubmittedSlotOwner_IsAllowed**: A slot owner whose ballot is submitted may start a check
 thread whatever the number of slots. This scenario is tested by

@@ -1214,6 +1214,28 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that the next step names the parts in a fixed order: unanswered checks, disputed checks, checks answered
+    ///     Fail, open threads and, last, the conclusion.
+    /// </summary>
+    [Fact]
+    public void ThreadService_NextStep_AllParts_AreNamedInFixedOrder()
+    {
+        // Arrange: two open threads and a checklist with every kind of check that is named
+        var threads = Enumerable.Range(0, 2).Select(i => MakeThread(i, ReviewThreadState.Open, 0)).ToList();
+        var progress = new ChecklistProgress(58 - 5, 58);
+
+        // Act: word the next step with every part present
+        var sentence = ThreadService.NextStep(
+            threads, progress, failedChecks: 3, disputedChecks: 2, conclusionRequired: true, unanswered: 4);
+
+        // Assert: unanswered, disputed, Fail, open threads, conclusion
+        Assert.Equal(
+            "4 checklist checks unanswered, 2 checks disputed between the ballots, 3 checks answered Fail, "
+            + "2 open questions to resolve, a conclusion stating the reasons is needed.",
+            sentence);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store or clock.
     /// </summary>
     [Fact]

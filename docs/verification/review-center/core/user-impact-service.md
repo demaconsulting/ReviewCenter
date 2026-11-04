@@ -61,6 +61,11 @@ in reverse order, and one in Borealis wait for `ann`. The list is Apollo/r1, Apo
 two batch reads and no single read. This scenario is tested by
 `UserImpactService_GetImpactAsync_ManyReviews_AreOrderedAndReadInOneBatchPerProject`.
 
+**UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber**: `ann` is the alternate of slot 1 and
+the primary of slots 2 and 3 of one review (slots 2 and 3 are arranged directly in the store, because the signing
+service allows a user in only one slot of a review). The list names the slots 1, 2, and 3 of that review in this order.
+This scenario is tested by `UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber`.
+
 **UserImpactService_GetImpactAsync_DisabledUserWithSlot_StillShowsOpenWork**: A user with a slot is disabled and the
 work is still listed; a user without work has an empty impact. This scenario is tested by
 `UserImpactService_GetImpactAsync_DisabledUserWithSlot_StillShowsOpenWork`.
@@ -97,6 +102,9 @@ administrator project. This scenario is tested by
 **UserImpactService_GetImpactAsync_ActorWithoutAdministration_IsRefused**: A theory over a member, a read-only member, a
 user outside every project, an unknown user, and the command line; each gets `ActorNotAllowed`. This scenario is tested
 by `UserImpactService_GetImpactAsync_ActorWithoutAdministration_IsRefused`.
+
+**UserImpactService_GetImpactAsync_DisabledMember_IsRefused**: A member whose account was disabled asks about another
+user and gets `ActorNotAllowed`. This scenario is tested by `UserImpactService_GetImpactAsync_DisabledMember_IsRefused`.
 
 **UserImpactService_GetImpactAsync_DisabledProjectAdministrator_IsRefused**: A project administrator whose account is
 disabled gets `ActorNotAllowed`. This scenario is tested by

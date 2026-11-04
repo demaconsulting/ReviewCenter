@@ -164,6 +164,12 @@ without one. This scenario is tested by `AuditService_ListAsync_Filter_NarrowsBy
 the links follow the matching entries only. This scenario is tested by
 `AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries`.
 
+**AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries**: The fake store resolves two users from
+their user names (ann is 7, bob is 9) and records four entries, the last one by the command line, which has no user
+identity. A filter with identity 7 lists the two entries of ann, newest first; identity 9 lists the one entry of bob; an
+identity that nobody has lists nothing. This scenario is tested by
+`AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries`.
+
 **AuditService_ListAsync_InvalidFilter_IsRefused**: A filter with a From date after the To date, and one with a text
 that is too long, are refused with `AuditFilterInvalid`. This scenario is tested by
 `AuditService_ListAsync_InvalidFilter_IsRefused`.
@@ -217,6 +223,20 @@ This scenario is tested by `AuditExport_ExportAsync_EntriesAppendedAfterPrepare_
 larger than 500, and 1,000 entries end after an empty read. This scenario is tested by
 `AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500` and
 `AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead`.
+
+**AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext**: 1,201 entries are exported while the
+hook of the fake store counts the rows that are already in the target right after each batch was read. It sees 0, 500,
+and 1,000 rows, so each batch is written before the next is read and the batches are never held together. This
+scenario is tested by `AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext`.
+
+**AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass**: A trail of 1,200 entries is verified once, which
+takes four reads (three batches and an empty one); preparing an export then adds exactly four reads more, one pass. This
+scenario is tested by `AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass`.
+
+**AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot**: The hook of the fake store
+appends a sixth entry after the first verification batch of a five-entry trail was read. The snapshot of the export is
+5, the verification covered all 6 entries and is intact, so the newest sequence was captured before the verification.
+This scenario is tested by `AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot`.
 
 **AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence**: A stored entry is altered; the
 prepared export is broken at its sequence, an untouched trail is intact, the file name says so, and a project export

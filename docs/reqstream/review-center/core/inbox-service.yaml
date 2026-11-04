@@ -428,6 +428,15 @@ sections:
         tests:
           - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
 
+      - id: ReviewCenter-InboxService-ToSign-UnansweredBlocks
+        title: >-
+          The InboxService class shall list nothing as ready to sign while a check of the review is unanswered.
+        justification: |
+          A review with an unanswered check cannot be signed, so the reviewer waits for the answer and a row that
+          asked for the signature would ask for the impossible.
+        tests:
+          - InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign
+
       - id: ReviewCenter-InboxService-ToSign-DisputeBlocks
         title: >-
           The InboxService class shall list nothing as ready to sign while the ballots that were handed in differ.
@@ -997,10 +1006,20 @@ sections:
       - id: ReviewCenter-InboxService-Access-Sysadmin
         title: >-
           The InboxService class shall give a system administrator who is no member of the project rows only for the
-          reviews that the administrator created, and no row for a review in which the administrator only holds a slot.
+          reviews in which the administrator is a reviewer or the creator.
         justification: |
-          A system administrator sees every project but is not a reviewer of it, so the inbox is limited to what is
-          the administrator's own.
+          A system administrator sees every project but is not a reviewer of it, so the inbox is limited to the
+          reviews in which the administrator has a part of their own.
+        tests:
+          - InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator
+
+      - id: ReviewCenter-InboxService-Access-Sysadmin-SlotOnly
+        title: >-
+          The InboxService class shall give a system administrator who is no member of the project no row other than an
+          update for a review in which the administrator only holds a slot.
+        justification: |
+          A reviewer must be a member of the project, so a slot without membership is no work that the administrator
+          may do, and a row that asked for it would ask for the impossible.
         tests:
           - InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews
 
@@ -1097,6 +1116,16 @@ sections:
           first one.
         tests:
           - InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread
+
+      - id: ReviewCenter-InboxService-Unread-SignatureLost
+        title: >-
+          The InboxService class shall mark a signature lost item of a review the user has seen before as unread when
+          somebody else commented after the user last saw it.
+        justification: |
+          A user whose signature was withdrawn waits for the open items to be settled, so a comment after the last
+          visit is news for that item as it is for an item to sign.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread
 
       - id: ReviewCenter-InboxService-Unread-CommentChange
         title: >-

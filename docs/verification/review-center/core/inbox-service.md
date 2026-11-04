@@ -199,6 +199,12 @@ waits for others and does not find the review under Ready to sign; the open ques
 Question for you row, which is the only action. This scenario is tested by
 `InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign`.
 
+**InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign**: Ann handed in a full ballot and bob has a
+draft with one answer, so ann finds the review under Ready to sign. Bob's ballot is then handed in in the store although
+it leaves checks unanswered; ann finds a single Waiting for others row with the chip "Waiting for 1 reviewer" and the
+detail "Waiting for Bob.", no Ready to sign row, and an action count of zero. This scenario is tested by
+`InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign`.
+
 **InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow**: A slot holder who has not written in a question
 that bob started finds a To answer row with the chip "Question for you", `OpensReview`, unread, with the name of bob and
 without the text of the question, counted as action. This scenario is tested by
@@ -228,6 +234,11 @@ ann finds a Signature lost row with the chip, the reason "open items remain", un
 or Waiting for others row; bob reads in his waiting row that the signature of ann no longer counts; when the finding is
 settled the row becomes Ready to sign with the chip "The review changed, sign again" and the sentence of the inbox. This
 scenario is tested by `InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow`.
+
+**InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread**: Ann signs, bob opens a finding that
+takes her signature, and ann sees the review. Her Signature lost row is read; when bob then adds a comment to the open
+finding, the same row is unread. This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread`.
 
 **InboxService_GetInboxAsync_SignatureLost_NotShownToOthers**: Bob, the author, a stranger and an auditor get no
 Signature lost row for the signature of ann. This scenario is tested by
@@ -329,9 +340,16 @@ when another reviewer hands in a ballot after the last seen time. This scenario 
 not the number of rows and not the information rows. This scenario is tested by
 `InboxService_CountAsync_EqualsDistinctActionReviews`.
 
-**InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews**: A system administrator who is no member gets
-rows only for what is their own: the review they authored, and no sign row for a slot without membership. This scenario
-is tested by `InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews`.
+**InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews**: A system administrator who is no member
+holds a slot of a review and authored another review. The authored review gives a Failed checks row, and the review with
+only a slot gives no row other than an update. This scenario is tested by
+`InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews`.
+
+**InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator**: A system administrator who is no member
+holds a slot of one review and authored a second one, which has a failed check; a third review, with a slot of ann and
+a thread of bob that nobody answered, is none of the administrator's. Every row of the administrator is of the first or
+the second review, the second gives its Failed checks row, and no row is of the third. This scenario is tested by
+`InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator`.
 
 **InboxService_MarkSeenAsync_NeverMovesBackwards**: Marking a review as seen never moves the state backwards, keeps the
 later time, and stores nothing for a user who may not see the review. This scenario is tested by

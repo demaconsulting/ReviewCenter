@@ -76,6 +76,18 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     public Action<int>? AfterMatchingRead { get; set; }
 
     /// <summary>
+    ///     Gets or sets what runs after each verification batch was read, with the number of the batch (1 for the
+    ///     first); <c>null</c> for nothing. It runs outside the lock, so it may append entries.
+    /// </summary>
+    public Action<int>? AfterReadAfter { get; set; }
+
+    /// <summary>
+    ///     Gets the identities that the store resolves from user names when it appends an entry, like the real store;
+    ///     a user name that is not listed leaves the identity of the entry empty.
+    /// </summary>
+    public Dictionary<string, int> UserIds { get; } = [];
+
+    /// <summary>
     ///     Gets the number of filtered batches requested for an export.
     /// </summary>
     public int MatchingReads
@@ -161,7 +173,9 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
             {
                 Sequence = (head?.Sequence ?? 0) + 1,
                 TimestampUtc = timeProvider.GetUtcNow(),
-                ActorUserId = null,
+                ActorUserId = draft.ActorUsername is { } username && UserIds.TryGetValue(username, out var userId)
+                    ? userId
+                    : null,
                 ActorName = AuditText.Clean(draft.ActorName, AuditText.MaxActorNameLength),
                 Action = AuditText.Clean(draft.Action, AuditText.MaxActionLength),
                 ProjectId = draft.ProjectId,
@@ -222,16 +236,21 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
         int count,
         CancellationToken cancellationToken = default)
     {
+        int call;
+        IReadOnlyList<AuditEntry> result;
         lock (_lock)
         {
-            _readAfterCalls++;
+            call = ++_readAfterCalls;
             _largestReadCount = Math.Max(_largestReadCount, count);
-            IReadOnlyList<AuditEntry> result = _entries.Where(e => e.Sequence > afterSequence)
+            result = _entries.Where(e => e.Sequence > afterSequence)
                 .OrderBy(e => e.Sequence)
                 .Take(count)
                 .ToList();
-            return Task.FromResult(result);
         }
+
+        // The hook runs outside the lock so that it may append entries (the trail keeps growing during a verification)
+        AfterReadAfter?.Invoke(call);
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc />

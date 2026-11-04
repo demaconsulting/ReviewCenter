@@ -138,7 +138,10 @@ public class EvidenceSettingsServiceTests
 
     /// <summary>
     ///     Test that the settings are read and changed by a system administrator and by a project administrator of
-    ///     the project only: a plain member is told it may not, and everybody else (and nobody) is refused.
+    ///     the project only: a plain member is told it may not, and every other actor is refused as for a project that
+    ///     does not exist: a user outside the project (<c>out</c>), an administrator of another project
+    ///     (<c>padm</c>), a disabled member (<c>off</c>), a disabled administrator of the project (<c>offadm</c>), and
+    ///     no actor at all.
     /// </summary>
     /// <param name="who">The user name of the actor, or <c>null</c> for nobody.</param>
     /// <param name="refusal">The rule that refuses the actor, or <c>null</c> when the actor is allowed.</param>
@@ -256,7 +259,34 @@ public class EvidenceSettingsServiceTests
     }
 
     /// <summary>
-    ///     Test that saving settings that equal the stored ones stores nothing and records nothing.
+    ///     Test that the service gives the store the audit entry in the very call that stores the change, so that
+    ///     the store can save the two together: one call carries the new settings and the entry.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceSettingsService_SetAsync_Change_GivesTheStoreEntryAndChangeInOneCall()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { IncludeFiles = false };
+
+        // Act
+        await world.Service.SetAsync(
+            new Actor("pa", "Pat Admin"), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Assert: one call to the store with the settings and the entry, and that entry is the one that was saved
+        var call = Assert.Single(world.Store.EvidenceSettingsUpdateCalls);
+        Assert.Equal(world.Project, call.ProjectId);
+        Assert.Equal(updated, call.Updated);
+        Assert.Equal(EvidenceSettingsService.ChangedAction, call.Audit.Action);
+        Assert.Equal("IncludeFiles on->off", call.Audit.Detail);
+        var saved = Assert.Single(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
+        Assert.Same(call.Audit, saved);
+    }
+
+    /// <summary>
+    ///     Test that saving settings that equal the stored ones stores nothing and records nothing: the store is not
+    ///     asked to change anything, whether the stored settings are the defaults or not.
     /// </summary>
     [Fact]
     public async Task EvidenceSettingsService_SetAsync_NoChange_RecordsNothing()
@@ -277,6 +307,16 @@ public class EvidenceSettingsServiceTests
         Assert.False(changed);
         Assert.Equal(EvidenceSettings.Default, await world.Service.GetEffectiveAsync(world.Project, ct));
         Assert.DoesNotContain(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
+
+        // Assert: the store was not even asked to change anything, also when the stored settings are not the defaults
+        Assert.Empty(world.Store.EvidenceSettingsUpdateCalls);
+        var stored = EvidenceSettings.Default with { AnonymousIndex = true };
+        var actor = new Actor("pa", "pa");
+        Assert.True(await world.Service.SetAsync(actor, world.Project, EvidenceSettings.Default, stored, ct));
+        Assert.False(await world.Service.SetAsync(actor, world.Project, stored, stored, ct));
+        Assert.Single(world.Store.EvidenceSettingsUpdateCalls);
+        Assert.Equal(stored, await world.Service.GetEffectiveAsync(world.Project, ct));
+        Assert.Single(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
     }
 
     /// <summary>

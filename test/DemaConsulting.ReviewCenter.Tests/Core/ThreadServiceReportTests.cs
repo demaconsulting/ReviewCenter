@@ -1113,6 +1113,71 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
+    ///     Test that every thread action is accepted, and audited once, in a review with every remaining slot signed
+    ///     but a thread open: starting, replying, resolving, reopening, promoting, demoting and changing whether a
+    ///     comment is in the report.
+    /// </summary>
+    /// <param name="action">The action to try.</param>
+    /// <param name="auditAction">The audit action the action records.</param>
+    [Theory]
+    [InlineData("start", "thread.started")]
+    [InlineData("reply", "thread.replied")]
+    [InlineData("resolve", "thread.resolved")]
+    [InlineData("reopen", "thread.reopened")]
+    [InlineData("promote", "thread.kind-changed")]
+    [InlineData("demote", "thread.kind-changed")]
+    [InlineData("toggle", "thread.comment-report-changed")]
+    public async Task ThreadService_AllThreadActions_OpenThreadReview_AreAcceptedWhenAllSigned(
+        string action, string auditAction)
+    {
+        // Arrange: a chat thread with a reply and a resolved Finding, then both are settled and slots 1 and 2 sign;
+        // the chat thread is reopened and the unsigned slot 3 removed, so all slots are signed but a thread is open
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var project = world.ProjectId;
+        var chat = await world.Threads.StartThreadAsync(
+            project, ReviewId, _anchor, TestActors.Ann, "Question", cancellationToken);
+        var reply = await world.Threads.ReplyAsync(
+            project, ReviewId, chat.Id, TestActors.Bob, "Answer", cancellationToken);
+        var finding = await world.Threads.StartThreadAsync(
+            project, ReviewId, _anchor, TestActors.Ann, "Please fix", cancellationToken, null, true);
+        await world.Threads.ResolveAsync(project, ReviewId, finding.Id, TestActors.Ann, cancellationToken, null, "Done");
+        await world.Threads.ResolveAsync(project, ReviewId, chat.Id, TestActors.Ann, cancellationToken);
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+        await world.Threads.ReopenAsync(project, ReviewId, chat.Id, TestActors.Ann, cancellationToken);
+        await world.Signing.RemoveSlotAsync(
+            new Actor("rita", "Rita"), project, ReviewId, world.Slots[2].Id, cancellationToken);
+        var signed = await world.SignedSlotIdsAsync();
+        var before = await world.ApprovalAsync();
+        var audits = world.Store.Audits.Count;
+        var attempts = new Dictionary<string, Func<Task>>
+        {
+            ["start"] = () => world.Threads.StartThreadAsync(
+                project, ReviewId, _anchor, TestActors.Bob, "Another question", cancellationToken),
+            ["reply"] = () => world.Threads.ReplyAsync(
+                project, ReviewId, chat.Id, TestActors.Bob, "More", cancellationToken),
+            ["resolve"] = () => world.Threads.ResolveAsync(project, ReviewId, chat.Id, TestActors.Ann, cancellationToken),
+            ["reopen"] = () => world.Threads.ReopenAsync(project, ReviewId, finding.Id, TestActors.Ann, cancellationToken),
+            ["promote"] = () => world.Threads.PromoteAsync(
+                project, ReviewId, chat.Id, TestActors.Ann, cancellationToken, signed),
+            ["demote"] = () => world.Threads.DemoteAsync(
+                project, ReviewId, finding.Id, TestActors.Ann, cancellationToken, signed),
+            ["toggle"] = () => world.Threads.SetCommentIncludedAsync(
+                project, ReviewId, chat.Id, reply.Id, true, TestActors.Ann, cancellationToken, signed)
+        };
+
+        // Act
+        await attempts[action]();
+
+        // Assert: the review was open, and the action was accepted and recorded
+        Assert.False(before.IsApproved);
+        Assert.All(before.Slots, slot => Assert.Equal(SlotSignatureState.Signed, slot.State));
+        Assert.Equal(audits + 1, world.Store.Audits.Count);
+        Assert.Equal(auditAction, world.Store.Audits[^1].Action);
+    }
+
+    /// <summary>
     ///     Test that a chat thread started after a signature needs no acknowledgement and keeps the signature.
     /// </summary>
     [Fact]
@@ -1604,6 +1669,142 @@ public class ThreadServiceReportTests
         var entry = Assert.Single(world.Store.Audits, audit => audit.Action == "thread.resolved");
         Assert.StartsWith($"thread {id}; note sha256 ", entry.Detail);
         Assert.DoesNotContain("Secret remedy", entry.Detail);
+    }
+
+    /// <summary>
+    ///     Test that starting a thread, replying, resolving and reopening each give the store the audit entry in the
+    ///     very call that stores the change, so that the store can save the two together.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ThreadActions_GiveTheStoreEntryAndChangeInOneCall()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var audits = world.Store.Audits.Count;
+
+        // Act
+        var id = await StartAsync(world);
+        await world.Threads.ReplyAsync(world.Project, ReviewId, id, Who("alt"), "Reply", cancellationToken);
+        await world.Threads.ResolveAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken);
+        await world.Threads.ReopenAsync(world.Project, ReviewId, id, Who("alt"), cancellationToken);
+
+        // Assert: one store call for each action, naming the thread, and the entry of each call is the one saved
+        var calls = world.Store.ThreadChangeCalls;
+        Assert.Equal(
+            [
+                nameof(IReviewStore.AddThreadAsync),
+                nameof(IReviewStore.AddCommentAsync),
+                nameof(IReviewStore.ResolveThreadAsync),
+                nameof(IReviewStore.ReopenThreadAsync)
+            ],
+            calls.Select(call => call.Call));
+        Assert.All(calls, call => Assert.Equal(id, call.ThreadId));
+        Assert.Equal(
+            ["thread.started", "thread.replied", "thread.resolved", "thread.reopened"],
+            calls.Select(call => call.Audit.Action));
+        var saved = world.Store.Audits.Skip(audits).ToList();
+        Assert.Equal(calls.Count, saved.Count);
+        for (var i = 0; i < saved.Count; i++)
+        {
+            Assert.Same(calls[i].Audit, saved[i]);
+        }
+    }
+
+    /// <summary>
+    ///     Test that starting a thread about a check gives the store the audit entry in the very call that stores the
+    ///     thread, so that the store can save the two together.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_CheckAnchor_GivesTheStoreEntryAndThreadInOneCall()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var firstItem = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var audits = world.Store.Audits.Count;
+
+        // Act
+        var thread = await world.Threads.StartThreadAsync(
+            world.Project, ReviewId, ThreadAnchor.ForCheck(firstItem), Who("root"), "About the check", TestContext.Current.CancellationToken);
+
+        // Assert: one store call that stores the thread on the check and carries the entry that was saved
+        var call = Assert.Single(world.Store.ThreadChangeCalls);
+        Assert.Equal(nameof(IReviewStore.AddThreadAsync), call.Call);
+        Assert.Equal(thread.Id, call.ThreadId);
+        Assert.Equal(firstItem, Assert.Single(world.Store.Threads).CheckItemId);
+        Assert.Equal("thread.started", call.Audit.Action);
+        Assert.Contains($"on check {firstItem}", call.Audit.Detail, StringComparison.Ordinal);
+        Assert.Same(call.Audit, Assert.Single(world.Store.Audits.Skip(audits)));
+    }
+
+    /// <summary>
+    ///     Test that promoting, demoting and including a comment in the report each give the store the audit entry in
+    ///     the very call that stores the change, so that the store can save the two together.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReportMutations_GiveTheStoreEntryAndChangeInOneCall()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var id = await StartAsync(world);
+        var reply = await world.Threads.ReplyAsync(world.Project, ReviewId, id, Who("alt"), "Reply", cancellationToken);
+        var calledBefore = world.Store.ThreadChangeCalls.Count;
+        var audits = world.Store.Audits.Count;
+
+        // Act
+        await world.Threads.PromoteAsync(world.Project, ReviewId, id, Who("alt"), cancellationToken);
+        await world.Threads.DemoteAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken);
+        await world.Threads.SetCommentIncludedAsync(world.Project, ReviewId, id, reply.Id, true, Who("alt"), cancellationToken);
+
+        // Assert: one store call for each change, naming the thread, and the entry of each call is the one saved
+        var calls = world.Store.ThreadChangeCalls.Skip(calledBefore).ToList();
+        Assert.Equal(
+            [
+                nameof(IReviewStore.SetThreadKindAsync),
+                nameof(IReviewStore.SetThreadKindAsync),
+                nameof(IReviewStore.SetCommentReportAsync)
+            ],
+            calls.Select(call => call.Call));
+        Assert.All(calls, call => Assert.Equal(id, call.ThreadId));
+        Assert.Equal(
+            ["thread.kind-changed", "thread.kind-changed", "thread.comment-report-changed"],
+            calls.Select(call => call.Audit.Action));
+        var saved = world.Store.Audits.Skip(audits).ToList();
+        Assert.Equal(calls.Count, saved.Count);
+        for (var i = 0; i < saved.Count; i++)
+        {
+            Assert.Same(calls[i].Audit, saved[i]);
+        }
+    }
+
+    /// <summary>
+    ///     Test that resolving a Finding with a note gives the store the note and the audit entry in one call, the
+    ///     same call that stores the new state, so that the note and the state are saved together.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ResolveAsync_FindingWithNote_GivesTheStoreNoteAndNewStateInOneCall()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var id = await StartAsync(world, include: true);
+
+        // Act
+        await world.Threads.ResolveAsync(world.Project, ReviewId, id, Who("mem"), cancellationToken, null, "  Fixed it  ");
+
+        // Assert: one store call to resolve, carrying the trimmed note as a Resolution comment and the entry
+        var call = Assert.Single(world.Store.ThreadChangeCalls, c => c.Call == nameof(IReviewStore.ResolveThreadAsync));
+        Assert.Equal(id, call.ThreadId);
+        Assert.NotNull(call.Resolution);
+        Assert.Equal("Fixed it", call.Resolution.Text);
+        Assert.Equal(ReviewCommentKind.Resolution, call.Resolution.Kind);
+        Assert.Equal("thread.resolved", call.Audit.Action);
+
+        // Assert: the store, which saved the state from that call, holds the state and the note
+        var thread = await GetAsync(world, id);
+        Assert.Equal(ReviewThreadState.Resolved, thread.State);
+        Assert.Equal("Fixed it", thread.Comments[^1].Text);
     }
 
     /// <summary>

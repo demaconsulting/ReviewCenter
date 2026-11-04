@@ -1007,6 +1007,36 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that a system administrator who is no member of the project finds only the reviews in which the
+    ///     administrator is a reviewer or the creator, and nothing of a review that the administrator has no part in.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_Sysadmin_RowsOnlyForReviewsAsReviewerOrCreator()
+    {
+        // Arrange: root created r2 (a failed check) and holds a slot of r1 (arranged in the store); r3 is a review that
+        // root has no part in, with a thread that nobody answered
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "r1", PrimaryUserId = world.Ids["root"] },
+            _ => AuditTestExtensions.Draft(),
+            Ct);
+        await world.CreateReviewAsync("r2", "root");
+        await world.FailCheckAsync("r2", "bob");
+        await world.CreateReviewAsync("r3");
+        await world.AddSlotAsync("r3", "ann");
+        await world.StartThreadAsync("r3", "bob");
+
+        // Act
+        var view = await world.InboxOfAsync("root");
+
+        // Assert: nothing of r3, and the row of the created review is there
+        Assert.DoesNotContain(view.Items, item => item.ReviewId == "r3");
+        Assert.All(view.Items, item => Assert.Contains(item.ReviewId, new[] { "r1", "r2" }));
+        Assert.Contains(view.Items, item => item.ReviewId == "r2" && item.Section == InboxSection.FailedChecks);
+    }
+
+    /// <summary>
     ///     Test that marking a review as seen never moves the state backwards, keeps the later time, and stores
     ///     nothing for a user who may not see the review.
     /// </summary>
@@ -1399,6 +1429,44 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that a check that is still unanswered keeps a reviewer who handed in from being asked to sign: the
+    ///     row is a waiting row, and the ready to sign row is back once the check is answered.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_UnansweredCheck_ShowsWaitingNotReadyToSign()
+    {
+        // Arrange: ann handed in a full ballot; bob has a draft with one answer, which does not count yet
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        var bobSlot = await world.AddSlotAsync("r1", "bob");
+        await world.SubmitBallotAsync("r1", "ann");
+        await world.StartBallotAsync("r1", "bob");
+        var before = await world.InboxOfAsync("ann");
+
+        // Act: the ballot of bob is handed in although it leaves checks unanswered (arranged in the store, as the
+        // service refuses an incomplete ballot)
+        await world.Store.SubmitBallotAsync(
+            world.ProjectId,
+            "r1",
+            bobSlot.Id,
+            world.Clock.GetUtcNow(),
+            "bob",
+            AuditTestExtensions.Draft(),
+            _ => true,
+            Ct);
+        var after = await world.InboxOfAsync("ann");
+
+        // Assert: the draft of bob blocks nothing, so the review is ready to sign; the unanswered checks block it
+        Assert.Equal(InboxSection.ToSign, Assert.Single(before.Items).Section);
+        var row = Assert.Single(after.Items);
+        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        Assert.Equal("Waiting for 1 reviewer", row.Chip);
+        Assert.Equal("Waiting for Bob.", row.Detail);
+        Assert.Equal(0, after.ActionCount);
+    }
+
+    /// <summary>
     ///     Test that a waiting row, which is no work, shows no due date and no overdue marker even when the review is
     ///     overdue.
     /// </summary>
@@ -1745,6 +1813,38 @@ public class InboxServiceTests
         var sign = Assert.Single(after.Items, item => item.Section == InboxSection.ToSign);
         Assert.Equal(InboxService.SignAgainChip, sign.Chip);
         Assert.Equal(InboxRules.SignAgainText, sign.Detail);
+    }
+
+    /// <summary>
+    ///     Test that a Your signature no longer counts row of a user who has seen the review turns unread when
+    ///     somebody else comments after the user last saw it.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLost_CommentByOtherAfterLastSeen_IsUnread()
+    {
+        // Arrange: ann signed, bob opened a finding, which took her signature; ann has seen the review since
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "ann");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+        var seenMax = InboxService.MaxCommentId(await world.Threads.ListAsync(world.ProjectId, "r1", Ct));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", seenMax, null, Ct);
+        var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.SignatureLost));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob adds a comment to the open finding
+        await world.ReplyAsync("r1", thread.Id, "bob");
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.SignatureLost));
+
+        // Assert: the row was read before and is new now
+        Assert.False(seen.IsUnread);
+        Assert.True(after.IsUnread);
     }
 
     /// <summary>

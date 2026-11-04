@@ -580,6 +580,15 @@ sections:
           - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
           - ThreadService_NextStep_DisputedAndConclusion_AreNamed
 
+      - id: ReviewCenter-ThreadService-NextStep-Order
+        title: >-
+          The ThreadService class shall name the parts of the sentence in the order unanswered checks, disputed
+          checks, checks answered Fail, open threads, and the hint to write the conclusion.
+        justification: |
+          A fixed order lets a reader look for the same kind of work in the same place of the sentence every time.
+        tests:
+          - ThreadService_NextStep_AllParts_AreNamedInFixedOrder
+
       - id: ReviewCenter-ThreadService-NextStep-Conclusion
         title: >-
           The ThreadService class shall add the hint to write the review conclusion when the review would be
@@ -614,6 +623,16 @@ sections:
           The history must show who started which discussion about which file or lines, and when.
         tests:
           - ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText
+
+      - id: ReviewCenter-ThreadService-Audit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of starting a thread, a reply, a resolve and a
+          reopen in the same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - ThreadService_ThreadActions_GiveTheStoreEntryAndChangeInOneCall
 
       - id: ReviewCenter-ThreadService-Audit-Reply
         title: >-
@@ -866,6 +885,17 @@ sections:
         tests:
           - ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck
 
+      - id: ReviewCenter-ThreadService-CheckThreadAudit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of a started check thread in the same call that
+          stores the thread.
+        justification: |
+          A check thread that is stored without its entry, or the reverse, would leave the history wrong. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction,
+          which needs both in one call.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchor_GivesTheStoreEntryAndThreadInOneCall
+
       - id: ReviewCenter-ThreadService-CheckThreadAudit-NoText
         title: >-
           The ThreadService class shall not copy the comment text of a started check thread into the audit trail.
@@ -969,12 +999,15 @@ sections:
 
       - id: ReviewCenter-ThreadService-ApprovalLock-OpenThread
         title: >-
-          The ThreadService class shall accept replying and resolving in a review whose slots are all signed but that
+          The ThreadService class shall accept starting a thread, replying, resolving, reopening, promoting, demoting,
+          and changing whether a comment is included in the report in a review whose slots are all signed but that
           still has an open thread.
         justification: |
-          A review with an open thread is not concluded, so the open thread can still be discussed and resolved.
+          A review with an open thread is not concluded, so the open thread can still be discussed and resolved, and
+          the other changes to its threads stay possible.
         tests:
           - ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned
+          - ThreadService_AllThreadActions_OpenThreadReview_AreAcceptedWhenAllSigned
 
       - id: ReviewCenter-ThreadService-ApprovalLock-ReviewNotFound
         title: >-
@@ -1320,6 +1353,17 @@ sections:
         tests:
           - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
           - ThreadService_ResolveAsync_QuestionWithNote_StoresExcludedResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-NoteWithState
+        title: >-
+          The ThreadService class shall give the store the resolution note and the new state of the thread in the same
+          call.
+        justification: |
+          A thread that is resolved without its note, or a note without the resolved thread, would leave the record
+          wrong. The store requirement ReviewCenter-ReviewStore-Audit states and verifies that the saving is one
+          transaction, which needs both in one call.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithNote_GivesTheStoreNoteAndNewStateInOneCall
 
       - id: ReviewCenter-ThreadService-ResolutionNote-NoteTrimmed
         title: >-
@@ -1687,6 +1731,16 @@ sections:
           Moving content into or out of the record is a decision that must be traceable.
         tests:
           - ThreadService_PromoteAndDemoteAsync_Audit_NamesKindChange
+
+      - id: ReviewCenter-ThreadService-ReportAudit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of promoting, demoting and changing whether a
+          comment is included in the report in the same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - ThreadService_ReportMutations_GiveTheStoreEntryAndChangeInOneCall
 
       - id: ReviewCenter-ThreadService-ReportAudit-CommentToggle
         title: >-

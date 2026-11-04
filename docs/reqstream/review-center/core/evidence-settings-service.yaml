@@ -123,8 +123,9 @@ sections:
 
       - id: ReviewCenter-EvidenceSettingsService-Access-Hidden
         title: >-
-          The EvidenceSettingsService class shall give an actor that may not see the project, including no actor at
-          all, the answer for a project that does not exist.
+          The EvidenceSettingsService class shall give a user outside the project, an administrator of another
+          project, a disabled user (a member or an administrator of the project), and no actor at all the answer for
+          a project that does not exist.
         justification: |
           A project that the actor may not see must read like a missing one, so that its existence does not leak.
         tests:
@@ -185,6 +186,16 @@ sections:
         tests:
           - EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey
           - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Audit-Atomic
+        title: >-
+          The EvidenceSettingsService class shall give the store the audit entry of a change of the settings in the
+          same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - EvidenceSettingsService_SetAsync_Change_GivesTheStoreEntryAndChangeInOneCall
 
       - id: ReviewCenter-EvidenceSettingsService-Audit-Actor
         title: >-

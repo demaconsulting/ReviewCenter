@@ -127,6 +127,7 @@ sections:
           - ReviewCenter-EvidenceSettingsService-Change-OtherProjects
           - ReviewCenter-EvidenceSettingsService-Change-Reported
           - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-EvidenceSettingsService-Audit-Atomic
           - ReviewCenter-EvidenceSettingsService-Audit-Actor
           - ReviewCenter-EvidenceSettingsService-Audit-Keys
           - ReviewCenter-EvidenceSettingsService-Audit-KeyValues
@@ -385,6 +386,7 @@ sections:
           - ReviewCenter-ThreadService-NextStep-FailNotBlocking
           - ReviewCenter-ThreadService-NextStep-ChecklistComplete
           - ReviewCenter-ThreadService-NextStep-Combined
+          - ReviewCenter-ThreadService-NextStep-Order
           - ReviewCenter-ThreadService-NextStep-Conclusion
           - ReviewCenter-ThreadService-NextStep-ExplicitUnanswered
           - ReviewCenter-ThreadService-NextStep-DisputedOnce
@@ -402,6 +404,7 @@ sections:
           - ReviewCenter-ThreadService-ResolutionNote-TooLong-StaysOpen
           - ReviewCenter-ThreadService-ResolutionNote-Question
           - ReviewCenter-ThreadService-ResolutionNote-NoteStored
+          - ReviewCenter-ThreadService-ResolutionNote-NoteWithState
           - ReviewCenter-ThreadService-ResolutionNote-NoteTrimmed
           - ReviewCenter-ThreadService-ResolutionNote-FindingNoteIncluded
           - ReviewCenter-ThreadService-ResolutionNote-QuestionNoteExcluded
@@ -1215,6 +1218,7 @@ sections:
           - ReviewCenter-AuditService-Filter-Project
           - ReviewCenter-AuditService-Filter-Review
           - ReviewCenter-AuditService-Filter-ActorText
+          - ReviewCenter-AuditService-Filter-ActorIdentity
           - ReviewCenter-AuditService-Filter-Action
           - ReviewCenter-AuditService-Filter-ActionGroup
           - ReviewCenter-AuditService-Filter-DayRange
@@ -1237,6 +1241,7 @@ sections:
           - ReviewCenter-AuditService-Export
           - ReviewCenter-AuditService-Export-Ascending
           - ReviewCenter-AuditService-Export-Batches
+          - ReviewCenter-AuditService-Export-Streamed
           - ReviewCenter-AuditService-Export-Snapshot
           - ReviewCenter-AuditService-Export-OwnEntry
           - ReviewCenter-AuditService-Export-Project
@@ -1249,6 +1254,8 @@ sections:
           - ReviewCenter-AuditService-ExportChainStatus-Intact
           - ReviewCenter-AuditService-ExportChainStatus-Broken
           - ReviewCenter-AuditService-ExportChainStatus-WholeChain
+          - ReviewCenter-AuditService-ExportChainStatus-Once
+          - ReviewCenter-AuditService-ExportChainStatus-SnapshotFirst
           - ReviewCenter-AuditService-ExportChainStatus-BrokenExported
           - ReviewCenter-AuditService-ExportChainStatus-FileName
           - ReviewCenter-AuditService-ExportChainStatus-ContentType
@@ -1294,6 +1301,7 @@ sections:
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-EvidenceSettingsService-Audit-Atomic
           - ReviewCenter-EvidenceSettingsService-Audit-Actor
           - ReviewCenter-EvidenceSettingsService-Audit-Keys
           - ReviewCenter-EvidenceSettingsService-Audit-KeyValues
@@ -1309,6 +1317,7 @@ sections:
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ReviewService-Audit-FileCount
           - ReviewCenter-ThreadService-Audit
+          - ReviewCenter-ThreadService-Audit-Atomic
           - ReviewCenter-ThreadService-Audit-Reply
           - ReviewCenter-ThreadService-Audit-Resolve
           - ReviewCenter-ThreadService-Audit-Reopen
@@ -1316,6 +1325,7 @@ sections:
           - ReviewCenter-ThreadService-Audit-NoText
           - ReviewCenter-ThreadService-Audit-MissingThread
           - ReviewCenter-ThreadService-ReportAudit
+          - ReviewCenter-ThreadService-ReportAudit-Atomic
           - ReviewCenter-ThreadService-ReportAudit-CommentToggle
           - ReviewCenter-ThreadService-ReportAudit-ResolutionNoteHash
           - ReviewCenter-ThreadService-ReportAudit-ResolutionNoteNoText
@@ -1324,6 +1334,7 @@ sections:
           - ReviewCenter-ThreadService-ReportAudit-ReplyInReport-ChatNotMarked
           - ReviewCenter-ThreadService-ReportAudit-NoOp
           - ReviewCenter-ThreadService-CheckThreadAudit
+          - ReviewCenter-ThreadService-CheckThreadAudit-Atomic
           - ReviewCenter-ThreadService-CheckThreadAudit-NoText
           - ReviewCenter-ChecklistService-Audit
           - ReviewCenter-ChecklistService-Audit-Section
@@ -1741,6 +1752,7 @@ sections:
           - ReviewCenter-UserImpactService-OpenWork-SignedLeftOut
           - ReviewCenter-UserImpactService-OpenWork-ApprovedLeftOut
           - ReviewCenter-UserImpactService-OpenWork-Ordering
+          - ReviewCenter-UserImpactService-OpenWork-Ordering-Slot
           - ReviewCenter-UserImpactService-OpenWork-BatchRead
           - ReviewCenter-UserImpactService-OpenWork-DisabledUser
           - ReviewCenter-UserImpactService-SoleAdmin
@@ -2143,6 +2155,7 @@ sections:
           - ReviewCenter-InboxService-ToSign-Alternate
           - ReviewCenter-InboxService-ToSign-BallotNotIn
           - ReviewCenter-InboxService-ToSign-OpenThreadBlocks
+          - ReviewCenter-InboxService-ToSign-UnansweredBlocks
           - ReviewCenter-InboxService-ToSign-DisputeBlocks
           - ReviewCenter-InboxService-ToSign-DisputeSettled
           - ReviewCenter-InboxService-ToSign-ConclusionTextBlocks
@@ -2232,6 +2245,7 @@ sections:
           - ReviewCenter-InboxService-Access-Anonymous-CountZero
           - ReviewCenter-InboxService-Access-ConcludedNoAction
           - ReviewCenter-InboxService-Access-Sysadmin
+          - ReviewCenter-InboxService-Access-Sysadmin-SlotOnly
           - ReviewCenter-InboxService-Count
           - ReviewCenter-InboxService-Count-UpdatesNotCounted
           - ReviewCenter-InboxService-Count-WaitingNotCounted
@@ -2242,6 +2256,7 @@ sections:
           - ReviewCenter-InboxService-Unread-OwnComment
           - ReviewCenter-InboxService-Unread-ItemComment
           - ReviewCenter-InboxService-Unread-Signature
+          - ReviewCenter-InboxService-Unread-SignatureLost
           - ReviewCenter-InboxService-Unread-CommentChange
           - ReviewCenter-InboxService-Unread-Reopen
           - ReviewCenter-InboxService-Unread-SubmittedBallot

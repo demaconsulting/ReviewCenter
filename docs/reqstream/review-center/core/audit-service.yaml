@@ -413,6 +413,14 @@ sections:
         tests:
           - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
 
+      - id: ReviewCenter-AuditService-Filter-ActorIdentity
+        title: >-
+          The AuditService class shall narrow the listing to the entries of the user whose identity the filter names.
+        justification: |
+          An auditor who knows which account acted wants the entries of that account, whatever name it showed then.
+        tests:
+          - AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries
+
       - id: ReviewCenter-AuditService-Filter-Action
         title: >-
           The AuditService class shall narrow the listing to the entries of the one exact action that the filter
@@ -606,6 +614,14 @@ sections:
           - AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500
           - AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead
 
+      - id: ReviewCenter-AuditService-Export-Streamed
+        title: >-
+          The AuditService class shall write each batch of an export to the target before it reads the next batch.
+        justification: |
+          The batches are never held together in memory, so the memory use of an export does not grow with the trail.
+        tests:
+          - AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext
+
       - id: ReviewCenter-AuditService-Export-Snapshot
         title: >-
           The AuditService class shall leave out of an export the entries that were appended after it was prepared.
@@ -711,6 +727,23 @@ sections:
           The chain is global, so the status of a project export covers every entry that was exported and more.
         tests:
           - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-Once
+        title: >-
+          The AuditService class shall read the chain for one verification pass only while it prepares an export.
+        justification: |
+          The chain may be long, and a second pass would cost as much as the first without telling the reader more.
+        tests:
+          - AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-SnapshotFirst
+        title: >-
+          The AuditService class shall capture the newest sequence of an export before it verifies the chain.
+        justification: |
+          An entry that is appended while the chain is verified must not be exported without being verified, so the
+          verified chain always reaches at least the newest exported entry.
+        tests:
+          - AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot
 
       - id: ReviewCenter-AuditService-ExportChainStatus-BrokenExported
         title: >-

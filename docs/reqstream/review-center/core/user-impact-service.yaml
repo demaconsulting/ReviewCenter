@@ -72,6 +72,15 @@ sections:
         tests:
           - UserImpactService_GetImpactAsync_ManyReviews_AreOrderedAndReadInOneBatchPerProject
 
+      - id: ReviewCenter-UserImpactService-OpenWork-Ordering-Slot
+        title: >-
+          The UserImpactService class shall order the open work of one review by the number of the slot.
+        justification: |
+          When a user holds more than one slot of a review, the list must keep the slots in the same order as the
+          approval status of the review shows them.
+        tests:
+          - UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber
+
       - id: ReviewCenter-UserImpactService-OpenWork-BatchRead
         title: >-
           The UserImpactService class shall read the snapshots of the reviews of a project with one batch read.
@@ -158,11 +167,12 @@ sections:
       - id: ReviewCenter-UserImpactService-Scope-Refused
         title: >-
           The UserImpactService class shall refuse an actor who administers no project (a member, a read-only member,
-          a user outside every project, an unknown actor, or the command line) as not allowed.
+          a disabled member, a user outside every project, an unknown actor, or the command line) as not allowed.
         justification: |
           The impact of a leaver is not for people who do not run projects.
         tests:
           - UserImpactService_GetImpactAsync_ActorWithoutAdministration_IsRefused
+          - UserImpactService_GetImpactAsync_DisabledMember_IsRefused
 
       - id: ReviewCenter-UserImpactService-Scope-DisabledAdmin
         title: >-

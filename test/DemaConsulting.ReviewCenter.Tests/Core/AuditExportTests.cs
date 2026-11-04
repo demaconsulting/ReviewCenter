@@ -200,6 +200,34 @@ public class AuditExportTests
     }
 
     /// <summary>
+    ///     Test that each batch of an export is in the target before the next batch is read, so the batches are never
+    ///     held together.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext()
+    {
+        // Arrange: 500 + 500 + 201 entries; the hook looks into the target right after each batch was read
+        var (service, store) = Create();
+        await Fill(service, 1201);
+        var export = await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+        using var target = new MemoryStream();
+        var rowsInTargetAtRead = new List<int>();
+        store.AfterMatchingRead = _ =>
+        {
+            var bytes = target.ToArray();
+            rowsInTargetAtRead.Add(Sequences(new UTF8Encoding(false).GetString(bytes, 3, bytes.Length - 3)).Count);
+        };
+
+        // Act
+        var rows = await service.ExportAsync(export, target, TestContext.Current.CancellationToken);
+
+        // Assert: when the second batch was read the first was already written, and so on
+        Assert.Equal(1201, rows);
+        Assert.Equal([0, 500, 1000], rowsInTargetAtRead);
+    }
+
+    /// <summary>
     ///     Test that an export is audited after the stream, with the format, the row count and the filter, as an
     ///     entry of the project of the filter and by the exporting user.
     /// </summary>
@@ -354,6 +382,58 @@ public class AuditExportTests
         Assert.Contains("chain-intact.csv", export.FileName, StringComparison.Ordinal);
         Assert.Equal(5, export.SnapshotSequence);
         Assert.Equal(0, store.MatchingReads);
+    }
+
+    /// <summary>
+    ///     Test that the chain is read for one verification pass only while an export is prepared: the preparation
+    ///     asks the store for as many batches as one verification of the same chain does.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass()
+    {
+        // Arrange: 1,200 entries are read in four batches of at most 500, the last one empty
+        var (service, store) = Create();
+        await Fill(service, 1200);
+        await service.VerifyAsync(TestContext.Current.CancellationToken);
+        var readsOfOnePass = store.ReadAfterCalls;
+
+        // Act
+        await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(4, readsOfOnePass);
+        Assert.Equal(2 * readsOfOnePass, store.ReadAfterCalls);
+    }
+
+    /// <summary>
+    ///     Test that the newest sequence of an export is captured before the chain is verified: an entry that is
+    ///     appended while the chain is verified is covered by the verification but is not part of the snapshot.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot()
+    {
+        // Arrange: the trail grows after the first verification batch was read
+        var (service, store) = Create();
+        await Fill(service, 5);
+        store.AfterReadAfter = call =>
+        {
+            if (call == 1)
+            {
+                service.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "during"), CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+        };
+
+        // Act
+        var export = await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the snapshot was fixed first, the verification then saw all six entries
+        Assert.Equal(5, export.SnapshotSequence);
+        Assert.Equal(6, store.Entries.Count);
+        Assert.Equal(6, export.Chain.Count);
+        Assert.Equal("intact", export.ChainStatus);
     }
 
     /// <summary>

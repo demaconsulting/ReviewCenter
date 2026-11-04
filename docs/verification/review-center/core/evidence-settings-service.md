@@ -91,6 +91,12 @@ of `Own`, no review, the name of the actor with the user name, and the detail
 `AnonymousAttestations off->on; IncludeThreads on->off`. This scenario is tested by
 `EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited`.
 
+**EvidenceSettingsService_SetAsync_Change_GivesTheStoreEntryAndChangeInOneCall**: A project administrator turns the file
+list off. The fake store received exactly one call to change the evidence settings; that call names the project of
+`Own`, carries the new settings and the audit draft `project.evidence-settings-changed` with the detail
+`IncludeFiles on->off`, and the draft is the very entry that the store saved. This scenario is tested by
+`EvidenceSettingsService_SetAsync_Change_GivesTheStoreEntryAndChangeInOneCall`.
+
 **EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey**: A system administrator turns the
 file list off. Exactly one entry `project.evidence-settings-changed` exists, with the project, no review, the name of
 the actor with the user name, and the detail `IncludeFiles on->off`. This scenario is tested by
@@ -110,7 +116,10 @@ and changes the settings once and is then removed from the project. The next rea
 tested by `EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall`.
 
 **EvidenceSettingsService_SetAsync_NoChange_RecordsNothing**: Settings equal to the expected ones are saved; the call
-reports `false`, the stored settings are still the defaults, and no entry exists. This scenario is tested by
+reports `false`, the stored settings are still the defaults, no entry exists, and the fake store recorded no call to
+change the evidence settings. The administrator then changes the settings (one store call, one entry) and saves the same
+settings again as expected and new; that call reports `false` too, the store call count is still one, the stored
+settings are unchanged, and still only one entry exists. This scenario is tested by
 `EvidenceSettingsService_SetAsync_NoChange_RecordsNothing`.
 
 **EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged**: One administrator changes the
