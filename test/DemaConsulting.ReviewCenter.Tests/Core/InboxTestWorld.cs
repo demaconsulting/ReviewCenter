@@ -136,8 +136,9 @@ internal sealed class InboxTestWorld
     /// <summary>
     ///     Creates the world: the users, the project and the memberships.
     /// </summary>
+    /// <param name="projectName">The name of the project; <c>Apollo</c> when omitted.</param>
     /// <returns>The arranged world.</returns>
-    public static async Task<InboxTestWorld> CreateAsync()
+    public static async Task<InboxTestWorld> CreateAsync(string projectName = "Apollo")
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = new InboxTestWorld();
@@ -148,7 +149,7 @@ internal sealed class InboxTestWorld
         }
 
         world.Ids = ids;
-        var project = await TestServices.Projects(world.Store, world.Clock).CreateAsync("Apollo", null, cancellationToken);
+        var project = await TestServices.Projects(world.Store, world.Clock).CreateAsync(projectName, null, cancellationToken);
         world.ProjectId = project.Id;
         foreach (var name in new[] { "ann", "bob", "cyd", "dee", "eve", "author", "off", "tmp" })
         {

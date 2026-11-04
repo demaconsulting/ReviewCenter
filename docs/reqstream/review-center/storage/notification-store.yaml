@@ -2,8 +2,10 @@
 # Software Unit Requirements for the NotificationStore Class
 #
 # The NotificationStore class keeps the e-mail address of a user for notifications, the pending confirmation of a new
-# address, and the log of the mails that were sent. Each change that must hold together, such as the reservation of a
-# confirmation with its limits, is one transaction. Each requirement states one rule.
+# address, and the log of the mails that were sent. It also keeps the notification mode of a user, the items that
+# the user was told about, and the state of the dispatcher for the user. Each change that must hold together, such as
+# the reservation of a confirmation with its limits or a commit of a notification pass, is one transaction. Each
+# requirement states one rule.
 
 sections:
   - title: NotificationStore Unit Requirements
@@ -291,3 +293,336 @@ sections:
           reason.
         tests:
           - NotificationStore_ReserveConfirmationAsync_OldLogEntries_AreDeleted
+
+      - id: ReviewCenter-NotificationStore-ModeDefault
+        title: >-
+          The NotificationStore class shall read the mode None for a row that was created without a mode.
+        justification: |
+          Users who entered an address before they chose a mode must get no mail.
+        tests:
+          - NotificationStore_Get_NewRow_ModeNone
+
+      - id: ReviewCenter-NotificationStore-ModeDefault-NoBaseline
+        title: >-
+          The NotificationStore class shall read no pending baseline for a row that was created without a mode.
+        justification: |
+          A row of a user who chose no mode has no backlog to record.
+        tests:
+          - NotificationStore_Get_NewRow_NoPendingBaseline
+
+      - id: ReviewCenter-NotificationStore-ModeDefault-EmptyState
+        title: >-
+          The NotificationStore class shall read an empty dispatch state for a row that was created without a mode.
+        justification: |
+          A row of a user who chose no mode has no batch window, no handled slot, and no failure to retry.
+        tests:
+          - NotificationStore_Get_NewRow_EmptyDispatchState
+
+      - id: ReviewCenter-NotificationStore-ModePersisted
+        title: >-
+          The NotificationStore class shall return the chosen mode of a user to a store instance that was created after
+          the choice.
+        justification: |
+          The mode must survive a restart of the server.
+        tests:
+          - NotificationStore_SetMode_Persisted_ReadBack
+
+      - id: ReviewCenter-NotificationStore-ModeAuditOneTransaction
+        title: >-
+          The NotificationStore class shall save a changed mode and its audit entry in one transaction.
+        justification: |
+          A change of the mode that is not in the audit trail, or an entry for a change that did not happen, would make
+          the trail wrong.
+        tests:
+          - NotificationStore_SetMode_AuditFailure_ModeUnchanged
+
+      - id: ReviewCenter-NotificationStore-ModeBaselineFlag
+        title: >-
+          When a mode is switched on from None, the NotificationStore class shall set the baseline flag.
+        justification: |
+          The dispatcher records the backlog as known before it mails anything.
+        tests:
+          - NotificationStore_SetMode_NoneToDaily_FlagSet
+
+      - id: ReviewCenter-NotificationStore-ModeBaselineFlag-BatchWindowCleared
+        title: >-
+          When a mode is switched on from None, the NotificationStore class shall clear the batch window.
+        justification: |
+          A batch window from an earlier use of the mode must not carry over.
+        tests:
+          - NotificationStore_SetMode_NoneToDaily_BatchWindowCleared
+
+      - id: ReviewCenter-NotificationStore-ModeBaselineFlag-FailureStateCleared
+        title: >-
+          When a mode is switched on from None, the NotificationStore class shall clear the failure state.
+        justification: |
+          A failure count and a retry time from an earlier use of the mode must not carry over.
+        tests:
+          - NotificationStore_SetMode_NoneToDaily_FailureStateCleared
+
+      - id: ReviewCenter-NotificationStore-ModeSwitchKeepsItems
+        title: >-
+          When the mode switches between Daily and Every, the NotificationStore class shall keep the notified items.
+        justification: |
+          Items that were notified stay known across the switch.
+        tests:
+          - NotificationStore_SetMode_DailyToEvery_KeepsItems
+
+      - id: ReviewCenter-NotificationStore-ModeSwitchKeepsItems-NoBaseline
+        title: >-
+          When the mode switches between Daily and Every, the NotificationStore class shall set no baseline flag.
+        justification: |
+          A new baseline would swallow news that arrived before the switch.
+        tests:
+          - NotificationStore_SetMode_DailyToEvery_NoBaselineFlag
+
+      - id: ReviewCenter-NotificationStore-ModeNoneClearsItems
+        title: >-
+          When the mode becomes None, the NotificationStore class shall delete the notified items of the user.
+        justification: |
+          A user who switches the mail off and on again starts from a new baseline, so old keys must not linger.
+        tests:
+          - NotificationStore_SetMode_None_DeletesNotified
+
+      - id: ReviewCenter-NotificationStore-ModeNoneClearsItems-DailySlot
+        title: >-
+          When the mode becomes None, the NotificationStore class shall delete the memory of the handled daily slot.
+        justification: |
+          A user who switches the mail on again must not be held back by a slot of the earlier use.
+        tests:
+          - NotificationStore_SetMode_None_ClearsDailySlotMemory
+
+      - id: ReviewCenter-NotificationStore-ModeNoChange
+        title: >-
+          The NotificationStore class shall change nothing when a mode is set for a user without a row.
+        justification: |
+          Nothing has changed then.
+        tests:
+          - NotificationStore_SetMode_NoRow_ReturnsFalse
+
+      - id: ReviewCenter-NotificationStore-ModeNoChange-NoAddress
+        title: >-
+          The NotificationStore class shall change nothing when a mode is set for a user without a confirmed address.
+        justification: |
+          A user without a confirmed address can not be mailed.
+        tests:
+          - NotificationStore_SetMode_NoConfirmedAddress_ReturnsFalse
+
+      - id: ReviewCenter-NotificationStore-ModeNoChange-SameMode
+        title: >-
+          The NotificationStore class shall change nothing when a mode is set for a user who has that mode already.
+        justification: |
+          Nothing has changed then.
+        tests:
+          - NotificationStore_SetMode_SameMode_ReturnsFalse
+
+      - id: ReviewCenter-NotificationStore-ModeNoChange-NoAudit
+        title: >-
+          The NotificationStore class shall write no audit entry when setting a mode changes nothing.
+        justification: |
+          An audit entry for a change that did not happen would be false.
+        tests:
+          - NotificationStore_SetMode_NoChangePossible_NoAuditEntry
+
+      - id: ReviewCenter-NotificationStore-RecipientsListed
+        title: >-
+          The NotificationStore class shall list only the users who have a mode other than None and a confirmed
+          address.
+        justification: |
+          Only those users may get mail, and the dispatcher must not look at anyone else.
+        tests:
+          - NotificationStore_ListRecipients_Mixed_OnlyEligible
+
+      - id: ReviewCenter-NotificationStore-RecipientsUserFlags
+        title: >-
+          The NotificationStore class shall report for each recipient whether the user is disabled.
+        justification: |
+          The dispatcher sends no mail to a disabled user, and the flag is that of the user table.
+        tests:
+          - NotificationStore_ListRecipients_Flags_Joined
+
+      - id: ReviewCenter-NotificationStore-RecipientsUserFlags-MustChangePassword
+        title: >-
+          The NotificationStore class shall report for each recipient whether the user must change a temporary
+          password.
+        justification: |
+          The dispatcher sends no mail to such a user, and the flag is that of the user table.
+        tests:
+          - NotificationStore_ListRecipients_MustChangePassword_Joined
+
+      - id: ReviewCenter-NotificationStore-RecipientsState
+        title: >-
+          The NotificationStore class shall report the stored dispatch state with each recipient.
+        justification: |
+          The batch window, the daily slot, and the retry state must survive a restart.
+        tests:
+          - NotificationStore_ListRecipients_State_RoundTrips
+
+      - id: ReviewCenter-NotificationStore-StateTimestamps
+        title: >-
+          The NotificationStore class shall store the timestamps of the dispatch state as fixed-width UTC text.
+        justification: |
+          The database can compare such text, and an instant with an offset must not change its meaning.
+        tests:
+          - NotificationStore_Apply_State_TimestampsStoredAsUtcText
+
+      - id: ReviewCenter-NotificationStore-StateTimestamps-ReadBack
+        title: >-
+          The NotificationStore class shall read the timestamps of the dispatch state back as the instants that were
+          stored.
+        justification: |
+          A retry time or a batch window that read back changed would send mail too early or too late.
+        tests:
+          - NotificationStore_Apply_State_TimestampsRoundTrip
+
+      - id: ReviewCenter-NotificationStore-ApplyUpsert
+        title: >-
+          The NotificationStore class shall insert a new notified item when a commit is applied.
+        justification: |
+          The items of a mail are recorded after it was sent, so that the next pass does not send them again.
+        tests:
+          - NotificationStore_Apply_Upserts_InsertsNewItem
+
+      - id: ReviewCenter-NotificationStore-ApplyUpsert-Update
+        title: >-
+          The NotificationStore class shall update the state of an existing notified item when a commit is applied.
+        justification: |
+          An item whose news changed is recorded with its new state, so that only newer news is mailed.
+        tests:
+          - NotificationStore_Apply_Upserts_UpdatesExistingItem
+
+      - id: ReviewCenter-NotificationStore-ApplyRemove
+        title: >-
+          The NotificationStore class shall delete the notified items that the keys of a commit name.
+        justification: |
+          An item that left the inbox is forgotten, so that it is news when it comes back.
+        tests:
+          - NotificationStore_Apply_RemoveKeys_Deleted
+
+      - id: ReviewCenter-NotificationStore-ApplyReplaceAll
+        title: >-
+          The NotificationStore class shall replace all notified items of a user by the set of a commit when it is a
+          replace-all commit.
+        justification: |
+          The baseline records the backlog as the whole set of known items.
+        tests:
+          - NotificationStore_Apply_ReplaceAll_ReplacesSet
+
+      - id: ReviewCenter-NotificationStore-ApplyLogRow
+        title: >-
+          The NotificationStore class shall write the send log row of a commit in the same transaction as the notified
+          items.
+        justification: |
+          The limits count the log, and a mail that is in the log must also be recorded as notified.
+        tests:
+          - NotificationStore_Apply_WithLog_RowWritten
+
+      - id: ReviewCenter-NotificationStore-ApplyAtomic
+        title: >-
+          When writing a part of a commit fails, the NotificationStore class shall persist nothing of that commit.
+        justification: |
+          A half-applied commit would either lose a mail or send it again.
+        tests:
+          - NotificationStore_Apply_Failure_NothingPersisted
+
+      - id: ReviewCenter-NotificationStore-ApplyModeNone
+        title: >-
+          The NotificationStore class shall report that a commit was not applied for a user whose mode is None.
+        justification: |
+          A user who switched the mail off while a pass ran: the dispatcher must learn it.
+        tests:
+          - NotificationStore_Apply_ModeNone_ReturnsFalse
+
+      - id: ReviewCenter-NotificationStore-ApplyModeNone-WritesNothing
+        title: >-
+          The NotificationStore class shall write nothing of a commit for a user whose mode is None.
+        justification: |
+          A user who switched the mail off while a pass ran must not get items or a log row recorded from that pass.
+        tests:
+          - NotificationStore_Apply_ModeNone_WritesNothing
+
+      - id: ReviewCenter-NotificationStore-ApplyRowGone
+        title: >-
+          The NotificationStore class shall report that a commit was not applied when the row of the user is gone.
+        justification: |
+          The user removed the address while a pass ran.
+        tests:
+          - NotificationStore_Apply_NoRow_ReturnsFalse
+
+      - id: ReviewCenter-NotificationStore-ItemsUniqueKey
+        title: >-
+          The NotificationStore class shall keep one notified item for each user, project, review, and section.
+        justification: |
+          The key decides whether an item is news, so two rows for one key would make the decision ambiguous.
+        tests:
+          - NotificationStore_Apply_SameKeyTwice_OneRow
+          - NotificationStore_Create_Database_NotifiedItemsKeyUnique
+
+      - id: ReviewCenter-NotificationStore-ItemsRead
+        title: >-
+          The NotificationStore class shall return only the notified items of the asked user.
+        justification: |
+          The items of one user are known to that user only.
+        tests:
+          - NotificationStore_GetNotified_ReturnsOnlyOwnItems
+
+      - id: ReviewCenter-NotificationStore-ItemsCascade
+        title: >-
+          The NotificationStore class shall delete the notified items of a user together with the user.
+        justification: |
+          Items must not outlive their user.
+        tests:
+          - NotificationStore_Delete_User_CascadesNotifiedItems
+
+      - id: ReviewCenter-NotificationStore-ItemsRemoveAddress
+        title: >-
+          The NotificationStore class shall delete the notified items of a user when the address is removed.
+        justification: |
+          Without an address the user is no recipient, and a later address starts from a new baseline.
+        tests:
+          - NotificationStore_Remove_DeletesNotified
+
+      - id: ReviewCenter-NotificationStore-CountUser
+        title: >-
+          The NotificationStore class shall count the mails of one user in the send log since an instant.
+        justification: |
+          The daily limit of one user is counted from the log.
+        tests:
+          - NotificationStore_CountSent_User_CountsOwn
+
+      - id: ReviewCenter-NotificationStore-CountAll
+        title: >-
+          The NotificationStore class shall count the mails of all users in the send log since an instant.
+        justification: |
+          The hourly limit of the server is counted from the log.
+        tests:
+          - NotificationStore_CountSent_All_CountsEverything
+
+      - id: ReviewCenter-NotificationStore-LogPrunedOnApply
+        title: >-
+          The NotificationStore class shall delete the send log entries that are older than one day when it records a
+          mail.
+        justification: |
+          No limit counts an entry that is older than a day.
+        tests:
+          - NotificationStore_Apply_OldLogRows_Pruned
+
+      - id: ReviewCenter-NotificationStore-UnavailableNoItemsTable
+        title: >-
+          The NotificationStore class shall report itself as not available when the table of notified items is
+          missing.
+        justification: |
+          A database from before the dispatcher has to be recreated, and the server must say so at the start instead of
+          failing in a pass.
+        tests:
+          - NotificationStore_IsAvailable_NoNotifiedItems_False
+
+      - id: ReviewCenter-NotificationStore-UnavailableNoModeColumn
+        title: >-
+          The NotificationStore class shall report itself as not available when the mode column of the preferences is
+          missing.
+        justification: |
+          A database from before the dispatcher has to be recreated, and the server must say so at the start instead of
+          failing in a pass.
+        tests:
+          - NotificationStore_IsAvailable_NoModeColumn_False

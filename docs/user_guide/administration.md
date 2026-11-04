@@ -513,12 +513,15 @@ of another user, and deleting a user or a review deletes the read state that bel
 
 ReviewCenter can send e-mail to its users. This is **off by default**: with no `Notifications` settings the server
 sends no mail, the Account page says that e-mail notifications are not set up by the administrator, and nothing else
-about the server changes. In this release the only mail that is sent is the **confirmation mail**, which carries the
-six-digit code that a user types back on the Account page to confirm an e-mail address. The mails that tell users about
-reviews, and the daily summary, are not sent yet.
+about the server changes. When you switch it on, two kinds of mail exist. The **confirmation mail** carries the
+six-digit code that a user types back on the Account page to confirm an e-mail address. The **notification mails** tell
+a user who has chosen to receive them about news in the inbox: something to answer, a review that is ready to sign, and
+similar items. Each user decides: the default of every user is **No e-mail**, even after you switch the feature on, so
+nobody receives a notification mail without having confirmed an address and chosen a mode.
 
-A mail never holds review content. The confirmation mail names the installation and the code, and says that the code
-is valid for 30 minutes. It holds no review, project, file, comment, or user name.
+A mail never holds review text. The confirmation mail names the installation and the code, and says that the code is
+valid for 30 minutes. A notification mail names the kind of news, the project, and the review, and links to the
+review; it never holds a comment, an answer, a verdict, or an outcome (see What Is Mailed below).
 
 ### Settings
 
@@ -544,17 +547,19 @@ the section is read or checked.
 | `Notifications:Smtp:TimeoutSeconds` | `30`           | How long the mail server may take to answer, 5 to 120    |
 | `Notifications:File:Directory`      | (none)         | The folder for the `File` sender; required for it        |
 | `Notifications:MaxMailsPerHour`     | `200`          | The most mails in one hour over all users, 1 to 10000    |
-| `Notifications:DigestHour`          | `8`            | Reserved (see below); 0 to 23                            |
-| `Notifications:TimeZone`            | `UTC`          | Reserved (see below)                                     |
-| `Notifications:BatchWindowSeconds`  | `300`          | Reserved (see below); 30 to 3600                         |
-| `Notifications:PollSeconds`         | `60`           | Reserved (see below); 10 to 3600                         |
-| `Notifications:IncludeTitles`       | `true`         | Reserved (see below)                                     |
+| `Notifications:DigestHour`          | `8`            | The local hour of the daily summary, 0 to 23             |
+| `Notifications:TimeZone`            | `UTC`          | The time zone of the daily summary (see below)           |
+| `Notifications:BatchWindowSeconds`  | `300`          | The quiet time before an Every mail is sent, 30 to 3600  |
+| `Notifications:PollSeconds`         | `60`           | How often the server looks for news, 10 to 3600          |
+| `Notifications:IncludeTitles`       | `true`         | Whether a mail names the review titles                   |
 
-`BaseUrl` must start with `https`, or with `http` for a loopback address only. The server checks it now and uses it for
-the links of the mails of a later release; the confirmation mail holds no link. `DigestHour`, `TimeZone`,
-`BatchWindowSeconds`, `PollSeconds`, and `IncludeTitles` are **reserved for the notification mails of a later
-release**: they are accepted and checked now, so that a configuration written today stays valid, but they change nothing
-in this release. `TimeZone` must be a time zone that the operating system knows, such as `UTC` or `Europe/Berlin`.
+`BaseUrl` must start with `https`, or with `http` for a loopback address only. The server uses it for the links in
+the notification mails; the confirmation mail holds no link. `TimeZone` must be a time zone that the operating system
+knows, such as `UTC` or `Europe/Berlin`. The schedule settings take effect when the server starts: `DigestHour` and
+`TimeZone` decide when the daily summary is due, `BatchWindowSeconds` is how long the server waits after the last
+change before it sends the mail of a user in the mode Every (so that several changes arrive as one mail),
+`PollSeconds` is the time between two looks for news, and `IncludeTitles` set to `false` leaves the review titles
+out of the mails (the project and the review identifier remain).
 
 The `Tls` values mean:
 
@@ -599,8 +604,13 @@ gives you, `StartTls` where it is offered, and a user name and a password file o
 
 With `Notifications:Sender` set to `File` and `Notifications:File:Directory` set to a folder, no mail leaves the
 machine: the server writes each message as one `.eml` file into the folder (it creates the folder when needed), which
-a mail program or a text editor can open. Use it to try the confirmation flow without a mail server. The folder holds
-the confirmation codes in clear text, so do not use the File sender for real users.
+a mail program or a text editor can open. Use it to try the confirmation flow and the notification mails without a mail
+server. The folder holds the confirmation codes and the notification mails in clear text, so do not use the File sender
+for real users.
+
+The server starts the sender and the background work of the notifications only when `Notifications:Enabled` is true
+and the sender is `Smtp` or `File`. Enabling the feature with the sender `None` stops the start with a message. With the
+feature off there is no background work at all, and the command-line verbs and the self-validation never send mail.
 
 ### What Users See
 
@@ -612,23 +622,81 @@ A user confirms an address on the **Account** page (see Account in the Users and
 3. A wrong code is refused. A code can be tried 5 times; after that the user asks for a new one.
 4. A new code can be requested at the earliest 60 seconds after the last mail. Each user, and each address, can have 3
    confirmation mails per day.
-5. The user can remove the address again. That removes it from the server.
+5. The user can remove the address again. That removes it from the server and sets the mode back to **No e-mail**.
 
 The confirmation code never appears on a page or in the audit trail. The audit trail records that an address was
 entered, confirmed, or removed, without the address.
+
+### When a User Gets Mail: the Modes
+
+After an address is confirmed, the user chooses a mode on the Account page. The mode is personal; an administrator
+cannot set it for somebody else.
+
+- **No e-mail** (the default): no notification mail.
+- **Daily summary**: at most one mail a day, sent in the first pass after `DigestHour` in `TimeZone`. It lists the
+  news that arrived since the last mail. When nothing is new, no mail is sent, and the slot of that day is used up.
+  The first summary after the user chooses the mode comes on the next local day.
+- **Every change**: a mail soon after something new arrives. The server waits `BatchWindowSeconds` after the first
+  change, so that changes that follow each other arrive in one mail.
+
+When a user switches a mode on, the server first notes what is already in the inbox and mails none of it (the
+baseline), so nobody gets a flood of old items. Switching between Daily and Every keeps that memory. Each item is mailed
+once; when it is gone and comes back, it counts as new again.
+
+### What Is Mailed
+
+A notification mail says that there is news and where it is; it never says what the news is. It lists the new items
+of the inbox of the user, grouped in a fixed order: To answer, Answers that differ, To sign, Signature no longer
+counts, Replies waiting, and Updates. Each item shows the project, the review (the title, unless `IncludeTitles` is
+false, in which case the review identifier is shown), a sentence for its state such as "waits for your signature" or
+"2 replies are waiting", and a link to the review. At most 50 items are listed, followed by "... and N more", and a
+mail is limited in size. A daily summary lists the new items and then says only how many items still wait. Every mail
+ends with the reason for the mail and a link to the Account page, where the user can stop it.
+
+A mail **never** holds a comment, an answer to a check, a verdict, a number derived from the ballots of the others, or
+the outcome of a review: a review that was approved or rejected is only reported as "was concluded". The inbox rows for
+failed checks and for waiting on others are not mailed, because the first hints at the verdicts of the reviewers and
+the second calls for no action.
+
+The link in a mail is built from `Notifications:BaseUrl`, and following it needs a sign-in; the page then shows only
+what the signed-in user may see.
+
+### Masking and Privacy of the Mails
+
+The server reads the inbox for each recipient exactly as the recipient would see it after the sign-in. A reviewer who
+has not yet handed in a ballot is never told that answers differ, so the mail cannot leak what the page keeps hidden.
+An account that signs in with a personal access token never receives notification mail, and a token cannot change the
+mode. A disabled user, and a user with a temporary password, get none.
+
+### Delivery, Retries, and Limits
+
+- **At least once**: the server records what it mailed after the mail server accepted it. If the server stops between
+  the two steps, the next pass can send the same mail again. A mail is not lost silently, but it can be repeated.
+- **Retries**: when a mail cannot be sent, the server tries again after 5 minutes, 15 minutes, 1 hour, 4 hours, and 12
+  hours. After the sixth failure it gives up on that batch; the news stays in the inbox of the user, but no mail
+  about those items is sent again.
+- **Limits**: a user gets at most 24 mails a day, and the server sends at most `Notifications:MaxMailsPerHour` mails in
+  an hour, counting every kind of mail. A mail beyond a limit is held back and sent when there is room.
+- **Idle cost**: an idle server does not read the inboxes. A look at the audit trail tells that something changed; at
+  most every 15 minutes the server checks anyway.
+- **Log**: the server logs a pass that sent or failed a mail as numbers (mails sent, failed, and deferred) and, for a
+  failure, only its type. An idle server leaves the log quiet. It never logs an address or the text of a mail.
 
 ### Privacy and Limits
 
 - Administrators cannot see or change the e-mail address of a user. No page shows it to anybody but its owner, and an
   administrator cannot confirm an address for a user.
-- Personal access tokens cannot be used for the e-mail settings: only a person who is signed in on the Account page can
-  enter, confirm, or remove an address.
+- Personal access tokens cannot be used for the e-mail settings, and an account that signs in with a token never
+  receives a notification mail: only a person who is signed in on the Account page can enter, confirm, or remove an
+  address, or choose a mode.
 - A user who signs in with a temporary password has to choose a new password first and sees no notification card until
   then.
-- The server sends at most `Notifications:MaxMailsPerHour` mails in an hour, over all users.
-- The send log keeps the target address of each confirmation mail in clear text, because the limits need it. A
-  confirmation request deletes the entries that are older than one day, so an address stays in the log for about a day
-  after the next request; removing the address on the Account page does not delete its log rows at once.
+- The server sends at most `Notifications:MaxMailsPerHour` mails in an hour, over all users, and a user gets at most 24
+  mails a day. Both limits count the confirmation mails, the update mails, and the daily summaries.
+- The send log keeps the target address of each mail in clear text, because the limits need it. Each send deletes the
+  entries that are older than one day, so an address stays in the log for about a day after the next mail; removing
+  the address on the Account page does not delete its log rows at once.
+- A change of the mode is recorded in the audit trail as a settings change, without the address.
 
 ### Check the Settings Without Sending Mail
 
@@ -644,11 +712,14 @@ Checking the Configured Database, Keys, and E-mail Settings in the Command-Line 
 
 ### Database Tables for Notifications
 
-The mail settings of a user and the log of sent mails need two tables, `NotificationPreferences` and
-`NotificationSendLog`. ReviewCenter does not migrate a database, so a database that was created by an earlier build
-does not have them. The server refuses to start with notifications on when they are missing. Recreate the database
-first (see Database and the Upgrade section of the Deployment chapter), and only then turn notifications on. With
-notifications off, an older database keeps working.
+The mail settings of a user, the log of sent mails, and the memory of what each user was told need three tables,
+`NotificationPreferences`, `NotificationSendLog`, and `NotifiedItems`, and the table `NotificationPreferences` needs the
+columns `Mode`, `BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`, `FailureCount`, and `NextAttemptUtc`.
+ReviewCenter does not migrate a database, so a database that was created by an earlier build does not have them; this
+includes a database that was created by the first release of the notifications, which has the first two tables
+without the new columns. The server refuses to start with notifications on when anything is missing. Recreate the
+database first (see Database and the Upgrade section of the Deployment chapter), and only then turn notifications on.
+With notifications off, an older database keeps working.
 
 ## Audit Trail
 

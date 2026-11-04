@@ -837,6 +837,84 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the notification mode, the notified items and the dispatch state of a user are still there,
+    ///     identical, after the database is closed and opened again, and that the mode None forgets the items.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_NotificationState_PersistsModeItemsAndState()
+    {
+        // Arrange: a new database file, a user with a confirmed address, the mode Every, one notified item and a state
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var actor = new Actor("ann", "Ann");
+        var state = new NotificationDispatchState(false, _now.AddMinutes(-3), _now.AddHours(-9), 2, _now.AddMinutes(15));
+        int userId;
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var factory = first.Provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+            var appender = new AuditAppender(TimeProvider.System);
+            var user = await new UserStore(factory, appender).AddAsync(
+                new User { Username = "ann", DisplayName = "Ann", PasswordHash = "hash", Created = _now },
+                cancellationToken);
+            userId = user.Id;
+            var notifications = new NotificationStore(factory, appender);
+            var request = new ConfirmationRequest(
+                userId,
+                "ann@example.com",
+                new string('a', 64),
+                "salt",
+                _now,
+                _now.AddMinutes(30),
+                TimeSpan.FromSeconds(60),
+                3,
+                3,
+                200);
+            await notifications.ReserveConfirmationAsync(request, AuditDraft.By(actor, "notification.settings-changed", "setup"), cancellationToken);
+            await notifications.ConfirmAsync(userId, new string('a', 64), _now, AuditDraft.By(actor, "notification.settings-changed", "setup"), cancellationToken);
+
+            // Act: choose the mode, and let a pass notify one item
+            await notifications.SetModeAsync(userId, NotificationMode.Every, _now, AuditDraft.By(actor, "notification.settings-changed", "mode"), cancellationToken);
+            await notifications.ApplyAsync(
+                userId,
+                new NotificationCommit(
+                    _now,
+                    [new NotifiedEntry(new NotifiedKey(1, "rev-1", InboxSection.ToAnswer), "to-answer")],
+                    [],
+                    null,
+                    state,
+                    null),
+                cancellationToken);
+        }
+
+        // Act: open the same database again and read everything back
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var factory = second.Provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+            var notifications = new NotificationStore(factory, new AuditAppender(TimeProvider.System));
+            var recipient = Assert.Single(await notifications.ListRecipientsAsync(cancellationToken));
+            var items = await notifications.GetNotifiedAsync(userId, cancellationToken);
+
+            // Assert: mode, address, state and the item are kept; the database passes the availability check
+            Assert.Equal(NotificationMode.Every, recipient.Mode);
+            Assert.Equal("ann@example.com", recipient.Address);
+            Assert.Equal(state, recipient.State);
+            var item = Assert.Single(items);
+            Assert.Equal(("rev-1", InboxSection.ToAnswer, "to-answer"), (item.ReviewId, item.Section, item.State));
+            Assert.True(await notifications.IsAvailableAsync(cancellationToken));
+
+            // Act: switch the e-mail off
+            await notifications.SetModeAsync(
+                userId, NotificationMode.None, _now, AuditDraft.By(actor, "notification.settings-changed", "mode"), cancellationToken);
+
+            // Assert: the notified items are forgotten
+            Assert.Empty(await notifications.GetNotifiedAsync(userId, cancellationToken));
+            Assert.Empty(await notifications.ListRecipientsAsync(cancellationToken));
+        }
+    }
+
+    /// <summary>
     ///     Builds the inbox service over the real stores of an opened database.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>

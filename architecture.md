@@ -142,9 +142,9 @@ UploadSource keeps uploaded bytes verbatim. GitSource uses the git CLI and a bar
 completed reviews and never modifies them.
 
 **Messaging** delivers notifications to the in-app inbox and, with built-in templates and per-user opt-out, by SMTP
-email. It consumes domain events and has no other inputs. The first part of the e-mail side is implemented: the
-settings, the SMTP and file senders, and the confirmation of an address with a code (see Implementation Status); the
-mails about reviews are not.
+email. It consumes domain events and has no other inputs. The e-mail side is implemented: the settings, the SMTP and
+file senders, the confirmation of an address with a code, the choice of a notification mode, and the worker that mails
+the news of the inbox (see Implementation Status); it is off by default.
 
 **Hosting** composes the application: startup, appsettings binding with startup validation, forwarded-headers
 handling, structured logging, and the command-line verbs (`serve` now; `migrate` reserved for later).
@@ -405,9 +405,23 @@ from the target design, an implementation note says so:
   Two new tables hold this, `NotificationPreferences` and `NotificationSendLog`; the schema is still created directly,
   so a database that was created before this slice must be recreated before notifications are turned on (the server
   refuses to start with notifications on and without the tables). The opt-in `ReviewCenter_ConfiguredNotifications`
-  check of `--validate --check-config` examines the settings without any network. No mail about a review is sent yet.
-- **Planned and deferred**: the mails about reviews (the notification mode of a user, the worker that sends them, and
-  the daily summary), database migrations, further database providers, and the rest of Core and
+  check of `--validate --check-config` examines the settings without any network.
+- **Implemented (e-mail notifications, mails about reviews)**: a user with a confirmed address chooses a notification
+  mode on the Account page: no e-mail (the default), a daily summary, or every change. A background worker, registered
+  for the web host only and only while the feature is on with a transport, runs a pass at the polling interval
+  (`Notifications:PollSeconds`). For each user with a mode it reads the inbox as that user (so masking and visibility
+  hold: a mail never tells more than the user sees after the sign-in, and a hidden ballot stays hidden), finds the items
+  that are new, and mails them: in the mode Every after a quiet batch window (`BatchWindowSeconds`), in the mode Daily
+  once for each local date from the digest hour (`DigestHour`, `TimeZone`). A mail names the kind of news, the project,
+  and the review (the title when `IncludeTitles` is on) and links to the review, which needs a sign-in; it never holds
+  comments, answers, verdicts, or outcomes. Turning a mode on starts after a baseline, so no backlog is mailed. Each
+  item is mailed once; delivery is at-least-once (a failed send is retried five times with growing waits, and a crash
+  between the send and the record can repeat one mail). A cap per user (24 a day) and for the server
+  (`MaxMailsPerHour`) defers mail. An actor that signed in with an API token never receives mail or sets a mode. The
+  mode is audited without the address. The table `NotifiedItems` and the columns of the mode and the dispatch state are
+  new, so a database of the first part of the e-mail notifications must be recreated too (the server refuses to start
+  with notifications on and without them).
+- **Planned and deferred**: database migrations, further database providers, and the rest of Core and
   Storage that the target design describes. They have no code, requirements,
   design documents, or verification documents yet (the Api subsystem and the review lifecycle, with ballots, signing,
   and conclusion, are implemented), so the

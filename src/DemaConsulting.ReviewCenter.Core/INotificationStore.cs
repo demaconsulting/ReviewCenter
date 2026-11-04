@@ -196,11 +196,69 @@ public interface INotificationStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Removes the confirmed and the pending address of a user, together with the audit entry.
+    ///     Removes the confirmed and the pending address of a user, together with the audit entry. The notification
+    ///     mode, the dispatch state and the notified items of the user are removed with it, in the same transaction.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="audit">The audit entry saved with the change. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when a row was removed; <c>false</c> when the user had no address.</returns>
     Task<bool> RemoveAsync(int userId, AuditDraft audit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Sets the notification mode of a user, together with the audit entry, when the user has a row and, for a
+    ///     mode other than <see cref="NotificationMode.None"/>, a confirmed address.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="mode">The new mode.</param>
+    /// <param name="nowUtc">The current time (UTC).</param>
+    /// <param name="audit">The audit entry saved with the change. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the mode changed; <c>false</c> when nothing changed and no audit entry was written.</returns>
+    /// <remarks>
+    ///     A change clears the batch window and the failure state. Switching on from <see cref="NotificationMode.None"/>
+    ///     marks the baseline as pending; switching to <see cref="NotificationMode.None"/> deletes the notified items
+    ///     and the time of the last digest.
+    /// </remarks>
+    Task<bool> SetModeAsync(
+        int userId,
+        NotificationMode mode,
+        DateTimeOffset nowUtc,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the users who chose a mode other than <see cref="NotificationMode.None"/> and have a confirmed
+    ///     address.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The recipients with their dispatch state, ordered by user identity.</returns>
+    Task<IReadOnlyList<NotificationRecipient>> ListRecipientsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the items a user was already told about.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The notified items of the user.</returns>
+    Task<IReadOnlyList<NotifiedItem>> GetNotifiedAsync(int userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Applies the result of a dispatcher pass for one user in one transaction: notified items, dispatch state
+    ///     and the send-log row. Send-log rows older than one day are deleted in the same transaction.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="commit">What to change. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when applied; <c>false</c> when the user has no row or the mode is none any more.</returns>
+    Task<bool> ApplyAsync(int userId, NotificationCommit commit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Counts the mails of the send log since a moment.
+    /// </summary>
+    /// <param name="userId">The user whose mails to count; <c>null</c> to count the mails of all users.</param>
+    /// <param name="sinceUtc">The start of the period (UTC).</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The number of mails of every kind sent at or after <paramref name="sinceUtc"/>.</returns>
+    Task<int> CountSentAsync(int? userId, DateTimeOffset sinceUtc, CancellationToken cancellationToken = default);
 }

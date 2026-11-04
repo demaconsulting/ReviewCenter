@@ -1,0 +1,784 @@
+---
+# Software Unit Requirements for the NotificationDispatcher Class
+#
+# The NotificationDispatcher class decides, for each user who chose a notification mode, which items of the inbox are
+# new and mails them. It reads the inbox as the recipient, so a mail can not say more than the recipient may see. It
+# sends nothing for the backlog that exists when a mode is switched on, batches the mails of the mode Every, sends one
+# summary for each local date in the mode Daily, never mails the same item in the same state twice, retries a failed
+# send at growing intervals, respects the limits on mails, and keeps an idle server cheap. Each requirement states
+# one rule, so that each rule can be traced to its own test case. "A pass" is one call of the method that looks at all
+# recipients. "A recipient" is a user whose mode is not None and who has a confirmed address.
+
+sections:
+  - title: NotificationDispatcher Unit Requirements
+    requirements:
+      # Recipients and masking
+      - id: ReviewCenter-NotificationDispatcher-SkipModeNone
+        title: >-
+          The NotificationDispatcher class shall send no mail to a user whose mode is None.
+        justification: |
+          A user who did not choose notifications must never get a mail.
+        tests:
+          - NotificationDispatcher_RunPass_ModeNone_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-SkipNoAddress
+        title: >-
+          The NotificationDispatcher class shall send no mail to a user who has no confirmed address.
+        justification: |
+          Mail may go only to an address that its owner has shown to be theirs.
+        tests:
+          - NotificationDispatcher_RunPass_NoConfirmedAddress_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-SkipDisabledUser
+        title: >-
+          The NotificationDispatcher class shall send no mail to a disabled user.
+        justification: |
+          A disabled account must not be reached by the server any more.
+        tests:
+          - NotificationDispatcher_RunPass_DisabledUser_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-SkipMustChangePassword
+        title: >-
+          The NotificationDispatcher class shall send no mail to a user who must still change a temporary password.
+        justification: |
+          Such a user has not taken over the account yet, so the account may not be in the hands of its owner.
+        tests:
+          - NotificationDispatcher_RunPass_MustChangePassword_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-MailToConfirmedAddress
+        title: >-
+          The NotificationDispatcher class shall send a mail only to the confirmed address of the recipient.
+        justification: |
+          A mail to any other address would tell a stranger about the reviews of the user.
+        tests:
+          - NotificationDispatcher_RunPass_Due_MessageToConfirmedAddress
+
+      - id: ReviewCenter-NotificationDispatcher-OwnInboxOnly
+        title: >-
+          The NotificationDispatcher class shall base the mail to a recipient on the inbox of that recipient only.
+        justification: |
+          What a person is told must not exceed what the person sees after the sign-in.
+        tests:
+          - NotificationDispatcher_RunPass_Recipient_ReadsInboxAsRecipient
+
+      - id: ReviewCenter-NotificationDispatcher-OwnIdentity
+        title: >-
+          The NotificationDispatcher class shall read the inbox with the identity of the recipient.
+        justification: |
+          The inbox applies its masking for the identity that asks, so the recipient must be the one who asks.
+        tests:
+          - NotificationDispatcher_RunPass_Recipient_ActorHasNoApiToken
+
+      - id: ReviewCenter-NotificationDispatcher-NoApiTokenActor
+        title: >-
+          The NotificationDispatcher class shall read the inbox of a recipient as the person, not as an actor of an API
+          token.
+        justification: |
+          The inbox treats an API token with fewer rights than the person, and a mail is a notice to the person, so a
+          token must never be the identity behind a notification. A question that the inbox shows only to the person
+          shows that the read was made as the person.
+        tests:
+          - NotificationDispatcher_RunPass_Recipient_ActorHasNoApiToken
+
+      - id: ReviewCenter-NotificationDispatcher-NoAuditEntries
+        title: >-
+          The NotificationDispatcher class shall write no audit entry in a pass.
+        justification: |
+          Reading an inbox for a mail is no action of the user, and a pass that wrote audit entries would wake itself
+          up.
+        tests:
+          - NotificationDispatcher_RunPass_Delivery_WritesNoAuditEntry
+
+      - id: ReviewCenter-NotificationDispatcher-HiddenBallotMasked
+        title: >-
+          The NotificationDispatcher class shall send no disputed item to a recipient whose own ballot is not handed in.
+        justification: |
+          Until a reviewer hands in a ballot, the answers of the others are hidden, and a mail must not reveal that
+          they differ.
+        tests:
+          - NotificationDispatcher_RunPass_HiddenBallotRecipient_NoDisputedItem
+
+      - id: ReviewCenter-NotificationDispatcher-NoOutcomeInMail
+        title: >-
+          The NotificationDispatcher class shall say only that a review was concluded in a mail about an approved
+          review.
+        justification: |
+          The outcome of a review is told on the page behind the sign-in, not in a mail.
+        tests:
+          - NotificationDispatcher_RunPass_Concluded_MailHasNoOutcome
+
+      - id: ReviewCenter-NotificationDispatcher-NoOutcomeInMailRejected
+        title: >-
+          The NotificationDispatcher class shall use the same words for a rejected review as for an approved review.
+        justification: |
+          A different wording would tell the outcome to the reader.
+        tests:
+          - NotificationDispatcher_RunPass_Rejected_MailHasNoOutcomeOrConclusionText
+
+      - id: ReviewCenter-NotificationDispatcher-NoDetailInMail
+        title: >-
+          The NotificationDispatcher class shall keep the detail text of an inbox row out of a mail.
+        justification: |
+          The detail text of a row holds content of the review, for example the text of a comment or of a check, which
+          must stay behind the sign-in.
+        tests:
+          - NotificationDispatcher_RunPass_DetailText_NotInMail
+
+      - id: ReviewCenter-NotificationDispatcher-HeaderInjectionSafe
+        title: >-
+          The NotificationDispatcher class shall keep a line break in a review title from changing the header of a
+          mail.
+        justification: |
+          A line break in a value that is put into the header of a mail starts a new header line, for example a second
+          recipient. The header of a mail is its subject and its address.
+        tests:
+          - NotificationDispatcher_RunPass_TitleWithCrLfBcc_SubjectFixedAndAddressUnchanged
+
+      - id: ReviewCenter-NotificationDispatcher-HeaderInjectionSafe-ProjectName
+        title: >-
+          The NotificationDispatcher class shall keep a line break in a project name from changing the header of a
+          mail.
+        justification: |
+          The name of a project is chosen by a user and is shown in a mail, so it must not reach the header.
+        tests:
+          - NotificationDispatcher_RunPass_ProjectNameWithCrLfBcc_SubjectFixedAndAddressUnchanged
+
+      - id: ReviewCenter-NotificationDispatcher-HeaderInjectionSafe-DisplayName
+        title: >-
+          The NotificationDispatcher class shall keep a line break in a display name from changing the header of a
+          mail.
+        justification: |
+          The display name of a user is chosen by that user and travels with the identity that reads the inbox, so it
+          must not reach the header.
+        tests:
+          - NotificationDispatcher_RunPass_DisplayNameWithCrLfBcc_SubjectFixedAndAddressUnchanged
+
+      - id: ReviewCenter-NotificationDispatcher-ExcludeFailedChecks
+        title: >-
+          The NotificationDispatcher class shall send no mail for a failed-checks row.
+        justification: |
+          The number of failed checks hints at the verdicts of the reviewers.
+        tests:
+          - NotificationDispatcher_RunPass_FailedChecksRow_NotMailed
+
+      - id: ReviewCenter-NotificationDispatcher-ExcludeWaitingForOthers
+        title: >-
+          The NotificationDispatcher class shall send no mail for a waiting-for-others row.
+        justification: |
+          A review that waits for other people calls for no action of the user.
+        tests:
+          - NotificationDispatcher_RunPass_WaitingForOthers_NotMailed
+
+      # Baseline
+      - id: ReviewCenter-NotificationDispatcher-BaselineNoSend
+        title: >-
+          The NotificationDispatcher class shall send no mail for the items that exist when a user switches a mode on.
+        justification: |
+          A user who switches notifications on must not get a mail for the whole backlog.
+        tests:
+          - NotificationDispatcher_RunPass_BaselinePending_RecordsBacklogNoMail
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineNoSend-RecordsItems
+        title: >-
+          The NotificationDispatcher class shall record the items that exist when a user switches a mode on as
+          notified.
+        justification: |
+          An item that is recorded as notified is not news any more, so the backlog is never mailed later.
+        tests:
+          - NotificationDispatcher_RunPass_BaselinePending_RecordsBacklogNoMail
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineClearsPending
+        title: >-
+          The NotificationDispatcher class shall clear the pending baseline of a user after it recorded the baseline.
+        justification: |
+          The baseline is taken once, and the items that follow are news.
+        tests:
+          - NotificationDispatcher_RunPass_BaselinePending_FlagCleared
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineNoLogRow
+        title: >-
+          The NotificationDispatcher class shall write no send-log row for a baseline.
+        justification: |
+          No mail went out, so the limits on mails must not count one.
+        tests:
+          - NotificationDispatcher_RunPass_Baseline_NoLogRow
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineStartsDigestDay
+        title: >-
+          The NotificationDispatcher class shall mark the slot of the daily summary of the current local date as handled
+          when it records a baseline.
+        justification: |
+          A user who switches the daily summary on gets the first summary on the next local date, not at once.
+        tests:
+          - NotificationDispatcher_RunPass_Baseline_DigestHandledNow
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineThenNewMails
+        title: >-
+          The NotificationDispatcher class shall mail an item that arrives after the baseline.
+        justification: |
+          The baseline hides the backlog only, and later news must reach the user.
+        tests:
+          - NotificationDispatcher_RunPass_AfterBaseline_NewItemMailed
+
+      - id: ReviewCenter-NotificationDispatcher-BaselineBypassesIdleSkip
+        title: >-
+          The NotificationDispatcher class shall read the inbox for a pending baseline although the audit trail has no
+          new entry.
+        justification: |
+          A baseline that waits for a change would not be taken, and the next change would be taken for the backlog.
+        tests:
+          - NotificationDispatcher_RunPass_BaselinePendingSequenceUnchanged_ReadsInbox
+
+      # Every
+      - id: ReviewCenter-NotificationDispatcher-EveryStartsWindow
+        title: >-
+          The NotificationDispatcher class shall start the batch window of a user of the mode Every when it sees the
+          first new item.
+        justification: |
+          The window collects the changes that follow one another, so that they are told in one mail.
+        tests:
+          - NotificationDispatcher_RunPass_Every_FirstNewItem_StartsWindow
+
+      - id: ReviewCenter-NotificationDispatcher-EveryNoSendInWindow
+        title: >-
+          The NotificationDispatcher class shall send no mail to a user of the mode Every while the batch window runs.
+        justification: |
+          A mail for each change would flood the mailbox of the user.
+        tests:
+          - NotificationDispatcher_RunPass_Every_InsideWindow_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-EverySendsAfterWindow
+        title: >-
+          The NotificationDispatcher class shall send a mail to a user of the mode Every when the batch window has
+          elapsed.
+        justification: |
+          The user must learn about the news after a short and bounded wait.
+        tests:
+          - NotificationDispatcher_RunPass_Every_AfterWindow_Sends
+
+      - id: ReviewCenter-NotificationDispatcher-EveryOneMessage
+        title: >-
+          The NotificationDispatcher class shall put all new items of a batch window into one message.
+        justification: |
+          One mail for the changes of a few minutes is easier to read than many.
+        tests:
+          - NotificationDispatcher_RunPass_Every_ThreeItems_OneMessage
+
+      - id: ReviewCenter-NotificationDispatcher-EveryIncludesLateItem
+        title: >-
+          The NotificationDispatcher class shall include an item that becomes new inside the batch window in the mail at
+          the end of the window.
+        justification: |
+          The mail must tell all news that is known when it is sent.
+        tests:
+          - NotificationDispatcher_RunPass_Every_ItemInWindow_Included
+
+      - id: ReviewCenter-NotificationDispatcher-EveryDropsHandledItem
+        title: >-
+          The NotificationDispatcher class shall leave an item out of the mail when the user handled it before the batch
+          window ended.
+        justification: |
+          A mail about something that the user already did is noise.
+        tests:
+          - NotificationDispatcher_RunPass_Every_ItemHandled_Dropped
+
+      - id: ReviewCenter-NotificationDispatcher-EveryNothingNewNoMail
+        title: >-
+          The NotificationDispatcher class shall send no mail when no item is new at the end of the batch window.
+        justification: |
+          A mail without news must never be sent.
+        tests:
+          - NotificationDispatcher_RunPass_Every_AllHandled_NoMailWindowCleared
+
+      - id: ReviewCenter-NotificationDispatcher-EveryNothingNewClearsWindow
+        title: >-
+          The NotificationDispatcher class shall clear the batch window when no item is new at its end.
+        justification: |
+          A window that stays open would swallow the first new item of the next change.
+        tests:
+          - NotificationDispatcher_RunPass_Every_AllHandled_NoMailWindowCleared
+
+      - id: ReviewCenter-NotificationDispatcher-EveryWindowSurvivesRestart
+        title: >-
+          The NotificationDispatcher class shall keep a running batch window across a restart of the server.
+        justification: |
+          A restart must neither lose the news nor delay the mail by a whole window.
+        tests:
+          - NotificationDispatcher_RunPass_Every_NewInstance_KeepsWindow
+
+      - id: ReviewCenter-NotificationDispatcher-EveryConfiguredWindow
+        title: >-
+          The NotificationDispatcher class shall use the configured length for the batch window.
+        justification: |
+          The operator decides how long the news is collected.
+        tests:
+          - NotificationDispatcher_RunPass_Every_CustomWindow_Honored
+
+      - id: ReviewCenter-NotificationDispatcher-EverySuccessClearsWindow
+        title: >-
+          The NotificationDispatcher class shall clear the batch window after a successful send.
+        justification: |
+          The next new item must start a new window.
+        tests:
+          - NotificationDispatcher_RunPass_Every_AfterSend_WindowCleared
+
+      # Daily
+      - id: ReviewCenter-NotificationDispatcher-DailyNoSendBeforeHour
+        title: >-
+          The NotificationDispatcher class shall send no daily summary before the digest hour.
+        justification: |
+          The summary is meant to arrive at the hour that the operator chose.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_BeforeHour_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-DailySendsAtHour
+        title: >-
+          The NotificationDispatcher class shall send the daily summary at the digest hour when an item is new.
+        justification: |
+          The user who chose the daily summary expects the news of the day in one mail.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_AtHour_Sends
+
+      - id: ReviewCenter-NotificationDispatcher-DailyNothingNewNoMail
+        title: >-
+          The NotificationDispatcher class shall send no daily summary when no item is new.
+        justification: |
+          A mail without news must never be sent.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_NothingNew_NoMailSlotConsumed
+
+      - id: ReviewCenter-NotificationDispatcher-DailyNothingNewConsumesSlot
+        title: >-
+          The NotificationDispatcher class shall mark the slot of the local date as handled when no item is new at the
+          digest hour.
+        justification: |
+          A slot that stays open would send a summary later on the same date, which is not the hour that was chosen.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_NothingNew_NoMailSlotConsumed
+
+      - id: ReviewCenter-NotificationDispatcher-DailyOnePerDate
+        title: >-
+          The NotificationDispatcher class shall send at most one daily summary for each local date.
+        justification: |
+          The daily summary is a mail for each day and not more.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_TwoPassesSameDate_OneMail
+
+      - id: ReviewCenter-NotificationDispatcher-DailyLateItemWaits
+        title: >-
+          The NotificationDispatcher class shall hold an item that becomes new after the summary until the next local
+          date.
+        justification: |
+          The time of the summary stays predictable for the reader.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_ItemAfterSlot_SentNextDay
+
+      - id: ReviewCenter-NotificationDispatcher-DailyCatchUp
+        title: >-
+          The NotificationDispatcher class shall send the daily summary as soon as the server runs after a downtime that
+          spanned the digest hour.
+        justification: |
+          The news of the day must not be lost because the server was down at the digest hour.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_DowntimeOverHour_SendsOnRestart
+
+      - id: ReviewCenter-NotificationDispatcher-DailyConfiguredZone
+        title: >-
+          The NotificationDispatcher class shall take the digest hour as the local hour of the configured time zone.
+        justification: |
+          The people who read the summary live by the clock of their zone.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_ZoneOffset_UsesLocalHour
+
+      - id: ReviewCenter-NotificationDispatcher-DailyDst
+        title: >-
+          The NotificationDispatcher class shall send one daily summary on a day on which the clock changes.
+        justification: |
+          A skipped hour must not lose the summary, and a repeated hour must not send it twice.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_DstChangeDay_OneMail
+
+      - id: ReviewCenter-NotificationDispatcher-DailyOutstandingCounted
+        title: >-
+          The NotificationDispatcher class shall give the daily summary the number of items that were mailed before and
+          still wait.
+        justification: |
+          The reader sees how much still needs attention without a second listing of old items.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_OutstandingCounted
+
+      - id: ReviewCenter-NotificationDispatcher-DailySwitchFromEvery
+        title: >-
+          The NotificationDispatcher class shall send the next daily summary when the slot opens for a user who switched
+          from the mode Every to the mode Daily.
+        justification: |
+          A switch between the modes keeps what the user was told, so no backlog is mailed.
+        tests:
+          - NotificationDispatcher_RunPass_SwitchEveryToDaily_DueWhenSlotOpen
+
+      - id: ReviewCenter-NotificationDispatcher-DailyFirstAfterEnable
+        title: >-
+          The NotificationDispatcher class shall send no daily summary on the local date on which the user switched the
+          mode Daily on.
+        justification: |
+          The backlog is no news, and the first summary follows on the next local date.
+        tests:
+          - NotificationDispatcher_RunPass_DailyJustEnabled_NoMailSameDate
+
+      # Dedupe
+      - id: ReviewCenter-NotificationDispatcher-DedupeSameState
+        title: >-
+          The NotificationDispatcher class shall send no second mail for an item in the same state.
+        justification: |
+          The same news must not be mailed twice.
+        tests:
+          - NotificationDispatcher_RunPass_SameItemSameState_NotMailedTwice
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeChangedState
+        title: >-
+          The NotificationDispatcher class shall send a mail when the state of an item changes.
+        justification: |
+          A change of the state is news.
+        tests:
+          - NotificationDispatcher_RunPass_StateChanged_Mailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeToAnswerDraft
+        title: >-
+          The NotificationDispatcher class shall send no mail when an item of the section to answer changes from "Not
+          started" to "Draft".
+        justification: |
+          Starting an answer is no news for the person who has to answer.
+        tests:
+          - NotificationDispatcher_RunPass_NotStartedThenDraft_NotNew
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesRise
+        title: >-
+          The NotificationDispatcher class shall send a mail when the number of waiting replies rises.
+        justification: |
+          More replies are news.
+        tests:
+          - NotificationDispatcher_RunPass_RepliesRise_Mailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall
+        title: >-
+          The NotificationDispatcher class shall send no mail when the number of waiting replies falls.
+        justification: |
+          A user who answers replies must not be mailed about the replies that are left.
+        tests:
+          - NotificationDispatcher_RunPass_RepliesFall_NotMailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeReappear
+        title: >-
+          The NotificationDispatcher class shall send a mail for an item that left the inbox and came back.
+        justification: |
+          A reason that disappeared and returns is news again.
+        tests:
+          - NotificationDispatcher_RunPass_ItemLeavesAndReturns_Mailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupePruneStale
+        title: >-
+          The NotificationDispatcher class shall forget the item of a user that is not in the inbox any more.
+        justification: |
+          Stored items that never leave would grow without bound and would hide the return of a reason.
+        tests:
+          - NotificationDispatcher_RunPass_ItemLeaves_KeyRemoved
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeConcludedThenReopened
+        title: >-
+          The NotificationDispatcher class shall send a mail for a review that is reopened after it was concluded.
+        justification: |
+          A reopened review is news that differs from the conclusion.
+        tests:
+          - NotificationDispatcher_RunPass_ConcludedThenReopened_BothMailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRecordAfterSend
+        title: >-
+          The NotificationDispatcher class shall record the items of a mail as notified only after the mail was sent.
+        justification: |
+          A mail that was not sent must not hide its news, and a crash after the send can repeat a mail but never
+          lose one.
+        tests:
+          - NotificationDispatcher_RunPass_SendSucceeds_ItemsRecorded
+          - NotificationDispatcher_RunPass_SendInProgress_ItemsNotYetRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeNotRecordedOnFailure
+        title: >-
+          The NotificationDispatcher class shall record no item as notified when the send fails.
+        justification: |
+          The next attempt must still tell the news.
+        tests:
+          - NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeUnseenOnly
+        title: >-
+          The NotificationDispatcher class shall leave an update out of the mail when the user looked at it before the
+          mail was due.
+        justification: |
+          An update that the user has seen is no news.
+        tests:
+          - NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped
+
+      # Retry
+      - id: ReviewCenter-NotificationDispatcher-RetryStoresFailure
+        title: >-
+          The NotificationDispatcher class shall store the number of failed sends in a row when a send fails.
+        justification: |
+          The retry must survive a restart of the server.
+        tests:
+          - NotificationDispatcher_RunPass_SendFails_FailureCountStored
+
+      - id: ReviewCenter-NotificationDispatcher-RetryStoresFailure-NextAttempt
+        title: >-
+          The NotificationDispatcher class shall store the time of the next attempt when a send fails.
+        justification: |
+          The wait between two attempts must survive a restart of the server.
+        tests:
+          - NotificationDispatcher_RunPass_SendFails_NextAttemptStored
+
+      - id: ReviewCenter-NotificationDispatcher-RetryFirstFiveMinutes
+        title: >-
+          The NotificationDispatcher class shall wait 5 minutes after the first failed send.
+        justification: |
+          A short outage of the mail server should cost only a short delay.
+        tests:
+          - NotificationDispatcher_RunPass_Failure1_Waits5Min
+
+      - id: ReviewCenter-NotificationDispatcher-RetrySecondFifteenMinutes
+        title: >-
+          The NotificationDispatcher class shall wait 15 minutes after the second failed send.
+        justification: |
+          The waits grow so that a dead mail server is not hammered.
+        tests:
+          - NotificationDispatcher_RunPass_Failure2_Waits15Min
+
+      - id: ReviewCenter-NotificationDispatcher-RetryThirdOneHour
+        title: >-
+          The NotificationDispatcher class shall wait 1 hour after the third failed send.
+        justification: |
+          The waits grow so that a dead mail server is not hammered.
+        tests:
+          - NotificationDispatcher_RunPass_Failure3_Waits1Hour
+
+      - id: ReviewCenter-NotificationDispatcher-RetryFourthFourHours
+        title: >-
+          The NotificationDispatcher class shall wait 4 hours after the fourth failed send.
+        justification: |
+          The waits grow so that a dead mail server is not hammered.
+        tests:
+          - NotificationDispatcher_RunPass_Failure4_Waits4Hours
+
+      - id: ReviewCenter-NotificationDispatcher-RetryFifthTwelveHours
+        title: >-
+          The NotificationDispatcher class shall wait 12 hours after the fifth failed send.
+        justification: |
+          The last wait covers a long outage before the dispatcher gives up.
+        tests:
+          - NotificationDispatcher_RunPass_Failure5_Waits12Hours
+
+      - id: ReviewCenter-NotificationDispatcher-RetryNoSendBeforeDue
+        title: >-
+          The NotificationDispatcher class shall send no retry before the wait after the last failed send has passed.
+        justification: |
+          The wait is the point of the retry rule.
+        tests:
+          - NotificationDispatcher_RunPass_BeforeNextAttempt_NoSend
+
+      - id: ReviewCenter-NotificationDispatcher-RetryRecomputes
+        title: >-
+          The NotificationDispatcher class shall base a retry on the inbox as it is when the retry runs.
+        justification: |
+          What the user handled meanwhile must not be mailed, and news that arrived meanwhile must be.
+        tests:
+          - NotificationDispatcher_RunPass_Retry_UsesCurrentInbox
+
+      - id: ReviewCenter-NotificationDispatcher-RetryGiveUp
+        title: >-
+          The NotificationDispatcher class shall give up the mail after the sixth failed send.
+        justification: |
+          A dead address must not be tried for ever.
+        tests:
+          - NotificationDispatcher_RunPass_Failure6_GivesUp
+
+      - id: ReviewCenter-NotificationDispatcher-RetryGiveUpRecordsItems
+        title: >-
+          The NotificationDispatcher class shall record the items of the mail as notified when it gives up.
+        justification: |
+          The items must not be tried again and again in the next passes.
+        tests:
+          - NotificationDispatcher_RunPass_GiveUp_ItemsRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-RetrySuccessResets
+        title: >-
+          The NotificationDispatcher class shall clear the failure state after a successful retry.
+        justification: |
+          The next failure must start again with the shortest wait.
+        tests:
+          - NotificationDispatcher_RunPass_RetrySucceeds_StateReset
+
+      - id: ReviewCenter-NotificationDispatcher-RetryFailureKeepsOthers
+        title: >-
+          The NotificationDispatcher class shall go on with the next user when a send to one user fails.
+        justification: |
+          The failure of one mailbox must not keep other users from their mail.
+        tests:
+          - NotificationDispatcher_RunPass_OneSendFails_OtherUserMailed
+
+      # Caps and log
+      - id: ReviewCenter-NotificationDispatcher-CapGlobal
+        title: >-
+          The NotificationDispatcher class shall defer a mail when the number of mails of the whole server in the last
+          hour has reached the configured limit.
+        justification: |
+          The server must not become a source of bulk mail.
+        tests:
+          - NotificationDispatcher_RunPass_GlobalCapReached_Deferred
+
+      - id: ReviewCenter-NotificationDispatcher-CapGlobalCountsAllKinds
+        title: >-
+          The NotificationDispatcher class shall count the mails of every kind, a confirmation mail too, against the
+          limit of the whole server.
+        justification: |
+          The limit protects the mail server from all mail that the server sends.
+        tests:
+          - NotificationDispatcher_RunPass_ConfirmationMailsCounted
+
+      - id: ReviewCenter-NotificationDispatcher-CapUser
+        title: >-
+          The NotificationDispatcher class shall defer a mail to a user who has received 24 mails in the last day.
+        justification: |
+          A single mailbox must not be flooded, whatever the traffic of the reviews is.
+        tests:
+          - NotificationDispatcher_RunPass_UserCapReached_Deferred
+
+      - id: ReviewCenter-NotificationDispatcher-CapKeepsItemsNew
+        title: >-
+          The NotificationDispatcher class shall send a deferred mail when the limit allows it again.
+        justification: |
+          A deferral delays the news and must not lose it.
+        tests:
+          - NotificationDispatcher_RunPass_Deferred_SentAfterWindowOfCap
+
+      - id: ReviewCenter-NotificationDispatcher-CapDeferNoFailure
+        title: >-
+          The NotificationDispatcher class shall leave the failure state unchanged when it defers a mail.
+        justification: |
+          A deferral is no failure of the mail server, so it must not move the retry schedule or lead to a give-up.
+        tests:
+          - NotificationDispatcher_RunPass_Deferred_FailureCountUnchanged
+
+      - id: ReviewCenter-NotificationDispatcher-LogUpdateKind
+        title: >-
+          The NotificationDispatcher class shall write a send-log row of the kind "update" for a mail of the mode Every.
+        justification: |
+          The limits on mails count the rows of the send log.
+        tests:
+          - NotificationDispatcher_RunPass_EverySent_LogKindUpdate
+
+      - id: ReviewCenter-NotificationDispatcher-LogDigestKind
+        title: >-
+          The NotificationDispatcher class shall write a send-log row of the kind "digest" for a mail of the mode Daily.
+        justification: |
+          The limits on mails count the rows of the send log.
+        tests:
+          - NotificationDispatcher_RunPass_DailySent_LogKindDigest
+
+      # Idle cost and resilience
+      - id: ReviewCenter-NotificationDispatcher-IdleNoRecipientsNoRead
+        title: >-
+          The NotificationDispatcher class shall read neither the audit trail nor any inbox in a pass while no user has
+          a recipient mode.
+        justification: |
+          A server on which nobody uses notifications must have no cost for them.
+        tests:
+          - NotificationDispatcher_RunPass_NoRecipients_NoSequenceRead
+
+      - id: ReviewCenter-NotificationDispatcher-IdleFirstPassFull
+        title: >-
+          The NotificationDispatcher class shall read the inbox of each recipient in the first pass.
+        justification: |
+          News that arrived while the server was down must be found.
+        tests:
+          - NotificationDispatcher_RunPass_First_ReadsInbox
+
+      - id: ReviewCenter-NotificationDispatcher-IdleSkipUnchanged
+        title: >-
+          The NotificationDispatcher class shall not read the inbox of a recipient again when the audit trail has no new
+          entry.
+        justification: |
+          A pass on an idle server must cost one cheap query.
+        tests:
+          - NotificationDispatcher_RunPass_SequenceUnchanged_NoInboxRead
+
+      - id: ReviewCenter-NotificationDispatcher-IdleReadOnChange
+        title: >-
+          The NotificationDispatcher class shall read the inbox of a recipient when the audit trail has a new entry.
+        justification: |
+          A change of a review shows in the audit trail, so a new entry is the sign of news.
+        tests:
+          - NotificationDispatcher_RunPass_SequenceChanged_ReadsInbox
+
+      - id: ReviewCenter-NotificationDispatcher-IdleSweep
+        title: >-
+          The NotificationDispatcher class shall read the inbox of a recipient when 15 minutes have passed since the
+          last full reading.
+        justification: |
+          Some news, such as a deadline that passes, comes with no entry in the audit trail.
+        tests:
+          - NotificationDispatcher_RunPass_15MinutesNoChange_ReadsInbox
+
+      - id: ReviewCenter-NotificationDispatcher-IdleTimeDriven
+        title: >-
+          The NotificationDispatcher class shall serve a batch window that has elapsed although the audit trail has no
+          new entry.
+        justification: |
+          A mail that is due by the clock must not wait for an unrelated change.
+        tests:
+          - NotificationDispatcher_RunPass_WindowElapsedSequenceUnchanged_Sends
+
+      - id: ReviewCenter-NotificationDispatcher-IdleSequenceKeptOnError
+        title: >-
+          The NotificationDispatcher class shall read the inbox again in the next pass when a user failed in a pass.
+        justification: |
+          A pass that failed for a user must not mark the change as seen.
+        tests:
+          - NotificationDispatcher_RunPass_PassFails_NextPassReads
+
+      - id: ReviewCenter-NotificationDispatcher-ErrorIsolation
+        title: >-
+          The NotificationDispatcher class shall go on with the next user when the inbox of one user fails.
+        justification: |
+          The failure of one user must not keep other users from their mail.
+        tests:
+          - NotificationDispatcher_RunPass_InboxFails_OtherUserMailed
+
+      - id: ReviewCenter-NotificationDispatcher-ErrorCallback
+        title: >-
+          The NotificationDispatcher class shall pass an unexpected failure of a user to the error callback.
+        justification: |
+          The host must be able to log the failure, which the framework-free unit can not do itself.
+        tests:
+          - NotificationDispatcher_RunPass_InboxFails_CallbackInvoked
+
+      - id: ReviewCenter-NotificationDispatcher-Cancellation
+        title: >-
+          The NotificationDispatcher class shall stop with a cancellation exception when the pass is canceled.
+        justification: |
+          A server that stops must not wait for a pass.
+        tests:
+          - NotificationDispatcher_RunPass_Cancelled_Throws
+
+      - id: ReviewCenter-NotificationDispatcher-ResultCounts
+        title: >-
+          The NotificationDispatcher class shall report the numbers of sent, failed, and deferred mails of a pass.
+        justification: |
+          The host logs the result, so that the operator sees that the notifications work.
+        tests:
+          - NotificationDispatcher_RunPass_Mixed_ResultCounts
+
+      - id: ReviewCenter-NotificationDispatcher-ResultCounts-NoAddress
+        title: >-
+          The NotificationDispatcher class shall keep any address out of the result of a pass.
+        justification: |
+          The host logs the result, and a log must hold no personal data.
+        tests:
+          - NotificationDispatcher_RunPass_Sent_ResultHoldsNoAddress

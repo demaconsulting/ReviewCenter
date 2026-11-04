@@ -93,7 +93,8 @@ The ReviewCenter system is divided as follows:
   RepositoriesPage unit, and the InboxPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
   users, personal access tokens, second factor enrollments, reviewer signatures, the inbox and read state of a user,
-  the e-mail address of a user for notifications and its confirmation, the hash-chained audit trail, and the
+  the e-mail address of a user for notifications, its confirmation, and the choice of when to get e-mail, the
+  composition, scheduling, and dispatch of the notification mails, the hash-chained audit trail, and the
   registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
   ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewProgressService, ReviewService, ThreadService,
@@ -102,14 +103,15 @@ The ReviewCenter system is divided as follows:
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
   RevisionValidator, ReviewPlanner, LineDiff, InboxService, UserImpactService, BallotConsolidation,
-  BallotVisibility, ReviewStatusService, NotificationAddress, NotificationMessage, and NotificationPreferenceService
-  units
+  BallotVisibility, ReviewStatusService, NotificationAddress, NotificationMessage, NotificationPreferenceService,
+  NotificationComposer, DigestSchedule, and NotificationDispatcher units
 - **Messaging** (subsystem): the optional sending of e-mail: the settings of the `Notifications` section, the sender
-  that delivers a message through an SMTP server, and the sender that writes the message to a file for development
-  and demonstrations; contains the NotificationOptions, SmtpNotificationSender, and FileNotificationSender units
+  that delivers a message through an SMTP server, the sender that writes the message to a file for development
+  and demonstrations, and the background worker that runs the notification pass at the polling interval; contains the
+  NotificationOptions, SmtpNotificationSender, FileNotificationSender, and NotificationWorker units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
-  tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the notification address
-  of a user, the audit trail, and the
+  tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the notification address,
+  mode, and dispatch state of a user, the audit trail, and the
   registered repositories in a
   database
   through Entity
@@ -133,8 +135,9 @@ invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
 Cli, Hosting, Identity, Web, Core, Messaging, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities
-subsystems, and the Puppet system. The notification worker of the target architecture (`architecture.md`) is planned
-and deferred; it will be added to the Messaging subsystem, with its requirements and design documents, as it is
+subsystems, and the Puppet system. The notification worker of the target architecture (`architecture.md`) is part of
+the Messaging subsystem; the mails about reviews are optional and off by default. Other items of the target
+architecture that are planned and deferred will be added, with their requirements and design documents, as they are
 implemented.
 
 ## Folder Layout
@@ -145,7 +148,7 @@ implemented.
     - **Hosting/** - web host subsystem
     - **Identity/** - local accounts, cookie sign-in, and authorization subsystem
     - **Web/** - Blazor Server user interface subsystem (Razor components)
-    - **Messaging/** - e-mail notification settings and senders subsystem
+    - **Messaging/** - e-mail notification settings, senders, and worker subsystem
     - **Storage/** - database persistence subsystem
     - **ContentSources/** - git content source and token protection subsystem
     - **Evidence/** - signed PDF attestation subsystem

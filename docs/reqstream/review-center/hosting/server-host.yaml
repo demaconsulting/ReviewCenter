@@ -409,3 +409,66 @@ sections:
           A database that was created before the feature must keep working for an administrator who does not use it.
         tests:
           - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerFile
+        title: >-
+          While e-mail notifications are enabled with the sender File, the ServerHost class shall add the notification
+          worker to the web application.
+        justification: |
+          The worker is what sends the mail, and the file sender needs it like the SMTP sender does.
+        tests:
+          - ServerHost_CreateApplication_NotificationsFile_HasWorker
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerSmtp
+        title: >-
+          While e-mail notifications are enabled with the sender Smtp, the ServerHost class shall add the notification
+          worker to the web application.
+        justification: |
+          The worker is what sends the mail.
+        tests:
+          - ServerHost_CreateApplication_NotificationsSmtp_HasWorker
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerOffNone
+        title: >-
+          While e-mail notifications are not enabled or not configured, the ServerHost class shall add no notification
+          worker to the web application.
+        justification: |
+          A feature that is off must run no background work.
+        tests:
+          - ServerHost_CreateApplication_NotificationsOff_NoWorker
+
+      - id: ReviewCenter-ServerHost-NotificationSenderNoneRefused
+        title: >-
+          While e-mail notifications are enabled with the sender None, the ServerHost class shall stop the start with an
+          error that names the setting.
+        justification: |
+          An administrator who enabled the feature without a sender has made a mistake that must show at the start and
+          not as a feature that silently does nothing.
+        tests:
+          - ServerHost_CreateApplication_EnabledSenderNone_RefusedBeforeAnyWorker
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerNotInShared
+        title: >-
+          The ServerHost class shall register no notification worker in the services that the web server shares with the
+          commands and the self-test.
+        justification: |
+          A command, such as the creation of a user or the self-test, must not send mail or start a background loop.
+        tests:
+          - ServerHost_AddServices_NotificationsEnabled_NoHostedService
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerNotInSelfTest
+        title: >-
+          The ServerHost class shall add no notification worker when it runs with the settings of the self-test.
+        justification: |
+          The self-test must not depend on or touch a mail setup.
+        tests:
+          - ServerHost_CreateApplication_SelfTestSettings_NoWorker
+
+      - id: ReviewCenter-ServerHost-NotificationWorkerStops
+        title: >-
+          When the web application stops, the ServerHost class shall stop the notification worker, so that its task
+          completes.
+        justification: |
+          A stop of the server must not leave a loop running or hang while it waits for one.
+        tests:
+          - ServerHost_RunAsync_Stop_WorkerStopped

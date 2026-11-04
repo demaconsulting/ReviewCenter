@@ -3,10 +3,11 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Messaging subsystem
-# - The Messaging subsystem spans the NotificationOptions, SmtpNotificationSender, and FileNotificationSender units
+# - The Messaging subsystem spans the NotificationOptions, SmtpNotificationSender, FileNotificationSender, and
+#   NotificationWorker units
 # - Subsystem requirements describe the externally visible behavior of the delivery of e-mail: which transport the
-#   settings of the Notifications section select, what happens while notifications are off, and what happens to
-#   settings that are not valid
+#   settings of the Notifications section select, what happens while notifications are off, what happens to
+#   settings that are not valid, and how the background passes that send the mails run
 
 sections:
   - title: Messaging Subsystem Requirements
@@ -390,3 +391,209 @@ sections:
           - ReviewCenter-NotificationOptions-MessagesNoPassword
         tests:
           - MessagingSubsystem_InvalidSettings_AreRefusedNamingTheSetting
+
+      - id: ReviewCenter-Messaging-NotificationWorker
+        title: >-
+          While e-mail notifications are enabled, the Messaging subsystem shall run a notification pass at the polling
+          interval of the settings.
+        justification: |
+          The mails of the server are sent by a background pass, so the passes must recur for as long as the server
+          runs. A notification pass is one look at all recipients that sends the mails that are due.
+        children:
+          - ReviewCenter-NotificationWorker-RunsPassOnStart
+          - ReviewCenter-NotificationWorker-RunsPassEachInterval
+          - ReviewCenter-NotificationWorker-WaitsBetweenPasses
+        tests:
+          - MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure
+
+      - id: ReviewCenter-Messaging-WorkerStops
+        title: >-
+          When the server stops, the Messaging subsystem shall end the notification passes before the next polling
+          interval ends.
+        justification: |
+          A server that stops must not wait for a background service or leave an error in the log.
+        children:
+          - ReviewCenter-NotificationWorker-StopCompletes
+          - ReviewCenter-NotificationWorker-StopWhileWaiting
+        tests:
+          - MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure
+          - NotificationWorker_StopAsync_Waiting_ReturnsPromptly
+
+      - id: ReviewCenter-Messaging-WorkerStops-CancelsPass
+        title: >-
+          When the server stops, the Messaging subsystem shall cancel a notification pass that is running.
+        justification: |
+          A server that stops must not wait for a pass.
+        children:
+          - ReviewCenter-NotificationWorker-CancelRunningPass
+        tests:
+          - NotificationWorker_StopAsync_PassRunning_CancelsPass
+
+      - id: ReviewCenter-Messaging-WorkerStops-NoErrorLogged
+        title: >-
+          When the server stops, the Messaging subsystem shall leave no error in the log for the canceled pass.
+        justification: |
+          A normal stop of the server is no error.
+        children:
+          - ReviewCenter-NotificationWorker-CancelRunningPass-NothingLogged
+        tests:
+          - NotificationWorker_StopAsync_PassRunning_NothingLogged
+
+      - id: ReviewCenter-Messaging-WorkerSurvivesFailure
+        title: >-
+          When a notification pass fails, the Messaging subsystem shall run the next notification pass.
+        justification: |
+          A failure of the mail server or the database for a while must not end the notifications until the next
+          restart.
+        children:
+          - ReviewCenter-NotificationWorker-SurvivesFailedPass
+        tests:
+          - MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure
+          - NotificationWorker_ExecuteAsync_PassThrows_RunsNextPass
+
+      - id: ReviewCenter-Messaging-WorkerSurvivesFailure-NoFault
+        title: >-
+          When a notification pass fails, the Messaging subsystem shall keep the server running.
+        justification: |
+          A failed pass must not bring the server down.
+        children:
+          - ReviewCenter-NotificationWorker-FailedPassNoFault
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_TaskNotFaulted
+
+      - id: ReviewCenter-Messaging-WorkerLogHasNoPersonalData
+        title: >-
+          The Messaging subsystem shall keep the address of a recipient out of the log of the notification passes.
+        justification: |
+          A log is kept and read by operators.
+        children:
+          - ReviewCenter-NotificationWorker-LogNoAddress
+        tests:
+          - NotificationWorker_ExecuteAsync_PassResultWithAddress_NotLogged
+          - NotificationWorker_ExecuteAsync_PassThrowsWithAddress_NoAddressAnywhereInLog
+
+      - id: ReviewCenter-Messaging-WorkerLogHasNoPersonalData-ErrorMessage
+        title: >-
+          The Messaging subsystem shall keep the message of an error out of the log of the notification passes.
+        justification: |
+          The message of an error can hold an address.
+        children:
+          - ReviewCenter-NotificationWorker-LogFailureTypeOnly
+          - ReviewCenter-NotificationWorker-LogFailureTypeOnly-NoMessage
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_LogHasNoMessage
+
+      - id: ReviewCenter-Messaging-WorkerLogCounts
+        title: >-
+          When a notification pass sent or failed a mail, the Messaging subsystem shall log the numbers of sent, failed,
+          and deferred mails.
+        justification: |
+          The operator sees that the notifications work and how often they fail.
+        children:
+          - ReviewCenter-NotificationWorker-LogCounts
+        tests:
+          - NotificationWorker_ExecuteAsync_PassSent_LogsCounts
+
+      - id: ReviewCenter-Messaging-WorkerLogCounts-IdleQuiet
+        title: >-
+          When a notification pass sent and failed no mail, the Messaging subsystem shall log nothing for that pass.
+        justification: |
+          An idle server leaves the log quiet.
+        children:
+          - ReviewCenter-NotificationWorker-LogNothingIdle
+        tests:
+          - NotificationWorker_ExecuteAsync_IdlePass_NothingLogged
+
+      - id: ReviewCenter-Messaging-WorkerArguments
+        title: >-
+          When the notification worker is given no pass, clock, or logger, the Messaging subsystem shall refuse it with
+          an argument error.
+        justification: |
+          A worker without one of these could never run properly, so the mistake must show at once.
+        children:
+          - ReviewCenter-NotificationWorker-RefuseNullArgument
+        tests:
+          - NotificationWorker_Constructor_NullArgument_Throws
+
+      - id: ReviewCenter-Messaging-WorkerArguments-Interval
+        title: >-
+          When the notification worker is given a polling interval that is not positive, the Messaging subsystem shall
+          refuse it with an argument error.
+        justification: |
+          A worker with an interval of zero could never run properly, so the mistake must show at once.
+        children:
+          - ReviewCenter-NotificationWorker-RefuseNonPositivePoll
+        tests:
+          - NotificationWorker_Constructor_NonPositivePoll_Throws
+
+      - id: ReviewCenter-Messaging-WorkerRegisteredWhenEnabled
+        title: >-
+          While e-mail notifications are enabled with a sender that sends mail, the Messaging subsystem shall register
+          one notification worker.
+        justification: |
+          The notification passes must run for as long as the server runs, and they must run once. A sender of None
+          can send nothing, so it gets no worker.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerRegisteredSmtp
+          - ReviewCenter-NotificationOptions-WorkerRegisteredFile
+          - ReviewCenter-NotificationOptions-WorkerNotRegisteredSenderNone
+          - ReviewCenter-NotificationOptions-WorkerRegistrationNullArgument
+        tests:
+          - MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure
+          - NotificationRegistration_AddNotificationWorker_EnabledSmtp_Registers
+
+      - id: ReviewCenter-Messaging-WorkerNotRegisteredWhenOff
+        title: >-
+          While e-mail notifications are not enabled, the Messaging subsystem shall register no background service.
+        justification: |
+          A feature that is off must run no background work and cost nothing.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerNotRegisteredOff
+          - ReviewCenter-NotificationOptions-WorkerNotRegisteredNoSection
+        tests:
+          - NotificationRegistration_AddNotificationWorker_Off_NotRegistered
+          - NotificationRegistration_AddNotificationWorker_NoSection_NotRegistered
+
+      - id: ReviewCenter-Messaging-WorkerUsesSettings
+        title: >-
+          The Messaging subsystem shall run the notification passes with the polling interval of the notification
+          settings.
+        justification: |
+          The administrator tunes the delay of the mails with this setting, and it must be in effect.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerUsesPollInterval
+        tests:
+          - NotificationRegistration_AddNotificationWorker_PollSeconds_Honored
+
+      - id: ReviewCenter-Messaging-WorkerUsesSettings-BatchWindow
+        title: >-
+          The Messaging subsystem shall run the notification passes with the batch window of the notification settings.
+        justification: |
+          The administrator tunes the collecting of changes with this setting, and it must be in effect.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerUsesBatchWindow
+        tests:
+          - NotificationRegistration_AddNotificationWorker_BatchWindow_Honored
+
+      - id: ReviewCenter-Messaging-WorkerUsesSettings-DigestSchedule
+        title: >-
+          The Messaging subsystem shall run the notification passes with the digest schedule of the notification
+          settings.
+        justification: |
+          The administrator tunes the time of the daily summary with the digest schedule, and it must be in effect.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerUsesDigestSchedule
+        tests:
+          - NotificationRegistration_AddNotificationWorker_ZoneAndHour_Honored
+
+      - id: ReviewCenter-Messaging-WorkerUsesSettings-IncludeTitles
+        title: >-
+          The Messaging subsystem shall run the notification passes with the title setting of the notification
+          settings.
+        justification: |
+          The administrator tunes the privacy of titles with this setting, and it must be in effect.
+        children:
+          - ReviewCenter-NotificationOptions-WorkerUsesIncludeTitles
+          - ReviewCenter-NotificationOptions-WorkerTitlesShownByDefault
+        tests:
+          - NotificationRegistration_AddNotificationWorker_IncludeTitles_Honored

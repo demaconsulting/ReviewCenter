@@ -3039,3 +3039,70 @@ sections:
           - ReviewCenter-ReviewPage-StatusPanel
         tests:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+
+      - id: ReviewCenter-Web-NotificationMode
+        title: >-
+          The Web subsystem shall let a signed-in user with a confirmed address choose the notification mode on the
+          Account page.
+        justification: |
+          The mode decides whether and when mail is sent, so it is chosen where the address is managed, with None as the
+          default and no choice while the user has no confirmed address.
+        children:
+          - ReviewCenter-AccountPage-NotificationModeSelector
+          - ReviewCenter-AccountPage-NotificationModeThreeChoices
+          - ReviewCenter-AccountPage-NotificationModeStoredShown
+          - ReviewCenter-AccountPage-NotificationModeDefaultNone
+          - ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled
+          - ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled-NoSaveButton
+          - ReviewCenter-AccountPage-NotificationModeNeedsAddressExplained
+          - ReviewCenter-AccountPage-NotificationModeSaveCalls
+          - ReviewCenter-AccountPage-NotificationModeSavedNotice
+          - ReviewCenter-AccountPage-NotificationModeSavedNotice-NoError
+          - ReviewCenter-AccountPage-NotificationModeRefusedMessage
+          - ReviewCenter-AccountPage-NotificationModeRefusedMessage-NoSavedNotice
+          - ReviewCenter-AccountPage-NotificationModeRemoveAddressNone
+        tests:
+          - WebSubsystem_AccountPage_ChoosesNotificationMode
+          - AccountPage_Render_ModeSelector_OffersThreeModes
+
+      - id: ReviewCenter-Web-NotificationModeHiddenNotAvailable
+        title: >-
+          While notifications are not available, the Web subsystem shall show no mode selector on the Account page.
+        justification: |
+          A feature that is off must show no controls for itself.
+        children:
+          - ReviewCenter-AccountPage-NotificationModeHiddenNotAvailable
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_NoModeSelector
+
+      - id: ReviewCenter-Web-NotificationExplainsMail
+        title: >-
+          The Web subsystem shall explain on the Account page what a notification mail contains.
+        justification: |
+          A person turns mail on only when they know what will be sent.
+        children:
+          - ReviewCenter-AccountPage-NotificationExplainsContent
+          - ReviewCenter-AccountPage-NotificationExplainsContent-ProjectAndReview
+          - ReviewCenter-AccountPage-NotificationExplainsContent-Link
+        tests:
+          - AccountPage_Render_Card_ExplainsWhatIsMailed
+
+      - id: ReviewCenter-Web-NotificationExplainsMail-NotMailed
+        title: >-
+          The Web subsystem shall explain on the Account page what a notification mail never contains.
+        justification: |
+          Reviews of regulated projects can be confidential.
+        children:
+          - ReviewCenter-AccountPage-NotificationExplainsNotMailed
+        tests:
+          - AccountPage_Render_Card_ExplainsWhatIsNotMailed
+
+      - id: ReviewCenter-Web-NotificationExplainsMail-Modes
+        title: >-
+          The Web subsystem shall explain on the Account page what each notification mode does.
+        justification: |
+          A person chooses a mode only when they know what it does.
+        children:
+          - ReviewCenter-AccountPage-NotificationExplainsModes
+        tests:
+          - AccountPage_Render_Card_ExplainsModes

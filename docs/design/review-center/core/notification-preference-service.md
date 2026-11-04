@@ -6,10 +6,12 @@
 
 `NotificationPreferenceService` lets a signed-in person name an e-mail address for notifications and prove that the
 address is theirs. The proof is a six digit code that the service mails to the address and that the person types back
-on the Account page. The service sends no other mail. It owns every rule around this confirmation: who may use it, how
-a code is made and kept, how long it is valid, how often it can be requested and tried, how many mails the server may
-send, and which changes are audited. It also tells other units which address a notification may be mailed to, which is
-the confirmed address and never a pending one.
+on the Account page. Once the address is confirmed, the person chooses a notification mode: `None` (no mail, the
+default), `Daily` (one summary a day), or `Every` (a mail a few minutes after changes). The service sends no other mail
+than the code; the mails about news are sent by `NotificationDispatcher`. It owns every rule around this confirmation
+and the mode: who may use it, how a code is made and kept, how long it is valid, how often it can be requested and
+tried, how many mails the server may send, and which changes are audited. It also tells other units which address a
+notification may be mailed to, which is the confirmed address and never a pending one.
 
 #### Data Model
 
@@ -23,15 +25,21 @@ held by `INotificationStore` (table `NotificationPreferences`, one row per user)
 - `PendingCodeExpiresUtc` — the end of the lifetime of the code;
 - `PendingAttempts` — the number of codes typed against the current pending code;
 - `PendingSentUtc` — the time the current code was mailed, used for the resend pause;
+- `Mode` — the `NotificationMode` the person chose (`None`, `Daily`, or `Every`; the default and the value of a row
+  without a choice is `None`);
+- `BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`, `FailureCount`, and `NextAttemptUtc` — the state of
+  `NotificationDispatcher` for the person; the service never reads or writes them, only the store clears them when the
+  mode changes;
 - `Updated` — the time of the last change.
 
 Each mail that is sent is also logged as a `NotificationSendLogEntry` (table `NotificationSendLog`: the user, the
-recipient, the kind, which is `confirmation`, and the time). The limits are counted from that log.
+recipient, the kind, which is `confirmation`, `update`, or `digest`, and the time). The limits are counted from that
+log.
 
 `NotificationSettings` holds the three settings: whether notifications are enabled, the instance name for the mails
 (default `ReviewCenter`), and the number of mails the whole server may send per hour (default 200). A status is
-reported as a `NotificationAddressStatus`: the confirmed address, the pending address, and whether the pending code has
-expired.
+reported as a `NotificationAddressStatus`: the confirmed address, the pending address, whether the pending code has
+expired, and the mode.
 
 Constants:
 
@@ -83,7 +91,21 @@ identity of the user, and the code, so a hash is useless for another user or ano
 **RemoveAddressAsync**: Removes the confirmed and the pending address of the person.
 
 - *Returns*: True when there was something to remove. The audit entry `notification.email-removed` is recorded in the
-  same transaction. The send log is kept.
+  same transaction. The send log is kept. The mode, the dispatcher state, and the notified items of the person go with
+  the row, so the person is back to the mode `None`.
+
+**SetModeAsync**: Chooses the notification mode of a person.
+
+- *Parameters*: The actor, the `NotificationMode`, and a cancellation token.
+- *Returns*: True when the mode changed; false when it was already the chosen one (or `None` for a person without a
+  row), in which case nothing is stored and no audit entry is written.
+- *Postconditions*: The actor is checked like for every action. A value that is not `None`, `Daily`, or `Every` raises
+  `ArgumentOutOfRangeException`. A mode other than `None` needs a confirmed address and fails with
+  `NotificationAddressNotConfirmed` otherwise. The store saves the new mode with the audit entry
+  `notification.settings-changed` (text "Notification mode set to X.", no address) in one transaction. Switching on
+  from `None` marks the baseline as pending, so the dispatcher records the items that exist now as known before it
+  mails anything; switching between `Daily` and `Every` keeps the known items; switching to `None` forgets them. Every
+  change clears the batch window and the failure state.
 
 **GetConfirmedAddressAsync**: Gets the address a notification may be mailed to.
 
@@ -109,6 +131,7 @@ All refusals are `DomainRuleException` with a rule and a message for the person:
   change a temporary password;
 - `ActorNotAllowed` — the user is unknown or disabled;
 - `NotificationAddressInvalid` — the typed text is not one valid address;
+- `NotificationAddressNotConfirmed` — a mode other than `None` was chosen while the person has no confirmed address;
 - `NotificationResendTooSoon` — the previous mail was sent less than 60 seconds ago;
 - `NotificationLimitReached` — a limit per user, per address, or per server was reached;
 - `NotificationSendFailed` — the sender failed;
@@ -132,5 +155,5 @@ No message contains the address or the code, and the audit entries carry neither
 
 #### Callers
 
-- **Account page** — shows the status, requests a confirmation, confirms a code, and removes the address.
+- **Account page** — shows the status, requests a confirmation, confirms a code, removes the address, and sets the mode.
 - **ServerHost** — registers the service with its settings.

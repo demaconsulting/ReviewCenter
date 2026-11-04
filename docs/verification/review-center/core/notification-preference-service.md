@@ -34,6 +34,14 @@ N/A - standard test environment (no database and no mail server are needed).
 - Each change is audited, and no audit entry holds the address or the code.
 - An actor with an API token, a feature that is off, a sender that is not configured, a disabled or unknown user, a
   user with a temporary password, and a missing actor are refused.
+- A user who never chose a mode has the mode `None`; the status shows the stored mode.
+- A mode (`None`, `Daily`, or `Every`) is stored and audited by its actor; a mode other than `None` is refused while no
+  address is confirmed, a value outside the enumeration is refused, and an API token actor, a disabled user, a user
+  with a temporary password, a missing actor, and a feature that is not available are refused too.
+- An audit entry of a mode change holds the mode and no address; choosing the mode that is stored changes nothing and
+  writes no entry.
+- Switching a mode on from `None` marks the baseline as pending; switching between `Daily` and `Every` does not;
+  removing the address returns the user to `None`.
 
 #### Test Scenarios
 
@@ -146,3 +154,45 @@ is refused. This scenario is tested by `NotificationPreferenceService_Actions_Te
 
 **NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull**: A missing actor raises `ArgumentNullException`.
 This scenario is tested by `NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull`.
+
+**Mode scenarios**: The tests of the mode are in `NotificationPreferenceServiceModeTests.cs`; they use the same
+stand-ins.
+
+**NotificationPreferenceService_GetStatus_NoRow_ModeNone** and
+**NotificationPreferenceService_GetStatus_ModeDaily_ShowsDaily**: A user without a row has the mode `None`, and the
+status shows a stored mode. These scenarios are tested by `NotificationPreferenceService_GetStatus_NoRow_ModeNone` and
+`NotificationPreferenceService_GetStatus_ModeDaily_ShowsDaily`.
+
+**NotificationPreferenceService_SetMode_Daily_StoresDaily**, **..._Every_StoresEvery**, and **..._None_StoresNone**:
+Each of the three modes is stored for a user with a confirmed address. These scenarios are tested by
+`NotificationPreferenceService_SetMode_Daily_StoresDaily`, `NotificationPreferenceService_SetMode_Every_StoresEvery`,
+and `NotificationPreferenceService_SetMode_None_StoresNone`.
+
+**NotificationPreferenceService_SetMode_NoConfirmedAddress_Throws**: Without a confirmed address a mode other than
+`None` raises the rule `NotificationAddressNotConfirmed`. This scenario is tested by
+`NotificationPreferenceService_SetMode_NoConfirmedAddress_Throws`.
+
+**SetMode refusals**: An API token actor, a feature that is not available, a disabled user, a user with a temporary
+password, and a value outside the enumeration are refused, and a missing actor raises `ArgumentNullException`. These
+scenarios are tested by `NotificationPreferenceService_SetMode_ApiTokenActor_Throws`,
+`NotificationPreferenceService_SetMode_NotAvailable_Throws`,
+`NotificationPreferenceService_SetMode_NotAvailable_StoreNotTouched`,
+`NotificationPreferenceService_SetMode_DisabledUser_Throws`,
+`NotificationPreferenceService_SetMode_MustChangePassword_Throws`,
+`NotificationPreferenceService_SetMode_UndefinedValue_Throws`, and
+`NotificationPreferenceService_SetMode_NullActor_ThrowsArgumentNull`.
+
+**Audit of the mode**: A changed mode is audited by its actor, the text holds the mode and no address, and an unchanged
+mode (also `None` without a row) writes nothing. These scenarios are tested by
+`NotificationPreferenceService_SetMode_Changed_AuditEntryWritten`,
+`NotificationPreferenceService_SetMode_Changed_AuditHasNoAddress`,
+`NotificationPreferenceService_SetMode_Same_NoAuditNoChange`,
+`NotificationPreferenceService_SetMode_Same_ReportsNoChange`, and
+`NotificationPreferenceService_SetMode_NoneWithoutRow_NoChange`.
+
+**Baseline and removal**: Switching on from `None` marks the baseline pending, switching between `Daily` and `Every`
+does not, and removing the address returns the mode to `None`. These scenarios are tested by
+`NotificationPreferenceService_SetMode_NoneToEvery_BaselinePending`,
+`NotificationPreferenceService_SetMode_DailyToEvery_NoBaseline`,
+`NotificationPreferenceService_SetMode_DailyToEvery_ItemsKept`, and
+`NotificationPreferenceService_RemoveAddress_AfterMode_ModeNone`.

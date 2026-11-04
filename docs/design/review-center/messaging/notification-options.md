@@ -29,7 +29,9 @@ once the server runs they are only read. Nothing prints them, so the password ne
 
 The accepted bounds are: port 1 to 65535, time-out 5 to 120 seconds, digest hour 0 to 23, batch window 30 to 3600
 seconds, poll interval 10 to 3600 seconds, and mail limit 1 to 10000 per hour. The settings of the schedule are
-accepted and checked here; they take effect when the server starts to send notifications.
+checked here and are in effect: the digest hour and the time zone give the daily summary its time, the batch window is
+the time in which changes are collected into one mail, the poll interval is the time between two notification passes,
+`IncludeTitles` decides whether a mail names the titles of reviews, and the mail limit bounds the server per hour.
 
 #### Key Methods
 
@@ -81,6 +83,19 @@ and the `INotificationSender`.
   is `NoNotificationSender` while notifications are off or no transport is chosen, `SmtpNotificationSender` for `Smtp`,
   and `FileNotificationSender` for `File`.
 
+**NotificationRegistration.AddNotificationWorker**: Registers the background worker that mails the notifications.
+
+- *Parameters*: The service collection and the configuration, neither of which may be null.
+- *Returns*: The same service collection.
+- *Postconditions*: Only while `Notifications:Enabled` is true and the transport is `Smtp` or `File` is exactly one
+  hosted `NotificationWorker` registered; otherwise (off, no section, or the transport `None`) nothing is registered, so
+  no timer runs and no mail is composed. When the worker is first built it gets a `NotificationComposer` with the
+  instance name, the base address, and `IncludeTitles`; a `DigestSchedule` with the digest hour and the time zone; a
+  `NotificationDispatcher` with the store, the inbox, the audit store, the sender, the settings, the clock, the batch
+  window of `BatchWindowSeconds`, and a callback that logs only the type of a failure; and the poll interval of
+  `PollSeconds`. The method belongs to the web host only: `ServerHost` calls it from `CreateApplication` and never
+  from `AddServices`, so a command and the self-test get no worker.
+
 #### Error Handling
 
 An invalid configuration is reported by the validator as a failed options validation that names the setting and never
@@ -95,10 +110,13 @@ written to a log, a message or a warning.
 - **SecretSource (Utilities)** - the inline-or-file resolution of the password.
 - **Microsoft.Extensions.Options and dependency injection** - the binding, the validation, and the registration.
 - **SmtpNotificationSender and FileNotificationSender** - the senders the registration creates.
+- **NotificationWorker, NotificationDispatcher, NotificationComposer, and DigestSchedule** - the parts that the worker
+  registration builds from the settings.
 
 #### Callers
 
-- **ServerHost** - registers the notifications, forces the check at start-up, and logs the warnings.
+- **ServerHost** - registers the notifications, registers the worker (web host only), forces the check at start-up, and
+  logs the warnings.
 - **ConfiguredNotificationsCheck of the self-validation** - runs the same check and the same password resolution.
 - **SmtpNotificationSender and FileNotificationSender** - read the settings and resolve the password.
 - **NotificationPreferenceService and the Account page** - use the Core `NotificationSettings` and the registered

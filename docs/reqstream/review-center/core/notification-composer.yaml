@@ -1,0 +1,442 @@
+---
+# Software Unit Requirements for the NotificationComposer Class
+#
+# The NotificationComposer class turns the rows of the inbox of a user into the candidates of a notification, decides
+# whether an item is new for a user, and composes the mail about the new items. A mail says only that there is news: it
+# never holds the detail text of an inbox row, a comment, an answer, a verdict, or the outcome of a review. Each
+# requirement states one rule, so that each rule can be traced to its own test case.
+
+sections:
+  - title: NotificationComposer Unit Requirements
+    requirements:
+      - id: ReviewCenter-NotificationComposer-SubjectEveryFixed
+        title: >-
+          The NotificationComposer class shall use a fixed subject text, with the name of the installation, for a mail
+          about new items.
+        justification: |
+          A subject made of fixed text can not carry text of a user into the header of the mail.
+        tests:
+          - NotificationComposer_Compose_Every_SubjectIsFixedText
+
+      - id: ReviewCenter-NotificationComposer-SubjectDailyFixed
+        title: >-
+          The NotificationComposer class shall use a fixed subject text, with the name of the installation, for a daily
+          summary.
+        justification: |
+          A subject made of fixed text can not carry text of a user into the header of the mail.
+        tests:
+          - NotificationComposer_Compose_Daily_SubjectIsFixedText
+
+      - id: ReviewCenter-NotificationComposer-SubjectNoItemText
+        title: >-
+          The NotificationComposer class shall keep project names, review titles, and review ids out of the subject.
+        justification: |
+          The subject is shown in notifications of the mail program on the lock screen of a device, and names of
+          projects and reviews are not meant to be read by anyone who passes by.
+        tests:
+          - NotificationComposer_Compose_AnyItems_SubjectHasNoItemText
+
+      - id: ReviewCenter-NotificationComposer-SubjectInstanceNameSingleLine
+        title: >-
+          The NotificationComposer class shall replace each control character of the name of the installation in the
+          subject by a space.
+        justification: |
+          A line break in a value that is put into the header of a mail starts a new header line.
+        tests:
+          - NotificationComposer_Compose_InstanceNameWithLineBreak_SubjectSingleLine
+
+      - id: ReviewCenter-NotificationComposer-ClassifyToAnswer
+        title: >-
+          The NotificationComposer class shall classify a "Not started" row and a "Draft" row of the section to answer
+          as the same state.
+        justification: |
+          Starting an answer is no news for the person who has to answer, so the two rows must not count as two states.
+        tests:
+          - NotificationComposer_Classify_NotStartedAndDraft_SameState
+
+      - id: ReviewCenter-NotificationComposer-ClassifyQuestion
+        title: >-
+          The NotificationComposer class shall classify a "Question for you" row as a state of its own.
+        justification: |
+          A question for the user is news that differs from the request to answer.
+        tests:
+          - NotificationComposer_Classify_QuestionChip_QuestionState
+
+      - id: ReviewCenter-NotificationComposer-ClassifyDisputed
+        title: >-
+          The NotificationComposer class shall classify a disputed row as a state that carries no count.
+        justification: |
+          The count of disputed answers is derived from the ballots of the other reviewers, which must not leave the
+          server in a mail.
+        tests:
+          - NotificationComposer_Classify_Disputed_StateHasNoCount
+
+      - id: ReviewCenter-NotificationComposer-ClassifyToSign
+        title: >-
+          The NotificationComposer class shall classify a "Not signed" row as the state ready to sign.
+        justification: |
+          A review that waits for the signature of the user is news that calls for an action.
+        tests:
+          - NotificationComposer_Classify_NotSigned_ReadyState
+
+      - id: ReviewCenter-NotificationComposer-ClassifySignAgain
+        title: >-
+          The NotificationComposer class shall classify a row of a review that changed and must be signed again as a
+          state of its own.
+        justification: |
+          A review that changed after the signature is news that differs from a review that waits for a first signature.
+        tests:
+          - NotificationComposer_Classify_SignAgain_SignAgainState
+
+      - id: ReviewCenter-NotificationComposer-ClassifySignatureLost
+        title: >-
+          The NotificationComposer class shall classify a row of a signature that no longer counts as a state of its
+          own.
+        justification: |
+          A signature that was lost is news that differs from a review that waits for a signature.
+        tests:
+          - NotificationComposer_Classify_SignatureLost_LostState
+
+      - id: ReviewCenter-NotificationComposer-ClassifyReplies
+        title: >-
+          The NotificationComposer class shall carry the number of waiting replies in the state of a replies row.
+        justification: |
+          The number tells whether more replies came in since the user was told about the replies.
+        tests:
+          - NotificationComposer_Classify_RepliesWaiting_StateHasCount
+
+      - id: ReviewCenter-NotificationComposer-ClassifyApprovedConcluded
+        title: >-
+          The NotificationComposer class shall classify an "Approved" update as the state concluded.
+        justification: |
+          The outcome of a review is not told in a mail, so the state keeps only that the review is over.
+        tests:
+          - NotificationComposer_Classify_Approved_Concluded
+
+      - id: ReviewCenter-NotificationComposer-ClassifyRejectedConcluded
+        title: >-
+          The NotificationComposer class shall classify a "Rejected" update as the state concluded.
+        justification: |
+          The outcome of a review is not told in a mail, so an approval and a rejection must give the same state.
+        tests:
+          - NotificationComposer_Classify_Rejected_Concluded
+
+      - id: ReviewCenter-NotificationComposer-ClassifyReopened
+        title: >-
+          The NotificationComposer class shall classify a "Reopened" update as a state of its own.
+        justification: |
+          A review that is reopened after it was concluded is news that differs from the conclusion.
+        tests:
+          - NotificationComposer_Classify_Reopened_Reopened
+
+      - id: ReviewCenter-NotificationComposer-ClassifyRefuseFailedChecks
+        title: >-
+          The NotificationComposer class shall return no candidate for a failed-checks row.
+        justification: |
+          The number of failed checks hints at the verdicts of the reviewers, so a mail must not be sent for it.
+        tests:
+          - NotificationComposer_Classify_FailedChecks_ReturnsNull
+
+      - id: ReviewCenter-NotificationComposer-ClassifyRefuseWaitingForOthers
+        title: >-
+          The NotificationComposer class shall return no candidate for a waiting-for-others row.
+        justification: |
+          A review that waits for other people calls for no action of the user, so it is no reason for a mail.
+        tests:
+          - NotificationComposer_Classify_WaitingForOthers_ReturnsNull
+
+      - id: ReviewCenter-NotificationComposer-ClassifyRefuseNullRow
+        title: >-
+          The NotificationComposer class shall refuse a missing inbox row with an argument error.
+        justification: |
+          A call without a row is a mistake of the caller that must show at once.
+        tests:
+          - NotificationComposer_Classify_NullRow_ThrowsArgumentNull
+
+      - id: ReviewCenter-NotificationComposer-NewWhenNothingStored
+        title: >-
+          The NotificationComposer class shall treat an item as new when the user was told nothing about it.
+        justification: |
+          An item that was never mailed is the news that a notification is meant for.
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-NotificationComposer-NewWhenStateDiffers
+        title: >-
+          The NotificationComposer class shall treat an item as new when its state differs from the state that the user
+          was told about.
+        justification: |
+          A change of the state of an item is news that was not mailed before.
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-NotificationComposer-NotNewWhenStateSame
+        title: >-
+          The NotificationComposer class shall treat an item as not new when its state equals the state that the user
+          was told about.
+        justification: |
+          The same news must not be mailed twice.
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-NotificationComposer-NewWhenRepliesRise
+        title: >-
+          The NotificationComposer class shall treat waiting replies as new when their number is greater than the
+          number that the user was told about.
+        justification: |
+          More replies are news that was not mailed before.
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-NotificationComposer-NotNewWhenRepliesFall
+        title: >-
+          The NotificationComposer class shall treat waiting replies as not new when their number is smaller than the
+          number that the user was told about.
+        justification: |
+          A user who answers replies must not be mailed about the replies that are left.
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-NotificationComposer-NeverUseDetail
+        title: >-
+          The NotificationComposer class shall keep the detail text of an inbox row out of a mail.
+        justification: |
+          The detail text carries names and hints that are meant for the page of the inbox behind the sign-in, not for
+          a mail that leaves the server.
+        tests:
+          - NotificationComposer_Compose_DetailSentinel_NotInTextOrHtml
+
+      - id: ReviewCenter-NotificationComposer-NeverShowOutcome
+        title: >-
+          The NotificationComposer class shall keep the words "Approved" and "Rejected" out of a mail about updates.
+        justification: |
+          The outcome of a review is told on the page behind the sign-in, not in a mail.
+        tests:
+          - NotificationComposer_Compose_Updates_NoOutcomeWord
+
+      - id: ReviewCenter-NotificationComposer-ConcludedWording
+        title: >-
+          The NotificationComposer class shall say that "the review was concluded" for an item in the state concluded.
+        justification: |
+          A concluded review needs a wording that is the same for an approval and a rejection.
+        tests:
+          - NotificationComposer_Compose_Concluded_SaysWasConcluded
+
+      - id: ReviewCenter-NotificationComposer-ReopenedWording
+        title: >-
+          The NotificationComposer class shall say that "the review was reopened" for an item in the state reopened.
+        justification: |
+          The reader must learn that the review needs attention again.
+        tests:
+          - NotificationComposer_Compose_Reopened_SaysWasReopened
+
+      - id: ReviewCenter-NotificationComposer-DisputedNoCount
+        title: >-
+          The NotificationComposer class shall write no number for a disputed item.
+        justification: |
+          The count of disputed answers is derived from the ballots of the other reviewers, which must not leave the
+          server in a mail.
+        tests:
+          - NotificationComposer_Compose_Disputed_NoCountInBody
+
+      - id: ReviewCenter-NotificationComposer-RepliesShowCount
+        title: >-
+          The NotificationComposer class shall show the number of waiting replies for a replies item.
+        justification: |
+          The number tells the reader how much is waiting and is no content of the replies.
+        tests:
+          - NotificationComposer_Compose_Replies_ShowsCount
+
+      - id: ReviewCenter-NotificationComposer-ShowProjectName
+        title: >-
+          The NotificationComposer class shall show the name of the project of each item.
+        justification: |
+          The reader must see where the news is.
+        tests:
+          - NotificationComposer_Compose_Item_ShowsProjectName
+
+      - id: ReviewCenter-NotificationComposer-ShowTitle
+        title: >-
+          The NotificationComposer class shall show the title of the review of an item when titles are included.
+        justification: |
+          The title is the name by which people know a review, so it helps the reader when the operator allows it.
+        tests:
+          - NotificationComposer_Compose_IncludeTitlesTrue_ShowsTitle
+
+      - id: ReviewCenter-NotificationComposer-OmitTitle
+        title: >-
+          The NotificationComposer class shall leave the title of the review of an item out when titles are not
+          included.
+        justification: |
+          An operator can keep the titles, which may be sensitive, out of the mail.
+        tests:
+          - NotificationComposer_Compose_IncludeTitlesFalse_OmitsTitle
+
+      - id: ReviewCenter-NotificationComposer-ShowReviewId
+        title: >-
+          The NotificationComposer class shall show the review id of an item when titles are not included.
+        justification: |
+          The reader still needs a way to tell the reviews of a project apart.
+        tests:
+          - NotificationComposer_Compose_IncludeTitlesFalse_ShowsReviewId
+
+      - id: ReviewCenter-NotificationComposer-LinkPath
+        title: >-
+          The NotificationComposer class shall link each item to the page of its review in the form that the review
+          links of the web pages use.
+        justification: |
+          A link that the page of the review does not understand would lead nowhere.
+        tests:
+          - NotificationComposer_Compose_Item_LinkMatchesReviewLinks
+
+      - id: ReviewCenter-NotificationComposer-LinkBaseUrl
+        title: >-
+          The NotificationComposer class shall start each link with the configured base address of the server.
+        justification: |
+          A mail is read outside of the server, so its links must be absolute.
+        tests:
+          - NotificationComposer_Compose_Item_LinkStartsWithBaseUrl
+
+      - id: ReviewCenter-NotificationComposer-LinkTrailingSlash
+        title: >-
+          The NotificationComposer class shall keep a single slash between the base address and the path of a link when
+          the base address ends with a slash.
+        justification: |
+          A doubled slash can make a link fail on some servers.
+        tests:
+          - NotificationComposer_Compose_BaseUrlTrailingSlash_SingleSlash
+
+      - id: ReviewCenter-NotificationComposer-LinkEscapeReviewId
+        title: >-
+          The NotificationComposer class shall escape the review id in a link.
+        justification: |
+          A review id with special characters could otherwise change the meaning of the link.
+        tests:
+          - NotificationComposer_Compose_ReviewIdWithSpecialChars_LinkEscaped
+
+      - id: ReviewCenter-NotificationComposer-LinkNoToken
+        title: >-
+          The NotificationComposer class shall keep a link free of a query string.
+        justification: |
+          A link in a mail can be forwarded, so it must open nothing without the sign-in of the reader and must carry
+          no token, which a query string could hold.
+        tests:
+          - NotificationComposer_Compose_Item_LinkHasNoQuery
+
+      - id: ReviewCenter-NotificationComposer-TextSingleLineValues
+        title: >-
+          The NotificationComposer class shall replace each control character, line separator, and paragraph separator
+          of a text of a user in the plain text part by a space.
+        justification: |
+          A line break in a title could otherwise forge lines of the mail. The Unicode separators U+2028 and U+2029
+          break a line in some mail programs although they are no control characters.
+        tests:
+          - NotificationComposer_Compose_TitleWithLineBreak_TextPartSingleLine
+          - NotificationComposer_Compose_TitleWithUnicodeLineSeparators_BecomeSpaces
+
+      - id: ReviewCenter-NotificationComposer-HtmlEncodeText
+        title: >-
+          The NotificationComposer class shall HTML-encode each text of a user in the HTML part.
+        justification: |
+          A title with markup must be shown as text and must not change the page of the mail.
+        tests:
+          - NotificationComposer_Compose_TitleWithMarkup_HtmlEncoded
+
+      - id: ReviewCenter-NotificationComposer-HtmlEncodeLink
+        title: >-
+          The NotificationComposer class shall encode each link in the href attribute of the HTML part.
+        justification: |
+          A quote in a review id could otherwise end the attribute and add attributes of the attacker.
+        tests:
+          - NotificationComposer_Compose_ReviewIdWithQuote_HrefEncoded
+
+      - id: ReviewCenter-NotificationComposer-GroupBySection
+        title: >-
+          The NotificationComposer class shall list the items grouped by the section of the inbox, in the order of the
+          inbox.
+        justification: |
+          The reader sees the most urgent kind of news first, as on the page of the inbox.
+        tests:
+          - NotificationComposer_Compose_MixedSections_GroupedInOrder
+
+      - id: ReviewCenter-NotificationComposer-DigestNewFirst
+        title: >-
+          The NotificationComposer class shall put the new items before the count of the outstanding items in a daily
+          summary.
+        justification: |
+          The news is the reason for the mail, so it comes first.
+        tests:
+          - NotificationComposer_Compose_Daily_NewItemsThenOutstanding
+
+      - id: ReviewCenter-NotificationComposer-DigestOutstandingCountOnly
+        title: >-
+          The NotificationComposer class shall show the outstanding items of a daily summary as a number only.
+        justification: |
+          Items that were mailed before need no second listing, and a number keeps the mail short.
+        tests:
+          - NotificationComposer_Compose_Daily_OutstandingNotListed
+
+      - id: ReviewCenter-NotificationComposer-EveryNoOutstanding
+        title: >-
+          The NotificationComposer class shall leave the line about outstanding items out of a mail about new items.
+        justification: |
+          Only the daily summary reports on what still waits.
+        tests:
+          - NotificationComposer_Compose_Every_NoOutstandingLine
+
+      - id: ReviewCenter-NotificationComposer-ItemLimit
+        title: >-
+          The NotificationComposer class shall list at most 50 items in a mail.
+        justification: |
+          A mail with hundreds of items is not read, and the size of a mail is limited.
+        tests:
+          - NotificationComposer_Compose_60Items_50ListedAndMore
+
+      - id: ReviewCenter-NotificationComposer-ItemLimit-More
+        title: >-
+          The NotificationComposer class shall state in a mail how many new items it did not list.
+        justification: |
+          The reader must know that the list is not complete.
+        tests:
+          - NotificationComposer_Compose_60Items_StatesHowManyNotListed
+
+      - id: ReviewCenter-NotificationComposer-FooterAccountLink
+        title: >-
+          The NotificationComposer class shall end a mail with a link to the Account page.
+        justification: |
+          The reader must be able to stop the mail.
+        tests:
+          - NotificationComposer_Compose_Footer_LinksToAccount
+
+      - id: ReviewCenter-NotificationComposer-FooterAccountLink-Reason
+        title: >-
+          The NotificationComposer class shall state in the footer of a mail why the mail was sent.
+        justification: |
+          The reader must be able to see why the mail came.
+        tests:
+          - NotificationComposer_Compose_Footer_SaysWhyMailWasSent
+
+      - id: ReviewCenter-NotificationComposer-BodyWithinMessageLimits
+        title: >-
+          The NotificationComposer class shall compose a mail whose size is within the limits of a notification message,
+          for the largest number of items with the longest titles.
+        justification: |
+          A mail that the message type refuses would never be sent.
+        tests:
+          - NotificationComposer_Compose_MaxItemsMaxLengthTitles_MessageAccepted
+
+      - id: ReviewCenter-NotificationComposer-RefuseNoItems
+        title: >-
+          The NotificationComposer class shall refuse to compose a mail without an item with an argument error.
+        justification: |
+          A mail without news must never be sent.
+        tests:
+          - NotificationComposer_Compose_NoItems_ThrowsArgument
+
+      - id: ReviewCenter-NotificationComposer-RefuseEmptyBaseUrl
+        title: >-
+          The NotificationComposer class shall refuse an empty base address with an argument error.
+        justification: |
+          Without a base address no link of a mail can be absolute.
+        tests:
+          - NotificationComposer_Constructor_EmptyBaseUrl_Throws

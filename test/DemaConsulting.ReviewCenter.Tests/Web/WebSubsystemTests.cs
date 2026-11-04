@@ -730,6 +730,59 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that through the real pipeline the account page offers the notification mode to a user with a
+    ///     confirmed address, shows the chosen mode, and explains what is and is not mailed.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_AccountPage_ChoosesNotificationMode()
+    {
+        // Arrange: the application with notifications on (a recording sender takes the mails), and ann signed in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var sender = new FakeNotificationSender();
+        var folder = Path.Combine(Path.GetTempPath(), $"rc-web-{Guid.NewGuid():N}");
+        var settings = new Dictionary<string, string?>
+        {
+            ["Notifications:Enabled"] = "true",
+            ["Notifications:Sender"] = "File",
+            ["Notifications:FromAddress"] = "reviewcenter@example.com",
+            ["Notifications:BaseUrl"] = "https://reviewcenter.example.com/",
+            ["Notifications:File:Directory"] = folder
+        };
+        await using var app = await TestWebApp.StartAsync(
+            new CapturingLoggerProvider(),
+            null,
+            ["serve", "--silent"],
+            settings,
+            services => services.AddSingleton<INotificationSender>(sender));
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var before = await ParseAsync(browser.Client, "/account");
+        var ann = new Actor("ann", "ann");
+
+        // Act: ann confirms an address and chooses the daily summary
+        using (var scope = app.Services.CreateScope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<NotificationPreferenceService>();
+            await service.RequestConfirmationAsync(ann, "ann@example.com", cancellationToken);
+            await service.ConfirmAsync(ann, sender.LastCode(), cancellationToken);
+            await service.SetModeAsync(ann, NotificationMode.Daily, cancellationToken);
+        }
+
+        var after = await ParseAsync(browser.Client, "/account");
+
+        // Assert: the page offers the three modes, ann's choice is selected, and the explanation is there
+        Assert.Equal(
+            ["None", "Daily", "Every"],
+            before.QuerySelectorAll("[data-testid='notifications-mode-select'] option").Select(o => o.GetAttribute("value")).ToArray());
+        var selected = after.QuerySelector("[data-testid='notifications-mode-select'] option[selected]");
+        Assert.Equal("Daily", selected?.GetAttribute("value"));
+        Assert.NotNull(after.QuerySelector("[data-testid='notifications-explanation']"));
+        if (Directory.Exists(folder))
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    /// <summary>
     ///     Requests a page and parses the returned document.
     /// </summary>
     /// <param name="client">The in-memory client.</param>

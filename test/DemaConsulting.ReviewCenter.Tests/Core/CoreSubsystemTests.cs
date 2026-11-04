@@ -135,7 +135,8 @@ public class CoreSubsystemTests
         DomainRule.NotificationNothingToConfirm,
         DomainRule.NotificationCodeIncorrect,
         DomainRule.NotificationCodeExpired,
-        DomainRule.NotificationTooManyAttempts
+        DomainRule.NotificationTooManyAttempts,
+        DomainRule.NotificationAddressNotConfirmed
     ];
 
     /// <summary>
@@ -1756,6 +1757,146 @@ public class CoreSubsystemTests
         Assert.Equal(
             [InboxSection.Updates], (await world.InboxOfAsync("author")).Items.Select(item => item.Section));
         Assert.Empty((await world.InboxOfAsync("bob")).Items);
+    }
+
+    /// <summary>
+    ///     Test that a user with a confirmed address chooses a notification mode, that the choice is audited without
+    ///     the address, and that a user without a confirmed address is refused.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_NotificationMode_ConfirmedUserChoosesAndIsAudited()
+    {
+        // Arrange: ann, and bob who never confirms an address
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new MovableTimeProvider(_now);
+        var audit = new AuditService(new FakeAuditStore(clock), null, clock);
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock, audit, new FakeTotpStore());
+        await users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        var store = new FakeNotificationStore();
+        var sender = new FakeNotificationSender();
+        var service = new NotificationPreferenceService(
+            store, sender, users, new NotificationSettings(true, "Test Center", 200), clock);
+        var ann = new Actor("ann", "Ann");
+        await service.RequestConfirmationAsync(ann, "ann@example.com", cancellationToken);
+        await service.ConfirmAsync(ann, sender.LastCode(), cancellationToken);
+
+        // Act: ann chooses Daily and then Every
+        var daily = await service.SetModeAsync(ann, NotificationMode.Daily, cancellationToken);
+        var every = await service.SetModeAsync(ann, NotificationMode.Every, cancellationToken);
+
+        // Assert: stored, audited by action and without the address
+        Assert.True(daily);
+        Assert.True(every);
+        Assert.Equal(NotificationMode.Every, (await service.GetStatusAsync(ann, cancellationToken)).Mode);
+        var changes = store.Audits.Where(a => a.Detail is not null && a.Detail.StartsWith("Notification mode", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, changes.Count);
+        Assert.All(changes, a => Assert.DoesNotContain("example.com", a.Detail, StringComparison.Ordinal));
+
+        // Assert: bob has no confirmed address, so he can not choose
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetModeAsync(new Actor("bob", "Bob"), NotificationMode.Daily, cancellationToken));
+        Assert.Equal(DomainRule.NotificationAddressNotConfirmed, refused.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a notification mail names sections, projects, reviews and links only: no comment, reply or
+    ///     outcome text of the inbox reaches it.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_NotificationMail_HasNoInboxDetailOrOutcome()
+    {
+        // Arrange: ann has a review with a thread to answer and an approved review, all with text that must not leak
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.ApproveAsync("r-done");
+        await world.SeatAsync("r-open", "ann", "Plain title");
+        var thread = await world.Inbox.StartThreadAsync("r-open", "bob", "SECRET-COMMENT-TEXT");
+        await world.Inbox.ReplyAsync("r-open", thread.Id, "author", "SECRET-REPLY-TEXT");
+        world.Enroll("ann", NotificationMode.Every);
+
+        // Act
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert: one mail that links the reviews and contains none of the texts or an outcome word
+        var message = Assert.Single(sent);
+        foreach (var body in new[] { message.TextBody, message.HtmlBody, message.Subject })
+        {
+            Assert.DoesNotContain("SECRET", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Approved", body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Rejected", body, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains("r-open", message.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("r-open", message.Subject, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a daily summary is sent at most once for each local date of the configured time zone, and
+    ///     not before the local hour.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_DailyDigest_OnePerLocalDate()
+    {
+        // Arrange: a zone five hours behind UTC, the digest at 8 local (13:00 UTC); the world starts at 00:06 local
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(-5), "Test", "Test");
+        var world = await NotificationDispatcherWorld.CreateAsync(digestHour: 8, zone: zone);
+        world.Enroll("ann", NotificationMode.Daily);
+        await world.SeatAsync("r1", "ann");
+
+        // Act: a pass before the local hour, then one after it, then more news on the same local date
+        await world.PassAsync();
+        var before = world.SentTo("ann");
+        world.AdvanceTo(new DateTimeOffset(2025, 3, 4, 13, 0, 0, TimeSpan.Zero));
+        await world.PassAsync();
+        var first = world.SentTo("ann");
+        await world.SeatAsync("r2", "ann");
+        world.Advance(TimeSpan.FromHours(3));
+        await world.PassAsync();
+        var sameDate = world.SentTo("ann");
+
+        // Act: the next local date, after the hour, with news
+        await world.SeatAsync("r3", "ann");
+        world.AdvanceTo(new DateTimeOffset(2025, 3, 5, 13, 0, 0, TimeSpan.Zero));
+        await world.PassAsync();
+
+        // Assert: nothing before the hour, one summary that date, the second on the next date
+        Assert.Equal(0, before);
+        Assert.Equal(1, first);
+        Assert.Equal(1, sameDate);
+        Assert.Equal(2, world.SentTo("ann"));
+    }
+
+    /// <summary>
+    ///     Test that each user is mailed only the new items of the own inbox, and each item only once.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce()
+    {
+        // Arrange: ann and bob each have a review of their own to answer
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r-ann", "ann");
+        await world.SeatAsync("r-bob", "bob");
+        world.Enroll("ann", NotificationMode.Every);
+        world.Enroll("bob", NotificationMode.Every);
+
+        // Act: the window runs and the mails go; then another pass after news for nobody
+        var sent = await world.DeliverEveryAsync();
+        var count = sent.Count;
+        world.Advance(NotificationDispatcherWorld.DefaultWindow);
+        await world.ChangeAsync();
+        await world.PassAsync();
+        world.Advance(NotificationDispatcherWorld.DefaultWindow);
+        await world.PassAsync();
+
+        // Assert: one mail each, with the own review only, and no repeat
+        Assert.Equal(2, count);
+        var toAnn = Assert.Single(sent, m => m.ToAddress == NotificationDispatcherWorld.AddressOf("ann"));
+        var toBob = Assert.Single(sent, m => m.ToAddress == NotificationDispatcherWorld.AddressOf("bob"));
+        Assert.Contains("r-ann", toAnn.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("r-bob", toAnn.TextBody, StringComparison.Ordinal);
+        Assert.Contains("r-bob", toBob.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("r-ann", toBob.TextBody, StringComparison.Ordinal);
+        Assert.Equal(2, world.Sender.Sent.Count);
     }
 }
 

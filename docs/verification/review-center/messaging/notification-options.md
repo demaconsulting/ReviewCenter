@@ -7,7 +7,7 @@ settings, the real `NotificationOptionsValidator`, and the real configuration bi
 source; nothing is substituted. Each validator test starts from complete enabled settings of one transport, breaks one
 value, and checks that the check fails with a message that names the setting and does not contain the test password.
 The registration of the sender is verified by the subsystem tests of `Messaging`, because it only makes sense together
-with the senders.
+with the senders. The registration of the worker is verified in `NotificationWorkerRegistrationTests.cs`.
 
 #### Test Environment
 
@@ -29,6 +29,9 @@ N/A - standard test environment (the password file tests create a temporary fold
 - An inline password and a connection without TLS to another machine each give one warning that names the setting;
   good settings and settings that are switched off give none.
 - No message and no warning contains the password.
+- The worker is registered once with notifications enabled and the SMTP or the file sender, and not with notifications
+  off, without a section, or with the sender `None`.
+- The poll interval, the batch window, the digest hour and time zone, and the titles setting reach the worker.
 
 #### Test Scenarios
 
@@ -159,3 +162,30 @@ password that are switched off give none either. This scenario is tested by
 **NotificationOptionsValidator_Messages_NeverContainThePassword**: Settings with a password and a wrong port are
 rejected for the port, and the message does not contain the password. This scenario is tested by
 `NotificationOptionsValidator_Messages_NeverContainThePassword`.
+
+**Worker registration scenarios**: The tests of the registration of the worker are in
+`NotificationWorkerRegistrationTests.cs`. They build a real service provider with the real registration over an
+in-memory configuration, the real dispatcher, the composer and the schedule, an in-memory notification store, and a
+recording sender; the worker runs on a clock that only moves when a test moves it, so the poll interval, the batch
+window and the digest hour are observed through the mails that the real wiring sends.
+
+**Registered or not**: With notifications enabled and the SMTP or the file sender, exactly one hosted worker is
+registered; with notifications off, with no `Notifications` section, and with the sender `None`, none is. These
+scenarios are tested by `NotificationRegistration_AddNotificationWorker_EnabledSmtp_Registers`,
+`NotificationRegistration_AddNotificationWorker_EnabledFile_Registers`,
+`NotificationRegistration_AddNotificationWorker_Off_NotRegistered`,
+`NotificationRegistration_AddNotificationWorker_NoSection_NotRegistered`, and
+`NotificationRegistration_AddNotificationWorker_EnabledSenderNone_NotRegistered`.
+
+**Settings in effect**: The worker passes at the configured poll interval and not before; the dispatcher waits the
+configured batch window before it sends; the daily summary follows the configured time zone and hour; titles are left
+out of the mail when they are not to be included and are part of it by default. These scenarios are tested by
+`NotificationRegistration_AddNotificationWorker_PollSeconds_Honored`,
+`NotificationRegistration_AddNotificationWorker_BatchWindow_Honored`,
+`NotificationRegistration_AddNotificationWorker_ZoneAndHour_Honored`,
+`NotificationRegistration_AddNotificationWorker_IncludeTitles_Honored`, and
+`NotificationRegistration_AddNotificationWorker_IncludeTitlesDefault_TitleShown`.
+
+**NotificationRegistration_AddNotificationWorker_NullArgument_Throws**: A missing service collection or configuration
+raises `ArgumentNullException`. This scenario is tested by
+`NotificationRegistration_AddNotificationWorker_NullArgument_Throws`.

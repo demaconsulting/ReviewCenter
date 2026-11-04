@@ -35,6 +35,12 @@ N/A - standard test environment (a temporary SQLite database file is created by 
   no entry, and a code one tick before its expiry is still confirmed; of parallel confirmations exactly one wins.
 - Removing deletes the row with one audit entry, removing again records nothing, and the send log is kept.
 - A reservation deletes the log entries that are older than one day and keeps the newer ones.
+- The mode is stored with its audit entry in one transaction; `None` deletes the notified items; an unchanged mode
+  writes nothing; a new row reads as `None`.
+- Only users with a mode and a confirmed address are listed as recipients, with their flags and dispatch state.
+- A commit of a mail is atomic, is refused for a user without a mode or a row, keeps one row per key, and prunes old
+  log rows; the mails sent are counted per user and for all users.
+- A database without the table of notified items or without the mode column is reported as not available.
 
 #### Test Scenarios
 
@@ -122,3 +128,49 @@ entry; a second removal returns false. This scenario is tested by `NotificationS
 
 **NotificationStore_RemoveAsync_KeepsTheSendLog**: After a removal the send log entry is still there. This scenario is
 tested by `NotificationStore_RemoveAsync_KeepsTheSendLog`.
+
+**Mode and dispatch scenarios**: The tests of the mode, the recipients, the notified items, and the commit of a mail
+are in `NotificationStoreModeTests.cs`, over the same real database.
+
+**Mode**: A new row reads as `None`, with no pending baseline and an empty dispatch state; the mode is read back by a
+new store instance; a failing audit write leaves the mode unchanged; switching on from `None` sets the baseline flag
+and clears the batch window and the failure state; switching between `Daily` and `Every` keeps the items and sets no
+baseline; `None` deletes the notified items and the daily slot memory; and a missing row, a missing address, or an
+unchanged mode changes nothing, and none of them writes an audit entry. These scenarios are tested by
+`NotificationStore_Get_NewRow_ModeNone`, `NotificationStore_Get_NewRow_NoPendingBaseline`,
+`NotificationStore_Get_NewRow_EmptyDispatchState`, `NotificationStore_SetMode_Persisted_ReadBack`,
+`NotificationStore_SetMode_AuditFailure_ModeUnchanged`, `NotificationStore_SetMode_NoneToDaily_FlagSet`,
+`NotificationStore_SetMode_NoneToDaily_BatchWindowCleared`, `NotificationStore_SetMode_NoneToDaily_FailureStateCleared`,
+`NotificationStore_SetMode_DailyToEvery_KeepsItems`, `NotificationStore_SetMode_DailyToEvery_NoBaselineFlag`,
+`NotificationStore_SetMode_None_DeletesNotified`, `NotificationStore_SetMode_None_ClearsDailySlotMemory`,
+`NotificationStore_SetMode_NoRow_ReturnsFalse`, `NotificationStore_SetMode_NoConfirmedAddress_ReturnsFalse`,
+`NotificationStore_SetMode_SameMode_ReturnsFalse`, and `NotificationStore_SetMode_NoChangePossible_NoAuditEntry`.
+
+**Recipients**: Only users with a mode other than `None` and a confirmed address are listed, the disabled flag and the
+temporary-password flag are joined, the stored dispatch state is returned, and the timestamps are stored in the
+sortable UTC text form and read back unchanged. These scenarios are tested by
+`NotificationStore_ListRecipients_Mixed_OnlyEligible`, `NotificationStore_ListRecipients_Flags_Joined`,
+`NotificationStore_ListRecipients_MustChangePassword_Joined`, `NotificationStore_ListRecipients_State_RoundTrips`,
+`NotificationStore_Apply_State_TimestampsStoredAsUtcText`, and `NotificationStore_Apply_State_TimestampsRoundTrip`.
+
+**Commit of a mail**: A commit inserts new items, updates existing ones, removes named keys, can replace all items,
+writes the log row, and is atomic (a failing log row rolls back the items and the state); a commit for a user whose
+mode is `None` returns false and writes nothing; a commit for a user without a row returns false; the same key keeps
+one row, also by the unique key of the database itself; old log rows are pruned. These scenarios are tested by
+`NotificationStore_Apply_Upserts_InsertsNewItem`, `NotificationStore_Apply_Upserts_UpdatesExistingItem`,
+`NotificationStore_Apply_RemoveKeys_Deleted`, `NotificationStore_Apply_ReplaceAll_ReplacesSet`,
+`NotificationStore_Apply_WithLog_RowWritten`, `NotificationStore_Apply_Failure_NothingPersisted`,
+`NotificationStore_Apply_ModeNone_ReturnsFalse`, `NotificationStore_Apply_ModeNone_WritesNothing`,
+`NotificationStore_Apply_NoRow_ReturnsFalse`, `NotificationStore_Apply_SameKeyTwice_OneRow`,
+`NotificationStore_Create_Database_NotifiedItemsKeyUnique`, and `NotificationStore_Apply_OldLogRows_Pruned`.
+
+**Notified items and counts**: A new database has the table; only the items of the asked user are returned; the items
+go away with the user and with the removal of the address; and the mails of one user or of all users since an instant
+are counted. These scenarios are tested by `NotificationStore_Create_Database_HasNotifiedItems`,
+`NotificationStore_GetNotified_ReturnsOnlyOwnItems`, `NotificationStore_Delete_User_CascadesNotifiedItems`,
+`NotificationStore_Remove_DeletesNotified`, `NotificationStore_CountSent_User_CountsOwn`, and
+`NotificationStore_CountSent_All_CountsEverything`.
+
+**Availability of the new parts**: A database without the table of notified items, or without the mode column, is
+reported as not available (a database of the first version of the notifications). These scenarios are tested by
+`NotificationStore_IsAvailable_NoNotifiedItems_False` and `NotificationStore_IsAvailable_NoModeColumn_False`.

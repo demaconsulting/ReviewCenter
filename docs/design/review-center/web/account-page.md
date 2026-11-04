@@ -76,6 +76,14 @@ different one, the address that waits for its code with a field for the 6-digit 
 or the address form. A remove button is shown while there is a confirmed or a waiting address. The code itself is never
 shown by the page: only the mailed copy holds it, and the page learns nothing about it from Core.
 
+The explanation also says what a mail contains (it names the kind of news, the project and the review, and links to
+the review), what it never contains (comments, answers, verdicts, outcomes), and what each mode does. **NotificationModeChoice**
+is the mode that the selector shows: the stored mode from `NotificationInfo.Mode` after every read, or the value the
+user picked. The selector offers "No e-mail" (`None`), "Daily summary" (`Daily`), and "Every change" (`Every`), in that
+order, and `None` is selected for a user who never chose. While the user has no confirmed address the selector is
+disabled, has no save button, and a hint says that an address has to be confirmed first. **NotificationModeSaved** is
+true after a successful save, so that the notice "Your e-mail setting was saved." is shown next to the selector.
+
 **Message**: the confirmation of the last successful change; `null` when there is none.
 
 **InteractiveMarker**: `"true"` or `"false"`, rendered as the `data-interactive` attribute of the root element; it
@@ -113,8 +121,9 @@ recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{
 `notifications-unavailable`, `notifications-explanation`, `notifications-error`, `notifications-message`,
 `notifications-confirmed-address`, `notifications-pending-address`, `notifications-address-form`,
 `notifications-address-input`, `notifications-send-code-button`, `notifications-confirm-form`,
-`notifications-code-input`, `notifications-confirm-button`, `notifications-resend-button`, and
-`notifications-remove-button`.
+`notifications-code-input`, `notifications-confirm-button`, `notifications-resend-button`,
+`notifications-remove-button`, `notifications-mode-form`, `notifications-mode-select`, `notifications-mode-save`,
+`notifications-mode-saved`, and `notifications-mode-needs-address`.
 
 #### Key Methods
 
@@ -203,10 +212,18 @@ code.
   attempts) is shown as `NotificationError`, the code form stays, and the code field is emptied in every case.
 
 **RemoveNotificationAddressAsync**: Calls `NotificationPreferenceService.RemoveAddressAsync`; the page then shows the
-address form again and the notice "Your e-mail address was removed.".
+address form again and the notice "Your e-mail address was removed."; the mode selector shows `None` and is disabled.
 
-All four actions go through one helper that clears the last error and notice, runs the action for the actor from
-`SignIn.GetActorAsync`, shows the outcome, and reads the status again, so a user can only change their own address.
+**SaveNotificationModeAsync**: Handles the mode form: `NotificationPreferenceService.SetModeAsync` with the actor and
+the chosen mode.
+
+- *Postconditions*: On success the notice "Your e-mail setting was saved." is shown next to the selector and the status
+  is read again. A rule violation (no confirmed address, an account that may not use the feature) is shown as
+  `NotificationError`, and no saved notice is shown.
+
+All five actions go through one helper that clears the last error and notice, runs the action for the actor from
+`SignIn.GetActorAsync`, shows the outcome, and reads the status again, so a user can only change their own address and
+mode.
 
 **RevokeTokenAsync**: Revokes one token of the user by its identity and shows "The token was revoked.". The revoke
 button is offered only for a token that is active; a rule violation is shown as the message of the violation.
@@ -234,7 +251,7 @@ the authority.
 - **TotpService** — sets up, confirms, cancels, and turns off the second factor, renews the recovery codes, and reports
   the status and whether the feature is on.
 - **NotificationPreferenceService** — tells whether e-mail notifications are available, and requests, confirms, and
-  removes the notification address of the user.
+  removes the notification address of the user and sets the notification mode.
 - **OidcOptions** (Identity) — the display name of the provider named in the sentence (injected options).
 - **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
 - **TimeProvider** — decides whether a token has expired.

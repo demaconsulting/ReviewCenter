@@ -223,3 +223,23 @@ address, the address form again, and "Your e-mail address was removed.", which i
 `AccountPage_Remove_ConfirmedAddress_ShowsAddressFormAgain`. The text of the card never contains the code of a waiting
 address, which is tested by `AccountPage_Render_PendingAddress_NeverShowsTheCode`. An account of an identity provider
 sees the address form, which is tested by `AccountPage_Render_ExternalUser_ShowsAddressForm`.
+
+**AccountPage notification mode scenarios**: The tests of the mode selector are in `AccountNotificationModeTests.cs`,
+rendered with the same real service and stand-ins. Once an address is confirmed, the selector and its save button are
+shown, which is tested by `AccountPage_Render_ConfirmedAddress_ShowsModeSelector`; it offers exactly the modes `None`,
+`Daily`, and `Every`, which is tested by `AccountPage_Render_ModeSelector_OffersThreeModes`; the stored mode is
+preselected, and a user without a stored mode sees `None`, which are tested by `AccountPage_Render_StoredEvery_EverySelected`
+and `AccountPage_Render_NoMode_NoneSelected`. Without a confirmed address the selector is disabled, has no save button,
+and a hint explains that an address has to be confirmed first, which is tested by
+`AccountPage_Render_NoConfirmedAddress_SelectorDisabled`, `AccountPage_Render_NoConfirmedAddress_NoSaveButton`, and
+`AccountPage_Render_NoConfirmedAddress_ExplainsNeed`. While
+notifications are not set up there is no selector, which is tested by `AccountPage_Render_NotificationsNotSetUp_NoModeSelector`.
+Saving calls the service with the chosen mode and shows the notice "Your e-mail setting was saved." once, which is
+tested by `AccountPage_SaveMode_Daily_CallsService`, `AccountPage_SaveMode_Success_ShowsSavedMessage`, and
+`AccountPage_SaveMode_Success_ShowsNoError`; a refusal of the service is shown and no saved notice appears, which is
+tested by `AccountPage_SaveMode_Refused_ShowsMessage` and `AccountPage_SaveMode_Refused_ShowsNoSavedMessage`.
+Removing the address shows `None` again, which is tested by `AccountPage_RemoveAddress_AfterMode_ShowsNone`. The
+explanation says what a mail contains, what is never mailed, and what the three modes do, which is tested by
+`AccountPage_Render_Card_ExplainsWhatIsMailed`, `AccountPage_Render_Card_ExplainsProjectAndReview`,
+`AccountPage_Render_Card_ExplainsLinkToReview`, `AccountPage_Render_Card_ExplainsWhatIsNotMailed`, and
+`AccountPage_Render_Card_ExplainsModes`.
