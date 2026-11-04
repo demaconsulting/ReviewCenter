@@ -12,72 +12,206 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Bearer
         title: >-
           The ApiTokenAuthentication unit shall sign in a request under /api that sends a valid personal access token
-          as a bearer token, or as the password of HTTP Basic credentials whatever the user name is, as the owner of the
-          token, with the id of the token on the actor, and shall record that the token was used.
+          as a bearer token as the owner of the token, so that what the request creates carries the name of the owner
+          and the id of the token.
         justification: |
-          Acting as the owner keeps every change attributable to a person, the id of the token tells which of the
-          tokens of that person was used, and the time of last use lets the owner find a token that nobody needs.
+          Acting as the owner keeps every change attributable to a person, and the id of the token tells which of the
+          tokens of that person was used.
+        tests:
+          - ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner
+
+      - id: ReviewCenter-ApiTokenAuthentication-Basic
+        title: >-
+          The ApiTokenAuthentication unit shall sign in a request under /api that sends a valid personal access token
+          as the password of HTTP Basic credentials, whatever the user name is, including no user name.
+        justification: |
+          Some tools, ReviewMark among them, can send only HTTP Basic credentials. Ignoring the user name lets them
+          present a token without a second kind of credential.
+        tests:
+          - ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner
+
+      - id: ReviewCenter-ApiTokenAuthentication-LastUsed
+        title: >-
+          The ApiTokenAuthentication unit shall record the time of the use on a personal access token when a request
+          under /api presents it and it is accepted.
+        justification: |
+          The time of last use lets the owner find a token that nobody needs any more and revoke it.
         tests:
           - ApiTokenAuthentication_Request_ValidToken_AuthenticatesAndRecordsLastUsed
-          - ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner
           - ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner
 
       - id: ReviewCenter-ApiTokenAuthentication-Refusal
         title: >-
-          The ApiTokenAuthentication unit shall answer a request under /api (except a request without any credentials
-          to one of the two routes that a project can open, see AnonymousEvidence) with no token, an unknown or revoked
-          token, an expired token, or a token whose owner still has to change a temporary password
-          with status 401 and a Bearer challenge, and shall give the same answer for
-          every reason that a token is refused, a wrong Basic password included. The challenge shall name the bearer and
-          the Basic scheme.
+          The ApiTokenAuthentication unit shall answer a request under /api that has no usable token (no credentials,
+          credentials that are not a token, or a scheme other than the two that it knows) with status 401 and a problem
+          document, except a request without any credentials to one of the two routes that a project can open (see
+          AnonymousEvidence).
         justification: |
-          A client must be told to send a token, but a different answer for an expired token and for a token that
-          never existed would help somebody who guesses tokens.
+          A client must be told that it needs to send a token, in a form that a script can read.
         tests:
           - ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal-Challenge
+        title: >-
+          The ApiTokenAuthentication unit shall name the bearer scheme and the Basic scheme, with the realm
+          ReviewCenter, in the challenge of the 401 answer to a request that has no usable token.
+        justification: |
+          A client that knows how to sign in with only one of the two schemes must be able to see that it may use it.
+        tests:
+          - ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge
+          - ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal-Generic
+        title: >-
+          The ApiTokenAuthentication unit shall give the same 401 answer for an unknown, a malformed and a revoked
+          token and for a token of a disabled owner, so that the answer does not say why the token was refused.
+        justification: |
+          A different answer for a token that never existed and for one that was revoked would help somebody who
+          guesses tokens.
+        tests:
           - ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal-Expired
+        title: >-
+          The ApiTokenAuthentication unit shall accept a personal access token until it expires and shall refuse it
+          with status 401 from then on.
+        justification: |
+          A token with an end date limits how long a leaked token can be used.
+        tests:
           - ApiTokenAuthentication_Request_ExpiredToken_Answers401
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal-MustChangePassword
+        title: >-
+          The ApiTokenAuthentication unit shall refuse a token whose owner still has to change a temporary password
+          with the same 401 answer as an unknown token, and shall accept the token again once the owner has changed
+          the password.
+        justification: |
+          A person who still uses a temporary password has not yet taken over the account, so a script that acts for
+          them must not work, and the answer must not tell somebody who guesses tokens that the token exists.
+        tests:
           - ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal-BasicWrong
+        title: >-
+          The ApiTokenAuthentication unit shall answer a wrong token that is sent as the password of HTTP Basic
+          credentials with the same status, challenge and body as a wrong token that is sent as a bearer token.
+        justification: |
+          A different answer for the two schemes would tell somebody who guesses tokens which of the two the server
+          prefers.
+        tests:
           - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
 
       - id: ReviewCenter-ApiTokenAuthentication-Cookie
         title: >-
           The ApiTokenAuthentication unit shall not accept the session cookie of the web pages for a request under
-          /api, and shall not sign in a request for a web page, the sign-in and sign-out endpoints or the web socket
-          negotiation of the pages from a bearer token or from HTTP Basic credentials.
+          /api, and shall answer such a request as one without credentials.
         justification: |
           A cookie is sent by the browser to a site without the user being asked, so an API that accepted it would
-          be open to forgery from other sites. A token that signed in a web page would give a leaked token the
-          power of the person at the screen, including the actions that need a password.
+          be open to forgery from other sites.
         tests:
           - ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted
+
+      - id: ReviewCenter-ApiTokenAuthentication-Cookie-WebPage
+        title: >-
+          The ApiTokenAuthentication unit shall not sign in a request for a web page or for the attestation page from
+          a personal access token that is sent as a bearer token or as the password of HTTP Basic credentials, and
+          shall send it to the sign-in page as a request that is signed out.
+        justification: |
+          A token that signed in a web page would give a leaked token the power of the person at the screen,
+          including the actions that need a password.
+        tests:
           - ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn
+
+      - id: ReviewCenter-ApiTokenAuthentication-Cookie-AuthAndBlazor
+        title: >-
+          The ApiTokenAuthentication unit shall answer a request to the sign-in and sign-out endpoints or to the web
+          socket negotiation of the pages in the same way with and without a personal access token, and shall record
+          nothing for the owner of the token.
+        justification: |
+          A token must not change what the sign-in endpoints or the pages do, or a leaked token could be used to sign
+          a person in or out, or to open a session of the pages.
+        tests:
           - ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn
 
       - id: ReviewCenter-ApiTokenAuthentication-Throttle
         title: >-
           The ApiTokenAuthentication unit shall answer a request from a client address that has had too many tokens
-          refused (20 for the address in a window of 300 seconds, as the address limit of the sign-in throttle) with
-          status 429 and a Retry-After header that tells the length of the window, whether the token was sent as a
-          bearer token or as a Basic password.
+          refused (more than the address limit of the sign-in throttle allows in its window) with
+          status 429 and a problem document, also when the request presents a good token.
         justification: |
-          Guessing tokens must be slow for one client, even though a token has high entropy, and a limit by address
-          does not stop other clients. The limit of the address, not the lower limit of a user name, is the one that
-          the documentation promises, and the header tells a script when it may try again.
+          Guessing tokens must be slow for one client, even though a token has high entropy. A good token is refused
+          as well, because the limit protects the address, not a token.
         tests:
           - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
+
+      - id: ReviewCenter-ApiTokenAuthentication-Throttle-RetryAfter
+        title: >-
+          The ApiTokenAuthentication unit shall tell the length of the window of the throttle in a Retry-After header
+          of the 429 answer.
+        justification: |
+          The header tells a script when it may try again.
+        tests:
+          - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
+
+      - id: ReviewCenter-ApiTokenAuthentication-Throttle-AddressLimit
+        title: >-
+          The ApiTokenAuthentication unit shall count the refused tokens against the limit of the client address
+          only, so that a lower limit for a user name does not throttle an address that is below its own limit.
+        justification: |
+          The limit of the address is the one that the documentation promises, and a request has no user name that
+          could be trusted.
+        tests:
           - ApiTokenAuthentication_Request_RefusalsBelowAddressLimit_AreNotThrottledByNameLimit
+
+      - id: ReviewCenter-ApiTokenAuthentication-Throttle-Basic
+        title: >-
+          The ApiTokenAuthentication unit shall count a wrong token that is sent as the password of HTTP Basic
+          credentials against the limit of the client address, and shall answer the next request from that address
+          with status 429.
+        justification: |
+          A limit that counted only the refused bearer tokens could be got around by sending the guesses as Basic
+          credentials.
+        tests:
+          - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
 
       - id: ReviewCenter-ApiTokenAuthentication-FailureAudit
         title: >-
-          The ApiTokenAuthentication unit shall record a refused token in the audit trail, once for each client
-          address and minute, without recording the token value.
+          The ApiTokenAuthentication unit shall record a refused token in the audit trail with the reason and, for a
+          token that is stored, the display id of the token.
         justification: |
-          An administrator needs to see that tokens are being guessed or that a script uses a revoked token. Once
-          for each address and minute keeps a flood of requests from filling the audit trail, and leaving out the
-          value keeps the audit trail from becoming a source of tokens.
+          An administrator needs to see that tokens are being guessed or that a script uses a revoked token.
         tests:
           - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+
+      - id: ReviewCenter-ApiTokenAuthentication-FailureAudit-Basic
+        title: >-
+          The ApiTokenAuthentication unit shall record a wrong token that is sent as the password of HTTP Basic
+          credentials in the audit trail, as it records a wrong bearer token.
+        justification: |
+          A guess that is sent as Basic credentials is as much a sign of an attack as one that is sent as a bearer
+          token, and the administrator must see both.
+        tests:
+          - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
+
+      - id: ReviewCenter-ApiTokenAuthentication-FailureAudit-Once
+        title: >-
+          The ApiTokenAuthentication unit shall record the repeated refusals of a token from one client address within
+          a minute once, and shall record a refusal again after that minute.
+        justification: |
+          Recording once keeps a flood of requests from filling the audit trail, and recording again after the minute
+          shows that the refusals go on.
+        tests:
+          - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+          - ApiTokenAuthentication_Request_RefusedTokenAfterAMinute_IsAuditedAgain
+
+      - id: ReviewCenter-ApiTokenAuthentication-FailureAudit-NoValue
+        title: >-
+          The ApiTokenAuthentication unit shall not record the value of a refused token in the audit trail.
+        justification: |
+          Leaving out the value keeps the audit trail from becoming a source of tokens.
+        tests:
+          - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+          - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
 
       - id: ReviewCenter-ApiTokenAuthentication-NoLog
         title: >-
@@ -91,44 +225,191 @@ sections:
 
       - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
         title: >-
-          The ApiTokenAuthentication unit shall let a request without credentials reach the evidence index route or the
-          attestation PDF route of a project only when the project has switched on the anonymous access of that route,
-          and no other route; shall answer a request without credentials to a route that is switched off, or to a
-          project that does not exist, with the same generic 401 as a missing token; shall never treat a request that
-          carries an Authorization header, valid or not, as anonymous; and shall let a request with a valid token
-          through to the normal project rules.
+          The ApiTokenAuthentication unit shall answer a request without credentials to the evidence index route or the
+          attestation PDF route of a project that has not switched on the anonymous access of that route with the
+          same 401 answer, challenge and body as for a project that does not exist.
         justification: |
-          A project may choose to publish its evidence to a pipeline or an auditor without an account, but the choice
-          must be the project's, per route, and must not widen anything else. An answer that differed for a project
-          that does not exist would tell a stranger which projects exist, and a wrong token that was silently treated
-          as anonymous would hide a broken pipeline and bypass the throttle of refused tokens.
+          A project may choose to publish its evidence to a pipeline or an auditor without an account, but an answer
+          that differed for a project that does not exist would tell a stranger which projects exist.
         tests:
           - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-Open
+        title: >-
+          The ApiTokenAuthentication unit shall let a request without credentials reach the evidence index route or the
+          attestation PDF route of a project once the project has switched on the anonymous access of that route.
+        justification: |
+          The choice to publish the evidence is the choice of the project, and the pipeline or auditor that it is meant
+          for must be able to use it.
+        tests:
           - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnRoute
+        title: >-
+          The ApiTokenAuthentication unit shall let a request without credentials reach only the route whose anonymous
+          access the project has switched on, not the other of the two routes.
+        justification: |
+          The choice is made per route, so opening the index must not open the attestation PDFs, or the other way
+          round.
+        tests:
           - AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnProject
+        title: >-
+          The ApiTokenAuthentication unit shall let a request without credentials reach the route of the project that
+          has switched on the anonymous access, not the same route of another project.
+        justification: |
+          The choice is the choice of one project, and it must not publish the evidence of the others.
+        tests:
           - AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-TurnedOff
+        title: >-
+          The ApiTokenAuthentication unit shall refuse a request without credentials at once when the project turns the
+          anonymous access of a route off.
+        justification: |
+          A project that withdraws its evidence must not have to wait for it to stop being served.
+        tests:
           - AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OtherRoutes
+        title: >-
+          The ApiTokenAuthentication unit shall keep every other route under /api closed to a request without
+          credentials, also when the project has switched on the anonymous access of both routes.
+        justification: |
+          The exception must be narrow and must not widen anything else, such as the list of the projects, the reviews
+          or the creation of a review.
+        tests:
           - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-AttestationPage
+        title: >-
+          The ApiTokenAuthentication unit shall still send a request without credentials for the attestation page of
+          the web pages to the sign-in page, also when the project has switched on the anonymous access of the
+          attestation PDF route.
+        justification: |
+          The exception is for the route of the API only, and must not open the pages.
+        tests:
           - AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-WrongToken
+        title: >-
+          The ApiTokenAuthentication unit shall refuse a request that carries a wrong token, or the token of a disabled
+          owner, with status 401, also when the project has switched on the anonymous access of the route.
+        justification: |
+          A wrong token that was silently treated as anonymous would hide a broken pipeline and bypass the throttle of
+          refused tokens.
+        tests:
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-ValidToken
+        title: >-
+          The ApiTokenAuthentication unit shall let a request with a valid token through to the normal project rules
+          of the two routes, so that a member is served and a user who is no member gets the answer for a project that
+          does not exist, whether or not the project has switched on the anonymous access.
+        justification: |
+          Opening a route to everybody must not take away what a member could do, and must not show a project to a
+          user who may not see it.
+        tests:
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
 
       - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
         title: >-
-          The ApiTokenAuthentication unit shall allow a client address at most 30 requests without credentials in a
-          window of one minute to the two routes that a project can open, count each address on its own, start a new
-          window when the old one has ended, and tell how long the window lasts; and shall keep the windows of at most
-          4096 addresses, removing the windows that have ended first and then the oldest ones, never a renewed window
-          by pruning, and be safe for concurrent use.
+          The ApiTokenAuthentication unit shall refuse a client address more requests without credentials to the two
+          routes that a project can open than its allowance in the current window.
         justification: |
           An anonymous attestation costs a signature and the caller has no account to hold responsible, so one address
-          must not be able to use up the server. A count by address does not stop other clients. The caller chooses
-          the address (for example by rotating through an IPv6 range), so the table must have a hard bound or it
-          could be used to exhaust memory.
+          must not be able to use up the server.
         tests:
           - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-PerAddress
+        title: >-
+          The ApiTokenAuthentication unit shall count the requests without credentials of each client address on its
+          own, also when the address of the client is not known.
+        justification: |
+          A count by address must not stop other clients because one client has used its allowance.
+        tests:
+          - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-NewWindow
+        title: >-
+          The ApiTokenAuthentication unit shall start a new window, with a new allowance, for a client address when the
+          old window has ended.
+        justification: |
+          A client that waited must be able to use the routes again.
+        tests:
+          - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-RetryAfter
+        title: >-
+          The ApiTokenAuthentication unit shall tell a refused client address how long it has to wait, which is more
+          than nothing and at most the length of the window.
+        justification: |
+          A script must know when it may try again.
+        tests:
+          - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Capacity
+        title: >-
+          The ApiTokenAuthentication unit shall keep the windows of no more than a fixed number of client addresses,
+          however many distinct addresses ask in one window.
+        justification: |
+          The caller chooses the address (for example by rotating through an IPv6 range), so the table must have a hard
+          bound or it could be used to exhaust memory.
+        tests:
           - AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictExpired
+        title: >-
+          The ApiTokenAuthentication unit shall remove the windows that have ended before it removes a window that is
+          still running, when the table of addresses is full.
+        justification: |
+          Removing a running window would let an address that is limited send more requests than its allowance.
+        tests:
           - AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictOldest
+        title: >-
+          The ApiTokenAuthentication unit shall remove the oldest window and accept the new address when the table is
+          full of windows that are still running.
+        justification: |
+          A flood of new addresses must neither grow the table nor lock out a new client.
+        tests:
           - AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Renewed
+        title: >-
+          The ApiTokenAuthentication unit shall not remove a window that was renewed while the table was cleaned, so
+          that a limited address stays limited.
+        justification: |
+          A window that was removed in a race with its renewal would give a limited address a new allowance.
+        tests:
           - AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ClockBack
+        title: >-
+          The ApiTokenAuthentication unit shall keep the table within its bound and its answers consistent when the
+          clock steps back.
+        justification: |
+          A clock that is corrected backwards must not make the table grow or throw an error.
+        tests:
           - AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Concurrent
+        title: >-
+          The ApiTokenAuthentication unit shall grant parallel requests from one client address exactly its allowance,
+          no more and no fewer.
+        justification: |
+          Requests arrive in parallel, and a race in the count would let an address send more than its allowance.
+        tests:
           - AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ConcurrentCapacity
+        title: >-
+          The ApiTokenAuthentication unit shall keep the table within its bound when parallel requests of many distinct
+          addresses arrive next to requests of a few busy addresses.
+        justification: |
+          A flood of parallel requests is the case in which a race would let the table grow.
+        tests:
           - AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity

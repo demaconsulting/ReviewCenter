@@ -118,6 +118,29 @@ public class AttestationRendererReportTests
     }
 
     /// <summary>
+    ///     Test that the banner of a rejected document comes directly under the title, before the review section.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Rejected_PrintsBannerBetweenTitleAndReviewSection()
+    {
+        // Arrange: a rejected document
+        var rejected = Rejected();
+
+        // Act: render
+        var lines = Render(rejected).TextLines.ToList();
+
+        // Assert: the banner starts on the line after the title, and the review section follows it; the banner is
+        // wrapped, so its first line is the start of it
+        var title = lines.IndexOf("Review attestation - REJECTED");
+        var banner = lines.FindIndex(
+            l => l.Length > 30 && AttestationRenderer.RejectedBanner.StartsWith(l, StringComparison.Ordinal));
+        var review = lines.IndexOf("Review");
+        Assert.True(title >= 0);
+        Assert.Equal(title + 1, banner);
+        Assert.True(review > banner);
+    }
+
+    /// <summary>
     ///     Test that the conclusion prints the outcome and its text: the reasons for a rejection, the conclusion of
     ///     an approval, and no text for a blank one.
     /// </summary>

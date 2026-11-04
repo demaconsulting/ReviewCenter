@@ -99,8 +99,12 @@ for another. These scenarios are tested by `ReviewMarkContract_Index_HasTheSchem
 
 **Visibility**: The attestation and the evidence index are guarded by the project rules of `Core`
 (`AttestationService` answers `NotFound` and `EvidenceIndexService.BuildAsync` refuses the project for a user who
-cannot see it). The units were not given a non-member case of their own; the guard is verified over HTTP, through the
-real application, by the tests of the `Api` subsystem: `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
+cannot see it). The units have non-member cases of their own
+(`AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview`,
+`EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound`, and
+`AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing`), and the guard is also verified over HTTP,
+through the real application, by the tests of the `Api` subsystem:
+`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
 (the attestation and the evidence index route, with a bearer token and with Basic credentials),
 `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` (a member and a system administrator are served),
 and `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` (the web route answers an empty 404 for a signed-in

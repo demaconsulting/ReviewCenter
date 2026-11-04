@@ -244,6 +244,109 @@ public class AttestationEndpointTests
     }
 
     /// <summary>
+    ///     Test that a visitor who is not signed in is still sent to the login page when the project allows anonymous
+    ///     evidence, because the attestation page is never served anonymously.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task AttestationEndpoint_Get_SignedOutWithAnonymousSwitchesOn_RedirectsToLogin()
+    {
+        // Arrange: an application with a complete review whose project allows anonymous evidence, and a visitor who is not signed in
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        await using var app = await StartAsync(keys);
+        var projectId = await CreateReviewAsync(app, signed: true);
+        var settings = app.Services.GetRequiredService<EvidenceSettingsService>();
+        var ann = new Actor("ann", "Ann");
+        var current = await settings.GetAsync(ann, projectId, TestContext.Current.CancellationToken);
+        await settings.SetAsync(
+            ann, projectId, current, current with { AnonymousIndex = true, AnonymousAttestations = true }, TestContext.Current.CancellationToken);
+        var requestsAtStart = keys.Requests;
+        using var browser = new TestBrowser(app);
+
+        // Act: request the attestation
+        var response = await browser.Client.GetAsync(ReviewLinks.ForAttestation(projectId, "REV-1"), TestContext.Current.CancellationToken);
+
+        // Assert: redirected to the login page, the key not used and nothing recorded
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/login", response.Headers.Location?.OriginalString, StringComparison.Ordinal);
+        Assert.Equal(requestsAtStart, keys.Requests);
+        Assert.Empty(await AttestationEventsAsync(app));
+    }
+
+    /// <summary>
+    ///     Test that a signed-in user who is not a member of the project and not a system administrator gets the same
+    ///     empty 404 as for a project that does not exist, no document, and nothing recorded.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing()
+    {
+        // Arrange: an application with a complete review and a signed-in user who is not a member
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        await using var app = await StartAsync(keys);
+        var projectId = await CreateReviewAsync(app, signed: true);
+        using var outsider = await TestBrowser.SignedInAsync(app, "out", UserRole.Reviewer);
+        var requestsAtStart = keys.Requests;
+
+        // Act: request the attestation of the project and of a project that does not exist
+        var hidden = await outsider.Client.GetAsync(ReviewLinks.ForAttestation(projectId, "REV-1"), TestContext.Current.CancellationToken);
+        var missing = await outsider.Client.GetAsync(ReviewLinks.ForAttestation(projectId + 99, "REV-1"), TestContext.Current.CancellationToken);
+        var hiddenBody = await hidden.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var missingBody = await missing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: both answer 404 with the same empty body, the key was not used and nothing is recorded
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        Assert.Equal(missing.StatusCode, hidden.StatusCode);
+        Assert.Equal(missingBody, hiddenBody);
+        Assert.Empty(hiddenBody);
+        Assert.NotEqual("application/pdf", hidden.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(requestsAtStart, keys.Requests);
+        Assert.Empty(await AttestationEventsAsync(app));
+    }
+
+    /// <summary>
+    ///     Test that a member of the project who is not a system administrator gets the document.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task AttestationEndpoint_Get_MemberSession_ReturnsPdf()
+    {
+        // Arrange: an application with a complete review and a signed-in member who is not a system administrator
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        await using var app = await StartAsync(keys);
+        var projectId = await CreateReviewAsync(app, signed: true);
+        using var browser = await TestBrowser.SignedInAsync(app, "bob");
+
+        // Act: download the attestation
+        var response = await browser.Client.GetAsync(ReviewLinks.ForAttestation(projectId, "REV-1"), TestContext.Current.CancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        // Assert: a PDF
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(bytes, 0, 5));
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who is not a member of the project gets the document.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task AttestationEndpoint_Get_SystemAdministratorNotMember_ReturnsPdf()
+    {
+        // Arrange: an application with a complete review and a signed-in system administrator who is not a member
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        await using var app = await StartAsync(keys);
+        var projectId = await CreateReviewAsync(app, signed: true);
+        using var browser = await TestBrowser.SignedInAsync(app, "root", UserRole.Admin);
+
+        // Act: download the attestation
+        var response = await browser.Client.GetAsync(ReviewLinks.ForAttestation(projectId, "REV-1"), TestContext.Current.CancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        // Assert: a PDF
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(bytes, 0, 5));
+    }
+
+    /// <summary>
     ///     Starts the application with a key provider of the test's choosing.
     /// </summary>
     /// <param name="keys">The key provider that replaces the configured one.</param>

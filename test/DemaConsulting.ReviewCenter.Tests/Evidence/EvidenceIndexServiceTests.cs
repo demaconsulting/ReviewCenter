@@ -302,6 +302,87 @@ public class EvidenceIndexServiceTests
     }
 
     /// <summary>
+    ///     Test that an actor who is not a member of the project and not a system administrator is refused as for a
+    ///     project that does not exist.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound()
+    {
+        // Arrange: a project with a complete review, a member, and a user who is not a member
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (service, projectId) = await ArrangeAccessWorldAsync();
+
+        // Act: the non-member asks for the index of the project and for the index of a project that does not exist
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.BuildAsync(new Actor("dan", "Dan"), projectId, cancellationToken));
+        var missing = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.BuildAsync(new Actor("dan", "Dan"), 9999, cancellationToken));
+
+        // Assert: the refusal is the one for a project that does not exist, with the same message
+        Assert.Equal(DomainRule.ProjectNotFound, refused.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, missing.Rule);
+        Assert.Equal(missing.Message, refused.Message);
+    }
+
+    /// <summary>
+    ///     Test that a member of the project gets the index.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_MemberActor_ListsEntries()
+    {
+        // Arrange: a project with a complete review and a member
+        var (service, projectId) = await ArrangeAccessWorldAsync();
+
+        // Act: the member builds the index
+        var entries = await service.BuildAsync(new Actor("ann", "Ann"), projectId, TestContext.Current.CancellationToken);
+
+        // Assert: the review is listed
+        Assert.Equal("Core-Logic", Assert.Single(entries).Id);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who is not a member of the project gets the index.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_SystemAdministratorNotMember_ListsEntries()
+    {
+        // Arrange: a project with a complete review and a system administrator who is not a member
+        var (service, projectId) = await ArrangeAccessWorldAsync();
+
+        // Act: the system administrator builds the index
+        var entries = await service.BuildAsync(new Actor("root", "Root"), projectId, TestContext.Current.CancellationToken);
+
+        // Assert: the review is listed
+        Assert.Equal("Core-Logic", Assert.Single(entries).Id);
+    }
+
+    /// <summary>
+    ///     Arranges a project with one complete review over the real access rules, with the member ann, the system
+    ///     administrator root, and the user dan, who is not a member.
+    /// </summary>
+    /// <returns>The service and the identity of the project.</returns>
+    private static async Task<(EvidenceIndexService Service, int ProjectId)> ArrangeAccessWorldAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        var userStore = new FakeUserStore(store);
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
+        await users.CreateAsync("dan", "Dan", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
+        await users.CreateAsync("root", "Root", UserRole.Admin, AttestationFixture.Password, cancellationToken);
+        var signing = TestServices.Signing(store, users, clock);
+        var checklists = TestServices.Checklists(store, clock, userStore);
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        await EvidenceTestSupport.AddReviewAsync(store, clock, project.Id, "set-1", "Core-Logic", TestContent.A);
+        await EvidenceTestSupport.CompleteAsync(checklists, signing, project.Id, "set-1", ann.Id, AttestationFixture.Password);
+        var service = new EvidenceIndexService(
+            TestServices.Reviews(store, clock), signing, new ProjectAccess(userStore, store), TestServices.EvidenceSettings(store));
+        return (service, project.Id);
+    }
+
+    /// <summary>
     ///     Creates the service over the fixture.
     /// </summary>
     /// <param name="fixture">The fixture.</param>

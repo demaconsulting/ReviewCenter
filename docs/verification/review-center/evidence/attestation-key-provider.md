@@ -48,7 +48,9 @@ certificate store tests need the store of the current user.
   warned about once with the defined text, is flagged in the key description, and is not refused because of its
   code-signing usage.
 - `Describe` never throws: a known key problem is reported with its message, and an unexpected failure is reported as
-  unavailable with a generic message.
+  unavailable with a generic message. A key that is found is reported as available with its description.
+- The expiry warning period is 30 days when it is not set, the file provider reads only the key and never writes a file,
+  and the refusals of `RequireTrustedKey` make no claim about the chain or the revocation of the certificate.
 
 #### Test Scenarios
 
@@ -198,15 +200,21 @@ later call are refused. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_RequireTrustedKey_IsCheckedOnEveryCall`.
 
 **SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets**: The key is created. The log has a
-warning that the key is self-signed and for development and test, and no secret. This scenario is tested by
-`SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets`.
+warning that the key is self-signed and for development and test only, the thumbprint, and no private key material.
+This scenario is tested by `SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets`.
+
+**SelfSignedKeyProvider_GetSigningKey_ExistingFile_LogsSelfSignedWarning**: A first provider creates the key file and a
+second provider with a capturing logger loads it. No second file is created, and the log of the second provider has the
+warning that the key is self-signed and for development and test only. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_ExistingFile_LogsSelfSignedWarning`.
 
 **SelfSignedKeyProvider_GetSigningKey_FolderNotSet_ThrowsNamingTheSetting**: No folder is set. The error names
 `Attestation:SelfSignedFolder`. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_FolderNotSet_ThrowsNamingTheSetting`.
 
 **SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting**: The folder is a file. The error names the
-setting. This scenario is tested by `SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting`.
+setting, and the status of the provider is unavailable with the message of the error as its problem. This scenario is
+tested by `SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting`.
 
 **SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile**: The key file holds garbage. The error names the
 file. This scenario is tested by `SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile`.
@@ -272,6 +280,14 @@ by `FileKeyProvider_GetSigningKey_PfxWithIntermediateAndRoot_ChainHoldsTheInterm
 **FileKeyProvider_GetSigningKey_PemWithSeparateKeyAndChain_LoadsSignerAndChain**: A PEM certificate file with the
 intermediate certificate, and the key in the file named by `PrivateKeyPath`. The signer and the chain are loaded. This
 scenario is tested by `FileKeyProvider_GetSigningKey_PemWithSeparateKeyAndChain_LoadsSignerAndChain`.
+
+**FileKeyProvider_GetSigningKey_FormatByContent_IgnoresTheFileExtension**: A PKCS #12 file is copied to a file named
+`.pem` and a PEM file with the key in the same file is copied to a file named `.pfx`. Both are loaded and give the
+signer certificate. This scenario is tested by `FileKeyProvider_GetSigningKey_FormatByContent_IgnoresTheFileExtension`.
+
+**FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_WritesAndChangesNoFile**: A protected PFX is in a folder. The key
+is loaded and described. The folder holds the same files with the same content as before. This scenario is tested by
+`FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_WritesAndChangesNoFile`.
 
 **FileKeyProvider_GetSigningKey_EncryptedPemInOneFile_LoadsSignerWithPassword**: An encrypted PEM with the key in the
 same file and a password. The signer is loaded. This scenario is tested by
@@ -348,9 +364,9 @@ with no unprotected warning, also with `RequireEncryptedKeys`. This scenario is 
 `FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused`.
 
 **FileKeyProvider_GetSigningKey_FilesReadableByOthersOnUnix_WarnsAboutEachOfThem**: On Linux, the PFX gets mode 640 and
-the password file mode 604. A warning for each names the file and the mode and no folder; the same files with mode 600
-give none. The test skips itself on Windows and is linked with the `ubuntu@` filter. This scenario is tested by
-`FileKeyProvider_GetSigningKey_FilesReadableByOthersOnUnix_WarnsAboutEachOfThem`.
+the password file mode 604. A warning for each names the file, the mode and the remedy `chmod 600`, and no folder; the
+same files with mode 600 give none. The test skips itself on Windows and is linked with the `ubuntu@` filter. This
+scenario is tested by `FileKeyProvider_GetSigningKey_FilesReadableByOthersOnUnix_WarnsAboutEachOfThem`.
 
 **FileKeyProvider_GetSigningKey_SeparateKeyOrPfxWithKeyPath_ChecksOnlyTheFileThatHoldsTheKey**: On Linux, an encrypted
 PEM certificate with a separate key file is described with the certificate file at mode 640 and the key file at 600: no
@@ -392,6 +408,20 @@ key and no `RequireTrustedKey`. It returns the key on each call and logs the war
 **AttestationKeyProviderBase_Describe_EndsSoonOrLater_WarnsOnlyWhenSoon**: One provider has a clock 10 days before the
 end of its certificate and one has a clock a year before it. Only the first status has an expiry warning. This scenario
 is tested by `AttestationKeyProviderBase_Describe_EndsSoonOrLater_WarnsOnlyWhenSoon`.
+
+**AttestationKeyProviderBase_Describe_DefaultWarningDays_WarnsAt29DaysAndNotAt31Days**: With the settings at their
+defaults, one provider has a clock 29 days before the end of its certificate and one has a clock 31 days before it. Only
+the first status has an expiry warning. This scenario is tested by
+`AttestationKeyProviderBase_Describe_DefaultWarningDays_WarnsAt29DaysAndNotAt31Days`.
+
+**AttestationKeyProviderBase_Describe_KeyFound_ReportsAvailableWithTheDescription**: A provider holds an organization
+key. Its status is available, names the provider, carries the thumbprint and the subject of the key, and has no problem.
+This scenario is tested by `AttestationKeyProviderBase_Describe_KeyFound_ReportsAvailableWithTheDescription`.
+
+**AttestationKeyPolicy_Enforce_RefusalMessages_DoNotMentionChainOrRevocation**: Each refusal of `RequireTrustedKey` (a
+self-signed certificate, no signing usage, outside the validity period) is collected. None of the messages mentions the
+chain or the revocation of the certificate. This scenario is tested by
+`AttestationKeyPolicy_Enforce_RefusalMessages_DoNotMentionChainOrRevocation`.
 
 **AttestationKeyProviderFactory_Create_SelfSigned_StatusHasNoExpiryWarning**: The self-signed provider replaces a key
 that has expired and logs its own warning. Its status gets no expiry warning, however long the warning period is. This

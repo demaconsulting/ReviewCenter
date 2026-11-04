@@ -37,7 +37,8 @@ N/A - standard test environment (a temporary database is created by each test).
   sign-in and sign-out
   endpoints or the web socket negotiation.
 - Refused tokens are throttled per address with 429, without stopping people signing in with a password.
-- A refused token is audited once for each address and minute and the value is never recorded.
+- A refused token is audited once for each address and minute, audited again when a minute has passed, and the value
+  is never recorded.
 - No token value, and no text with the token prefix, is written to the application log for any outcome.
 - A request without credentials is served by the evidence index route and the attestation PDF route only when the
   project has switched on that route, and is otherwise answered with the same generic 401 as for a project that does
@@ -120,6 +121,11 @@ accepted, so only the address limit counts. This scenario is tested by
 **ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue**: A revoked token is presented three times.
 The audit trail has one `token.use-failed` entry that names the reason and the display id, and no entry holds the token
 value. This scenario is tested by `ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue`.
+
+**ApiTokenAuthentication_Request_RefusedTokenAfterAMinute_IsAuditedAgain**: A revoked token is presented twice and the
+audit trail has one `token.use-failed` entry. The clock is moved by 61 seconds and the token is presented again. The
+audit trail then has two such entries. This scenario is tested by
+`ApiTokenAuthentication_Request_RefusedTokenAfterAMinute_IsAuditedAgain`.
 
 **ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn**: The web socket negotiation of the pages
 (`/_blazor/negotiate`) and the sign-out and sign-in endpoints (`/auth/logout`, `/auth/login`) are posted to once with a

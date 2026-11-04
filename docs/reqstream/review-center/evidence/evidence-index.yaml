@@ -9,75 +9,175 @@ sections:
     requirements:
       - id: ReviewCenter-EvidenceIndex-Completed
         title: >-
-          The EvidenceIndexService class shall list a review of the project only when every reviewer slot of the
-          review has signed the record that the review has now with the outcome Approved, and shall not list a review
-          that is not complete, a review that changed after it was signed, a review that was concluded as Rejected, or
-          a review of another project.
+          The EvidenceIndexService class shall list a review of the project when every reviewer slot of the review
+          has signed the record that the review has now with the outcome Approved.
         justification: |
-          An entry in the index tells ReviewMark that the files with that fingerprint were reviewed and approved. A
-          review that is still open, or whose record changed after the signatures, has no such approval, and a review
-          that was rejected is the opposite of one.
+          An entry in the index tells ReviewMark that the files with that fingerprint were reviewed and approved.
         tests:
           - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
-          - EvidenceIndexService_Build_IncompleteReview_IsNotListed
-          - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
-          - EvidenceIndexService_Build_OtherProject_IsNotListed
+
+      - id: ReviewCenter-EvidenceIndex-Completed-Several
+        title: >-
+          The EvidenceIndexService class shall list every complete review of a project that has several of them.
+        justification: |
+          A project reviews many review-sets, and ReviewMark needs the entry of each of them.
+        tests:
           - EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce
+
+      - id: ReviewCenter-EvidenceIndex-Completed-Incomplete
+        title: >-
+          The EvidenceIndexService class shall not list a review that has a reviewer slot that has not signed.
+        justification: |
+          A review that is still open has no approval to report.
+        tests:
+          - EvidenceIndexService_Build_IncompleteReview_IsNotListed
+
+      - id: ReviewCenter-EvidenceIndex-Completed-Changed
+        title: >-
+          The EvidenceIndexService class shall not list a review whose record changed after it was signed.
+        justification: |
+          The signatures approve the record as it was, so a changed record has no approval.
+        tests:
+          - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
+
+      - id: ReviewCenter-EvidenceIndex-Completed-Rejected
+        title: >-
+          The EvidenceIndexService class shall not list a review that was concluded as Rejected.
+        justification: |
+          A rejected review is the opposite of an approval, and the index lists approvals only.
+        tests:
           - EvidenceIndexService_Build_RejectedConcludedReview_IsNeverListed
+
+      - id: ReviewCenter-EvidenceIndex-Completed-OtherProject
+        title: >-
+          The EvidenceIndexService class shall not list a review of another project.
+        justification: |
+          The index of a project must not disclose or claim the work of another project.
+        tests:
+          - EvidenceIndexService_Build_OtherProject_IsNotListed
 
       - id: ReviewCenter-EvidenceIndex-Identity
         title: >-
-          The EvidenceIndexService class shall use the review-set id of a review as the id of its entry, and shall skip
-          a review that has no review-set id.
+          The EvidenceIndexService class shall use the review-set id of a review as the id of its entry.
         justification: |
-          ReviewMark matches an entry with the review-set of its configuration by id. A review that was not planned
-          from a review-set has no id that ReviewMark could match, and inventing one would claim evidence for a set
-          that nobody reviewed.
+          ReviewMark matches an entry with the review-set of its configuration by id.
         tests:
           - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
+
+      - id: ReviewCenter-EvidenceIndex-Identity-NoSetId
+        title: >-
+          The EvidenceIndexService class shall skip a review that has no review-set id.
+        justification: |
+          A review that was not planned from a review-set has no id that ReviewMark could match, and inventing one
+          would claim evidence for a set that nobody reviewed.
+        tests:
           - EvidenceIndexService_Build_NoSetId_IsSkipped
-          - ReviewMarkContract_Index_FollowsReviewMarkSemantics
 
       - id: ReviewCenter-EvidenceIndex-Fields
         title: >-
-          The EvidenceIndexService class shall give each entry the content fingerprint of the review as the
-          fingerprint that ReviewMark computes for the same files, the UTC day of the latest signature of the review as
-          the date in the form yyyy-MM-dd, and the result pass.
+          The EvidenceIndexService class shall give each entry the UTC day of the latest signature of the review as
+          the date in the form yyyy-MM-dd.
         justification: |
-          ReviewMark compares the fingerprint with the one it computes from the files in the repository, so the two
-          must be the same algorithm. It picks the newest entry by comparing the dates as text, and it can only be told
-          about approvals, because a review with a failed check cannot be completed.
+          ReviewMark picks the newest entry by comparing the dates as text.
         tests:
           - EvidenceIndexService_Build_Date_IsLatestSignatureAsUtcDay
-          - ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm
-          - ReviewMarkContract_Index_HasTheSchemaReviewMarkReads
+
+      - id: ReviewCenter-EvidenceIndex-Fields-Fingerprint
+        title: >-
+          The EvidenceIndexService class shall give each entry the content fingerprint of the review.
+        justification: |
+          ReviewMark compares the fingerprint with the one it computes from the files in the repository, so the entry
+          must carry the fingerprint of the files that were reviewed.
+        tests:
+          - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
 
       - id: ReviewCenter-EvidenceIndex-Order
         title: >-
-          The EvidenceIndexService class shall list one entry for each review-set id and fingerprint, the one with the
-          latest completion and, for the same completion time, the lowest review id, and shall order the entries by id
-          and then by fingerprint, in ordinal order, so that the same reviews give the same index.
+          The EvidenceIndexService class shall order the entries by id and then by fingerprint, in ordinal order.
         justification: |
-          ReviewMark keeps the last of two entries with the same id and fingerprint, so a duplicate would make the
-          result depend on the order. A fixed order makes the index comparable and testable byte for byte.
+          A fixed order makes the index comparable and testable byte for byte, so that the same reviews give the same
+          index.
         tests:
           - EvidenceIndexService_Build_Order_IsByIdThenFingerprint
+
+      - id: ReviewCenter-EvidenceIndex-Order-Entries
+        title: >-
+          The EvidenceIndexService class shall list a separate entry for each fingerprint of the same review-set id.
+        justification: |
+          Two fingerprints of one review-set are two pieces of evidence for different file contents; merging them
+          would lose one.
+        tests:
+          - EvidenceIndexService_Build_Order_IsByIdThenFingerprint
+
+      - id: ReviewCenter-EvidenceIndex-Order-LatestCompletion
+        title: >-
+          The EvidenceIndexService class shall keep, for a review-set id and fingerprint that several complete reviews
+          have, the entry of the review with the latest completion.
+        justification: |
+          The latest completion is the newest evidence for the same files.
+        tests:
           - EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion
+
+      - id: ReviewCenter-EvidenceIndex-Order-LowestReviewId
+        title: >-
+          The EvidenceIndexService class shall keep, for the same completion time, the entry of the review with the
+          lowest review id.
+        justification: |
+          A fixed tie-break makes the index independent of the order in which the reviews were stored.
+        tests:
           - EvidenceIndexService_Build_SameCompletionTime_KeepsLowestReviewId
-          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
 
       - id: ReviewCenter-EvidenceIndex-Visibility
         title: >-
-          The EvidenceIndexService class shall build the index only for an actor who may view the project, and shall
-          refuse any other actor as for a project that does not exist. For a request without an actor it shall build
-          the index only when the project has switched on the anonymous evidence index, and otherwise refuse as for a
-          project that does not exist.
+          The EvidenceIndexService class shall refuse an actor who may not view the project as for a project that does
+          not exist.
         justification: |
           The index names the review-sets and fingerprints of the project. Showing it to somebody who may not see the
-          project would disclose its work, and a different refusal would tell that the project exists. A project may
-          publish the index by its own decision, and the service itself enforces that decision so that no caller can
-          forget the check.
+          project would disclose its work, and a different refusal would tell that the project exists.
         tests:
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound
+
+      - id: ReviewCenter-EvidenceIndex-Visibility-Member
+        title: >-
+          The EvidenceIndexService class shall build the index for a member of the project.
+        justification: |
+          A member works on the project and may see its evidence.
+        tests:
+          - EvidenceIndexService_Build_MemberActor_ListsEntries
+
+      - id: ReviewCenter-EvidenceIndex-Visibility-SystemAdmin
+        title: >-
+          The EvidenceIndexService class shall build the index for a system administrator who is not a member of the
+          project.
+        justification: |
+          A system administrator may see every project.
+        tests:
+          - EvidenceIndexService_Build_SystemAdministratorNotMember_ListsEntries
+
+      - id: ReviewCenter-EvidenceIndex-Visibility-Anonymous
+        title: >-
+          The EvidenceIndexService class shall build the index for a request without an actor when the project has
+          switched on the anonymous evidence index.
+        justification: |
+          A project may publish the index by its own decision, and the service itself enforces that decision so that
+          no caller can forget the check.
+        tests:
+          - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
+
+      - id: ReviewCenter-EvidenceIndex-Visibility-AnonymousOff
+        title: >-
+          The EvidenceIndexService class shall refuse a request without an actor as for a project that does not exist
+          when the project has not switched on the anonymous evidence index.
+        justification: |
+          Without the decision of the project the index stays private, and the refusal does not tell that the project
+          exists.
+        tests:
+          - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
+
+      - id: ReviewCenter-EvidenceIndex-Visibility-AnonymousMissing
+        title: >-
+          The EvidenceIndexService class shall refuse a request without an actor for a project that does not exist.
+        justification: |
+          A missing project has no setting that could allow the request.
+        tests:
           - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting

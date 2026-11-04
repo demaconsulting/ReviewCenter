@@ -14,48 +14,180 @@ sections:
         justification: |
           An attestation contains the whole review. Only the signed-in users of the server may see it on this page
           route.
-          A project that publishes its attestations opens only the API route of the Api subsystem, never this page.
         tests:
           - AttestationEndpoint_Get_SignedOut_RedirectsToLogin
-          - AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn
+
+      - id: ReviewCenter-AttestationEndpoint-Authorization-NothingGenerated
+        title: >-
+          The AttestationEndpoint class shall not use the signing key for a visitor who is not signed in.
+        justification: |
+          Signing is the costly and sensitive step, and a visitor who is sent to the sign-in page must not trigger it.
+        tests:
+          - AttestationEndpoint_Get_SignedOut_RedirectsToLogin
+
+      - id: ReviewCenter-AttestationEndpoint-Authorization-NothingRecorded
+        title: >-
+          The AttestationEndpoint class shall record nothing in the audit trail for a visitor who is not signed in.
+        justification: |
+          Only a document that was handed out is an event of the audit trail.
+        tests:
+          - AttestationEndpoint_Get_SignedOut_RedirectsToLogin
+
+      - id: ReviewCenter-AttestationEndpoint-Authorization-AnonymousSwitches
+        title: >-
+          The AttestationEndpoint class shall answer a visitor who is not signed in with a redirect to the sign-in page
+          also when the project allows anonymous evidence.
+        justification: |
+          A project that publishes its attestations opens only the API route of the Api subsystem, never this page.
+        tests:
+          - AttestationEndpoint_Get_SignedOutWithAnonymousSwitchesOn_RedirectsToLogin
 
       - id: ReviewCenter-AttestationEndpoint-Visibility
         title: >-
-          The AttestationEndpoint class shall answer a signed-in user who may not view the project with an empty 404,
-          the answer for a review that does not exist, and not with the document or a refusal that tells the project
-          exists.
+          The AttestationEndpoint class shall answer a signed-in user who may not view the project with an empty 404
+          and not with the document.
         justification: |
-          Only the members of a project, and the system administrators, may see what its reviews contain, and a
-          different answer would tell everybody else that the project exists.
+          Only the members of a project, and the system administrators, may see what its reviews contain.
         tests:
-          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Visibility-SameAsMissing
+        title: >-
+          The AttestationEndpoint class shall answer a signed-in user who may not view the project in the same way as
+          for a project that does not exist.
+        justification: |
+          A different answer would tell everybody else that the project exists.
+        tests:
+          - AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Visibility-NothingRecorded
+        title: >-
+          The AttestationEndpoint class shall not use the signing key and shall record nothing in the audit trail for
+          a signed-in user who may not view the project.
+        justification: |
+          Nothing was handed out, so nothing is an event, and the refused request must not cause any signing.
+        tests:
+          - AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Visibility-Member
+        title: >-
+          The AttestationEndpoint class shall answer a member of the project who is not a system administrator with the
+          document.
+        justification: |
+          The members of a project work on its reviews and need their attestations.
+        tests:
+          - AttestationEndpoint_Get_MemberSession_ReturnsPdf
+
+      - id: ReviewCenter-AttestationEndpoint-Visibility-SystemAdmin
+        title: >-
+          The AttestationEndpoint class shall answer a system administrator who is not a member of the project with
+          the document.
+        justification: |
+          A system administrator may see every project.
+        tests:
+          - AttestationEndpoint_Get_SystemAdministratorNotMember_ReturnsPdf
 
       - id: ReviewCenter-AttestationEndpoint-Download
         title: >-
-          The AttestationEndpoint class shall answer a signed-in user's request for a concluded review, approved or
-          rejected, with the signed
-          PDF as a download with the content type application/pdf and a response that no cache keeps, and shall record
-          who asked for it in the audit trail.
+          The AttestationEndpoint class shall answer a signed-in user's request for a complete review with a signed
+          PDF that verifies against the signing key.
         justification: |
-          The attestation is generated on demand and is kept nowhere, so a cache must not keep it either. The event
-          shows who took a copy of the document.
+          The attestation is the evidence of the review, and it is worth something only when its signature verifies.
         tests:
           - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+
+      - id: ReviewCenter-AttestationEndpoint-Download-ContentType
+        title: >-
+          The AttestationEndpoint class shall give the signed PDF the content type application/pdf.
+        justification: |
+          A client opens or saves the document according to its content type.
+        tests:
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+
+      - id: ReviewCenter-AttestationEndpoint-Download-FileName
+        title: >-
+          The AttestationEndpoint class shall offer the signed PDF as a download with a file name that holds the
+          project number and the review id.
+        justification: |
+          Saved documents of several reviews must be told apart by their names.
+        tests:
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+
+      - id: ReviewCenter-AttestationEndpoint-Download-NoCache
+        title: >-
+          The AttestationEndpoint class shall answer with a response that no cache keeps.
+        justification: |
+          The attestation is generated on demand and is kept nowhere, so a cache must not keep it either.
+        tests:
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+
+      - id: ReviewCenter-AttestationEndpoint-Download-AuditEvent
+        title: >-
+          The AttestationEndpoint class shall record who downloaded the signed PDF, for which project and review, and
+          with which signing key, in the audit trail.
+        justification: |
+          The event shows who took a copy of the document and which key signed it.
+        tests:
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+
+      - id: ReviewCenter-AttestationEndpoint-Download-DefaultKey
+        title: >-
+          The AttestationEndpoint class shall sign with the self-signed key that the server creates when no signing key
+          is configured.
+        justification: |
+          A server that was started without any key configuration must still produce attestations, which mark
+          themselves as not signed by an organization key.
+        tests:
           - AttestationEndpoint_Get_DefaultConfiguration_SignsWithTheServerGeneratedSelfSignedKey
 
       - id: ReviewCenter-AttestationEndpoint-Statuses
         title: >-
-          The AttestationEndpoint class shall answer 404 for a review that does not exist, 409 with a problem
-          description that says the review is not complete for a review that is not concluded, 409 with a problem
-          description that says the review changed during generation when it changed while the document was being
-          prepared, and 500 with a problem description that says the signing key is unavailable when the key cannot
-          be used, and in the last two cases record nothing in the audit trail.
+          The AttestationEndpoint class shall answer 404 for a review that does not exist.
         justification: |
-          A client must be able to tell a wrong address from a review that has to be signed first and from a problem
-          that only the operator can solve.
+          A client must be able to tell a wrong address from a review that has to be signed first.
         tests:
           - AttestationEndpoint_Get_UnknownReview_Answers404
+
+      - id: ReviewCenter-AttestationEndpoint-Statuses-NotComplete
+        title: >-
+          The AttestationEndpoint class shall answer 409 with a problem description that says the review is not
+          complete for a review that is not complete.
+        justification: |
+          A client must be told that the review has to be signed first.
+        tests:
           - AttestationEndpoint_Get_ReviewNotSigned_Answers409
+
+      - id: ReviewCenter-AttestationEndpoint-Statuses-Changed
+        title: >-
+          The AttestationEndpoint class shall answer 409 with a problem description that says the review changed when
+          it changed while the document was being prepared.
+        justification: |
+          A document of a review that changed would not show the record that was signed.
+        tests:
           - AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Statuses-ChangedNothingRecorded
+        title: >-
+          The AttestationEndpoint class shall record nothing in the audit trail when the review changed while the
+          document was being prepared.
+        justification: |
+          No document was handed out, so nothing is an event.
+        tests:
+          - AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailable
+        title: >-
+          The AttestationEndpoint class shall answer 500 with a problem description that names the problem of the
+          signing key when the key cannot be used.
+        justification: |
+          A problem that only the operator can solve must not look like a problem of the request.
+        tests:
+          - AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing
+
+      - id: ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailableNothingRecorded
+        title: >-
+          The AttestationEndpoint class shall record nothing in the audit trail when the signing key cannot be used.
+        justification: |
+          No document was handed out, so nothing is an event.
+        tests:
           - AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing

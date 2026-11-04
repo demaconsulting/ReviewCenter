@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Evidence;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -269,6 +270,44 @@ public class PdfDocumentWriterTests
         Assert.Equal("A subject", pdf.Info("Subject"));
         Assert.Equal("key words", pdf.Info("Keywords"));
         Assert.Contains("/CreationDate (D:20250304050607+00'00')", pdf.Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the creator and the producer given in the document information are written.
+    /// </summary>
+    [Fact]
+    public void PdfDocumentWriter_Build_Info_RecordsCreatorAndProducer()
+    {
+        // Arrange: a writer with the fixed information
+        var writer = CreateWriter();
+
+        // Act: build and read the information back
+        var pdf = new PdfInspector(writer.Build());
+
+        // Assert: the creator and the producer are the ones given
+        Assert.Equal("Creator", pdf.Info("Creator"));
+        Assert.Equal("Producer", pdf.Info("Producer"));
+    }
+
+    /// <summary>
+    ///     Test that every page has the size of an A4 sheet in points.
+    /// </summary>
+    [Fact]
+    public void PdfDocumentWriter_Build_LongBody_EveryPageIsA4()
+    {
+        // Arrange: far more lines than fit on one page
+        var writer = CreateWriter();
+        for (var line = 1; line <= 200; line++)
+        {
+            writer.Paragraph($"Body line {line}");
+        }
+
+        // Act: build the file
+        var pdf = new PdfInspector(writer.Build());
+
+        // Assert: several pages, and every one has the A4 media box of 595 by 842 points
+        Assert.True(pdf.PageCount > 1);
+        Assert.Equal(pdf.PageCount, Regex.Count(pdf.Text, @"/MediaBox \[0 0 595 842\]"));
     }
 
     /// <summary>

@@ -21,9 +21,10 @@ N/A - standard test environment (a temporary database and key folder are created
   that does not exist is a 404 problem document.
 - Every route refuses a request without a token with 401 while the anonymous evidence settings of the project are off,
   which is the default; the two routes that a project can open are verified by `AnonymousEvidenceAccessTests.cs` (see
-  the `ApiTokenAuthentication` unit).
+  the `ApiTokenAuthentication` unit and the anonymous evidence requirements of the `Api` subsystem).
 - A review is created from uploaded files or from the changes of a repository, answered with 201, flagged as created
-  through the API, and the audit entry names the token.
+  through the API, and the audit entry names the token; the entries of a repository that are not reviewed (a symbolic
+  link) are listed with their path and reason.
 - A review can be created with an optional `dueDate` (`yyyy-MM-dd`, UTC); the answer, the list, and the details show
   `dueDate` and `overdue`, and a date that is not a date, is in the past, or is more than two years ahead is a 400
   problem that names the due date and creates nothing.
@@ -57,11 +58,12 @@ N/A - standard test environment (a temporary database and key folder are created
 - A route of a project answers a non-member like a missing project, and the project list holds only the projects the
   owner of the token may see; these are verified over HTTP by `ApiProjectAccessTests.cs` (see the `Api` subsystem).
 - The checklist template of a project is a JSON document with the definition, the version label, the default flag, the
-  hash, and the counts; a project that cannot be seen is a 404 problem, an unreadable stored definition a 400 problem,
-  and no route changes the template.
+  hash, and the counts; a project that cannot be seen is a 404 problem, and an unreadable stored definition a 400
+  problem.
 - The evidence index and the attestation PDF are the only two routes that serve a request without a token, when the
   project allows it, and the only two that are limited per address; the endpoint grouping, the policies, and the limit
-  are verified by `AnonymousEvidenceAccessTests.cs` (see the `ApiTokenAuthentication` unit).
+  are verified by `AnonymousEvidenceAccessTests.cs` (see the `ApiTokenAuthentication` unit and the `Api` subsystem,
+  where the criteria are stated).
 - The audit export routes (`AuditExportEndpoints.cs`, verified by `AuditExportEndpointsTests.cs`, which start the real
   application and sign in through the sign-in form to get a cookie) serve a project admin or a system administrator
   the CSV (default) or JSON export with the headers `Content-Type`, `Content-Disposition` (scope, time, chain status),
@@ -212,7 +214,8 @@ is no member of the project is a 404, as before. This scenario is tested by
 
 **ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail**: An allow-list scan of the source of the endpoints finds
 that every read of the approval, the threads, and the consolidated checklist passes the actor as its first argument,
-and that the removed viewer-less checklist read does not come back. This scenario is tested by
+and that the removed viewer-less checklist read does not come back. It guards the masking requirement of the unit: a
+read without an actor could not mask. This scenario is tested by
 `ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail`.
 
 **ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote**: Both ballots fail the first check. The
@@ -246,6 +249,11 @@ with a
 head revision, a baseline revision, and a selection. The review is from the repository, flagged, shows both commits and
 the two changed files, and the audit entry names the token. This scenario is tested by
 `ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges`.
+
+**ApiEndpoints_CreateReview_Repository_SkippedEntries_AreListedWithTheirReason**: A review is created from a registered
+repository whose changes are one added file and a symbolic link that is not reviewed. The answer is 201, the review
+counts one file, and the `skipped` list holds one entry with the path `src/link` and the reason "Symbolic links are not
+reviewed.". This scenario is tested by `ApiEndpoints_CreateReview_Repository_SkippedEntries_AreListedWithTheirReason`.
 
 **ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange**: A review is created from a registered
 repository with a request whose repository source leaves out the selection, and with a request whose selection is
@@ -344,12 +352,10 @@ not (see `AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMis
 `ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem`.
 
 **ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl**: A project has a complete
-review
-without a review-set id and one with a review-set id. The index is requested with a bearer token and with Basic
+review without a review-set id and one with a review-set id. The index is requested with a bearer token and with Basic
 credentials. Each answer is 200 JSON with `Cache-Control: no-store`, a `reviews` list with the one entry of the review
-that has
-a set id (its id, a 64-character fingerprint, the date of the day, the result `pass`), and the absolute address of its
-attestation built from the request. This scenario is tested by
+that has a set id (its id, a 64-character fingerprint, the date of the day, the result `pass`), and the absolute
+address of its attestation built from the request. This scenario is tested by
 `ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl`.
 
 **ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList**: The index of a project whose only complete review

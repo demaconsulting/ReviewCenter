@@ -518,6 +518,32 @@ public class ApiTokenAuthenticationTests
     }
 
     /// <summary>
+    ///     Test that a token that is refused again after the minute of the first record is recorded again, so the
+    ///     audit trail shows that the refusals go on.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiTokenAuthentication_Request_RefusedTokenAfterAMinute_IsAuditedAgain()
+    {
+        // Arrange: a revoked token and an application whose clock a test moves
+        var clock = new MovableTimeProvider(DateTimeOffset.UtcNow);
+        await using var app = await StartAsync(configureServices: services => services.AddSingleton<TimeProvider>(clock));
+        var created = await CreateTokenAsync(app, "ann");
+        await app.Services.GetRequiredService<PersonalAccessTokenService>()
+            .RevokeAsync(TestActors.Ann, created.Token.Id, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, created.Value);
+        await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        Assert.Single(await AuditAsync(app), e => e.Action == "token.use-failed");
+
+        // Act: a minute and a second pass, and the token is presented again
+        clock.Advance(TimeSpan.FromSeconds(61));
+        await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the second record is added
+        Assert.Equal(2, (await AuditAsync(app)).Count(e => e.Action == "token.use-failed"));
+    }
+
+    /// <summary>
     ///     Test that the person behind a token is the one the token was made for, with their current role, so the
     ///     things the token creates carry their name.
     /// </summary>

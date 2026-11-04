@@ -28,9 +28,22 @@ sections:
           without the value lets an administrator see failed use without the log becoming a source of tokens.
         children:
           - ReviewCenter-ApiTokenAuthentication-Bearer
+          - ReviewCenter-ApiTokenAuthentication-Basic
+          - ReviewCenter-ApiTokenAuthentication-LastUsed
           - ReviewCenter-ApiTokenAuthentication-Refusal
+          - ReviewCenter-ApiTokenAuthentication-Refusal-Challenge
+          - ReviewCenter-ApiTokenAuthentication-Refusal-Generic
+          - ReviewCenter-ApiTokenAuthentication-Refusal-Expired
+          - ReviewCenter-ApiTokenAuthentication-Refusal-MustChangePassword
+          - ReviewCenter-ApiTokenAuthentication-Refusal-BasicWrong
           - ReviewCenter-ApiTokenAuthentication-Throttle
+          - ReviewCenter-ApiTokenAuthentication-Throttle-RetryAfter
+          - ReviewCenter-ApiTokenAuthentication-Throttle-AddressLimit
+          - ReviewCenter-ApiTokenAuthentication-Throttle-Basic
           - ReviewCenter-ApiTokenAuthentication-FailureAudit
+          - ReviewCenter-ApiTokenAuthentication-FailureAudit-Basic
+          - ReviewCenter-ApiTokenAuthentication-FailureAudit-Once
+          - ReviewCenter-ApiTokenAuthentication-FailureAudit-NoValue
           - ReviewCenter-ApiTokenAuthentication-NoLog
         tests:
           - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
@@ -52,11 +65,59 @@ sections:
           lets a script act on an error without parsing text.
         children:
           - ReviewCenter-ApiEndpoints-Read
+          - ReviewCenter-ApiEndpoints-Read-Reviews
+          - ReviewCenter-ApiEndpoints-Read-ReviewsNotFound
+          - ReviewCenter-ApiEndpoints-Read-Details
+          - ReviewCenter-ApiEndpoints-Read-DetailsNotFound
+          - ReviewCenter-ApiEndpoints-Read-CheckThreadCounts
+          - ReviewCenter-ApiEndpoints-Read-ThreadKinds
+          - ReviewCenter-ApiEndpoints-Read-NoToken
           - ReviewCenter-ApiEndpoints-Masking
+          - ReviewCenter-ApiEndpoints-Masking-LeadOrOwner
+          - ReviewCenter-ApiEndpoints-Masking-SubmittedOwner
+          - ReviewCenter-ApiEndpoints-Masking-Concluded
+          - ReviewCenter-ApiEndpoints-Masking-SingleSlot
+          - ReviewCenter-ApiEndpoints-Masking-NoOutcome
+          - ReviewCenter-ApiEndpoints-Masking-StoredText
+          - ReviewCenter-ApiEndpoints-Masking-CreateResponse
+          - ReviewCenter-ApiEndpoints-Masking-NoSlotFields
+          - ReviewCenter-ApiEndpoints-Masking-AgreedFail
+          - ReviewCenter-ApiEndpoints-Masking-AgreedFailSubmitted
+          - ReviewCenter-ApiEndpoints-Masking-NextStep
+          - ReviewCenter-ApiEndpoints-Masking-NextStepMasked
           - ReviewCenter-ApiEndpoints-Create
+          - ReviewCenter-ApiEndpoints-Create-Flag
+          - ReviewCenter-ApiEndpoints-Create-Audit
+          - ReviewCenter-ApiEndpoints-Create-Repository
+          - ReviewCenter-ApiEndpoints-Create-AllChanges
+          - ReviewCenter-ApiEndpoints-Create-Skipped
+          - ReviewCenter-ApiEndpoints-Create-NoToken
           - ReviewCenter-ApiEndpoints-Validation
+          - ReviewCenter-ApiEndpoints-Validation-Base64
+          - ReviewCenter-ApiEndpoints-Validation-EmptyBody
+          - ReviewCenter-ApiEndpoints-Validation-Malformed
+          - ReviewCenter-ApiEndpoints-Validation-ContentType
+          - ReviewCenter-ApiEndpoints-Validation-DuplicateId
+          - ReviewCenter-ApiEndpoints-Validation-InvalidIdOrTitle
+          - ReviewCenter-ApiEndpoints-Validation-UnknownProject
+          - ReviewCenter-ApiEndpoints-Validation-LastAdmin
+          - ReviewCenter-ApiEndpoints-Validation-TooManyAttempts
+          - ReviewCenter-ApiEndpoints-Validation-PasswordChange
+          - ReviewCenter-ApiEndpoints-Validation-ConclusionRequired
+          - ReviewCenter-ApiEndpoints-Validation-InvalidInput
+          - ReviewCenter-ApiEndpoints-Validation-ChecklistInvalid
           - ReviewCenter-ApiEndpoints-Limits
+          - ReviewCenter-ApiEndpoints-Limits-BodySize
+          - ReviewCenter-ApiEndpoints-Limits-FileCount
+          - ReviewCenter-ApiEndpoints-Limits-FileSize
+          - ReviewCenter-ApiEndpoints-Limits-TotalSize
+          - ReviewCenter-ApiEndpoints-Limits-DecodeCount
+          - ReviewCenter-ApiEndpoints-Limits-DecodeLength
+          - ReviewCenter-ApiEndpoints-Limits-DecodeOrder
           - ReviewCenter-ApiEndpoints-Attestation
+          - ReviewCenter-ApiEndpoints-Attestation-NotFound
+          - ReviewCenter-ApiEndpoints-Attestation-NotSigned
+          - ReviewCenter-ApiEndpoints-Attestation-NoToken
           - ReviewCenter-ApiEndpoints-Errors
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
@@ -71,6 +132,10 @@ sections:
           and a script that polls the reviews must see which are late without reading a page.
         children:
           - ReviewCenter-ApiEndpoints-CreateDueDate
+          - ReviewCenter-ApiEndpoints-CreateDueDate-Audit
+          - ReviewCenter-ApiEndpoints-CreateDueDate-List
+          - ReviewCenter-ApiEndpoints-CreateDueDate-OverdueFlag
+          - ReviewCenter-ApiEndpoints-CreateDueDate-Invalid
         tests:
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
@@ -85,6 +150,8 @@ sections:
           added field must not break a client that already reads the list.
         children:
           - ReviewCenter-ApiEndpoints-ListProgress
+          - ReviewCenter-ApiEndpoints-ListProgress-ReadOnce
+          - ReviewCenter-ApiEndpoints-ListProgress-Outcome
         tests:
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
@@ -100,6 +167,9 @@ sections:
           exist.
         children:
           - ReviewCenter-ApiEndpoints-ReadOnlyRole
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole-Auditor403
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole-NonMember404
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole-OpenWork
         tests:
           - ApiAuditor_Reads_Token_ServeTheProject
           - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
@@ -114,6 +184,8 @@ sections:
           fine, and a script that polls the reviews must see which ones are follow-ups without reading a page.
         children:
           - ReviewCenter-ApiEndpoints-CreateFollowUp
+          - ReviewCenter-ApiEndpoints-CreateFollowUp-Shown
+          - ReviewCenter-ApiEndpoints-CreateFollowUp-Invalid
         tests:
           - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
 
@@ -129,6 +201,16 @@ sections:
           kind of credential.
         children:
           - ReviewCenter-ApiEndpoints-EvidenceIndex
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-OnlyPlanned
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Result
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-File
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-UrlBuild
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-RequestHost
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Basic
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoStore
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Empty
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-UnknownProject
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoToken
         tests:
           - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
 
@@ -143,6 +225,8 @@ sections:
           cookie accepted by the API would open it to forgery from other sites.
         children:
           - ReviewCenter-ApiTokenAuthentication-Cookie
+          - ReviewCenter-ApiTokenAuthentication-Cookie-WebPage
+          - ReviewCenter-ApiTokenAuthentication-Cookie-AuthAndBlazor
           - ReviewCenter-ApiEndpoints-NoSigning
         tests:
           - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
@@ -173,7 +257,13 @@ sections:
           that is committed and compared with the running server is kept from drifting away from the behavior.
         children:
           - ReviewCenter-ApiDocument-Document
+          - ReviewCenter-ApiDocument-Document-Version
+          - ReviewCenter-ApiDocument-Document-NoServer
+          - ReviewCenter-ApiDocument-Document-Scheme
+          - ReviewCenter-ApiDocument-Document-OpenOperations
+          - ReviewCenter-ApiDocument-Document-RequiredMembers
           - ReviewCenter-ApiDocument-Snapshot
+          - ReviewCenter-ApiDocument-Snapshot-Committed
           - ReviewCenter-OTS-OpenApi-Document
         tests:
           - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
@@ -194,13 +284,73 @@ sections:
           effect with the next request.
         children:
           - ReviewCenter-ApiEndpoints-ProjectAccess
+          - ReviewCenter-ApiEndpoints-ProjectAccess-Create
           - ReviewCenter-ApiEndpoints-EvidenceIndex
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-OnlyPlanned
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Result
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-File
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-UrlBuild
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-RequestHost
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Basic
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoStore
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-Empty
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-UnknownProject
+          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoToken
           - ReviewCenter-ApiEndpoints-Attestation
+          - ReviewCenter-ApiEndpoints-Attestation-NotFound
+          - ReviewCenter-ApiEndpoints-Attestation-NotSigned
+          - ReviewCenter-ApiEndpoints-Attestation-NoToken
           - ReviewCenter-ApiEndpoints-Checklist
+          - ReviewCenter-ApiEndpoints-Checklist-Custom
+          - ReviewCenter-ApiEndpoints-Checklist-EmptyHint
+          - ReviewCenter-ApiEndpoints-Checklist-NonMember
+          - ReviewCenter-ApiEndpoints-Checklist-UnknownProject
+          - ReviewCenter-ApiEndpoints-Checklist-Unreadable
+          - ReviewCenter-ApiEndpoints-Checklist-NoToken
         tests:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
           - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
+          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+
+      - id: ReviewCenter-Api-ProjectAccess-SameAnswer
+        title: >-
+          The Api subsystem shall answer a request on any route of a project, from a token whose owner may not see the
+          project, with the status 404 and the same body that it answers for a project that does not exist, for a
+          bearer token and for HTTP Basic credentials.
+        justification: |
+          Every route that names a project is a way to find out whether the project exists. Answering with the body of
+          a missing project closes all of them, and checking before the body of a creation is read keeps a non-member
+          from learning anything from the validation of a request.
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+
+      - id: ReviewCenter-Api-ProjectAccess-Served
+        title: >-
+          The Api subsystem shall serve a request on any route of a project from the token of a member of the project
+          and from the token of a system administrator, and not refuse it as for a project that does not exist.
+        justification: |
+          The check that hides a project from a non-member must not hide it from the people who may see it.
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+
+      - id: ReviewCenter-Api-ProjectAccess-ListProjects
+        title: >-
+          The Api subsystem shall list for a token only the projects that its owner is a member of, except that it
+          lists every project for a system administrator.
+        justification: |
+          A script that holds a token must see only what its owner sees, and the list of projects must not tell it
+          which other projects exist.
+        tests:
+          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
+
+      - id: ReviewCenter-Api-ProjectAccess-Removed
+        title: >-
+          The Api subsystem shall answer a token with the status 404 for a project at once when its owner has been
+          removed from the project.
+        justification: |
+          The token carries no copy of the memberships, so a change of them must take effect with the next request.
+        tests:
           - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
 
       - id: ReviewCenter-Api-AuditExport
@@ -215,6 +365,29 @@ sections:
           names every user and action must be limited like the page that shows it.
         children:
           - ReviewCenter-ApiEndpoints-AuditExport
+          - ReviewCenter-ApiEndpoints-AuditExport-FileName
+          - ReviewCenter-ApiEndpoints-AuditExport-Chain
+          - ReviewCenter-ApiEndpoints-AuditExport-NoStore
+          - ReviewCenter-ApiEndpoints-AuditExport-System
+          - ReviewCenter-ApiEndpoints-AuditExport-WholeTrail
+          - ReviewCenter-ApiEndpoints-AuditExport-Json
+          - ReviewCenter-ApiEndpoints-AuditExport-JsonEnvelope
+          - ReviewCenter-ApiEndpoints-AuditExport-Filter
+          - ReviewCenter-ApiEndpoints-AuditExport-ReversedRange
+          - ReviewCenter-ApiEndpoints-AuditExport-Audited
+          - ReviewCenter-ApiEndpoints-AuditExport-ProjectRouteScope
+          - ReviewCenter-ApiEndpoints-AuditExport-GlobalScope
+          - ReviewCenter-ApiEndpoints-AuditExport-Forbidden
+          - ReviewCenter-ApiEndpoints-AuditExport-NotFound
+          - ReviewCenter-ApiEndpoints-AuditExport-Auditor
+          - ReviewCenter-ApiEndpoints-AuditExport-SignedOut
+          - ReviewCenter-ApiEndpoints-AuditExport-GlobalRefused
+          - ReviewCenter-ApiEndpoints-AuditExport-Hostile
+          - ReviewCenter-ApiEndpoints-AuditExport-UnknownFormat
+          - ReviewCenter-ApiEndpoints-AuditExport-Broken
+          - ReviewCenter-ApiEndpoints-AuditExport-NotInApiDocument
+          - ReviewCenter-ApiEndpoints-AuditExport-ClientAbort
+          - ReviewCenter-ApiEndpoints-AuditExport-WriteFailure
         tests:
           - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
           - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
@@ -235,11 +408,91 @@ sections:
           contract of the API.
         children:
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-Open
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnRoute
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnProject
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-TurnedOff
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OtherRoutes
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-AttestationPage
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-WrongToken
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-ValidToken
           - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
-          - ReviewCenter-ApiEndpoints-OpenRoutes
-          - ReviewCenter-ApiEndpoints-AnonymousLimit
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-PerAddress
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-NewWindow
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-RetryAfter
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Capacity
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictExpired
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictOldest
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Renewed
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ClockBack
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Concurrent
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ConcurrentCapacity
           - ReviewCenter-ApiDocument-Document
+          - ReviewCenter-ApiDocument-Document-Version
+          - ReviewCenter-ApiDocument-Document-NoServer
+          - ReviewCenter-ApiDocument-Document-Scheme
+          - ReviewCenter-ApiDocument-Document-OpenOperations
+          - ReviewCenter-ApiDocument-Document-RequiredMembers
         tests:
           - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
           - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
+
+      - id: ReviewCenter-Api-AnonymousEvidence-OpenRoutes
+        title: >-
+          The Api subsystem shall let only two routes of the API, the evidence index and the attestation PDF of a
+          project, be called without credentials, and shall require a token for every other route of the API.
+        justification: |
+          The exception for the evidence that a project chooses to publish must be narrow, so that a new route of the
+          API is closed to a caller without credentials unless somebody opens it on purpose.
+        tests:
+          - AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies
+
+      - id: ReviewCenter-Api-AnonymousEvidence-Index
+        title: >-
+          The Api subsystem shall serve the evidence index of a project, with the file address of the attestation of a
+          review in each entry, to a client without credentials once the project has switched on the anonymous access
+          of the index.
+        justification: |
+          A pipeline or an auditor that has no account can read the evidence that the project chose to publish.
+        tests:
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+
+      - id: ReviewCenter-Api-AnonymousEvidence-Pdf
+        title: >-
+          The Api subsystem shall serve the signed attestation PDF of a review to a client without credentials once the
+          project has switched on the anonymous access of the PDFs, as a PDF whose signature can be verified and that
+          is not stored by caches.
+        justification: |
+          A pipeline or an auditor that has no account can fetch the attestation that the index points to and check it.
+        tests:
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+
+      - id: ReviewCenter-Api-AnonymousEvidence-Audited
+        title: >-
+          The Api subsystem shall record in the audit trail, with the actor anonymous and the project, the release of
+          an attestation PDF to a client without credentials.
+        justification: |
+          A project must be able to see afterwards that its attestations were fetched without an account.
+        tests:
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+
+      - id: ReviewCenter-Api-AnonymousEvidence-Limit
+        title: >-
+          The Api subsystem shall answer a client without credentials that has sent more requests to the evidence index
+          route than the limit of its address allows with status 429 and a response that caches do
+          not store, and shall not limit a client that sends a token.
+        justification: |
+          An anonymous attestation costs a signature and the caller has no account to hold responsible, but a member
+          who is signed in with a token must not be locked out by the requests of strangers.
+        tests:
+          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
+
+      - id: ReviewCenter-Api-AnonymousEvidence-RetryAfter
+        title: >-
+          The Api subsystem shall tell a client without credentials that was limited, in a Retry-After header, how long
+          it has to wait.
+        justification: |
+          A script must know when it may try again.
+        tests:
           - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
