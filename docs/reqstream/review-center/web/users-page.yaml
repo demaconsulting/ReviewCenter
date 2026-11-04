@@ -10,174 +10,560 @@ sections:
     requirements:
       - id: ReviewCenter-UsersPage-List
         title: >-
-          The UsersPage unit shall serve at /users, to a system administrator only, the list of users with their user
-          name, display name, a System admin badge where the user is one, and enabled state, and the controls to
-          change them, with no role to choose.
+          The UsersPage unit shall list the users at /users with their user name, display name, a System admin badge
+          where the user is one, and enabled state.
         justification: |
-          System administrators need an overview of who has access. Other users must not see or change the accounts
-          of others.
+          System administrators need an overview of who has access and in which state each account is.
         tests:
           - UsersPage_Render_ExistingUsers_ListsThemWithControls
 
-      - id: ReviewCenter-UsersPage-NewPage
+      - id: ReviewCenter-UsersPage-List-AdminOnly
         title: >-
-          The UsersPage unit shall offer a button that leads to a separate page that holds only the form that creates
-          a user, and that page shall offer a way back to the list without creating anything and return to the list
-          after a user was created.
+          The UsersPage unit shall show the list at /users, when it is reached through the router, to a system
+          administrator only.
         justification: |
-          A creation form among the rows of a list pushes the users down and keeps a typed password on a page that
-          is meant for reading. A page of its own keeps the list tidy and makes cancelling obvious.
+          Other users must not see or change the accounts of others, so the page is closed to everyone who is not a
+          system administrator.
+        tests:
+          - UsersPage_Render_SystemAdminThroughRouter_ShowsUserList
+          - UsersPage_Render_ReviewerThroughRouter_ShowsAccessDeniedAndNoAccounts
+
+      - id: ReviewCenter-UsersPage-List-Controls
+        title: >-
+          The UsersPage unit shall show with each user the controls to disable or enable the account, to make the user
+          a system administrator or take that away, and to set a password.
+        justification: |
+          The administrator who finds a problem in the list must be able to act on that row without looking for
+          another page.
         tests:
           - UsersPage_Render_ExistingUsers_ListsThemWithControls
+
+      - id: ReviewCenter-UsersPage-List-NoRole
+        title: >-
+          The UsersPage unit shall offer no role to choose for a user in the list.
+        justification: |
+          What a user may do in a project is set on the project page, and being a system administrator is a flag, so
+          a choice of a role here would be a second and conflicting way to say the same.
+        tests:
+          - UsersPage_Render_ExistingUsers_OffersNoRoleChoice
+
+      - id: ReviewCenter-UsersPage-NewPage
+        title: >-
+          The UsersPage unit shall offer a button that leads to a separate page for creating a user.
+        justification: |
+          A creation form among the rows of a list pushes the users down and keeps a typed password on a page that
+          is meant for reading. A page of its own keeps the list tidy.
+        tests:
+          - UsersPage_Render_ExistingUsers_ListsThemWithControls
+
+      - id: ReviewCenter-UsersPage-NewPage-FormOnly
+        title: >-
+          The UsersPage unit shall hold only the form that creates a user on the page for creating a user.
+        justification: |
+          A form that stands alone shows what is asked for and nothing else, and no password typed there is kept next
+          to a list of other people's accounts.
+        tests:
+          - NewUserPage_Render_Form_ShowsOnlyTheForm
+
+      - id: ReviewCenter-UsersPage-NewPage-Cancel
+        title: >-
+          The UsersPage unit shall offer on the page for creating a user a way back to the list that creates nothing.
+        justification: |
+          An administrator who opened the page by mistake needs an obvious way out that leaves no account behind.
+        tests:
+          - NewUserPage_Render_FilledForm_CancelIsPlainLinkBackAndCreatesNoUser
+
+      - id: ReviewCenter-UsersPage-NewPage-Return
+        title: >-
+          The UsersPage unit shall return to the list after a user was created.
+        justification: |
+          The administrator sees the new account in the list, which confirms that it was created.
+        tests:
           - NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm
 
       - id: ReviewCenter-UsersPage-Create
         title: >-
-          The UsersPage unit shall create a user from a form with a user name, a display name, a System
-          administrator checkbox, and a password, clearing the password afterwards, and shall show a violated rule as
-          a message, creating nothing.
+          The UsersPage unit shall create a user from a form with a user name, a display name, a System administrator
+          checkbox, and a password.
         justification: |
           After the first system administrator exists, users are added in the web interface rather than on the
-          command line. The password is cleared so that it does not stay on the page.
+          command line.
+        tests:
+          - NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm
+
+      - id: ReviewCenter-UsersPage-Create-PasswordCleared
+        title: >-
+          The UsersPage unit shall clear the password field of the form for creating a user after the form was
+          submitted.
+        justification: |
+          A password that stays in the field stays on the page, where a person looking over the shoulder or the next
+          user of the computer can read it.
         tests:
           - NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm
           - NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
 
+      - id: ReviewCenter-UsersPage-Create-Violation
+        title: >-
+          The UsersPage unit shall show a rule that the new user violates as a message.
+        justification: |
+          A password that is too short or a user name that is taken is a mistake the administrator can correct, but
+          only when the page says what is wrong instead of failing silently.
+        tests:
+          - NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UsersPage-Create-NothingCreated
+        title: >-
+          The UsersPage unit shall create no user when a rule is violated.
+        justification: |
+          An account that exists although the form was refused would be one that the administrator does not know
+          about.
+        tests:
+          - NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
+
       - id: ReviewCenter-UsersPage-Update
         title: >-
-          The UsersPage unit shall let a system administrator disable and enable a user and set a new password for a
-          user, clearing the password field afterwards, and shall tell that the password has to be changed at the next
-          sign-in.
+          The UsersPage unit shall let a system administrator disable and enable a user.
         justification: |
-          Disabling takes access away without losing the record of what the user did, and a new password lets a
-          system administrator help a user who forgot the password. The password is a temporary one, and the page
-          says so, so that nobody expects it to stay.
+          Disabling takes access away without losing the record of what the user did, and enabling gives it back.
         tests:
           - UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain
+          - UsersPage_Enable_DisabledUser_NeedsNoConfirmation
+
+      - id: ReviewCenter-UsersPage-Update-SetPassword
+        title: >-
+          The UsersPage unit shall let a system administrator set a new password for a user.
+        justification: |
+          A new password lets a system administrator help a user who forgot the password.
+        tests:
           - UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField
+          - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
+
+      - id: ReviewCenter-UsersPage-Update-PasswordCleared
+        title: >-
+          The UsersPage unit shall clear the password field of the user after the password was set.
+        justification: |
+          A password that stays in the field stays on the page, where it can be read by anyone who passes.
+        tests:
+          - UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField
+
+      - id: ReviewCenter-UsersPage-Update-TemporaryNotice
+        title: >-
+          The UsersPage unit shall tell that the password set for another user has to be changed at the next sign-in.
+        justification: |
+          The password is a temporary one, and the page says so, so that nobody expects it to stay.
+        tests:
           - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
 
       - id: ReviewCenter-UsersPage-Status
         title: >-
           The UsersPage unit shall show for each user a badge with the end of the lockout, in UTC, while the user is
-          locked, a badge for a temporary password, and the time of the last sign-in in UTC or the word Never, and
-          shall offer a button that ends the lockout only for a locked user, which acts at once and shows the outcome.
+          locked.
         justification: |
-          An administrator who reviews access must see which accounts are locked, waiting for a first password
-          change, or not used, and must be able to help a person who is locked out without waiting.
+          An administrator who reviews access must see which accounts are locked and for how long.
         tests:
           - UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn
           - UsersPage_Render_ExpiredLockout_IsNotShownAsLocked
+
+      - id: ReviewCenter-UsersPage-Status-Temporary
+        title: >-
+          The UsersPage unit shall show a badge for a user whose password is temporary.
+        justification: |
+          An account that waits for a first password change is one the administrator may have to follow up.
+        tests:
+          - UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn
+
+      - id: ReviewCenter-UsersPage-Status-LastSignIn
+        title: >-
+          The UsersPage unit shall show the time of the last sign-in of a user, in UTC.
+        justification: |
+          An administrator who reviews access sees which accounts are in use and which are not.
+        tests:
+          - UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn
+
+      - id: ReviewCenter-UsersPage-Status-NeverSignedIn
+        title: >-
+          The UsersPage unit shall show the word Never as the last sign-in of a user who never signed in.
+        justification: |
+          A blank would read as a missing value, while the word says that the account was never used.
+        tests:
+          - UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn
+
+      - id: ReviewCenter-UsersPage-Status-UnlockButton
+        title: >-
+          The UsersPage unit shall offer the button that ends the lockout only for a locked user.
+        justification: |
+          A button that does nothing for an account that is not locked would only invite a click that explains
+          nothing.
+        tests:
+          - UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick
+          - UsersPage_Render_ExpiredLockout_IsNotShownAsLocked
+
+      - id: ReviewCenter-UsersPage-Status-Unlock
+        title: >-
+          The UsersPage unit shall end the lockout of a user at once when the button is clicked, without a
+          confirmation.
+        justification: |
+          An administrator who helps a person who is locked out should not make that person wait, and ending a
+          lockout takes nothing away from anyone.
+        tests:
+          - UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick
+
+      - id: ReviewCenter-UsersPage-Status-UnlockOutcome
+        title: >-
+          The UsersPage unit shall show the outcome when the lockout of a user was ended.
+        justification: |
+          The administrator must see that the click had the effect that was meant.
+        tests:
           - UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick
 
       - id: ReviewCenter-UsersPage-SearchFilter
         title: >-
           The UsersPage unit shall narrow the list to the users whose user name or display name contains the typed
-          text in any letter case, and to the users that are enabled, disabled, locked, or system administrators,
-          both together, without a new request to the store.
+          text in any letter case.
         justification: |
-          A list of many users is hard to review as a whole, and a short list of the locked or disabled accounts is
-          what an access review looks at first.
+          A list of many users is hard to review as a whole, and an administrator who looks for a person types a part
+          of the name.
         tests:
           - UsersPage_Search_TypedText_MatchesUserNameOrDisplayNameIgnoringCase
+
+      - id: ReviewCenter-UsersPage-SearchFilter-Status
+        title: >-
+          The UsersPage unit shall narrow the list to the users that are enabled, disabled, locked, or system
+          administrators, as chosen.
+        justification: |
+          A short list of the locked or disabled accounts is what an access review looks at first.
+        tests:
           - UsersPage_Filter_EachStatus_ListsOnlyMatchingUsers
+
+      - id: ReviewCenter-UsersPage-SearchFilter-Combined
+        title: >-
+          The UsersPage unit shall apply the typed text and the chosen status together.
+        justification: |
+          An administrator who looks for a name among the disabled accounts expects both to narrow the list, not the
+          last one to win.
+        tests:
           - UsersPage_SearchAndFilter_Combined_BothApply
+
+      - id: ReviewCenter-UsersPage-SearchFilter-NoReload
+        title: >-
+          The UsersPage unit shall narrow the list without a new request to the store.
+        justification: |
+          A request for every typed letter would load the store and make the list lag behind the typing.
+        tests:
+          - UsersPage_Search_TypedText_DoesNotReloadTheUsers
 
       - id: ReviewCenter-UsersPage-DisableImpact
         title: >-
-          The UsersPage unit shall, when a system administrator disables a user, first show a confirmation that lists
-          the open reviews of the user as links to the reviews and the projects where the user is the only
-          administrator as links to the projects, or says that nothing is waiting, shall disable the user only after
-          the second click on the button that confirms, shall change nothing when the confirmation is cancelled, and
-          shall show an error and open no confirmation when the impact cannot be loaded.
+          The UsersPage unit shall show a confirmation that lists the open reviews of the user as links to the reviews
+          before a system administrator disables a user.
         justification: |
-          Disabling a person who holds open review slots or administers a project alone leaves work stuck. The list
-          warns without blocking, because a person who has left must be disabled whatever is open, and the second
-          click keeps a mistaken click from taking access away.
+          Disabling a person who holds open review slots leaves work stuck. The list warns without blocking, because a
+          person who has left must be disabled whatever is open.
+        tests:
+          - UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed
+
+      - id: ReviewCenter-UsersPage-DisableImpact-Projects
+        title: >-
+          The UsersPage unit shall list in the confirmation of disabling the projects where the user is the only
+          administrator as links to the projects.
+        justification: |
+          A project without an administrator cannot be managed, so the person who disables the user should see which
+          projects are affected and can follow the link to name another administrator.
+        tests:
+          - UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed
+
+      - id: ReviewCenter-UsersPage-DisableImpact-NothingWaiting
+        title: >-
+          The UsersPage unit shall say in the confirmation of disabling that nothing is waiting when the user has no
+          open review and administers no project alone.
+        justification: |
+          An empty confirmation could be taken for a failure to load, while the sentence tells that the check was made
+          and found nothing.
+        tests:
+          - UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick
+
+      - id: ReviewCenter-UsersPage-DisableImpact-SecondClick
+        title: >-
+          The UsersPage unit shall disable the user only after the second click on the button that confirms.
+        justification: |
+          The second click keeps a mistaken click from taking access away.
         tests:
           - UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed
           - UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick
+          - UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain
+
+      - id: ReviewCenter-UsersPage-DisableImpact-Cancel
+        title: >-
+          The UsersPage unit shall change nothing when the confirmation of disabling is cancelled.
+        justification: |
+          An administrator who sees what depends on the user must be able to back out without any effect.
+        tests:
           - UsersPage_Disable_Cancel_ClosesThePanelAndChangesNothing
+
+      - id: ReviewCenter-UsersPage-DisableImpact-LoadError
+        title: >-
+          The UsersPage unit shall show an error when the impact of disabling cannot be loaded.
+        justification: |
+          A confirmation that is missing without a word would leave the administrator guessing whether the click was
+          received.
+        tests:
           - UsersPage_Disable_ImpactLoadRefused_ShowsErrorAndOpensNoPanel
-          - UsersPage_Enable_DisabledUser_NeedsNoConfirmation
+
+      - id: ReviewCenter-UsersPage-DisableImpact-NoPanel
+        title: >-
+          The UsersPage unit shall open no confirmation of disabling when the impact cannot be loaded.
+        justification: |
+          A confirmation without the list of what is waiting would ask for a decision without the facts it is meant
+          to show.
+        tests:
+          - UsersPage_Disable_ImpactLoadRefused_ShowsErrorAndOpensNoPanel
 
       - id: ReviewCenter-UsersPage-Confirmations
         title: >-
-          The UsersPage unit shall, before it resets the second factor of a user, explain that the user has to set it
-          up again, and, before it sets a password, explain that the user has to change it at the next sign-in and
-          can only use the Account, Help, and About pages, cannot sign reviews, and cannot use the API tokens until
-          then (for the own password of the administrator, which is not temporary, say that instead), and shall
-          act only after the second click that confirms and not at all when the confirmation is cancelled.
+          The UsersPage unit shall explain that the user has to set up the second factor again before it resets the
+          second factor of a user.
         justification: |
-          Both actions change how a person gets in, and the person who performs them should know what follows
-          before it happens. The explanation is shown on the page, in the place of the action, without a dialog of
-          the browser.
+          The reset changes how a person gets in, and the person who performs it should know what follows before it
+          happens. The explanation is shown on the page, in the place of the action, without a dialog of the browser.
         tests:
           - UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing
+
+      - id: ReviewCenter-UsersPage-Confirmations-PasswordExplained
+        title: >-
+          The UsersPage unit shall explain before it sets a password that the user has to change it at the next
+          sign-in and can only use the Account, Help, and About pages, cannot sign reviews, and cannot use the API
+          tokens until then.
+        justification: |
+          The person who sets a password should know what the user will meet before it happens, so that the user is
+          not surprised by a locked-down session. The explanation is shown on the page, without a dialog of the
+          browser.
+        tests:
           - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
+
+      - id: ReviewCenter-UsersPage-Confirmations-OwnPassword
+        title: >-
+          The UsersPage unit shall say, instead of that explanation, that the password is not temporary when the
+          system administrator sets the own password.
+        justification: |
+          The own password of the administrator is not temporary, and a warning that the user has to change it would
+          be untrue.
+        tests:
           - UsersPage_SetPassword_OwnRow_SaysThePasswordIsNotTemporary
+
+      - id: ReviewCenter-UsersPage-Confirmations-ResetSecondClick
+        title: >-
+          The UsersPage unit shall reset the second factor only after the second click that confirms.
+        justification: |
+          The second click keeps a mistaken click from taking away the protection of an account.
+        tests:
+          - UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing
+          - UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus
+
+      - id: ReviewCenter-UsersPage-Confirmations-ResetCancel
+        title: >-
+          The UsersPage unit shall change nothing when the confirmation of the reset of the second factor is cancelled.
+        justification: |
+          An administrator who reads what follows must be able to back out without any effect.
+        tests:
+          - UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing
+
+      - id: ReviewCenter-UsersPage-Confirmations-PasswordSecondClick
+        title: >-
+          The UsersPage unit shall set the password only after the second click that confirms.
+        justification: |
+          The second click keeps a mistaken click from replacing the password of a person.
+        tests:
+          - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
+          - UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField
+
+      - id: ReviewCenter-UsersPage-Confirmations-PasswordCancel
+        title: >-
+          The UsersPage unit shall change nothing when the confirmation of setting a password is cancelled.
+        justification: |
+          An administrator who reads what follows must be able to back out without any effect.
+        tests:
           - UsersPage_SetPassword_CancelOrEmptyField_ChangesNothing
 
       - id: ReviewCenter-UsersPage-SystemAdmin
         title: >-
           The UsersPage unit shall let a system administrator make a user a system administrator and take that away
-          again with one button per user, and show the outcome.
+          again with one button per user.
         justification: |
           Being a system administrator is the one right that is not tied to a project, so it is a flag of the user
           that is changed on the page of the users, replacing the earlier choice of a role.
         tests:
           - UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag
 
+      - id: ReviewCenter-UsersPage-SystemAdmin-Outcome
+        title: >-
+          The UsersPage unit shall show the outcome when a user was made a system administrator or that was taken away.
+        justification: |
+          The administrator must see which way the flag was changed, because one button does both.
+        tests:
+          - UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag
+
       - id: ReviewCenter-UsersPage-LastAdmin
         title: >-
-          The UsersPage unit shall show an error and change nothing when a system administrator tries to disable or
-          demote the last enabled system administrator.
+          The UsersPage unit shall show an error when a system administrator tries to disable or demote the last
+          enabled system administrator.
         justification: |
           Without an enabled system administrator nobody could manage users, so the refusal must be shown to the
           system administrator instead of failing silently.
         tests:
           - UsersPage_LastAdmin_DisableOrDemote_IsRefusedWithError
 
+      - id: ReviewCenter-UsersPage-LastAdmin-NothingChanged
+        title: >-
+          The UsersPage unit shall change nothing when a system administrator tries to disable or demote the last
+          enabled system administrator.
+        justification: |
+          A refusal that still changed the account would leave the installation without anyone who can manage users.
+        tests:
+          - UsersPage_LastAdmin_DisableOrDemote_IsRefusedWithError
+
       - id: ReviewCenter-UsersPage-AdminCheck
         title: >-
-          The UsersPage unit shall refuse every create or change action, showing an error and changing nothing,
-          when the signed-in user is no longer an enabled system administrator in the user store, or nobody is
-          signed in any more, and shall then stop rendering the user list, the typed passwords and the button
-          that creates a user.
+          The UsersPage unit shall refuse every create or change action, showing an error, when the signed-in user is
+          no longer an enabled system administrator in the user store.
         justification: |
-          An open page can keep the sign-in state it started with for up to one revalidation interval, so a user
-          who was demoted or disabled after opening the page must not be able to go on managing users in that
-          time. The check is made on every action, so it does not wait for the next revalidation. An error shown
-          above the list would still leave the names and roles readable, so the list is dropped with it.
+          An open page can keep the sign-in state it started with for up to one revalidation interval, so a user who
+          was demoted or disabled after opening the page must not be able to go on managing users in that time. The
+          check is made on every action, so it does not wait for the next revalidation.
+        tests:
+          - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
+          - UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords
+
+      - id: ReviewCenter-UsersPage-AdminCheck-NotSignedIn
+        title: >-
+          The UsersPage unit shall refuse every create or change action, showing a clear error, when nobody is signed
+          in any more.
+        justification: |
+          A session that ended while the page was open must not leave the page able to change accounts, and the person
+          at the screen needs to be told why the click did nothing.
+        tests:
+          - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
+
+      - id: ReviewCenter-UsersPage-AdminCheck-NothingChanged
+        title: >-
+          The UsersPage unit shall change nothing when it refuses an action because the signed-in user is no longer a
+          system administrator or nobody is signed in.
+        justification: |
+          A refusal that still carried out the change would be no refusal.
         tests:
           - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
           - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
           - UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords
+
+      - id: ReviewCenter-UsersPage-AdminCheck-StopRendering
+        title: >-
+          The UsersPage unit shall stop rendering the user list, the typed passwords and the button that creates a user
+          after it refused an action for that reason.
+        justification: |
+          An error shown above the list would still leave the names and flags readable to a user who is not a system
+          administrator, so the list is dropped with it.
+        tests:
+          - UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords
+          - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
+          - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
           - UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList
+
+      - id: ReviewCenter-UsersPage-AdminCheck-CreateAction
+        title: >-
+          The UsersPage unit shall refuse the creation of a user, showing an error and creating nothing, when the
+          signed-in user is no longer an enabled system administrator in the user store.
+        justification: |
+          The form for creating a user is an action like any other on the users, so a user who was demoted after
+          opening it must not be able to add an account.
+        tests:
+          - NewUserPage_CreateForm_AdminDemotedAfterOpening_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-UsersPage-ExternalAccount
         title: >-
-          The UsersPage unit shall mark an account of a provider with a badge that names the provider, and shall show
-          no password control, and no temporary password control, for it.
+          The UsersPage unit shall mark an account of a provider with a badge that names the provider.
         justification: |
-          An administrator must see which accounts are managed by the provider, and must not be offered an action
-          that cannot work for them, or that could give such an account a password.
+          An administrator must see which accounts are managed by the provider.
+        tests:
+          - UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls
+
+      - id: ReviewCenter-UsersPage-ExternalAccount-NoPassword
+        title: >-
+          The UsersPage unit shall show no password control, and no temporary password control, for an account of a
+          provider.
+        justification: |
+          An administrator must not be offered an action that cannot work for such an account, or that could give it a
+          password.
         tests:
           - UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls
 
       - id: ReviewCenter-UsersPage-TotpReset
         title: >-
-          The UsersPage unit shall mark the accounts that have a second factor with a badge, offer a button to reset the
-          second factor only for them, also while the feature is off, remove the second factor and show a status when
-          the button is used, show no control for an account of a provider, and show an error and keep the second
-          factor when the signed-in user is no longer a system administrator.
+          The UsersPage unit shall mark the accounts that have a second factor with a badge.
         justification: |
-          A person who lost the phone and the recovery codes needs an administrator to let them in again, and the
-          administrator must see who has a second factor. The rule that only a system administrator may reset it is
-          the service's, and the page must show what the service decides.
+          The administrator must see who has a second factor.
         tests:
           - UsersPage_Render_EnrolledAndPlainUsers_BadgeAndResetOnlyForEnrolled
-          - UsersPage_Render_ExternalUser_HasNoTotpControls
-          - UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus
+
+      - id: ReviewCenter-UsersPage-TotpReset-ResetButton
+        title: >-
+          The UsersPage unit shall offer a button to reset the second factor only for the accounts that have one.
+        justification: |
+          A person who lost the phone and the recovery codes needs an administrator to let them in again, and a button
+          for an account without a second factor would have nothing to reset.
+        tests:
+          - UsersPage_Render_EnrolledAndPlainUsers_BadgeAndResetOnlyForEnrolled
+
+      - id: ReviewCenter-UsersPage-TotpReset-FeatureOff
+        title: >-
+          The UsersPage unit shall show the badge and the button to reset the second factor also while the feature is
+          off.
+        justification: |
+          An enrollment that is dormant can come back to life when the feature is switched on again, so the
+          administrator must still be able to see it and clear it.
+        tests:
           - UsersPage_Render_FeatureDisabled_StillShowsBadgeAndReset
+
+      - id: ReviewCenter-UsersPage-TotpReset-Reset
+        title: >-
+          The UsersPage unit shall remove the second factor of an account when the button is used.
+        justification: |
+          The reset lets a person who lost the second factor sign in with the password alone and set it up again.
+        tests:
+          - UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus
+
+      - id: ReviewCenter-UsersPage-TotpReset-ResetStatus
+        title: >-
+          The UsersPage unit shall show a status that the second factor was reset when the button is used.
+        justification: |
+          The administrator must see that the click had the effect that was meant.
+        tests:
+          - UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus
+
+      - id: ReviewCenter-UsersPage-TotpReset-External
+        title: >-
+          The UsersPage unit shall show no badge and no button for the second factor for an account of a provider.
+        justification: |
+          The provider handles the sign-in of such an account, so a second factor of this application has no meaning
+          for it.
+        tests:
+          - UsersPage_Render_ExternalUser_HasNoTotpControls
+
+      - id: ReviewCenter-UsersPage-TotpReset-ResetError
+        title: >-
+          The UsersPage unit shall show an error when the second factor is reset while the signed-in user is no longer
+          a system administrator or nobody is signed in.
+        justification: |
+          The rule that only a system administrator may reset a second factor is the service's, and the page must show
+          what the service decides instead of acting as if the reset worked.
+        tests:
           - UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment
+          - UsersPage_ResetTotp_AdminDemotedAfterOpening_ShowsErrorAndKeepsEnrollment
+
+      - id: ReviewCenter-UsersPage-TotpReset-ResetKept
+        title: >-
+          The UsersPage unit shall keep the second factor of the account when the reset is refused.
+        justification: |
+          A refused reset that still removed the second factor would take away the protection of an account without
+          anyone who may do so.
+        tests:
+          - UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment
+          - UsersPage_ResetTotp_AdminDemotedAfterOpening_ShowsErrorAndKeepsEnrollment

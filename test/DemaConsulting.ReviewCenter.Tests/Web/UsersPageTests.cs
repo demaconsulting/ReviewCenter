@@ -39,7 +39,49 @@ public class UsersPageTests : PageTestBase
     private const string Password = "correct horse battery";
 
     /// <summary>
-    ///     Test that the existing users are listed with their details and controls, and the creation form is there.
+    ///     Test that the router, which applies the authorization rules of a page, shows the user list at /users to a
+    ///     system administrator.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Render_SystemAdminThroughRouter_ShowsUserList()
+    {
+        // Arrange: a system administrator is signed in and the router is at /users
+        await Users.CreateAsync("root", "Root User", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root User", UserRole.Admin);
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/users");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the list is shown and no access denied message is
+        Assert.Equal("Root User", cut.Find("[data-testid^='user-display-name-']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
+    }
+
+    /// <summary>
+    ///     Test that the router refuses the user list at /users to a user who is not a system administrator, and
+    ///     shows no account.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Render_ReviewerThroughRouter_ShowsAccessDeniedAndNoAccounts()
+    {
+        // Arrange: a reviewer is signed in, another account exists, and the router is at /users
+        await Users.CreateAsync("root", "Root User", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        SignInAs("ann", "Ann", UserRole.Reviewer);
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/users");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: access is denied and no account is shown
+        Assert.Contains("Access denied", cut.Find("[data-testid='access-denied']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid^='user-display-name-']"));
+        Assert.DoesNotContain("Root User", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the existing users are listed with their details and controls, and that the creation form is not
+    ///     on the list but behind a button.
     /// </summary>
     [Fact]
     public async Task UsersPage_Render_ExistingUsers_ListsThemWithControls()
@@ -69,7 +111,78 @@ public class UsersPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the new-user form creates the user with the chosen role and returns to the user list.
+    ///     Test that the list offers no choice of a role: its only selection is the status filter, and there is no
+    ///     control named for a role.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Render_ExistingUsers_OffersNoRoleChoice()
+    {
+        // Arrange: an administrator and a reviewer
+        await Users.CreateAsync("root", "Root User", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = Render<UsersPage>();
+
+        // Assert: the filter is the only selection, and nothing offers a role
+        var selects = cut.FindAll("select");
+        Assert.Equal("users-filter", Assert.Single(selects).GetAttribute("data-testid"));
+        Assert.Empty(cut.FindAll("input[type='radio']"));
+        Assert.Empty(cut.FindAll("[data-testid*='role']"));
+    }
+
+    /// <summary>
+    ///     Test that the new-user page holds only the form that creates a user, and neither the list nor a user row,
+    ///     even when other users exist.
+    /// </summary>
+    [Fact]
+    public async Task NewUserPage_Render_Form_ShowsOnlyTheForm()
+    {
+        // Arrange: a signed-in administrator and one more user
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+
+        // Act: render the new-user page
+        var cut = Render<NewUserPage>();
+
+        // Assert: the form is there, and the list and its rows are not
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-user-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='users-list']"));
+        Assert.Empty(cut.FindAll($"[data-testid='user-row-{ann.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the new-user page offers Cancel as a plain link back to the user list, which does not submit the
+    ///     form, so that leaving through it creates no user even when the form was filled in.
+    /// </summary>
+    [Fact]
+    public async Task NewUserPage_Render_FilledForm_CancelIsPlainLinkBackAndCreatesNoUser()
+    {
+        // Arrange: a signed-in administrator and a form that is filled in but not submitted
+        await SignInAsNewAdminAsync();
+        var before = (await Users.ListAsync(TestContext.Current.CancellationToken)).Count;
+        var cut = Render<NewUserPage>();
+        await cut.Find("[data-testid='new-user-username-input']").InputAsync("bea");
+        await cut.Find("[data-testid='new-user-display-name-input']").InputAsync("Bea");
+        await cut.Find("[data-testid='new-user-password-input']").InputAsync(Password);
+
+        // Act: look at the Cancel control that the user would activate
+        var cancel = cut.Find("[data-testid='cancel-new-user-link']");
+
+        // Assert: it is a plain link to the user list, no submit button and no handler of its own, and no user was
+        // created
+        Assert.Equal("a", cancel.TagName.ToLowerInvariant());
+        Assert.Equal("Cancel", cancel.TextContent);
+        Assert.Equal("/users", cancel.GetAttribute("href"));
+        Assert.Null(cancel.GetAttribute("type"));
+        Assert.DoesNotContain("onclick", cancel.OuterHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, (await Users.ListAsync(TestContext.Current.CancellationToken)).Count);
+        Assert.Null(await Users.GetAsync("bea", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the new-user form creates the user with the typed names and password and the chosen
+    ///     system administrator flag, and returns to the user list.
     /// </summary>
     [Fact]
     public async Task NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm()
@@ -85,14 +198,42 @@ public class UsersPageTests : PageTestBase
         // Act: submit
         await cut.Find("[data-testid='new-user-form']").SubmitAsync();
 
-        // Assert: the user exists with the role, the password field is empty and the browser returned to the list
+        // Assert: the user exists with the names, the flag and the password, the password field is empty and the
+        // browser returned to the list
         var created = await Users.GetAsync("bea", TestContext.Current.CancellationToken);
         Assert.NotNull(created);
+        Assert.Equal("Bea", created.DisplayName);
         Assert.True(created.IsSystemAdmin);
+        Assert.NotNull(await Users.AuthenticateAsync("bea", Password, TestContext.Current.CancellationToken));
         Assert.Empty(cut.FindAll("[data-testid='users-error']"));
         Assert.Equal(string.Empty, cut.Find("[data-testid='new-user-password-input']").GetAttribute("value") ?? string.Empty);
         Assert.EndsWith("/users", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
         Assert.Equal("/users", cut.Find("[data-testid='cancel-new-user-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the new-user page refuses to create a user, with an error and nothing created, when the signed-in
+    ///     administrator was demoted after the page was opened.
+    /// </summary>
+    [Fact]
+    public async Task NewUserPage_CreateForm_AdminDemotedAfterOpening_ShowsErrorAndCreatesNothing()
+    {
+        // Arrange: two administrators; one has the filled-in form open and is then demoted
+        await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = Render<NewUserPage>();
+        await cut.Find("[data-testid='new-user-username-input']").InputAsync("bea");
+        await cut.Find("[data-testid='new-user-display-name-input']").InputAsync("Bea");
+        await cut.Find("[data-testid='new-user-password-input']").InputAsync(Password);
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-user-form']").SubmitAsync();
+
+        // Assert: refused with an error, and the user does not exist
+        Assert.Contains("System administrator", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.Null(await Users.GetAsync("bea", TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -158,16 +299,18 @@ public class UsersPageTests : PageTestBase
         // Act: make ann a system admin
         await cut.Find($"[data-testid='user-toggle-admin-{ann.Id}']").ClickAsync();
 
-        // Assert: stored and shown
+        // Assert: stored, shown and acknowledged
         Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.IsSystemAdmin);
         Assert.Equal("System admin", cut.Find($"[data-testid='user-admin-{ann.Id}']").TextContent);
+        Assert.Equal("'ann' is now a system administrator.", cut.Find("[data-testid='users-status']").TextContent);
 
         // Act: take it away again
         await cut.Find($"[data-testid='user-toggle-admin-{ann.Id}']").ClickAsync();
 
-        // Assert: stored and shown
+        // Assert: stored, shown and acknowledged
         Assert.False((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.IsSystemAdmin);
         Assert.Empty(cut.FindAll($"[data-testid='user-admin-{ann.Id}']"));
+        Assert.Equal("'ann' is no longer a system administrator.", cut.Find("[data-testid='users-status']").TextContent);
     }
 
     /// <summary>
@@ -455,6 +598,28 @@ public class UsersPageTests : PageTestBase
         Assert.Equal([root.Id], ShownUserIds(cut));
         await cut.Find("[data-testid='users-filter']").ChangeAsync("all");
         Assert.Equal(4, ShownUserIds(cut).Count);
+    }
+
+    /// <summary>
+    ///     Test that typing a search and choosing a filter narrows the list that was loaded, without reading the
+    ///     users again: a change made in the store after the page was opened does not show.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Search_TypedText_DoesNotReloadTheUsers()
+    {
+        // Arrange: an enabled user is listed, and is then disabled directly in the store
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+        await UpdateUserAsync("ann", user => user.Enabled = false);
+
+        // Act: search, and choose the filter for enabled users
+        await cut.Find("[data-testid='users-search']").InputAsync("ann");
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("enabled");
+
+        // Assert: the user is still listed as enabled, so the list was not read again
+        Assert.Equal([ann.Id], ShownUserIds(cut));
+        Assert.Equal("Enabled", cut.Find($"[data-testid='user-enabled-{ann.Id}']").TextContent);
     }
 
     /// <summary>

@@ -10,73 +10,168 @@ sections:
     requirements:
       - id: ReviewCenter-ProjectsPage-List
         title: >-
-          The ProjectsPage unit shall list every project the user may see as a row that links to its page and shows
-          its description, or show a message that there are no projects.
+          The ProjectsPage unit shall list every project the user may see as a row that links to its page.
         justification: |
-          The projects page is where users find their work. An explicit empty message tells a new user that
-          nothing is wrong and what to do next.
+          The projects page is where users find their work, so each project must be one click away.
+        tests:
+          - ProjectsPage_Render_ExistingProjects_ListsThemWithLinks
+
+      - id: ReviewCenter-ProjectsPage-List-Description
+        title: >-
+          The ProjectsPage unit shall show the description of a project in its row when the project has one.
+        justification: |
+          The description helps users tell similar projects apart before they open one.
+        tests:
+          - ProjectsPage_Render_ExistingProjects_ListsThemWithLinks
+
+      - id: ReviewCenter-ProjectsPage-List-Empty
+        title: >-
+          The ProjectsPage unit shall show a message that there are no projects when the user may see none.
+        justification: |
+          An explicit empty message tells a new user that nothing is wrong and what to do next.
         tests:
           - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton
           - ProjectsPage_Render_ExistingProjects_ListsThemWithLinks
 
       - id: ReviewCenter-ProjectsPage-Visibility
         title: >-
-          The ProjectsPage unit shall list only the projects the user is a member of, and every project to a system
-          administrator, and shall tell a user who is a member of no project that the list is empty because no
-          administrator added the user, without offering the button that creates a project.
+          The ProjectsPage unit shall list to a user who is no system administrator only the projects the user is a
+          member of.
         justification: |
-          A project is visible to its members and to system administrators only. A user without a project would
-          otherwise see a blank page and not know whether something is wrong or whom to ask.
+          A project is visible to its members and to system administrators only.
         tests:
           - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-ProjectsPage-Visibility-Administrator
+        title: >-
+          The ProjectsPage unit shall list every project to a system administrator.
+        justification: |
+          System administrators manage all projects, so they must reach each one, whether or not they are a member.
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-ProjectsPage-Visibility-EmptyReason
+        title: >-
+          The ProjectsPage unit shall tell a user who is a member of no project that the list is empty because no
+          administrator added the user.
+        justification: |
+          A user without a project would otherwise see a blank page and not know whether something is wrong or whom
+          to ask.
+        tests:
           - ProjectsPage_Render_UserWithoutMembership_ExplainsTheEmptyListAndOffersNoCreateButton
+
+      - id: ReviewCenter-ProjectsPage-Visibility-NoCreateButton
+        title: >-
+          The ProjectsPage unit shall offer no button that creates a project to a user who is no system
+          administrator.
+        justification: |
+          Only system administrators may create projects, so the button would only lead to a refusal.
+        tests:
+          - ProjectsPage_Render_UserWithoutMembership_ExplainsTheEmptyListAndOffersNoCreateButton
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
 
       - id: ReviewCenter-ProjectsPage-NewForm
         title: >-
-          The ProjectsPage unit shall offer a system administrator a button that leads to a separate page holding the
-          form to create a project, shall not show that form in the list, and shall offer on that page a Cancel link
-          back to the list.
+          The ProjectsPage unit shall offer a system administrator a button that leads to a separate page for a new
+          project.
         justification: |
-          Choosing a project is what nearly every visit is for, so the list stays uncluttered. Creating a project
-          is a deliberate step, and users who change their mind must be able to leave it without side effects.
+          Choosing a project is what nearly every visit is for, so the list stays uncluttered, and creating a project
+          is a deliberate step on its own page.
         tests:
           - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-ProjectsPage-NewForm-NotInList
+        title: >-
+          The ProjectsPage unit shall not show the form to create a project in the project list.
+        justification: |
+          The form would clutter the list that users visit to choose a project.
+        tests:
+          - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton
+
+      - id: ReviewCenter-ProjectsPage-NewForm-FormPage
+        title: >-
+          The ProjectsPage unit shall hold the form to create a project, with a name, a description, and a create
+          button, on the separate page for a new project.
+        justification: |
+          The separate page lets the list stay uncluttered and keeps creation a deliberate step.
+        tests:
+          - NewProjectPage_Render_Default_ShowsFormAndCancelLink
+
+      - id: ReviewCenter-ProjectsPage-NewForm-Cancel
+        title: >-
+          The ProjectsPage unit shall offer on the page for a new project a Cancel link back to the list.
+        justification: |
+          Users who change their mind must be able to leave the form without side effects.
+        tests:
           - NewProjectPage_Render_Default_ShowsFormAndCancelLink
 
       - id: ReviewCenter-ProjectsPage-CreateAccess
         title: >-
-          The ProjectsPage unit shall let only a system administrator create a project, shall refuse the form of
-          any other user with a message that names the missing right, and shall create nothing.
+          The ProjectsPage unit shall refuse the form of a user who is no system administrator with a message that
+          names the missing right.
         justification: |
           A new project has no members, so creating one is an administrative act. The page refuses a user who is
           no system administrator even when the user reaches the form, and Core checks the same rule again.
         tests:
           - NewProjectPage_CreateForm_MemberWhoIsNoSystemAdmin_IsRefusedAndCreatesNothing
 
+      - id: ReviewCenter-ProjectsPage-CreateAccess-NothingCreated
+        title: >-
+          The ProjectsPage unit shall create no project from the form of a user who is no system administrator.
+        justification: |
+          A refused form must leave no project behind.
+        tests:
+          - NewProjectPage_CreateForm_MemberWhoIsNoSystemAdmin_IsRefusedAndCreatesNothing
+
       - id: ReviewCenter-ProjectsPage-Create
         title: >-
-          The ProjectsPage unit shall offer, on its page for a new project, a form with a name and a description
-          that creates a project and then shows the page of the new project.
+          The ProjectsPage unit shall create a project from the name and the description entered on the page for a
+          new project.
         justification: |
-          Users must be able to start a new body of work without any other tool, and to continue straight into
-          the project they created.
+          Users must be able to start a new body of work without any other tool.
+        tests:
+          - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
+
+      - id: ReviewCenter-ProjectsPage-Create-Opens
+        title: >-
+          The ProjectsPage unit shall show the page of the new project once the project has been created.
+        justification: |
+          Users continue straight into the project they created.
         tests:
           - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
 
       - id: ReviewCenter-ProjectsPage-Error
         title: >-
-          The ProjectsPage unit shall show the reason when a project cannot be created, including when the
-          sign-in state of the user has ended, and shall create nothing.
+          The ProjectsPage unit shall show the reason when a project cannot be created.
         justification: |
-          A rejected form must tell users what to correct, and must not silently create a project.
+          A rejected form must tell users what to correct.
+        tests:
+          - NewProjectPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectsPage-Error-SessionEnded
+        title: >-
+          The ProjectsPage unit shall show that the user is no longer signed in when a project cannot be created
+          because the sign-in state of the user has ended.
+        justification: |
+          A user whose sign-in has ended needs to sign in again, and a different message would send the user looking
+          for a problem with the form.
+        tests:
+          - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectsPage-Error-NothingCreated
+        title: >-
+          The ProjectsPage unit shall create no project when the project cannot be created.
+        justification: |
+          A rejected form must not silently create a project.
         tests:
           - NewProjectPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing
           - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
 
       - id: ReviewCenter-ProjectsPage-Interactive
         title: >-
-          Each page of the ProjectsPage unit shall report that it is interactive, through a marker on its root
-          element, once it has rendered on a live connection.
+          The ProjectsPage unit shall report on each of its pages, through a marker on the root element of the page,
+          that the page is interactive once it has rendered on a live connection.
         justification: |
           Users, automated tests, and tooling need a reliable signal that the page now responds, so that they do
           not act before the live connection exists.

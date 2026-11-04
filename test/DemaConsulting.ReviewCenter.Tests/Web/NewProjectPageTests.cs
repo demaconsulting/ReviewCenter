@@ -69,6 +69,7 @@ public class NewProjectPageTests : PageTestBase
         // Assert: the project is stored, no error is displayed, and the browser was sent to the project
         var project = Assert.Single(await Projects.ListAsync(TestContext.Current.CancellationToken));
         Assert.Equal("Apollo", project.Name);
+        Assert.Equal("Moon landing", project.Description);
         Assert.Empty(cut.FindAll("[data-testid='project-error']"));
         Assert.EndsWith($"/projects/{project.Id}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
     }

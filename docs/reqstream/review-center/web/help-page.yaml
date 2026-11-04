@@ -5,16 +5,27 @@
 # /help/{topic} with its shared frame (HelpTopicFrame.razor) fed by the list of topics (HelpTopics.cs), and the
 # friendly page for an unknown address under /help/ (HelpNotFoundPage.razor). The link to the help in the header of
 # every page belongs to the App unit.
+#
+# Each requirement states one thing that a help page explains. The topics are grouped by theme: a requirement is one
+# explanation of one subject, and an enumeration that the page explains together (for example the five content
+# switches of the evidence settings) stays in one requirement.
 
 sections:
   - title: HelpPage Unit Requirements
     requirements:
       - id: ReviewCenter-HelpPage-Index
         title: >-
-          The HelpPage unit shall serve at /help an index headed Help that lists every help topic with its title and a
-          link to the page of the topic, and a link to the About page.
+          The HelpPage unit shall show an index headed Help that lists every help topic with its title and a
+          link to the page of the topic.
         justification: |
           A user who needs help must be able to see what is covered and to choose a topic without guessing an address.
+        tests:
+          - HelpPage_Render_ListsEveryTopicWithItsPageLink
+
+      - id: ReviewCenter-HelpPage-Index-AboutLink
+        title: >-
+          The HelpPage unit shall show on the help index a link to the About page.
+        justification: |
           The About page holds the version and the project page, which a user reporting a problem needs, so the help
           points to it.
         tests:
@@ -23,23 +34,54 @@ sections:
       - id: ReviewCenter-HelpPage-Topics
         title: >-
           The HelpPage unit shall serve for every help topic, at the address /help/ followed by the name of the topic,
-          a page headed with the title of the topic, in which every image has alternative text.
+          a page headed with the title of the topic.
         justification: |
           Each task of a review is explained on a page of its own, so that a user can find it from the index and
-          share its address. A listed topic without a page would lead to an error, and an image without alternative
-          text cannot be read by a user of assistive technology.
+          share its address. A listed topic without a page would lead to an error.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-Topics-ImageAlt
+        title: >-
+          The HelpPage unit shall give every image on a help topic page alternative text.
+        justification: |
+          An image without alternative text cannot be read by a user of assistive technology, and the screenshots carry
+          part of the explanation.
         tests:
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
 
       - id: ReviewCenter-HelpPage-Navigation
         title: >-
-          The HelpPage unit shall end every topic page with links to the previous topic, to the index of all help
-          topics, and to the next topic, leaving out the link to the previous topic on the first page and the link to
-          the next topic on the last, and shall not use a link to a place within the same page.
+          The HelpPage unit shall end every help topic page with links to the previous topic, to the index of all help
+          topics, and to the next topic.
         justification: |
           A user who has finished reading a topic should be able to continue, go back, or return to the index without
-          scrolling up or using the browser. The site gives every page a base address, so a link to a place within the
-          page would lead to the home page, and the links must lead to whole pages.
+          scrolling up or using the browser.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-Navigation-FirstPage
+        title: >-
+          The HelpPage unit shall leave out the link to the previous topic on the first help topic page.
+        justification: |
+          The first topic has no previous topic, and a link that leads nowhere would confuse the reader.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-Navigation-LastPage
+        title: >-
+          The HelpPage unit shall leave out the link to the next topic on the last help topic page.
+        justification: |
+          The last topic has no next topic, and a link that leads nowhere would confuse the reader.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-Navigation-NoAnchors
+        title: >-
+          The HelpPage unit shall not use a link to a place within the same page on any help page.
+        justification: |
+          The site gives every page a base address, so a link to a place within the page would lead to the home page,
+          and the links must lead to whole pages.
         tests:
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
           - HelpPage_Render_ListsEveryTopicWithItsPageLink
@@ -47,183 +89,677 @@ sections:
       - id: ReviewCenter-HelpPage-NotFound
         title: >-
           The HelpPage unit shall show, for an address under /help/ that is not a help topic, a message that there is no
-          such topic and a link to the index of all help topics.
+          such topic.
         justification: |
-          An old or mistyped help address, such as a bookmark of a topic that was renamed, should lead the user back to
-          the index and not to a blank page or the general not-found message.
+          An old or mistyped help address, such as a bookmark of a topic that was renamed, should be answered with a
+          message that says what is wrong, and not with a blank page or the general not-found message.
+        tests:
+          - HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink
+
+      - id: ReviewCenter-HelpPage-NotFound-IndexLink
+        title: >-
+          The HelpPage unit shall show, with the message for an address under /help/ that is not a help topic, a link to
+          the index of all help topics.
+        justification: |
+          The user who met the message should be led back to the index and can choose the topic that was meant.
         tests:
           - HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink
 
       - id: ReviewCenter-HelpPage-AttestationTopic
         title: >-
-          The HelpPage unit shall serve a topic, Signed attestation, that explains what the signature of the
-          attestation proves (integrity since the signing and the origin of the server key), what it does not prove
-          (who the reviewers are, and when the signing happened), that the self-signed key is for development and test
-          only, how to use a certificate from a certificate store or from a file, that the server warns before the
-          certificate ends (ExpiryWarningDays), and what RequireTrustedKey checks (the server refuses
-          to start for a self-signed key or a certificate without a signing key usage, and the review page shows why
-          attestation is unavailable when a certificate stops being valid while the server runs), that the signature
-          certifies the document with no changes allowed, and that a code-signing-only certificate is used with a
-          note and a start-up warning while the server does not check the chain or revocation, that the PDF lists
-          who answered each check and when, that a concluded review, approved or rejected, has an attestation, that a
-          rejection is marked on its first page, what the findings, conclusion and ballots appendix of the document
-          hold and that only the findings and included comments are in it, with a
-          screenshot of the download of an approved review.
+          The HelpPage unit shall explain in the Signed attestation topic what the signature of the attestation proves
+          and what it does not prove, and that it certifies the document with no changes allowed.
         justification: |
           The attestation is easy to take for more than it is. The place the user is sent from the review page must
-          say plainly what the document proves and how to make it carry weight.
+          say plainly what the document proves (that it has not changed and who holds the key) and what it does not
+          prove (who the reviewers are, and when the signing happened).
         tests:
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+          - HelpAttestationPage_Render_ExplainsIntegrityOriginAndDevelopmentOnlyKey
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-KeyChoice
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic that the self-signed key is for development
+          and test only, and how to use a certificate from a certificate store or from a file.
+        justification: |
+          A document signed with the self-signed key carries no weight with a reader, so an administrator must be told
+          how to replace the key with a certificate of the organization.
+        tests:
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+          - HelpAttestationPage_Render_ExplainsIntegrityOriginAndDevelopmentOnlyKey
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-ExpiryWarning
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic that the server warns before the certificate
+          ends.
+        justification: |
+          An administrator must know that the warning exists and how many days ahead it is given, to renew the
+          certificate before attestation stops.
+        tests:
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-TrustedKey
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic what the setting that requires a trusted key
+          checks: the refusal to start for a self-signed key or a certificate without a signing key usage, and the
+          reason that the review page shows when a certificate stops being valid while the server runs.
+        justification: |
+          The refusal to start and the missing download button look like faults when met without explanation, and an
+          administrator who sets the option must know what it checks.
+        tests:
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+          - HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-CodeSigning
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic that a certificate for code signing only is
+          used, with a note in the PDF and a warning at start-up, and that the server does not check the certificate
+          chain or revocation.
+        justification: |
+          An administrator who supplies such a certificate must know that it is not refused, what the reader of the
+          PDF will see, and that the trust in the certificate is left to the reader.
+        tests:
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-PdfContents
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic what the PDF holds: who answered each check
+          and when, the findings, the conclusion and the ballots appendix, and that only the findings and the included
+          comments are in it.
+        justification: |
+          A reader of the PDF, and the person who decides which comments to include, must know what is printed and what
+          never is.
+        tests:
           - HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+          - HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-Concluded
+        title: >-
+          The HelpPage unit shall explain in the Signed attestation topic that a concluded review, approved or
+          rejected, has an attestation, and that a rejection is marked on the first page of the PDF.
+        justification: |
+          A rejected review ends in a record too, and a person who holds the PDF of a rejected review must be able to
+          tell at a glance that it is not an approval.
+        tests:
+          - HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix
+
+      - id: ReviewCenter-HelpPage-AttestationTopic-Screenshot
+        title: >-
+          The HelpPage unit shall show in the Signed attestation topic a screenshot of the download of an approved
+          review.
+        justification: |
+          A picture of the page that the user sees makes it clear where the download is and what it offers.
+        tests:
+          - HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime
 
       - id: ReviewCenter-HelpPage-SigningTopic
         title: >-
           The HelpPage unit shall state in the Reviewers and signing topic that, while the project rule is on, the
-          person who reopened a review cannot sign it again, and that a reopen that would leave a slot without anyone
-          who may sign is refused, and shall explain that a Fail answer does not block signing, that the signature of
-          a review in which the ballots agree on a Fail records a rejection, and that a rejection needs a conclusion
-          text.
+          person who reopened a review cannot sign it again.
         justification: |
-          The rules and the refusal look like errors when met without explanation, and a reviewer who has found a
-          failed check must know that the way to end the review is to reject it with reasons. The topic that explains
-          signing is the place a reviewer or an administrator looks first.
+          The rule looks like an error when met without explanation. The topic that explains signing is the place a
+          reviewer or an administrator looks first.
         tests:
           - HelpSigningPage_Render_ExplainsTheReopenerRule
+
+      - id: ReviewCenter-HelpPage-SigningTopic-ReopenRefused
+        title: >-
+          The HelpPage unit shall state in the Reviewers and signing topic that a reopen that would leave a slot without
+          anyone who may sign is refused.
+        justification: |
+          The refusal looks like an error when met without explanation, and the person who reopens must know what to
+          change.
+        tests:
+          - HelpSigningPage_Render_ExplainsTheReopenerRule
+
+      - id: ReviewCenter-HelpPage-SigningTopic-FailDoesNotBlock
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic that a Fail answer does not block signing.
+        justification: |
+          A reviewer who has found a failed check must know that the signature is still possible, and that the way to
+          end the review is to sign it.
+        tests:
           - HelpPage_Signing_NoLongerSaysFailBlocks
+
+      - id: ReviewCenter-HelpPage-SigningTopic-Rejection
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic that the signature of a review in which the
+          ballots agree on a Fail records a rejection.
+        justification: |
+          A reviewer must know that a Fail that all reviewers agree on ends the review as Rejected, and not as a
+          review that cannot be completed.
+        tests:
+          - HelpPage_Signing_NoLongerSaysFailBlocks
+          - HelpPage_Signing_ExplainsRejectionRecordsAndNeedsConclusionText
+
+      - id: ReviewCenter-HelpPage-SigningTopic-RejectionConclusion
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic that a rejection needs a conclusion text.
+        justification: |
+          A reviewer who rejects a review must know that the reasons have to be written down before the review can be
+          concluded.
+        tests:
+          - HelpPage_Signing_ExplainsRejectionRecordsAndNeedsConclusionText
 
       - id: ReviewCenter-HelpPage-ReadingReviewTopic
         title: >-
           The HelpPage unit shall state in the Reading a review topic that the holder of a reviewer slot owns a ballot,
-          answers the checks in it, submits it and then signs, and that the review concludes when every slot has signed
-          the same, current record, that a concluded review, approved or rejected, is locked, shall tell the holder
-          of a reviewer slot where to write the review conclusion, in the Review conclusion card, and shall say that the
-          conclusion stays hidden until the reader hands in their own ballot, except for the lead, administrators,
-          Auditors, a single-slot review and a concluded review.
+          answers the checks in it, submits it and then signs.
         justification: |
-          A reviewer needs to know that the ballot is their own and must be submitted before signing, that a review
-          ends only when every slot has signed the same record, that a rejection is written in the review conclusion,
-          and that a review that is concluded can no longer be changed. The topic that explains the review page is the
-          place to say it.
+          A reviewer needs to know that the ballot is their own and must be submitted before signing. The topic that
+          explains the review page is the place to say it.
         tests:
           - HelpPage_ReadingReview_ShowsSlotOwnerNote
 
+      - id: ReviewCenter-HelpPage-ReadingReviewTopic-Concluding
+        title: >-
+          The HelpPage unit shall state in the Reading a review topic that the review concludes when every slot has
+          signed the same, current record.
+        justification: |
+          A reviewer must know that a signature counts only for the record that was signed, and that the review ends
+          only when all slots agree on it.
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
+
+      - id: ReviewCenter-HelpPage-ReadingReviewTopic-Locked
+        title: >-
+          The HelpPage unit shall state in the Reading a review topic that a concluded review, approved or rejected, is
+          locked.
+        justification: |
+          A user who looks for the buttons of a concluded review must be told that it can no longer be changed.
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
+
+      - id: ReviewCenter-HelpPage-ReadingReviewTopic-ConclusionCard
+        title: >-
+          The HelpPage unit shall tell, in the Reading a review topic, the holder of a reviewer slot to write the review
+          conclusion in the Review conclusion card.
+        justification: |
+          A rejection is written in the review conclusion, and the person who has to write it must find the place.
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
+
+      - id: ReviewCenter-HelpPage-ReadingReviewTopic-ConclusionHidden
+        title: >-
+          The HelpPage unit shall state in the Reading a review topic that the conclusion stays hidden until the reader
+          hands in their own ballot, except for the lead, administrators, Auditors, a single-slot review and a
+          concluded review.
+        justification: |
+          Reviewers answer independently, so a reader who does not see a conclusion that others wrote must be told why,
+          and who sees it at once.
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
+          - HelpPage_ReadingReview_NamesWhoSeesTheConclusionAtOnce
+
       - id: ReviewCenter-HelpPage-ApiTokensTopic
         title: >-
-          The HelpPage unit shall serve a topic, API tokens, that explains how to create a token on the account page
-          and that its value is shown once, how to send it as a bearer token with a curl example, which endpoints
-          the API offers, how to use it with ReviewMark as the password of HTTP Basic credentials, that a token never
-          signs or opens a page, and what the errors of the API mean.
+          The HelpPage unit shall explain in the API tokens topic how to create a token on the account page and that
+          its value is shown once.
         justification: |
-          A script author needs one place that tells how to get a token and use it, and the limits of a token must
-          be said plainly so that nobody expects a pipeline to sign a review.
+          A script author needs one place that tells how to get a token, and must know that the value cannot be shown
+          again.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-CurlExample
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic how to send the token as a bearer token, with a curl
+          example.
+        justification: |
+          A script author needs a working example of the header to start from.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-Endpoints
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic which endpoints the API offers.
+        justification: |
+          A script author must find the addresses that exist, and the document that describes them, without reading
+          the source.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-ReviewMark
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic how to use the token with ReviewMark as the password
+          of HTTP Basic credentials.
+        justification: |
+          ReviewMark reads the evidence with the credentials that a user gives it, and the user must know that a token
+          serves as the password.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-NeverSigns
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic that a token never signs and does not open the web
+          pages.
+        justification: |
+          The limits of a token must be said plainly so that nobody expects a pipeline to sign a review.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+          - HelpApiTokensPage_Render_SaysTokenDoesNotOpenWebPages
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-Errors
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic what the errors of the API mean.
+        justification: |
+          A script author who meets a refusal must be able to tell a bad token from a request that came too often.
         tests:
           - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
 
       - id: ReviewCenter-HelpPage-MembersTopic
         title: >-
           The HelpPage unit shall serve a topic, Project members, at /help/project-members, that explains how a project
-          admin adds an existing user with the + Add member button by the exact user name, how a new account is
-          created as part of adding it, with a temporary password that is shown once and must be replaced at the first
-          sign-in, that the last project admin cannot be removed or demoted, that a person who is no longer a member is
-          marked as such on the reviews assigned to them, and that the Audit trail button shows the trail of the
-          project.
+          admin adds an existing user with the + Add member button by the exact user name.
         justification: |
-          Managing members is new to project admins and has rules that look like errors when met without
-          explanation: no list of users, one message for any name that cannot be added, a password that cannot be
-          shown again, and a last administrator that cannot leave. One place explains them.
+          Managing members is new to project admins and has rules that look like errors when met without explanation:
+          no list of users, and one message for any name that cannot be added.
         tests:
           - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
 
+      - id: ReviewCenter-HelpPage-MembersTopic-NewAccount
+        title: >-
+          The HelpPage unit shall explain in the Project members topic that a new account is created as part of adding
+          it, with a temporary password that is shown once and must be replaced at the first sign-in.
+        justification: |
+          A password that cannot be shown again, and a person who cannot do anything before choosing another one, look
+          like faults when met without explanation.
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+          - HelpMembersPage_Render_SaysNewAccountMustChoosePasswordAtFirstSignIn
+
+      - id: ReviewCenter-HelpPage-MembersTopic-LastAdmin
+        title: >-
+          The HelpPage unit shall explain in the Project members topic that the last project admin cannot be removed or
+          demoted.
+        justification: |
+          A project admin who meets the refusal must know that the project always keeps one administrator.
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+
+      - id: ReviewCenter-HelpPage-MembersTopic-FormerMember
+        title: >-
+          The HelpPage unit shall explain in the Project members topic that a person who is no longer a member is marked
+          as such on the reviews assigned to them.
+        justification: |
+          A reader of a review who sees the marker must know what it means.
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+
+      - id: ReviewCenter-HelpPage-MembersTopic-AuditTrail
+        title: >-
+          The HelpPage unit shall explain in the Project members topic that the Audit trail button shows the trail of
+          the project.
+        justification: |
+          A project admin who wants to know who changed the members must be told where to look.
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+
       - id: ReviewCenter-HelpPage-EvidenceSettingsTopic
         title: >-
           The HelpPage unit shall serve a topic, Evidence settings, at /help/evidence-settings, that explains that only
-          a project admin or a system administrator can change the evidence settings of a project from the Evidence
-          settings button, what the two anonymous switches (the evidence index and the attestation PDFs) do, that they
-          are off by default and independent, that the index alone is of no use to ReviewMark without the PDFs and that
-          anyone who reaches the server can then read what was opened, what the five PDF content
-          switches (review discussion threads, reviewer names, checklist wording, file list and hashes, git context)
-          leave out, the regulatory warning, the Content scope section of every PDF, and that every change is recorded
-          in the audit trail, with two screenshots of the settings page.
+          a project admin or a system administrator can change the evidence settings of a project, from the Evidence
+          settings button.
         justification: |
-          The settings open the evidence to anonymous readers and can reduce what a PDF proves, so the person who
-          changes them must be able to read what each switch costs before turning it. The consequences are explained
-          in one place, with pictures of the page the person sees.
+          The settings open the evidence to anonymous readers and can reduce what a PDF proves, so a person who looks
+          for them must be told who may change them and where.
         tests:
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
 
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-AnonymousSwitches
+        title: >-
+          The HelpPage unit shall explain in the Evidence settings topic what the two anonymous switches (the evidence
+          index and the attestation PDFs) do, that they are off by default, and that they are independent.
+        justification: |
+          The person who changes the switches must be able to read what each one opens before turning it on.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+          - HelpEvidenceSettingsPage_Render_ExplainsDefaultsAndExposureOfTheAnonymousSwitches
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-IndexAlone
+        title: >-
+          The HelpPage unit shall explain in the Evidence settings topic that the evidence index alone is of no use to
+          ReviewMark without the PDFs, and that anyone who can reach the server can read what was opened.
+        justification: |
+          A project admin who opens the index must know what else ReviewMark needs, and that what is opened is open to
+          everybody who can reach the server.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+          - HelpEvidenceSettingsPage_Render_ExplainsDefaultsAndExposureOfTheAnonymousSwitches
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-ContentSwitches
+        title: >-
+          The HelpPage unit shall explain in the Evidence settings topic what the five PDF content switches (review
+          discussion threads, reviewer names, checklist wording, file list and hashes, git context) leave out.
+        justification: |
+          The person who reduces a PDF must be able to read what each switch takes out.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-ContentScope
+        title: >-
+          The HelpPage unit shall explain in the Evidence settings topic the regulatory warning and the Content scope
+          section of every PDF.
+        justification: |
+          Leaving content out can make a record unacceptable for a regulatory regime, and a reader of a PDF must be told
+          where the PDF says what it does not show.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-AuditRecord
+        title: >-
+          The HelpPage unit shall explain in the Evidence settings topic that every change is recorded in the audit
+          trail.
+        justification: |
+          A project admin must know that changes of the settings can be traced.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic-Screenshots
+        title: >-
+          The HelpPage unit shall show in the Evidence settings topic two screenshots of the settings page.
+        justification: |
+          Pictures of the page that the user sees, with the defaults and with content left out, make clear what the
+          switches and their warnings look like.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+
       - id: ReviewCenter-HelpPage-ChecklistTemplateTopic
         title: >-
           The HelpPage unit shall serve a topic, Checklist template, at /help/checklist-template, that explains that
-          only a project admin or a system administrator can change the checklist template of a project from the
-          Checklist button, that a token can only read it, that a review keeps the checklist it was created with and
-          only new reviews use a replaced or reset template, how to export the current and the built-in default
-          checklist, how to import, validate, and preview a definition and read its errors by path, that a changed
-          definition needs another version label, what replace and reset do, that every change is recorded in the audit
-          trail, and that the shipped example is a structure to adapt and does not make a record compliant.
+          only a project admin or a system administrator can change the checklist template of a project, from the
+          Checklist button, and that an API token can only read it.
         justification: |
-          Replacing the checklist changes what later reviews are checked against, so the person who does it must be
-          able to read what it changes and what it leaves alone, in one place, before using the page.
+          A person who looks for the checklist of a project must be told who may change it and where, and a script
+          author must know the limit of a token.
         tests:
           - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+          - HelpChecklistTemplatePage_Render_ExplainsTokenReadOnlyImportAndErrorPaths
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-ReviewsKeepCopy
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic that a review keeps the checklist it was
+          created with, and that only new reviews use a replaced or reset template.
+        justification: |
+          Replacing the checklist changes what later reviews are checked against, and the person who does it must know
+          that existing and signed reviews are not touched.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-Export
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic how to export the current checklist and the
+          built-in default checklist.
+        justification: |
+          An exported file is the usual starting point for a checklist of the organization.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-Import
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic how to import, validate and preview a
+          definition, and that the errors of an invalid definition are listed by path.
+        justification: |
+          A person who imports a definition must know that nothing is stored before it is validated, and how to find
+          and fix every error in one pass.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+          - HelpChecklistTemplatePage_Render_ExplainsTokenReadOnlyImportAndErrorPaths
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-VersionLabel
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic that a changed definition needs another
+          version label.
+        justification: |
+          A refusal to replace the checklist looks like a fault when met without explanation, and two reviews with
+          the same label must always have the same wording.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-ReplaceReset
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic what replace and reset do.
+        justification: |
+          The person who changes the checklist must know what each button does before pressing it.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-AuditRecord
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic that every change is recorded in the audit
+          trail.
+        justification: |
+          A project admin must know that changes of the checklist can be traced.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic-ExampleNotCompliant
+        title: >-
+          The HelpPage unit shall explain in the Checklist template topic that the shipped example is a structure to
+          adapt and does not make a record compliant.
+        justification: |
+          A person who takes over the example must not take it for a guarantee of compliance with a standard.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
 
       - id: ReviewCenter-HelpPage-OidcSignIn
         title: >-
-          The HelpPage unit shall explain, in the topics for getting started, for signing, and for API tokens, that
-          an account of an identity provider signs in at the provider, confirms a signature there, and has no password
-          and no token that signs.
+          The HelpPage unit shall explain in the Getting started topic that an account of an identity provider signs in
+          at the provider.
         justification: |
-          People who sign in with a provider meet different steps, and they should find the reasons where they look
-          for help on those tasks.
+          People who sign in with a provider meet different steps, and they should find the reasons where they look for
+          help on getting started.
+        tests:
+          - HelpTopicPage_Render_MentionsSignInWithProvider
+
+      - id: ReviewCenter-HelpPage-OidcSignIn-Signing
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic that an account of an identity provider
+          confirms a signature at the provider and has no password to give.
+        justification: |
+          People who sign in with a provider meet a different step at a signature, and they should find the reasons
+          where they look for help on signing.
+        tests:
+          - HelpTopicPage_Render_MentionsSignInWithProvider
+
+      - id: ReviewCenter-HelpPage-OidcSignIn-ApiTokens
+        title: >-
+          The HelpPage unit shall explain in the API tokens topic that a token of an account of an identity provider
+          cannot sign.
+        justification: |
+          People who sign in with a provider should find in the topic on tokens that a token never replaces the
+          confirmation at the provider.
         tests:
           - HelpTopicPage_Render_MentionsSignInWithProvider
 
       - id: ReviewCenter-HelpPage-TwoFactorTopic
         title: >-
-          The HelpPage unit shall offer a topic on two-factor sign-in that explains how to set it up, sign in with a
-          code, use the recovery codes, sign a review with a code, turn it off, and ask an administrator for a reset,
-          and that notes that the sessions and the API tokens are not affected, and shall link to it from the topic on
-          signing.
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to set up two-factor sign-in, with the
+          recovery codes that are shown once.
         justification: |
-          A person who is locked out or asked for a code at a signature looks for help on exactly those tasks, and the
-          topic is the place for the reasons and for the warning that a recovery code does not sign.
+          A person who wants to protect an account looks for the steps, and must know that the recovery codes cannot be
+          shown again.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-SignIn
+        title: >-
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to sign in with a code.
+        justification: |
+          A person who is asked for a code after the password must know what to type and that a code works once.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-Recovery
+        title: >-
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to use the recovery codes.
+        justification: |
+          A person who lost the phone looks for exactly this task.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-SigningWithCode
+        title: >-
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to sign a review with a code, and that a
+          recovery code does not sign.
+        justification: |
+          A person who is asked for a code at a signature must know that a recovery code is not accepted and that a used
+          code needs the next one.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-TurnOff
+        title: >-
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to turn two-factor sign-in off.
+        justification: |
+          A person who changed the phone must be able to turn the protection off and set it up again.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-Reset
+        title: >-
+          The HelpPage unit shall explain in the Two-factor sign-in topic how to ask a system administrator for a reset
+          of two-factor sign-in, and that a project admin cannot do it.
+        justification: |
+          A person who has neither the phone nor a recovery code must know who can help.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-Unaffected
+        title: >-
+          The HelpPage unit shall note in the Two-factor sign-in topic that open sessions and API tokens are not
+          affected.
+        justification: |
+          A person who turns two-factor sign-in off or resets it, or who runs scripts, must know what stays as it is.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+          - HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic-SigningLink
+        title: >-
+          The HelpPage unit shall link to the Two-factor sign-in topic from the Reviewers and signing topic.
+        justification: |
+          A person who is asked for a code at a signature looks for help in the topic on signing.
         tests:
           - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
 
       - id: ReviewCenter-HelpPage-InboxTopic
         title: >-
-          The HelpPage unit shall offer a topic on the inbox that explains its eight groups (to answer, with the
-          question for you and its limit, disputed, ready to sign, signature no longer counts, replies waiting, failed
-          checks,
-          waiting for others and updates), the New badge, and how to
-          mark everything as read, that notes that a reviewer who has not handed in the own ballot never sees how the
-          others answered, and that notes that what a user has seen is not part of the signed record.
+          The HelpPage unit shall explain in the Your inbox topic its eight groups: to answer, disputed, ready to sign,
+          signature no longer counts, replies waiting, failed checks, waiting for others and updates.
         justification: |
-          A person who sees a number on the home page looks for what it counts and for what clears it.
+          A person who sees a number on the home page looks for what it counts.
         tests:
           - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-InboxTopic-QuestionForYou
+        title: >-
+          The HelpPage unit shall explain in the Your inbox topic the question for you and its limit: a thread has no
+          addressee, so every other reviewer sees the question, and the author is told by the replies waiting instead.
+        justification: |
+          A reviewer who sees a question that is not meant for them must know why it is there.
+        tests:
+          - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-InboxTopic-NewMarker
+        title: >-
+          The HelpPage unit shall explain in the Your inbox topic the New marker.
+        justification: |
+          A person who sees the marker must know what it says about the review.
+        tests:
+          - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-InboxTopic-MarkAllRead
+        title: >-
+          The HelpPage unit shall explain in the Your inbox topic how to mark everything as read.
+        justification: |
+          A person who wants to clear the markers looks for what clears them.
+        tests:
+          - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-InboxTopic-HiddenBallots
+        title: >-
+          The HelpPage unit shall note in the Your inbox topic that a reviewer who has not handed in the own ballot
+          never sees how the others answered.
+        justification: |
+          Reviewers answer independently, and a reviewer who sees no disputed row must know that this says nothing about
+          the others.
+        tests:
+          - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-InboxTopic-SeenNotRecorded
+        title: >-
+          The HelpPage unit shall note in the Your inbox topic that what a user has seen is kept for that user alone and
+          is not part of the signed record.
+        justification: |
+          A person who reads the markers must know that looking at a review never changes the record that the
+          signatures cover.
+        tests:
+          - HelpPage_HelpInboxPage_Render_SaysWhatYouHaveSeenIsNotPartOfTheSignedRecord
 
       - id: ReviewCenter-HelpPage-PlanningTopic
         title: >-
           The HelpPage unit shall state in the Planning reviews topic that the default baseline of the plan is the last
-          approved review of each set, that a review counts as approved only when it concluded with the Approved outcome
-          (every ballot submitted, current signatures, nothing disputed, pending or failing, no open thread), so a
-          Rejected review is not approved, and that a set without an approved review is planned as a full review.
+          approved review of each set.
         justification: |
-          A person who plans reviews must know which earlier review a delta is measured from, or a change of a review
-          that was never approved could be taken for reviewed.
+          A person who plans reviews must know which earlier review a delta is measured from.
+        tests:
+          - HelpPage_Planning_NamesTheLastApprovedReviewBaseline
+
+      - id: ReviewCenter-HelpPage-PlanningTopic-Approved
+        title: >-
+          The HelpPage unit shall state in the Planning reviews topic that a review counts as approved only when it
+          concluded with the Approved outcome, so a Rejected review is not approved.
+        justification: |
+          A change of a review that was never approved could be taken for reviewed if a rejected review were used as
+          the baseline.
+        tests:
+          - HelpPage_Planning_NamesTheLastApprovedReviewBaseline
+
+      - id: ReviewCenter-HelpPage-PlanningTopic-NoApproved
+        title: >-
+          The HelpPage unit shall state in the Planning reviews topic that a set without an approved review is planned
+          as a full review.
+        justification: |
+          A person who sees a full review planned for a set must know why there is no delta.
         tests:
           - HelpPage_Planning_NamesTheLastApprovedReviewBaseline
 
       - id: ReviewCenter-HelpPage-PlainLanguage
         title: >-
-          The HelpPage unit shall explain in the topics on signing, comments and the inbox, in plain words and without
-          the phrase "out of date", that a signature needs to be given again after the review changed, what the "Where
-          are we?" panel on the review page shows, and what the list of changes since a signature does and does not
-          tell.
+          The HelpPage unit shall explain in the Reviewers and signing topic, in plain words, that a signature needs to
+          be given again after the review changed.
         justification: |
           The help must use the words that the pages use, or a person who reads it cannot match it to the screen.
+        tests:
+          - HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe
+
+      - id: ReviewCenter-HelpPage-PlainLanguage-WhereAreWe
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic what the "Where are we?" panel on the
+          review page shows.
+        justification: |
+          A reviewer who reads the panel must be able to match it to the explanation.
+        tests:
+          - HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe
+
+      - id: ReviewCenter-HelpPage-PlainLanguage-Changes
+        title: >-
+          The HelpPage unit shall explain in the Reviewers and signing topic and in the Your inbox topic that the review
+          page explains what changed since a signature.
+        justification: |
+          A reviewer who has to sign again must know where to see what changed since the signature.
+        tests:
+          - HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature
+
+      - id: ReviewCenter-HelpPage-PlainLanguage-NoOutOfDate
+        title: >-
+          The HelpPage unit shall not use the phrase "out of date" in the topics on signing, comments and the inbox.
+        justification: |
+          The pages say that a signature no longer counts, and the help must not use another word for the same thing.
         tests:
           - HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe

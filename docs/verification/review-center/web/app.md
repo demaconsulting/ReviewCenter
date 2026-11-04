@@ -36,10 +36,12 @@ N/A - standard test environment.
   page and the logout button, and the links to the audit and users pages only for a system administrator (there is no
   repositories link, because repositories belong to projects); for
   nobody signed in it shows the link to the login page and no projects link, no name, and no logout button.
-- The header shows the help link to everyone, and for nobody signed in it comes before the sign-in link.
-- The header has exactly one link to the home page.
+- The header shows the help link to everyone, signed in or not, and for nobody signed in it comes before the sign-in
+  link.
+- The header has exactly one link to the home page, and it is labeled with the product name.
+- Reviewers and visitors who are not signed in see no link to a repositories page.
 - While the session carries the must-change-password claim, the header has no projects and users tabs, and the browser
-  is sent to `/account` from the projects and review pages but not from the account, help, and about pages.
+  is sent to `/account` from the projects and review pages but not from the account, help, about, and login pages.
 - The footer shows the product name, the copyright holder, a version that begins with the version of the program and is
   no longer than it, and a link to the About page, also when nobody is signed in.
 - A signed-in user sees the Inbox tab, a link to `/inbox`, with a badge of the number of reviews that need the user's
@@ -129,9 +131,25 @@ users page and the audit page (`/audit`) appear, and there is still no repositor
 projects. This scenario is tested by
 `MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.
 
+**MainLayout_Render_SignedInUser_ShowsLogoutButtonThatPostsToSignOutEndpoint**: `MainLayout` is rendered for a
+signed-in user; the logout button with the text "Logout" is a submit button inside a form whose method is post and
+whose action is the sign-out endpoint `/auth/logout`. This scenario is tested by
+`MainLayout_Render_SignedInUser_ShowsLogoutButtonThatPostsToSignOutEndpoint`.
+
 **MainLayout_Render_NobodySignedIn_ShowsSignInLink**: `MainLayout` is rendered with nobody signed in; the header shows
 the sign-in link to `/login`, no projects link, and no user name and no logout button. This scenario is tested by
 `MainLayout_Render_NobodySignedIn_ShowsSignInLink`.
+
+**MainLayout_Render_NobodySignedIn_LabelsHomeLinkWithProductName**: `MainLayout` is rendered with nobody signed in; the
+one header link to the home page has the product name `ReviewCenter` in its text. This scenario is tested by
+`MainLayout_Render_NobodySignedIn_LabelsHomeLinkWithProductName`.
+
+**MainLayout_Render_SignedInUser_ShowsHelpLink**: `MainLayout` is rendered for a signed-in ordinary user; the header
+has the help link, pointing to `/help`. This scenario is tested by `MainLayout_Render_SignedInUser_ShowsHelpLink`.
+
+**MainLayout_Render_ReviewerAndNobody_ShowNoRepositoriesLink**: `MainLayout` is rendered for a signed-in ordinary user
+and then with nobody signed in; neither header has a link to a repositories page. This scenario is tested by
+`MainLayout_Render_ReviewerAndNobody_ShowNoRepositoriesLink`.
 
 **MainLayout_Render_NobodySignedIn_ShowsHelpLinkBeforeSignIn**: `MainLayout` is rendered with nobody signed in; the
 help link points to `/help`, and the links of the right-hand group of the header are the help link and then the
@@ -143,9 +161,9 @@ not longer than it, the About link points to `/about`, and there is exactly one 
 scenario is tested by `MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink`.
 
 **MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage**: A theory over the pages `projects`, `reviews/1`,
-`account`, `help/project-members`, and `about`, with a session that carries the must-change-password claim; `MainLayout`
-is rendered with no projects and no users tab, and the browser is sent to `/account` from the first two pages only. This
-scenario is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`.
+`account`, `help/project-members`, `about`, and `login`, with a session that carries the must-change-password claim;
+`MainLayout` is rendered with no projects and no users tab, and the browser is sent to `/account` from the first two
+pages only. This scenario is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`.
 
 **MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose**: A flagged session renders
 `MainLayout` on `/help`, then navigates (the layout stays alive) to `/account` and `/help/project-members`, which are

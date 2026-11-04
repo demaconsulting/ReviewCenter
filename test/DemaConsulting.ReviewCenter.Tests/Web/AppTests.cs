@@ -225,6 +225,29 @@ public class AppTests : InboxWebTestBase
     }
 
     /// <summary>
+    ///     Test that the logout button of the header, shown to a signed-in user, is a button of a form that posts to the
+    ///     sign-out endpoint, so that signing out is not triggered by a plain link.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_SignedInUser_ShowsLogoutButtonThatPostsToSignOutEndpoint()
+    {
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea", UserRole.Reviewer);
+
+        // Act: render the layout
+        var cut = Render<MainLayout>();
+
+        // Assert: the logout button submits a form whose method is post and whose action is the sign-out endpoint
+        var button = cut.Find("[data-testid='logout-button']");
+        Assert.Equal("Logout", button.TextContent);
+        Assert.Equal("submit", button.GetAttribute("type"));
+        var form = button.Closest("form");
+        Assert.NotNull(form);
+        Assert.Equal("post", form.GetAttribute("method"));
+        Assert.Equal("/auth/logout", form.GetAttribute("action"));
+    }
+
+    /// <summary>
     ///     Test that a user who signed in with a temporary password sees no navigation tabs and is sent to the
     ///     account page from any other page, but may stay on the account, help and about pages.
     /// </summary>
@@ -236,6 +259,7 @@ public class AppTests : InboxWebTestBase
     [InlineData("account", false)]
     [InlineData("help/project-members", false)]
     [InlineData("about", false)]
+    [InlineData("login", false)]
     public void MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage(string path, bool redirected)
     {
         // Arrange: a flagged session on the given page
@@ -666,6 +690,168 @@ public class AppTests : InboxWebTestBase
     }
 
     /// <summary>
+    ///     Test that the form of the sign-in page is an ordinary post to the sign-in endpoint, which needs no live
+    ///     connection.
+    /// </summary>
+    [Fact]
+    public void LoginPage_Render_Default_FormPostsToSignInEndpoint()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the form posts to the sign-in endpoint with the plain form method, and is no event handler of a
+        // live connection
+        var form = cut.Find("form[data-testid='login-form']");
+        Assert.Equal("post", form.GetAttribute("method"));
+        Assert.Equal("/auth/login", form.GetAttribute("action"));
+        Assert.Null(form.GetAttribute("onsubmit"));
+    }
+
+    /// <summary>
+    ///     Test that the router, which applies the authorization rules of a page, shows the sign-in page at /login to a
+    ///     visitor who is not signed in and does not ask the visitor to sign in.
+    /// </summary>
+    [Fact]
+    public void LoginPage_Render_AnonymousThroughRouter_ShowsFormAndNoSignInPrompt()
+    {
+        // Arrange: nobody is signed in and the router is at /login
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/login");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the sign-in form is shown, and neither the access denied message nor a link to sign in is
+        Assert.NotNull(cut.Find("[data-testid='login-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
+        Assert.Empty(cut.FindAll("[data-testid='access-denied-login-link']"));
+    }
+
+    /// <summary>
+    ///     Test that the sign-in form has a user name field, a password field that hides what is typed, and a Sign in
+    ///     button that sends the form.
+    /// </summary>
+    [Fact]
+    public void LoginPage_Render_Default_ShowsUserNamePasswordAndSignInButton()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the fields are named and labelled, the password field hides its input, and the button sends the form
+        var form = cut.Find("form[data-testid='login-form']");
+        var user = form.QuerySelector("input[name='username']");
+        var password = form.QuerySelector("input[name='password']");
+        Assert.Equal("text", user?.GetAttribute("type"));
+        Assert.Equal("password", password?.GetAttribute("type"));
+        Assert.Equal("User name", cut.Find("label[for='login-username']").TextContent);
+        Assert.Equal("Password", cut.Find("label[for='login-password']").TextContent);
+        var button = form.QuerySelector("button[type='submit']");
+        Assert.Equal("Sign in", button?.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a failed sign-in shows the same message whatever the flag in the address says, and that a plain
+    ///     visit shows no message.
+    /// </summary>
+    /// <param name="query">The query string of the address.</param>
+    /// <param name="shown">Whether the message must be shown.</param>
+    [Theory]
+    [InlineData("?error=1", true)]
+    [InlineData("?error=unknown-user", true)]
+    [InlineData("?error=locked", true)]
+    [InlineData("", false)]
+    public void LoginPage_Render_ErrorFlag_ShowsOneMessageWhateverTheReason(string query, bool shown)
+    {
+        // Arrange: nobody is signed in, and the address carries the query
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/login" + query);
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the one message is shown for every flag and only then
+        var messages = cut.FindAll("[data-testid='login-error']");
+        if (shown)
+        {
+            Assert.Equal("Invalid user name or password.", Assert.Single(messages).TextContent);
+        }
+        else
+        {
+            Assert.Empty(messages);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the sign-in page shows the message about too many attempts, and not the generic one, for the
+    ///     throttled flag.
+    /// </summary>
+    [Fact]
+    public void LoginPage_Render_ThrottledFlag_ShowsTooManyAttemptsMessageOnly()
+    {
+        // Arrange: nobody is signed in, and the address says the sign-in was refused by the throttle
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/login?error=throttled");
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the message tells there were too many attempts and to try again in a few minutes; the generic one is not shown
+        var message = cut.Find("[data-testid='login-throttled']").TextContent;
+        Assert.Contains("Too many", message, StringComparison.Ordinal);
+        Assert.Contains("few minutes", message, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='login-error']"));
+    }
+
+    /// <summary>
+    ///     Test that a failed sign-in keeps a local return address in the form, so that the second attempt leads
+    ///     back to where the user came from.
+    /// </summary>
+    [Fact]
+    public void LoginPage_Render_FailureWithLocalReturnAddress_KeepsItInTheForm()
+    {
+        // Arrange: nobody is signed in, and the address says a sign-in failed and carries a local return address
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/login?error=1&ReturnUrl=" + Uri.EscapeDataString("/projects/1"));
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the error is shown and the form carries the return address
+        Assert.NotNull(cut.Find("[data-testid='login-error']"));
+        Assert.Equal("/projects/1", cut.Find("form[data-testid='login-form'] input[name='returnUrl']").GetAttribute("value"));
+    }
+
+    /// <summary>
+    ///     Test that a return address that leads to another site is not put into the form; the home page is.
+    /// </summary>
+    /// <param name="returnUrl">The return address in the query.</param>
+    [Theory]
+    [InlineData("https://evil.example/")]
+    [InlineData("//evil.example/")]
+    [InlineData("javascript:alert(1)")]
+    public void LoginPage_Render_ForeignReturnAddress_IsReplacedByHomePage(string returnUrl)
+    {
+        // Arrange: nobody is signed in, and the address carries the foreign return address
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/login?ReturnUrl=" + Uri.EscapeDataString(returnUrl));
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the form leads to the home page, and nothing on the page carries the foreign address
+        Assert.Equal("/", cut.Find("form[data-testid='login-form'] input[name='returnUrl']").GetAttribute("value"));
+        Assert.DoesNotContain(returnUrl, cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that every page has a footer with the version and a link to the About page, even when nobody is
     ///     signed in, and that the header has exactly one link to the home page.
     /// </summary>
@@ -791,6 +977,60 @@ public class AppTests : InboxWebTestBase
         Assert.Equal("/login", cut.Find("[data-testid='signin-link']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='current-user']"));
         Assert.Empty(cut.FindAll("[data-testid='logout-button']"));
+    }
+
+    /// <summary>
+    ///     Test that the link to the home page in the header is labeled with the product name when nobody is
+    ///     signed in.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_NobodySignedIn_LabelsHomeLinkWithProductName()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the layout
+        var cut = Render<MainLayout>();
+
+        // Assert: the one link to the home page carries the product name
+        var link = Assert.Single(cut.FindAll("[data-testid='home-link']"));
+        Assert.Contains("ReviewCenter", link.TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the header offers the link to the help to a signed-in user too.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_SignedInUser_ShowsHelpLink()
+    {
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea", UserRole.Reviewer);
+
+        // Act: render the layout
+        var cut = Render<MainLayout>();
+
+        // Assert: the link to the help is there
+        Assert.Equal("/help", cut.Find("[data-testid='help-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the header shows no link to a repositories page to a reviewer or to a visitor who is not
+    ///     signed in.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_ReviewerAndNobody_ShowNoRepositoriesLink()
+    {
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea", UserRole.Reviewer);
+
+        // Act: render the layout as the reviewer, then as a visitor who is not signed in
+        var reviewer = Render<MainLayout>();
+        SignOut();
+        var nobody = Render<MainLayout>();
+
+        // Assert: neither header has the link
+        Assert.Empty(reviewer.FindAll("[data-testid='repositories-link']"));
+        Assert.Empty(nobody.FindAll("[data-testid='repositories-link']"));
     }
 
     /// <summary>

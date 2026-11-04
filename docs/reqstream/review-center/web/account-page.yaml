@@ -9,7 +9,7 @@ sections:
     requirements:
       - id: ReviewCenter-AccountPage-Show
         title: >-
-          The AccountPage unit shall serve at /account, to a signed-in user, a form for changing the password.
+          The AccountPage unit shall show a form for changing the password to a signed-in user.
         justification: |
           Users must be able to change the password without asking an administrator.
         tests:
@@ -18,134 +18,472 @@ sections:
       - id: ReviewCenter-AccountPage-ChangePassword
         title: >-
           The AccountPage unit shall change the password of the signed-in user when the current password is given
-          correctly and the new password follows the password rules, clearing the password fields afterwards, and
-          shall show a violated rule as a message, changing nothing. While the second factor is on it shall also ask
-          for a code or a recovery code, send it with the request, answer a missing or wrong code with a general
-          message, and empty that field too; it shall ask for no code otherwise.
+          correctly and the new password follows the password rules.
         justification: |
-          The current password is required so that somebody at an unattended session cannot take over the
-          account, and the fields are cleared so that no password stays on the page. With a second factor the
-          password alone is not enough, so the page must offer the field for the code.
+          The current password is required so that somebody at an unattended session cannot take over the account,
+          and the rules keep the new password from being weak.
         tests:
           - AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields
+
+      - id: ReviewCenter-AccountPage-ChangePassword-ClearFields
+        title: >-
+          The AccountPage unit shall empty the current, the new, and the repeated password field after the password was
+          changed.
+        justification: |
+          No password may stay on the page once it has been used.
+        tests:
+          - AccountPage_ChangePassword_ValidInput_EmptiesAllThreePasswordFields
+
+      - id: ReviewCenter-AccountPage-ChangePassword-RuleViolation
+        title: >-
+          The AccountPage unit shall show a violated password rule as a message.
+        justification: |
+          A person who is refused must be told which rule the new password breaks, so that the next attempt can
+          succeed.
+        tests:
           - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing
+
+      - id: ReviewCenter-AccountPage-ChangePassword-NothingChanged
+        title: >-
+          The AccountPage unit shall leave the password unchanged when it refuses the change.
+        justification: |
+          A refused change that took effect anyway would let somebody replace a password without having proved that
+          they know the current one.
+        tests:
+          - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing
+          - AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing
+          - AccountPage_ChangePassword_Enrolled_WrongCode_ShowsGenericErrorAndChangesNothing
+
+      - id: ReviewCenter-AccountPage-ChangePassword-CodeField
+        title: >-
+          The AccountPage unit shall ask a user who has turned on the second factor for a code or a recovery code in
+          the form that changes the password.
+        justification: |
+          With a second factor the password alone is not enough to take over the account, so the page must offer the
+          field for the code.
+        tests:
           - AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser
+
+      - id: ReviewCenter-AccountPage-ChangePassword-NoCodeField
+        title: >-
+          The AccountPage unit shall ask for no code in the form that changes the password when the user has not
+          turned on the second factor or signed in with a temporary password.
+        justification: |
+          A field that cannot be used would only confuse the person and block a change that needs no code.
+        tests:
+          - AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser
+
+      - id: ReviewCenter-AccountPage-ChangePassword-CodeAccepted
+        title: >-
+          The AccountPage unit shall change the password of a user who has turned on the second factor when the right
+          code is sent with the request.
+        justification: |
+          The code is the second proof that the person at the page owns the account.
+        tests:
+          - AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields
+
+      - id: ReviewCenter-AccountPage-ChangePassword-RecoveryCode
+        title: >-
+          The AccountPage unit shall change the password of a user who has turned on the second factor when a recovery
+          code is sent with the request instead of the code.
+        justification: |
+          A person who lost the authenticator app must still be able to change the password with a recovery code.
+        tests:
+          - AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount
+
+      - id: ReviewCenter-AccountPage-ChangePassword-MissingCode
+        title: >-
+          The AccountPage unit shall answer a missing code of a user who has turned on the second factor with a
+          general message.
+        justification: |
+          A general message does not tell an observer which of the proofs failed.
+        tests:
+          - AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing
+
+      - id: ReviewCenter-AccountPage-ChangePassword-WrongCode
+        title: >-
+          The AccountPage unit shall answer a wrong code of a user who has turned on the second factor with the same
+          general message.
+        justification: |
+          A message that differed from the one for a missing code would tell an observer how close a guess was.
+        tests:
+          - AccountPage_ChangePassword_Enrolled_WrongCode_ShowsGenericErrorAndChangesNothing
+
+      - id: ReviewCenter-AccountPage-ChangePassword-ClearCode
+        title: >-
+          The AccountPage unit shall empty the code field after an attempt to change the password.
+        justification: |
+          A code must not stay on the page after it has been sent, whether the attempt worked or not.
+        tests:
           - AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing
           - AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields
-          - AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount
 
       - id: ReviewCenter-AccountPage-TemporaryPassword
         title: >-
-          The AccountPage unit shall, for a user whose session carries the must-change-password claim, show a banner
-          that a temporary password is in use and the form for changing the password only, with no card of personal
-          access tokens and no appearance card, and shall, after the password was replaced, send the browser to the
-          sign-in page with the changed notice flag; a normal session shall show no banner.
+          The AccountPage unit shall show a banner that a temporary password is in use to a user whose session carries
+          the must-change-password claim.
         justification: |
           An account made by a project admin starts with a password that the project admin has seen, so the person
-          must replace it before anything else. The page shows nothing that the person cannot use yet, and the new
-          sign-in proves that the new password works and drops the session that carried the flag.
+          must be told to replace it before anything else.
         tests:
           - AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm
-          - AccountPage_Render_NormalSession_ShowsNoBanner
+
+      - id: ReviewCenter-AccountPage-TemporaryPassword-PasswordFormOnly
+        title: >-
+          The AccountPage unit shall show only the form for changing the password, with no card of personal access
+          tokens and no appearance card, to a user whose session carries the must-change-password claim.
+        justification: |
+          The page shows nothing that the person cannot use yet, so that the replacement of the password comes first.
+        tests:
+          - AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm
+
+      - id: ReviewCenter-AccountPage-TemporaryPassword-SignInAgain
+        title: >-
+          The AccountPage unit shall send the browser to the sign-in page with the changed notice flag after the
+          temporary password was replaced.
+        justification: |
+          The new sign-in proves that the new password works and drops the session that carried the claim.
+        tests:
           - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
+
+      - id: ReviewCenter-AccountPage-TemporaryPassword-NormalSession
+        title: >-
+          The AccountPage unit shall show no banner about a temporary password in a session that does not carry the
+          must-change-password claim.
+        justification: |
+          A banner that always showed would be ignored when it matters.
+        tests:
+          - AccountPage_Render_NormalSession_ShowsNoBanner
 
       - id: ReviewCenter-AccountPage-Appearance
         title: >-
-          The AccountPage unit shall let the signed-in user choose between a system, a light, and a dark appearance,
-          with the system appearance selected until a choice was made, apply a chosen appearance at once, and keep the
-          choice in the browser only, showing the stored choice as selected when the page is opened.
+          The AccountPage unit shall let the signed-in user choose between a system, a light, and a dark appearance.
         justification: |
-          Reviewers read code for long periods and have different needs for contrast and glare. The choice is a
-          property of the device and its surroundings, so it is kept in the browser rather than on the server, and
-          following the device setting is the default so that nobody has to configure anything.
+          Reviewers read code for long periods and have different needs for contrast and glare.
         tests:
           - AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected
+
+      - id: ReviewCenter-AccountPage-Appearance-Default
+        title: >-
+          The AccountPage unit shall show the system appearance as selected until a choice was made.
+        justification: |
+          Following the device setting is the default, so that nobody has to configure anything.
+        tests:
+          - AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected
+
+      - id: ReviewCenter-AccountPage-Appearance-Apply
+        title: >-
+          The AccountPage unit shall apply a chosen appearance at once.
+        justification: |
+          The person must see the effect of the choice at the moment of choosing, without a reload.
+        tests:
           - AccountPage_ChooseDark_AppliesThemeAndSelectsOption
+
+      - id: ReviewCenter-AccountPage-Appearance-BrowserOnly
+        title: >-
+          The AccountPage unit shall keep a chosen appearance in the browser only.
+        justification: |
+          The choice is a property of the device and its surroundings, so it is kept in the browser rather than on the
+          server.
+        tests:
+          - AccountPage_ChooseDark_AppliesThemeAndSelectsOption
+          - AccountPage_Render_StoredLightChoice_IsSelected
+
+      - id: ReviewCenter-AccountPage-Appearance-StoredChoice
+        title: >-
+          The AccountPage unit shall show the stored appearance as selected when the page is opened.
+        justification: |
+          The page must show the choice that is in effect, not the default.
+        tests:
           - AccountPage_Render_StoredLightChoice_IsSelected
 
       - id: ReviewCenter-AccountPage-TokensCard
         title: >-
-          The AccountPage unit shall show a card of the personal access tokens of the signed-in user, with a form to
-          create a token, the list of the tokens with the name, the display id, the expiry, the last use, and the
-          state of each, without any token value, and a link to the help topic about the API.
+          The AccountPage unit shall show a card of the personal access tokens of the signed-in user with a form to
+          create a token.
         justification: |
-          The owner of a token must see which tokens exist and which are in use, in order to take back the ones that
-          are not needed, and a link to the help topic puts the explanation where the token is made.
+          The owner of a token must be able to make a token and see which tokens exist in one place.
         tests:
           - AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink
+
+      - id: ReviewCenter-AccountPage-TokensCard-List
+        title: >-
+          The AccountPage unit shall list the tokens of the signed-in user with the name, the display id, the expiry,
+          the last use, and the state of each.
+        justification: |
+          The owner must see which tokens exist and which are in use, in order to take back the ones that are not
+          needed.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
           - AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton
+
+      - id: ReviewCenter-AccountPage-TokensCard-NoValue
+        title: >-
+          The AccountPage unit shall show no token value in the list of tokens.
+        justification: |
+          The value is a secret that is shown only when the token is made, so the list must never expose it.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-AccountPage-TokensCard-HelpLink
+        title: >-
+          The AccountPage unit shall show a link to the help topic about the API in the card of the tokens.
+        justification: |
+          A link to the help topic puts the explanation where the token is made.
+        tests:
+          - AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink
 
       - id: ReviewCenter-AccountPage-TokenCreate
         title: >-
-          The AccountPage unit shall create a token from the name and the expiry that the user entered, show its
-          value once, with a copy button and a note that it cannot be shown again, list the new token, and show an
-          error and create nothing when the name is empty or the user already has 20 active tokens.
+          The AccountPage unit shall create a token from the name and the expiry that the user entered.
         justification: |
-          The value is only known at the moment of creation, so the page must show it then, and a refusal must say why
-          and must not leave a token that the user did not see.
+          The name tells the owner later what the token is used for, and the expiry limits the harm of a leak.
         tests:
           - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-AccountPage-TokenCreate-ValueOnce
+        title: >-
+          The AccountPage unit shall show the value of a new token once, until the user dismisses it.
+        justification: |
+          The value is only known at the moment of creation, so the page must show it then and must not keep it.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-AccountPage-TokenCreate-Note
+        title: >-
+          The AccountPage unit shall show with the value of a new token a note that the value cannot be shown again.
+        justification: |
+          The person must know that the value is lost if it is not copied now.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsNoteThatValueCannotBeShownAgain
+
+      - id: ReviewCenter-AccountPage-TokenCreate-Listed
+        title: >-
+          The AccountPage unit shall list a new token among the tokens of the user.
+        justification: |
+          The owner must see the new token among the others at once.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-AccountPage-TokenCreate-EmptyName
+        title: >-
+          The AccountPage unit shall show an error when the user submits the form for a token with an empty name.
+        justification: |
+          A refusal must say why, so that the person can correct the form.
+        tests:
+          - AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-AccountPage-TokenCreate-LimitReached
+        title: >-
+          The AccountPage unit shall show an error that names the limit when the user submits the form for a token
+          while already having 20 active tokens.
+        justification: |
+          A refusal must say why, so that the person knows to revoke a token that is no longer needed.
+        tests:
+          - AccountPage_CreateToken_TwentyActive_ShowsLimitError
+
+      - id: ReviewCenter-AccountPage-TokenCreate-NothingCreated
+        title: >-
+          The AccountPage unit shall create no token and show no token value when it refuses the form for a token.
+        justification: |
+          A refusal must not leave a token that the user did not see.
+        tests:
           - AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing
           - AccountPage_CreateToken_TwentyActive_ShowsLimitError
 
       - id: ReviewCenter-AccountPage-TokenCopy
         title: >-
           The AccountPage unit shall copy the value of a new token to the clipboard through the browser when the user
-          presses the copy button, and show a hint to copy it by hand, keeping the value on the page, when the
-          browser refuses.
+          presses the copy button.
         justification: |
-          Copying the value avoids a typing error, and the value must not be lost because a browser did not allow the
-          copy, as it cannot be shown again.
+          Copying the value avoids a typing error.
         tests:
           - AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript
+
+      - id: ReviewCenter-AccountPage-TokenCopy-Hint
+        title: >-
+          The AccountPage unit shall show a hint to copy the value of a new token by hand when the browser refuses the
+          copy.
+        justification: |
+          The person must be told what to do when the automatic copy did not work.
+        tests:
+          - AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken
+
+      - id: ReviewCenter-AccountPage-TokenCopy-ValueKept
+        title: >-
+          The AccountPage unit shall keep the value of a new token on the page when the browser refuses the copy.
+        justification: |
+          The value cannot be shown again, so it must not be lost because a browser did not allow the copy.
+        tests:
           - AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken
 
       - id: ReviewCenter-AccountPage-TokenRevoke
         title: >-
-          The AccountPage unit shall let the user revoke an active token of their own, show the token as revoked
-          without the revoke button afterwards, and offer no revoke button for a token that is expired.
+          The AccountPage unit shall let the user revoke an active token of their own.
         justification: |
-          A token that leaked or is no longer used must be possible to take back from the page at once, and a button
-          that does nothing for a token that is already dead would only confuse.
+          A token that leaked or is no longer used must be possible to take back from the page at once.
         tests:
           - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
+
+      - id: ReviewCenter-AccountPage-TokenRevoke-NoButton
+        title: >-
+          The AccountPage unit shall show a revoked token as revoked, without the revoke button.
+        justification: |
+          A button that does nothing for a token that is already revoked would only confuse.
+        tests:
+          - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
+
+      - id: ReviewCenter-AccountPage-TokenRevoke-ExpiredToken
+        title: >-
+          The AccountPage unit shall offer no revoke button for a token that is expired.
+        justification: |
+          A button that does nothing for a token that is already dead would only confuse.
+        tests:
           - AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton
 
       - id: ReviewCenter-AccountPage-ExternalAccount
         title: >-
           The AccountPage unit shall show, for an account of a provider, a sentence that the password is managed by the
-          provider instead of the form that changes the password.
+          provider.
         justification: |
-          The account has no password, so a form for it would only fail, and the sentence tells the person where to go.
+          The sentence tells the person where to go to change the password.
+        tests:
+          - AccountPage_Render_ExternalUser_ShowsNoPasswordForm
+
+      - id: ReviewCenter-AccountPage-ExternalAccount-NoForm
+        title: >-
+          The AccountPage unit shall show no form that changes the password for an account of a provider.
+        justification: |
+          The account has no password, so a form for it would only fail.
         tests:
           - AccountPage_Render_ExternalUser_ShowsNoPasswordForm
 
       - id: ReviewCenter-AccountPage-Totp
         title: >-
-          The AccountPage unit shall show, for a local account while the second factor is on, a card with the status
-          and the steps: start the setup with the password, show the secret and its address as text, confirm with a code
-          and show the ten recovery codes once until dismissed, give up a setup, show how many recovery codes are left,
-          and remove the second factor or replace the recovery codes only with the password and a code, emptying the
-          fields after each attempt and answering a wrong code with a general message. It shall show no card while the
-          feature is off or the password is temporary, and a sentence for an account of a provider.
+          The AccountPage unit shall show, for a local account while the second factor feature is on, a card with the
+          status of the second factor.
         justification: |
-          The person manages their own second factor here, and the page must make the safe way the easy way: the secret
-          and the codes appear once, a mistake does not tell an observer anything, and nothing that cannot work is
-          offered.
+          The person manages their own second factor here, so the status must be visible at a glance.
         tests:
           - AccountPage_Render_LocalUserNotEnrolled_ShowsStatusOffAndStartForm
-          - AccountPage_Render_FeatureDisabled_HidesCard
-          - AccountPage_Render_ExternalUser_ShowsNoteAndNoControls
-          - AccountPage_Render_TemporaryPassword_HidesCard
+          - AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft
+
+      - id: ReviewCenter-AccountPage-Totp-Start
+        title: >-
+          The AccountPage unit shall start the set-up of the second factor only when the user gives the right password.
+        justification: |
+          Somebody at an unattended session must not be able to bind an authenticator of their own to the account.
+        tests:
+          - AccountPage_Render_LocalUserNotEnrolled_ShowsStatusOffAndStartForm
           - AccountPage_Start_WrongPassword_ShowsErrorAndNoSecret
           - AccountPage_Start_RightPassword_ShowsSecretAndAddress
-          - AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending
+
+      - id: ReviewCenter-AccountPage-Totp-Secret
+        title: >-
+          The AccountPage unit shall show the secret of a started set-up and its address as text.
+        justification: |
+          The person must be able to enter the secret into an authenticator app by hand when scanning is not possible.
+        tests:
+          - AccountPage_Start_RightPassword_ShowsSecretAndAddress
+
+      - id: ReviewCenter-AccountPage-Totp-Confirm
+        title: >-
+          The AccountPage unit shall turn the second factor on when the user confirms the set-up with the right code.
+        justification: |
+          The right code proves that the authenticator app works before the account depends on it.
+        tests:
           - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
-          - AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm
-          - AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft
-          - AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields
-          - AccountPage_Disable_RecoveryCode_TurnsItOff
+
+      - id: ReviewCenter-AccountPage-Totp-RecoveryCodes
+        title: >-
+          The AccountPage unit shall show ten distinct recovery codes after the second factor was turned on.
+        justification: |
+          The recovery codes are the way back into the account when the authenticator app is lost.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
+
+      - id: ReviewCenter-AccountPage-Totp-RecoveryOnce
+        title: >-
+          The AccountPage unit shall show recovery codes only until the user dismisses them.
+        justification: |
+          The codes are secrets that cannot be shown again, so they must not stay on the page.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
           - AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce
+          - AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft
+
+      - id: ReviewCenter-AccountPage-Totp-GiveUp
+        title: >-
+          The AccountPage unit shall let the user give up a set-up of the second factor that is in progress.
+        justification: |
+          A person who changes their mind must be able to leave without a half-finished set-up.
+        tests:
+          - AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm
+
+      - id: ReviewCenter-AccountPage-Totp-RecoveryLeft
+        title: >-
+          The AccountPage unit shall show how many recovery codes are left.
+        justification: |
+          The person must know when the recovery codes are running out and new ones are needed.
+        tests:
+          - AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft
+          - AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount
+
+      - id: ReviewCenter-AccountPage-Totp-Disable
+        title: >-
+          The AccountPage unit shall turn the second factor off when the user gives the password and a code.
+        justification: |
+          Turning the second factor off weakens the account, so it needs the proofs that the owner is at the page.
+        tests:
+          - AccountPage_Disable_RecoveryCode_TurnsItOff
+          - AccountPage_Disable_RightPasswordAndCode_TurnsItOff
+
+      - id: ReviewCenter-AccountPage-Totp-Regenerate
+        title: >-
+          The AccountPage unit shall replace the recovery codes when the user gives the password and a code.
+        justification: |
+          New recovery codes make the old ones useless, so the request needs the proofs that the owner is at the page.
+        tests:
+          - AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce
+
+      - id: ReviewCenter-AccountPage-Totp-ConfirmWrongCode
+        title: >-
+          The AccountPage unit shall answer a wrong code for the confirmation of the set-up with a general message.
+        justification: |
+          A general message does not tell an observer how close a guess was.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending
+
+      - id: ReviewCenter-AccountPage-Totp-ConfirmWrongCode-SetupOpen
+        title: >-
+          The AccountPage unit shall keep the set-up open after a wrong code for its confirmation.
+        justification: |
+          The person can try again without starting the set-up over.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending
+
+      - id: ReviewCenter-AccountPage-Totp-DisableWrongCode
+        title: >-
+          The AccountPage unit shall answer a wrong code for turning the second factor off with a general message.
+        justification: |
+          A general message does not tell an observer how close a guess was.
+        tests:
+          - AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields
+
+      - id: ReviewCenter-AccountPage-Totp-DisableWrongCode-StaysOn
+        title: >-
+          The AccountPage unit shall keep the second factor on after a wrong code for turning it off.
+        justification: |
+          A wrong code must not weaken the account.
+        tests:
+          - AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields
+
+      - id: ReviewCenter-AccountPage-Totp-RegenerateWrongCode
+        title: >-
+          The AccountPage unit shall answer a wrong code for new recovery codes with a general message.
+        justification: |
+          A general message does not tell an observer how close a guess was.
+        tests:
           - AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes
 
       - id: ReviewCenter-AccountPage-NotificationUnavailableSentence
@@ -444,3 +782,49 @@ sections:
           way to give it.
         tests:
           - AccountPage_Render_ExternalUser_ShowsAddressForm
+
+      - id: ReviewCenter-AccountPage-Totp-RegenerateWrongCode-NoCodes
+        title: >-
+          The AccountPage unit shall show no recovery codes after a wrong code for new recovery codes.
+        justification: |
+          No code may be handed out on a wrong proof.
+        tests:
+          - AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes
+
+      - id: ReviewCenter-AccountPage-Totp-FieldsEmptied
+        title: >-
+          The AccountPage unit shall empty the password and code fields of the card after an attempt.
+        justification: |
+          Neither a password nor a code may stay on the page after it was sent.
+        tests:
+          - AccountPage_Start_WrongPassword_ShowsErrorAndNoSecret
+          - AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending
+          - AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields
+          - AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce
+
+      - id: ReviewCenter-AccountPage-Totp-FeatureOff
+        title: >-
+          The AccountPage unit shall show no card for the second factor while the second factor feature is off.
+        justification: |
+          A card for a feature that is off would offer steps that cannot work.
+        tests:
+          - AccountPage_Render_FeatureDisabled_HidesCard
+
+      - id: ReviewCenter-AccountPage-Totp-TemporaryPassword
+        title: >-
+          The AccountPage unit shall show no card for the second factor while the password is temporary.
+        justification: |
+          A person who has to replace the password first must not set up the second factor with a password that the
+          project admin has seen.
+        tests:
+          - AccountPage_Render_TemporaryPassword_HidesCard
+
+      - id: ReviewCenter-AccountPage-Totp-External
+        title: >-
+          The AccountPage unit shall show, for an account of a provider, a sentence that the provider handles the
+          second factor of the sign-in.
+        justification: |
+          The sign-in of such an account does not use the password of this application, so the person is told where
+          the second factor is managed.
+        tests:
+          - AccountPage_Render_ExternalUser_ShowsNoteAndNoControls

@@ -20,6 +20,8 @@
 
 using Bunit;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
@@ -44,6 +46,44 @@ public class AboutPageTests : PageTestBase
         Assert.Equal(Program.Version, cut.Find("[data-testid='about-version']").TextContent);
         Assert.Contains("DEMA Consulting", cut.Find("[data-testid='about-page']").TextContent, StringComparison.Ordinal);
         Assert.Equal("https://github.com/demaconsulting/ReviewCenter", cut.Find("[data-testid='about-github-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the router, which applies the authorization rules of a page, shows the page at /about to a
+    ///     visitor who is not signed in and does not ask the visitor to sign in.
+    /// </summary>
+    [Fact]
+    public void AboutPage_Render_AnonymousThroughRouter_ShowsPageAndNoSignInPrompt()
+    {
+        // Arrange: nobody is signed in and the router is at /about
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/about");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the page with its version is shown, and neither the sign-in prompt nor the access denied message is
+        Assert.Equal(Program.Version, cut.Find("[data-testid='about-version']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
+        Assert.Empty(cut.FindAll("[data-testid='access-denied-login-link']"));
+    }
+
+    /// <summary>
+    ///     Test that the page is served by the running server to a visitor who is not signed in.
+    /// </summary>
+    [Fact]
+    public async Task AboutPage_Request_Anonymous_IsServedWithoutSignIn()
+    {
+        // Arrange: start the real pipeline in memory and a visitor who is not signed in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request the page
+        var page = await browser.GetPageAsync("/about");
+
+        // Assert: the page itself is served (status 200 is checked by the browser), not a redirect to the sign-in page
+        Assert.NotNull(page.QuerySelector("[data-testid='about-version']"));
     }
 
     /// <summary>

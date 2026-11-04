@@ -24,7 +24,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   tagline.
 - The Help index, the help topic pages, and the About page are served to a signed-in user over HTTP (their content is
   verified by the component tests of `AboutPage` and `HelpPage`, and their service to an anonymous visitor by the
-  system test `ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn`).
+  system test `ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn`; the About page is also requested
+  through the real pipeline by `AboutPage_Request_Anonymous_IsServedWithoutSignIn`, the evidence of the requirement
+  `ReviewCenter-Web-Help-About`).
 - The projects route, which is the interactive page that the subsystem tests use for the marker, is served with the
   `data-interactive` marker set to `false`.
 - A project and a review created through the services are presented by the pages with the correct fingerprint.
@@ -49,65 +51,73 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   subsystem.
 - When the sign-in state of an open page ends, the page is replaced by the "Session ended" message and offers no
   actions. This needs the live state of a page, which plain HTTP requests do not have, so it is verified at unit level
-  by the component tests of `SessionGate`, `ReviewPage`, `UsersPage`, and `RepositoriesPage` (see the children of the requirement
-  `ReviewCenter-Web-SessionEnd` in `web.yaml`), together with the `Identity` subsystem test of the provider that ends
-  the state.
+  by the component tests of `SessionGate`, `ReviewPage`, `UsersPage`, and `RepositoriesPage` (see the requirements
+  `ReviewCenter-Web-SessionEnd`, `ReviewCenter-Web-SessionEnd-ChangeRefused`,
+  `ReviewCenter-Web-SessionEnd-NothingChanged`, and `ReviewCenter-Web-SessionEnd-UserAdminRefused` and their children in
+  `web.yaml`), together with the `Identity` subsystem test of the provider that ends the state.
 - A system administrator who opens `/projects/{id}/repositories` is shown the repositories of that project; a user who
   is no member of it receives the same not-found page as for a project that does not exist.
 - Every interactive element of every page has a `data-testid`, no identifier repeats within a page, and the breadcrumb links
   have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-users-link`), distinct from the header tabs.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
   display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
-  verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
-  `ReviewCenter-Web-RepositoryReviews` in `web.yaml`).
+  verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the requirements
+  `ReviewCenter-Web-RepositoryReviews` and `ReviewCenter-Web-RepositoryReviews-*` and their children in `web.yaml`).
 - The diff view of a review page (collapsed unchanged lines, line comments on both sides, threads under their lines,
   and the too-large state) needs a live connection, so it is verified at unit level by the component tests of
   `ReviewPage`; the subsystem test reads the stylesheet that keeps the code area scrolling inside itself on a phone
-  (see the requirement `ReviewCenter-Web-DiffReview` in `web.yaml`).
+  (see the requirements `ReviewCenter-Web-DiffReview-PhoneLayout` and `ReviewCenter-Web-DiffReview-LineComment` in
+  `web.yaml`).
 - The plan page and the planning links need a live connection for the form and the creation, so they are verified at
-  unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
-  `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
-  repository.
+  unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the requirements
+  `ReviewCenter-Web-PlanReviews` and `ReviewCenter-Web-PlanReviews-*` and their children in `web.yaml`); the subsystem
+  test requests the plan route of a project that has a repository.
 - Links to files, lines and threads (the routes, the highlight, the replacement of the address, the thread links, the
   messages for addresses that name nothing, and the return to a link after signing in over HTTP) are verified by the
   component tests of `ReviewPage` in `ReviewDeepLinkTests.cs`, which render the real router, and by the tests of
   `SignIn`; the subsystem test renders the router for a signed-out visitor (see the requirement
-  `ReviewCenter-Web-DeepLinks` in `web.yaml`).
+  `ReviewCenter-Web-DeepLinks-ReturnAfterSignIn` for the return to a link after signing in, and
+  `ReviewCenter-Web-DeepLinks` for the link style, in `web.yaml`).
 - The token card of the account page (the form, the value shown once with the copy button, the list with the state of
   each token, and the revocation) and the help topic on the API tokens need a live connection for the actions, so they
-  are verified at unit level by the component tests of `AccountPage` and `HelpPage` (see the children of the requirement
-  `ReviewCenter-Web-AccessTokens` in `web.yaml`).
+  are verified at unit level by the component tests of `AccountPage` and `HelpPage` (see the requirements
+  `ReviewCenter-Web-AccessTokens` and `ReviewCenter-Web-AccessTokens-*` and their children in `web.yaml`).
 - The management of project members (the member list and its actions, the pages for a new member and a new account,
   the temporary password and its confinement, the audit page of a project, and the help topic on project members) needs
   a live connection, so it is verified at unit level by the component tests of `ProjectPage`, `AuditPage`,
-  `AccountPage`, `LoginPage`, `App`, and `HelpPage` (see the children of the requirements
-  `ReviewCenter-Web-ProjectAccess`, `ReviewCenter-Web-SignIn`, and `ReviewCenter-Web-AuditPage` in `web.yaml`).
+  `AccountPage`, `LoginPage`, `App`, and `HelpPage` (see the requirements `ReviewCenter-Web-ProjectAccess-*`,
+  `ReviewCenter-Web-SignIn-*`, and `ReviewCenter-Web-AuditPage-*` and their children in `web.yaml`).
 - The evidence settings page (who gets it, the switches and their defaults, the warnings, the save with its audit
   entry, a change by someone else, and a lost right) and the help topic on the evidence settings need a live connection,
   so they are verified at unit level by the component tests of `ProjectPage` (`EvidenceSettingsPageTests.cs`) and
-  `HelpPage` (see the children of the requirement `ReviewCenter-Web-EvidenceSettings` in `web.yaml`). What the stored
+  `HelpPage` (see the requirements `ReviewCenter-Web-EvidenceSettings` and `ReviewCenter-Web-EvidenceSettings-*` and
+  their children in `web.yaml`). What the stored
   settings do to the API and the PDFs is verified in the `Api` and `Evidence` subsystems.
 - The checklist template page (who gets it, export, import and validation with every error, the preview and the
   differences, replace and reset with their confirmations and audit entries, a change by someone else, and a lost
   right), the link and summary on the project page, and the help topic need a live connection, so they are verified at
   unit level by the component tests of `ProjectPage` (`ProjectChecklistPageTests.cs`, `ChecklistDiffTests.cs`) and
-  `HelpPage` (see the children of the requirement `ReviewCenter-Web-ChecklistTemplate` in `web.yaml`); the journey in a
+  `HelpPage` (see the requirements `ReviewCenter-Web-ChecklistTemplate` and `ReviewCenter-Web-ChecklistTemplate-*` and
+  their children in `web.yaml`); the journey in a
   browser is verified by the system test `ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault`.
 - Optional sign-in with an OpenID Connect provider: the login page offers the button of the provider beside the local
   form only while it is enabled, the users and account pages show that such an account has no password, the review
   page offers the confirmation at the provider instead of the password field, and the help topics mention it; the
   pages are verified at unit level by their component tests (`OidcPageTests.cs`) and the review page by the
-  integration test of the `Identity` subsystem (see the children of the requirement `ReviewCenter-Web-OidcSignIn` in
-  `web.yaml`).
+  integration test of the `Identity` subsystem (see the requirements `ReviewCenter-Web-OidcSignIn` and
+  `ReviewCenter-Web-OidcSignIn-*` and their children in `web.yaml`).
 - Optional second factor: the code is asked for in a page of its own after the password and shows no user name, the
   account page sets up, confirms (with ten recovery codes shown once and never the secret), and turns off the second
   factor, the users page shows who has it and lets a system administrator reset it, the sign form of a review asks for
   the code beside the password, and the help topic explains it; the pages are verified at unit level by their
-  component tests (see the children of the requirement `ReviewCenter-Web-TotpSecondFactor` in `web.yaml`).
+  component tests (see the requirements `ReviewCenter-Web-TotpSecondFactor` and
+  `ReviewCenter-Web-TotpSecondFactor-*` and
+  their children in `web.yaml`).
 - The progress table of the project page (stage, signatures, blockers, waiting on, last activity, due date, the summary
   strip, the filters, the sortable columns, the paging, the query string, and the read-only view of an auditor) needs a
   live connection, so it is verified at unit level by the component tests of `ProjectPage` in
-  `ProjectPageOverviewTests.cs` (see the children of the requirement `ReviewCenter-Web-Progress` in `web.yaml`); the
+  `ProjectPageOverviewTests.cs` (see the requirements `ReviewCenter-Web-Progress` and `ReviewCenter-Web-Progress-*` and
+  their children in `web.yaml`); the
   journey in a browser is verified by the system test
   `ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState`.
 
@@ -391,6 +401,13 @@ replacing the password sends the browser to the login page with the notice, whic
 `LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`. The refusals on the server side (signatures, access
 tokens, project access) are verified in the `Core` and `Api` subsystems.
 
+**Sign-in pages served over HTTP**: Through the real server pipeline, the login page is answered with status 200 to a
+visitor who is not signed in, which is tested by `SignIn_PublicPage_Anonymous_IsServed`, and the users page is served to
+a system administrator and refused to a reviewer with an explanation, which is tested by
+`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; both tests are defined in `SignInTests.cs` and are evidence of the
+requirements `ReviewCenter-Web-SignIn-LoginPage` and `ReviewCenter-Web-SignIn-UsersPage`. The pages themselves are
+verified in the component tests of `LoginPage` and `UsersPage`, which render them with the router.
+
 **Sign-in with an OpenID Connect provider**: With the provider on and nobody signed in, the login page shows the button
 beside the local form, which is tested by `LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm`. A reviewer
 who signs in at the provider sees, on the review page, the button to confirm the identity and no password field, and
@@ -410,7 +427,11 @@ and the right code shows the confirmed address, which is tested by
 `AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. The other states of the card are tested in the unit tests of
 `AccountPage`.
 
-**Inbox**: A visitor who is not signed in is sent to the login page by the inbox route and sees nothing of the inbox,
-which is tested by `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`. The groups, the markers, and Mark all as read
+**Inbox**: A signed-in user who requests the inbox route is served the inbox page, which waits for its live
+connection and carries the interactive marker, which is tested by
+`WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is the evidence of the requirement
+`ReviewCenter-Web-Inbox`. A visitor who is not signed in is sent to the login page by the inbox route and sees nothing
+of the inbox, which is tested by `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`, the evidence of the requirement
+`ReviewCenter-Web-Inbox-SignedInOnly`. The groups, the markers, and Mark all as read
 are tested in the unit tests of `InboxPage`, the unread markers of the review in those of `ReviewPage`, the card in
 those of `HomePage`, and the topic in those of `HelpPage`.

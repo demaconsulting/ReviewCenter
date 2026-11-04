@@ -96,6 +96,26 @@ public class AccountPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a successful change empties the current, the new and the repeated password field.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_ValidInput_EmptiesAllThreePasswordFields()
+    {
+        // Arrange: the signed-in user exists, and the form is filled in
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var cut = Render<AccountPage>();
+        await FillAsync(cut, OldPassword, NewPassword, NewPassword);
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: none of the three fields keeps a value
+        Assert.Equal(string.Empty, cut.Find("[data-testid='current-password-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='new-password-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='confirm-password-input']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
     ///     Test that a wrong current password, a mismatch and a too short new password are each shown as an
     ///     error and change nothing.
     /// </summary>
@@ -248,6 +268,24 @@ public class AccountPageTests : PageTestBase
         // Assert: the value is nowhere on the page any more
         Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
         Assert.DoesNotContain(value, cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the box that shows the value of a new token says that the value cannot be shown again.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CreateToken_ValidInput_ShowsNoteThatValueCannotBeShownAgain()
+    {
+        // Arrange: the signed-in user exists and a name is typed
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='token-name-input']").InputAsync("build server");
+
+        // Act: submit the form
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+
+        // Assert: the box with the value carries the note
+        Assert.Contains("cannot be shown again", cut.Find("[data-testid='new-token-box']").TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

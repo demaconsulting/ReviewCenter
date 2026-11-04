@@ -116,6 +116,26 @@ public class RepositoriesPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a system administrator who is no member of the project is served the repositories of the project
+    ///     and may add one.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Render_SystemAdminWithoutMembership_ShowsRepositoriesAndActions()
+    {
+        // Arrange: a system administrator who holds no membership, and a repository in the project
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderList();
+
+        // Assert: the repository is listed with its controls, and the page is not the not-found message
+        Assert.Equal("alpha", cut.Find($"[data-testid='repository-name-{repo.Id}']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-repository-button']"));
+        Assert.NotEmpty(cut.FindAll($"[data-testid='repository-toggle-enabled-{repo.Id}']"));
+    }
+
+    /// <summary>
     ///     Test that a project admin manages the repositories of the project.
     /// </summary>
     [Fact]
@@ -192,6 +212,9 @@ public class RepositoriesPageTests : PageTestBase
         var created = Assert.Single(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
         Assert.True(created.HasToken);
         Assert.Equal(_projectId, created.ProjectId);
+        Assert.Equal("alpha", created.Name);
+        Assert.Equal(Location, created.Location);
+        Assert.Equal("svc", created.Username);
         Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
         Assert.Equal(string.Empty, cut.Find("[data-testid='new-repository-token-input']").GetAttribute("value") ?? string.Empty);
@@ -199,6 +222,77 @@ public class RepositoriesPageTests : PageTestBase
             $"/projects/{_projectId}/repositories", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
         Assert.Equal(
             $"/projects/{_projectId}/repositories", cut.Find("[data-testid='cancel-new-repository-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the add page offers Cancel as a plain link back to the repositories of the project, which does not
+    ///     submit the form, so that leaving through it registers nothing even when the form was filled in.
+    /// </summary>
+    [Fact]
+    public async Task NewRepositoryPage_Render_FilledForm_CancelIsPlainLinkBackAndRegistersNothing()
+    {
+        // Arrange: a signed-in administrator and an add form that is filled in but not submitted
+        await SignInAsNewAdminAsync();
+        var cut = RenderNew();
+        await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
+        await cut.Find("[data-testid='new-repository-location-input']").InputAsync(Location);
+
+        // Act: look at the Cancel control that the user would activate
+        var cancel = cut.Find("[data-testid='cancel-new-repository-link']");
+
+        // Assert: it is a plain link to the list of the project, no submit button and no handler of its own, and
+        // nothing is registered
+        Assert.Equal("a", cancel.TagName.ToLowerInvariant());
+        Assert.Equal("Cancel", cancel.TextContent);
+        Assert.Equal($"/projects/{_projectId}/repositories", cancel.GetAttribute("href"));
+        Assert.Null(cancel.GetAttribute("type"));
+        Assert.DoesNotContain("onclick", cancel.OuterHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the add page holds only the form that registers a repository, and neither the list nor a
+    ///     repository row, even when the project already has a repository.
+    /// </summary>
+    [Fact]
+    public async Task NewRepositoryPage_Render_ProjectWithRepository_ShowsOnlyTheForm()
+    {
+        // Arrange: a signed-in administrator and a project that already has a repository
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+
+        // Act: render the add page
+        var cut = RenderNew();
+
+        // Assert: the form is there, and the list and its rows are not
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-repository-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-list']"));
+        Assert.Empty(cut.FindAll($"[data-testid='repository-row-{repo.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the add form registers a repository from a name and a location alone, without a user name and
+    ///     without a token.
+    /// </summary>
+    [Fact]
+    public async Task NewRepositoryPage_CreateForm_NameAndLocationOnly_RegistersRepositoryWithoutTokenOrUserName()
+    {
+        // Arrange: a signed-in administrator and a form with only the name and the location
+        await SignInAsNewAdminAsync();
+        var cut = RenderNew();
+        await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
+        await cut.Find("[data-testid='new-repository-location-input']").InputAsync(Location);
+
+        // Act: submit
+        await cut.Find("[data-testid='new-repository-form']").SubmitAsync();
+
+        // Assert: the repository is registered with neither a user name nor a token
+        var created = Assert.Single(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+        Assert.Equal("alpha", created.Name);
+        Assert.Equal(Location, created.Location);
+        Assert.Null(created.Username);
+        Assert.False(created.HasToken);
+        Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
     }
 
     /// <summary>
@@ -247,6 +341,31 @@ public class RepositoriesPageTests : PageTestBase
         Assert.Equal(before, RepositoryStore.StoredToken(repo.Id));
         Assert.Empty(cut.FindAll($"[data-testid='repository-edit-form-{repo.Id}']"));
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that editing the name and the location shows the changed values and stores them.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Edit_NameAndLocation_ShowsChangedValues()
+    {
+        // Arrange: a repository and its open edit form
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderList();
+        await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
+
+        // Act: type a new name and a new location and save
+        await cut.Find("[data-testid='edit-repository-name-input']").InputAsync("beta");
+        await cut.Find("[data-testid='edit-repository-location-input']").InputAsync("https://example.com/org/other.git");
+        await cut.Find("[data-testid='edit-repository-save-button']").ClickAsync();
+
+        // Assert: the row and the stored repository show the new values
+        Assert.Equal("beta", cut.Find($"[data-testid='repository-name-{repo.Id}']").TextContent);
+        Assert.Equal("https://example.com/org/other.git", cut.Find($"[data-testid='repository-location-{repo.Id}']").TextContent);
+        var stored = Assert.Single(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+        Assert.Equal("beta", stored.Name);
+        Assert.Equal("https://example.com/org/other.git", stored.Location);
     }
 
     /// <summary>

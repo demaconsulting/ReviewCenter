@@ -105,6 +105,26 @@ public class HomePageTests : InboxWebTestBase
     }
 
     /// <summary>
+    ///     Test that the inbox and projects links each have a one-line description.
+    /// </summary>
+    [Fact]
+    public void HomePage_Render_Reviewer_EachLinkHasOneLineDescription()
+    {
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea", UserRole.Reviewer);
+
+        // Act: render the page
+        var cut = Render<HomePage>();
+
+        // Assert: the list item of each link holds a non-empty description
+        foreach (var card in new[] { "home-card-inbox", "home-card-projects" })
+        {
+            var description = cut.Find($"[data-testid='{card}']").ParentElement!.QuerySelector("p");
+            Assert.False(string.IsNullOrWhiteSpace(description?.TextContent), card);
+        }
+    }
+
+    /// <summary>
     ///     Test that a signed-in system administrator also sees the audit and users links.
     /// </summary>
     [Fact]
@@ -122,5 +142,25 @@ public class HomePageTests : InboxWebTestBase
         Assert.Equal("/inbox", cut.Find("[data-testid='home-card-inbox']").GetAttribute("href"));
         Assert.Equal("/audit", cut.Find("[data-testid='home-card-audit']").GetAttribute("href"));
         Assert.Equal("/users", cut.Find("[data-testid='home-card-users']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the audit and users links each have a one-line description.
+    /// </summary>
+    [Fact]
+    public void HomePage_Render_Admin_AdminLinksHaveOneLineDescription()
+    {
+        // Arrange: a system administrator is signed in
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act: render the page
+        var cut = Render<HomePage>();
+
+        // Assert: the list item of each link holds a non-empty description
+        foreach (var card in new[] { "home-card-audit", "home-card-users" })
+        {
+            var description = cut.Find($"[data-testid='{card}']").ParentElement!.QuerySelector("p");
+            Assert.False(string.IsNullOrWhiteSpace(description?.TextContent), card);
+        }
     }
 }

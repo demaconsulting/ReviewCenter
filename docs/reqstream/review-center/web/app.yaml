@@ -11,67 +11,182 @@ sections:
     requirements:
       - id: ReviewCenter-App-Shell
         title: >-
-          The App unit shall render every page inside an HTML document that sets the base
-          address, receives the page title, loads the interactive client script, and defines the
-          browser helper that copies text to the clipboard for the Copy link button, the helper that moves
-          the focus to a field by its test id, and the keyboard shortcut that presses the submit button named
-          by a comment field when Ctrl+Enter is pressed in it.
+          The App unit shall render every page inside an HTML document that sets the base address.
         justification: |
-          Pages need a common document around them so that relative links resolve, so that each
-          page can set the browser title, and so that the client script that makes a page
-          interactive is loaded exactly once. Copying needs browser code, which falls back to a
-          hidden text area where the clipboard API is not available (a page that is not a secure context).
-          Moving the focus and the shortcut are browser behavior as well; handling the shortcut in the
-          browser avoids a round trip to the server for every key pressed.
+          Pages need a common document around them so that relative links resolve.
         tests:
           - App_Render_ServedAtRoot_ContainsShellElements
+
+      - id: ReviewCenter-App-Shell-PageTitle
+        title: >-
+          The App unit shall let each page set the title of the HTML document.
+        justification: |
+          Each page must be able to give the browser tab a title that tells the pages apart.
+        tests:
+          - App_Render_ServedAtRoot_ContainsShellElements
+
+      - id: ReviewCenter-App-Shell-ClientScript
+        title: >-
+          The App unit shall load the interactive client script in the HTML document of every page.
+        justification: |
+          The script makes a page interactive, so it must be loaded exactly once by the document that every page
+          shares.
+        tests:
+          - App_Render_ServedAtRoot_ContainsShellElements
+
+      - id: ReviewCenter-App-Shell-CopyHelper
+        title: >-
+          The App unit shall define in the HTML document the browser helper that copies text to the clipboard for the
+          Copy link button.
+        justification: |
+          Copying needs browser code, which falls back to a hidden text area where the clipboard API is not available
+          (a page that is not a secure context).
+        tests:
           - App_Render_ServedAtRoot_DefinesCopyTextHelper
+
+      - id: ReviewCenter-App-Shell-FocusHelper
+        title: >-
+          The App unit shall define in the HTML document the browser helper that moves the focus to a field by its test
+          id.
+        justification: |
+          Moving the focus is browser behavior, so the page that wants a field focused needs a helper in the document.
+        tests:
+          - App_Render_ServedAtRoot_DefinesFocusHelperAndCtrlEnterListener
+
+      - id: ReviewCenter-App-Shell-CtrlEnterShortcut
+        title: >-
+          The App unit shall define in the HTML document the keyboard shortcut that presses the submit button named by
+          a comment field when Ctrl+Enter is pressed in it.
+        justification: |
+          Handling the shortcut in the browser avoids a round trip to the server for every key pressed.
+        tests:
           - App_Render_ServedAtRoot_DefinesFocusHelperAndCtrlEnterListener
 
       - id: ReviewCenter-App-Routing
         title: >-
-          The App unit shall show the home page for the root URL and, for a URL that no page handles, a
-          not-found page inside the same page frame (header and footer) as every other page.
+          The App unit shall show the home page for the root URL.
         justification: |
-          Users must reach the home page at the root address and must be told clearly when an
-          address matches no page, instead of seeing a blank page.
+          Users must reach the home page at the root address.
         tests:
           - Routes_Render_RootUrl_RendersHomePage
+
+      - id: ReviewCenter-App-Routing-NotFound
+        title: >-
+          The App unit shall show a not-found page for a URL that no page handles.
+        justification: |
+          Users must be told clearly when an address matches no page, instead of seeing a blank page.
+        tests:
           - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+
+      - id: ReviewCenter-App-Routing-NotFoundFrame
+        title: >-
+          The App unit shall show the not-found page inside the same page frame, with the header and the footer, as
+          every other page.
+        justification: |
+          The familiar frame gives the user the way back to the other pages.
+        tests:
           - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
       - id: ReviewCenter-App-NotFoundPage
         title: >-
-          The App unit shall answer a request for a page that no page handles with HTTP status 404 and a "Page not
-          found" page that has the header and the footer and a button back to the projects page, and shall leave the
-          404 of an API address, of an address that ends in a file extension, and of a request that is not a GET or
-          HEAD without the page.
+          The App unit shall answer a request for a page that no page handles with HTTP status 404.
         justification: |
-          A mistyped address must give the user a clear answer and a way back inside the familiar page frame, not a
-          blank page. A missing script, style sheet, or API address is read by a program, which needs the plain 404
-          and not an HTML document, and the 404 status keeps the answer honest for browsers and search engines.
+          The 404 status keeps the answer honest for browsers and search engines.
         tests:
           - App_Request_UnknownPath_Returns404WithFramedNotFoundPage
-          - App_Request_UnknownApiPath_Returns404WithoutPageFrame
-          - App_Request_UnknownFilePath_Returns404WithoutPageFrame
-          - App_Request_PostToUnknownPath_Returns404WithoutPageFrame
+
+      - id: ReviewCenter-App-NotFoundPage-Message
+        title: >-
+          The App unit shall answer a request for a page that no page handles with a page that says "Page not found".
+        justification: |
+          A mistyped address must give the user a clear answer, not a blank page.
+        tests:
+          - App_Request_UnknownPath_Returns404WithFramedNotFoundPage
+          - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+
+      - id: ReviewCenter-App-NotFoundPage-Frame
+        title: >-
+          The App unit shall give the "Page not found" page the header and the footer of every other page.
+        justification: |
+          The user gets a way back inside the familiar page frame.
+        tests:
+          - App_Request_UnknownPath_Returns404WithFramedNotFoundPage
           - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
+
+      - id: ReviewCenter-App-NotFoundPage-ProjectsButton
+        title: >-
+          The App unit shall show on the "Page not found" page a button that leads back to the projects page.
+        justification: |
+          A user who followed a wrong address needs one step back to the work.
+        tests:
+          - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+
+      - id: ReviewCenter-App-NotFoundPage-ApiAddress
+        title: >-
+          The App unit shall leave the 404 of an unknown API address without the "Page not found" page.
+        justification: |
+          An API address is read by a program, which needs the plain 404 and not an HTML document.
+        tests:
+          - App_Request_UnknownApiPath_Returns404WithoutPageFrame
+
+      - id: ReviewCenter-App-NotFoundPage-FileExtension
+        title: >-
+          The App unit shall leave the 404 of an unknown address that ends in a file extension without the "Page not
+          found" page.
+        justification: |
+          A missing script or style sheet is read by the browser as such a file, which needs the plain 404 and not an
+          HTML document.
+        tests:
+          - App_Request_UnknownFilePath_Returns404WithoutPageFrame
+
+      - id: ReviewCenter-App-NotFoundPage-NonPageRequest
+        title: >-
+          The App unit shall leave the 404 of a request that is not a GET or HEAD request without the "Page not found"
+          page.
+        justification: |
+          Only a request that asks for a page to read gets the page; any other request is made by a program, which
+          needs the plain 404.
+        tests:
+          - App_Request_PostToUnknownPath_Returns404WithoutPageFrame
 
       - id: ReviewCenter-App-Header
         title: >-
-          The App unit shall show in a header on every page the display name of the signed-in user, a link to the
-          account page, and a logout button, or a sign-in link when nobody is signed in.
+          The App unit shall show in the header of every page the display name of the signed-in user.
         justification: |
-          Users need to see who they are signed in as, and to sign in or out from wherever they are, without searching
-          for a page.
+          Users need to see who they are signed in as.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-Header-AccountLink
+        title: >-
+          The App unit shall show in the header of every page a link to the account page while a user is signed in.
+        justification: |
+          Users need to reach their account from wherever they are, without searching for a page.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-Header-LogoutButton
+        title: >-
+          The App unit shall show in the header of every page a logout button while a user is signed in.
+        justification: |
+          Users need to sign out from wherever they are, and a logout button for a visitor who is not signed in would
+          have nothing to end.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+          - MainLayout_Render_SignedInUser_ShowsLogoutButtonThatPostsToSignOutEndpoint
+
+      - id: ReviewCenter-App-Header-SignInLink
+        title: >-
+          The App unit shall show in the header of every page a sign-in link, and no account controls, when nobody is
+          signed in.
+        justification: |
+          A visitor needs to sign in from wherever they are, and has no name, account, or logout to show.
+        tests:
           - MainLayout_Render_NobodySignedIn_ShowsSignInLink
 
       - id: ReviewCenter-App-HomeLink
         title: >-
-          The App unit shall show in the header of every page exactly one link to the home page, labeled with the
-          product name.
+          The App unit shall show in the header of every page exactly one link to the home page.
         justification: |
           Users need one familiar way back to the start from any page. Because the header always provides it, the
           pages do not repeat it, and a second link to the same place would only confuse.
@@ -79,35 +194,62 @@ sections:
           - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
           - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
+      - id: ReviewCenter-App-HomeLink-ProductName
+        title: >-
+          The App unit shall label the link to the home page in the header with the product name.
+        justification: |
+          The product name is the familiar way to recognize the way back to the start.
+        tests:
+          - MainLayout_Render_NobodySignedIn_LabelsHomeLinkWithProductName
+
       - id: ReviewCenter-App-Navigation
         title: >-
-          The App unit shall show in the header a link to the projects page while a user is signed in, and no
-          such link while nobody is.
+          The App unit shall show in the header a link to the projects page while a user is signed in.
         justification: |
-          Users need to reach the review features from wherever they are, and a link to a page that needs a sign-in
-          must not be offered to a visitor who is not signed in.
+          Users need to reach the review features from wherever they are.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-Navigation-SignedOut
+        title: >-
+          The App unit shall show in the header no link to the projects page while nobody is signed in.
+        justification: |
+          A link to a page that needs a sign-in must not be offered to a visitor who is not signed in.
+        tests:
           - MainLayout_Render_NobodySignedIn_ShowsSignInLink
 
       - id: ReviewCenter-App-HelpLink
         title: >-
-          The App unit shall show in the header of every page, to a visitor who is signed in or not, a link to the
-          help, placed before the sign-in link when nobody is signed in.
+          The App unit shall show in the header of every page a link to the help, to a visitor who is signed in or not.
         justification: |
-          Help is most needed by a new user who may not have signed in yet, so it is offered to everyone and stays in
-          the same place on every page.
+          Help is most needed by a new user who may not have signed in yet, so it is offered to everyone.
+        tests:
+          - MainLayout_Render_NobodySignedIn_ShowsHelpLinkBeforeSignIn
+          - MainLayout_Render_SignedInUser_ShowsHelpLink
+
+      - id: ReviewCenter-App-HelpLink-BeforeSignIn
+        title: >-
+          The App unit shall place the link to the help before the sign-in link in the header when nobody is signed in.
+        justification: |
+          The help stays in the same place on every page, and the sign-in link remains the last control.
         tests:
           - MainLayout_Render_NobodySignedIn_ShowsHelpLinkBeforeSignIn
 
       - id: ReviewCenter-App-Footer
         title: >-
-          The App unit shall show in a footer on every page the product name, its version, the copyright
-          holder, and a link to the About page.
+          The App unit shall show in a footer on every page the product name, its version, and the copyright holder.
         justification: |
-          Users and auditors need to see which version of the product they are using wherever they are, and
-          to find the full version and the project page from there. The footer shows the version number and the
-          start of the commit identifier, enough to tell builds apart.
+          Users and auditors need to see which version of the product they are using wherever they are. The footer
+          shows the version number and the start of the commit identifier, enough to tell builds apart.
+        tests:
+          - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
+          - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
+
+      - id: ReviewCenter-App-Footer-AboutLink
+        title: >-
+          The App unit shall show in the footer of every page a link to the About page.
+        justification: |
+          The full version and the project page are found from the About page.
         tests:
           - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
           - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
@@ -135,31 +277,70 @@ sections:
 
       - id: ReviewCenter-App-RouteAuthorization
         title: >-
-          The App unit shall apply the authorization rules of a page when the user navigates to it inside an open
-          interactive session, showing a signed-in user without the needed role an access denied message and a
-          signed-out user a link to the login page, without rendering the page.
+          The App unit shall show the page to a user who has the role that the page needs when the user navigates to it
+          inside an open interactive session.
         justification: |
-          The endpoint check runs only for requests to the server; navigation inside an open interactive session
-          does not make such a request, so without this rule a reviewer could open the user administration page
-          and a signed-out user could open a protected page.
+          The authorization rule of a page must let through the users it is meant for, also when the navigation makes
+          no request to the server.
+        tests:
+          - Routes_Render_AdminOpensUsersRoute_ShowsUsersPage
+
+      - id: ReviewCenter-App-RouteAuthorization-AccessDenied
+        title: >-
+          The App unit shall show a signed-in user without the role that a page needs an access denied message, and not
+          the page, when the user navigates to it inside an open interactive session.
+        justification: |
+          The endpoint check runs only for requests to the server; navigation inside an open interactive session does
+          not make such a request, so without this rule a reviewer could open the user administration page.
         tests:
           - Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList
-          - Routes_Render_AdminOpensUsersRoute_ShowsUsersPage
+
+      - id: ReviewCenter-App-RouteAuthorization-LoginLink
+        title: >-
+          The App unit shall show a signed-out user a link to the login page, and not the page, when the user navigates
+          to a protected page inside an open interactive session.
+        justification: |
+          Without this rule a signed-out user could open a protected page by navigating inside an open session.
+        tests:
           - Routes_Render_AnonymousOpensProjectsRoute_ShowsLoginLinkNotPage
 
       - id: ReviewCenter-App-SessionGate
         title: >-
-          The App unit shall show the content of a protected page only while a user is signed in, and shall
-          replace the whole page, as soon as the sign-in state of the open page ends, with a message that the
-          session has ended and a link to the login page that returns to the same page, leaving no page content
-          and no control on the page.
+          The App unit shall show the content of a protected page while a user is signed in.
         justification: |
-          The header and the router are served once and cannot react when the sign-in state of an open page
-          ends. Only a component inside the page can. Without it, ending the sign-in state of a user who was
-          disabled, removed, or changed would change nothing the user sees, and the page would go on showing
-          review data and offering actions.
+          A signed-in user must see the page they asked for.
         tests:
           - SessionGate_Render_SignedInUser_ShowsContent
+
+      - id: ReviewCenter-App-SessionGate-Ended
+        title: >-
+          The App unit shall replace the whole page with a message that the session has ended as soon as the sign-in
+          state of the open page ends.
+        justification: |
+          The header and the router are served once and cannot react when the sign-in state of an open page ends. Only
+          a component inside the page can; without it, ending the sign-in state of a user who was disabled, removed, or
+          changed would change nothing the user sees.
+        tests:
+          - SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage
+          - SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent
+          - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
+
+      - id: ReviewCenter-App-SessionGate-LoginLink
+        title: >-
+          The App unit shall show in the message that the session has ended a link to the login page that returns to
+          the same page.
+        justification: |
+          The person must be able to sign in again and continue where they were.
+        tests:
+          - SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent
+
+      - id: ReviewCenter-App-SessionGate-NoContent
+        title: >-
+          The App unit shall leave no page content and no control on a page whose session has ended.
+        justification: |
+          Without this the page would go on showing review data and offering actions to somebody who is no longer
+          signed in.
+        tests:
           - SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent
           - SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
@@ -175,13 +356,14 @@ sections:
 
       - id: ReviewCenter-App-NoRepositoriesLink
         title: >-
-          The App unit shall show no link to a repositories page in the header, for any user, because the
-          repositories belong to the projects and are reached from the page of a project.
+          The App unit shall show no link to a repositories page in the header, for any user.
         justification: |
-          A header link would lead to a registry outside the projects, which does not exist, and would suggest that
-          repositories are shared between projects.
+          The repositories belong to the projects and are reached from the page of a project; a header link would lead
+          to a registry outside the projects, which does not exist, and would suggest that repositories are shared
+          between projects.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+          - MainLayout_Render_ReviewerAndNobody_ShowNoRepositoriesLink
 
       - id: ReviewCenter-App-UsersLink
         title: >-
@@ -194,41 +376,147 @@ sections:
 
       - id: ReviewCenter-App-InboxBadge
         title: >-
-          The App unit shall, while a user who does not need to change a temporary password is signed in, show in the
-          header an Inbox tab with a badge of the number of reviews that need the user's action, shown only above zero
-          and as 99+ above ninety-nine, with that number in its accessible label; read the number when the layout
-          starts and on each navigation, normally once per user in 30 seconds (concurrent tabs may each read once),
-          and ask for no number when nobody is signed in or the password is temporary; and, when the number cannot
-          be read, hide the badge and still render the page.
+          The App unit shall show on the Inbox tab in the header a badge with the number of reviews that need the
+          action of the signed-in user.
         justification: |
-          A reviewer should see from every page that something waits, without opening the inbox. Counting costs a
-          snapshot for each review the user is involved in, so the number is kept for 30 seconds per user and
-          refreshed on navigation instead of by a timer, which bounds the cost however often the user clicks; a hint
-          must never break the page, so a failure only hides it.
+          A reviewer should see from every page that something waits, without opening the inbox.
+        tests:
+          - MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount
+          - MainLayout_Render_TwoUsers_KeepsTheirCountsApart
+
+      - id: ReviewCenter-App-InboxBadge-Tab
+        title: >-
+          The App unit shall show in the header an Inbox tab that links to the inbox while a user who does not need to
+          change a temporary password is signed in.
+        justification: |
+          The inbox must be one click away from every page for the users who can use it.
         tests:
           - MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount
           - MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge
+
+      - id: ReviewCenter-App-InboxBadge-HiddenAtZero
+        title: >-
+          The App unit shall show the badge on the Inbox tab only when the number is above zero.
+        justification: |
+          A badge that reads zero would draw attention to nothing.
+        tests:
+          - MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge
+
+      - id: ReviewCenter-App-InboxBadge-Capped
+        title: >-
+          The App unit shall show the number on the badge as 99+ when it is above ninety-nine.
+        justification: |
+          A long number would not fit the badge, and above ninety-nine the exact figure does not change what the
+          person does next.
+        tests:
           - MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus
-          - MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount
-          - MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards
+
+      - id: ReviewCenter-App-InboxBadge-AccessibleLabel
+        title: >-
+          The App unit shall give the badge an accessible label that holds the exact number.
+        justification: |
+          A reader of the screen must be told the number, including when the badge shows 99+.
+        tests:
+          - MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount
+          - MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus
+
+      - id: ReviewCenter-App-InboxBadge-ReadAtStart
+        title: >-
+          The App unit shall read the number of reviews that need the action of the user when the layout starts.
+        justification: |
+          The first page the user opens must already show the badge.
+        tests:
+          - MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount
+          - MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge
+
+      - id: ReviewCenter-App-InboxBadge-ReadOnNavigation
+        title: >-
+          The App unit shall read the number of reviews that need the action of the user again on each navigation.
+        justification: |
+          The number is refreshed on navigation instead of by a timer, which bounds the cost however often the user
+          clicks.
+        tests:
           - MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose
-          - MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead
           - MainLayout_Navigate_DisposedLayout_DoesNothing
           - MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose
-          - MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage
+
+      - id: ReviewCenter-App-InboxBadge-Cache
+        title: >-
+          The App unit shall read the number of reviews that need the action of the user once per user in 30 seconds,
+          and again after that.
+        justification: |
+          Counting costs a snapshot for each review the user is involved in, so the number is kept for 30 seconds per
+          user.
+        tests:
+          - MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards
+          - MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead
           - MainLayout_Render_TwoUsers_KeepsTheirCountsApart
+          - MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose
+
+      - id: ReviewCenter-App-InboxBadge-NoRead
+        title: >-
+          The App unit shall ask for no number and show no Inbox tab when nobody is signed in or the password is
+          temporary.
+        justification: |
+          There is no inbox to count for a visitor who is not signed in or for a user who must replace the password
+          first, so counting would only cost.
+        tests:
+          - MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount
+
+      - id: ReviewCenter-App-InboxBadge-ReadFailure
+        title: >-
+          The App unit shall hide the badge when the number cannot be read.
+        justification: |
+          A hint must never show a wrong number, so a failure only hides it.
+        tests:
+          - MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage
+
+      - id: ReviewCenter-App-InboxBadge-ReadFailurePage
+        title: >-
+          The App unit shall still render the page when the number cannot be read.
+        justification: |
+          A hint must never break the page.
+        tests:
+          - MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage
 
       - id: ReviewCenter-App-TemporaryPassword
         title: >-
-          The App unit shall, while the signed-in session carries the must-change-password claim, show no navigation
-          tabs in the header and send the browser to the account page from every page except the account, login,
-          help, and about pages, on the first request and on every later navigation inside the same session.
+          The App unit shall send the browser to the account page from every page except the account, login, help, and
+          about pages, on the first request, while the signed-in session carries the must-change-password claim.
         justification: |
           A user who signed in with a temporary password may do nothing but replace it. The layout wraps every page,
-          so confining the user there keeps all pages out of reach without each page having to know; the layout lives
-          on while the user clicks from page to page, so the check is repeated on every navigation; the server side
+          so confining the user there keeps all pages out of reach without each page having to know; the server side
           refuses the same user as well, so the confinement is a convenience and not the only barrier.
         tests:
           - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+
+      - id: ReviewCenter-App-TemporaryPassword-OpenPages
+        title: >-
+          The App unit shall not send the browser away from the account, login, help, and about pages while the
+          signed-in session carries the must-change-password claim.
+        justification: |
+          The user needs the account page to replace the password, the login page to sign in again, and the help and
+          about pages to ask for help.
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+          - MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose
+
+      - id: ReviewCenter-App-TemporaryPassword-NoTabs
+        title: >-
+          The App unit shall show no navigation tabs in the header while the signed-in session carries the
+          must-change-password claim.
+        justification: |
+          A tab that leads to a page the user cannot open would only invite a refused request.
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+          - MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount
+
+      - id: ReviewCenter-App-TemporaryPassword-LaterNavigation
+        title: >-
+          The App unit shall send the browser to the account page on every later navigation inside the same session
+          to a page other than the pages that stay open, while the session carries the must-change-password claim.
+        justification: |
+          The layout lives on while the user clicks from page to page, so the check is repeated on every navigation.
+        tests:
           - MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose
           - MainLayout_Navigate_OrdinaryUser_IsNotRedirected

@@ -659,6 +659,27 @@ public class SignInTests
     }
 
     /// <summary>
+    ///     Test that the form of the login page posts to the sign-in endpoint and carries an antiforgery token.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_LoginPage_Anonymous_FormPostsToSignInEndpointWithAntiforgeryToken()
+    {
+        // Arrange: an application and a visitor who is not signed in
+        await using var app = await StartAsync();
+        using var browser = new TestBrowser(app);
+
+        // Act: request the login page
+        var page = await browser.GetPageAsync("/login");
+
+        // Assert: the form posts to the sign-in endpoint and holds a token
+        var form = page.QuerySelector("form[data-testid='login-form']");
+        Assert.Equal("post", form?.GetAttribute("method"));
+        Assert.Equal(SignIn.LoginEndpoint, form?.GetAttribute("action"));
+        var token = form?.QuerySelector("input[name='__RequestVerificationToken']");
+        Assert.False(string.IsNullOrEmpty(token?.GetAttribute("value")));
+    }
+
+    /// <summary>
     ///     Test that the login page shows the "too many attempts" message, instead of the generic one, only for the
     ///     throttled error.
     /// </summary>

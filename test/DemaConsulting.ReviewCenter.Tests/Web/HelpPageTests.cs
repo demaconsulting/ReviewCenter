@@ -476,7 +476,7 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the inbox topic is listed second, explains the four groups, the New marker and Mark all as read,
+    ///     Test that the inbox topic is listed second, explains the eight groups, the New marker and Mark all as read,
     ///     and links to the inbox.
     /// </summary>
     [Fact]
@@ -519,6 +519,21 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the Your inbox topic says that what a user has seen is kept for that user alone and is not part
+    ///     of the signed record.
+    /// </summary>
+    [Fact]
+    public void HelpPage_HelpInboxPage_Render_SaysWhatYouHaveSeenIsNotPartOfTheSignedRecord()
+    {
+        // Act: render the topic page
+        var page = Render<HelpInboxPage>();
+
+        // Assert: the topic says the read state is private and outside the signed record
+        Assert.Contains("kept for you alone", page.Markup, StringComparison.Ordinal);
+        Assert.Contains("not part of the signed record", page.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the signing, comments and inbox topics describe the "Where are we?" panel and the reviewers who
     ///     must look again and sign again in plain words, without the words "out of date".
     /// </summary>
@@ -541,6 +556,173 @@ public sealed class HelpPageTests : PageTestBase
             Assert.DoesNotContain("out of date", text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("out-of-date", text, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    /// <summary>
+    ///     Test that the attestation topic says that the signature proves integrity and origin, that the signing time is
+    ///     not trusted, that the self-signed key is for development and test only, and how to use a certificate store.
+    /// </summary>
+    [Fact]
+    public void HelpAttestationPage_Render_ExplainsIntegrityOriginAndDevelopmentOnlyKey()
+    {
+        // Act: render the topic page
+        var page = Render<HelpAttestationPage>();
+
+        // Assert: what the signature proves, the untrusted signing time, the development-only key and the store route
+        var text = page.Markup;
+        Assert.Contains("has not changed since it was signed", text, StringComparison.Ordinal);
+        Assert.Contains("it was produced by the holder of", text, StringComparison.Ordinal);
+        Assert.Contains("The signing time is the server clock", text, StringComparison.Ordinal);
+        Assert.Contains("Use it for development and test only", text, StringComparison.Ordinal);
+        Assert.Contains("<code>CertificateStore</code>", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the attestation topic shows the screenshot of the download of an approved review, says that the PDF
+    ///     lists the name and time of each answer, and says that the review page shows why attestation is unavailable.
+    /// </summary>
+    [Fact]
+    public void HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime()
+    {
+        // Act: render the topic page
+        var page = Render<HelpAttestationPage>();
+
+        // Assert: the screenshot with alternative text, the name and time of an answer, and the unavailable notice
+        var text = page.Markup;
+        var shot = page.Find("img.help-shot");
+        Assert.Equal("/help/signed-attestation-1.png", shot.GetAttribute("src"));
+        Assert.False(string.IsNullOrWhiteSpace(shot.GetAttribute("alt")));
+        Assert.Contains("the name and time of that answer", text, StringComparison.Ordinal);
+        Assert.Contains("page then shows why attestation is unavailable", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the signing topic says that the ballots agreeing on a Fail make the outcome Rejected and that a
+    ///     rejection needs a written conclusion with the reasons.
+    /// </summary>
+    [Fact]
+    public void HelpPage_Signing_ExplainsRejectionRecordsAndNeedsConclusionText()
+    {
+        // Act: render the topic page
+        var page = Render<HelpSigningPage>();
+
+        // Assert: the rejection, and the conclusion text that it needs
+        var text = page.Markup;
+        Assert.Contains("<strong>Rejected</strong> when the ballots agree on a Fail", text, StringComparison.Ordinal);
+        Assert.Contains("needs a written conclusion with the reasons", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Review conclusion</strong>", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the reading-a-review topic names who sees the conclusion before handing in a ballot: the lead,
+    ///     administrators, Auditors, everyone in a single-slot review, and everyone once the review is concluded.
+    /// </summary>
+    [Fact]
+    public void HelpPage_ReadingReview_NamesWhoSeesTheConclusionAtOnce()
+    {
+        // Act: render the topic page
+        var page = Render<HelpReadingReviewPage>();
+
+        // Assert: the people and the cases that are exempt from the hidden conclusion
+        var text = page.Markup;
+        Assert.Contains("administrators and Auditors always see it", text, StringComparison.Ordinal);
+        Assert.Contains("in a review with a single", text, StringComparison.Ordinal);
+        Assert.Contains("reviewer slot and in a concluded review", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the API tokens topic says that a token does not sign the user in to the web pages.
+    /// </summary>
+    [Fact]
+    public void HelpApiTokensPage_Render_SaysTokenDoesNotOpenWebPages()
+    {
+        // Act: render the topic page
+        var page = Render<HelpApiTokensPage>();
+
+        // Assert: a token is for the API only
+        Assert.Contains("It does not sign you in to the web pages", page.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the project members topic says that a person with a new account must choose a new password at the
+    ///     first sign-in.
+    /// </summary>
+    [Fact]
+    public void HelpMembersPage_Render_SaysNewAccountMustChoosePasswordAtFirstSignIn()
+    {
+        // Act: render the topic page
+        var page = Render<HelpMembersPage>();
+
+        // Assert: the new password at the first sign-in
+        Assert.Contains("must choose a new password", page.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the evidence settings topic says that the anonymous switches are off by default and that anyone
+    ///     who can reach the server can read what was opened, and that the index alone is no use to ReviewMark.
+    /// </summary>
+    [Fact]
+    public void HelpEvidenceSettingsPage_Render_ExplainsDefaultsAndExposureOfTheAnonymousSwitches()
+    {
+        // Act: render the topic page
+        var page = Render<HelpEvidenceSettingsPage>();
+
+        // Assert: the default, the use of the index alone, and the exposure
+        var text = page.Markup;
+        Assert.Contains("<strong>off</strong> by default", text, StringComparison.Ordinal);
+        Assert.Contains("ReviewMark also needs the PDFs", text, StringComparison.Ordinal);
+        Assert.Contains("Anyone who can reach the server", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the checklist template topic says that an API token can only read the template, and explains
+    ///     importing, validating and previewing a definition, with every error shown with its path.
+    /// </summary>
+    [Fact]
+    public void HelpChecklistTemplatePage_Render_ExplainsTokenReadOnlyImportAndErrorPaths()
+    {
+        // Act: render the topic page
+        var page = Render<HelpChecklistTemplatePage>();
+
+        // Assert: the token limit, the import steps, the error paths and the preview
+        var text = page.Markup;
+        Assert.Contains("an API token can only read it", text, StringComparison.Ordinal);
+        Assert.Contains("<h2>Import, validate and preview</h2>", text, StringComparison.Ordinal);
+        Assert.Contains("upload a JSON file of up to 256 KiB", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>every</strong> error with its path", text, StringComparison.Ordinal);
+        Assert.Contains("a preview of all sections and checks", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the two-factor topic explains the second step of the sign-in with a code, and says that API tokens
+    ///     are not affected.
+    /// </summary>
+    [Fact]
+    public void HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens()
+    {
+        // Act: render the topic page
+        var page = Render<HelpTwoFactorPage>();
+
+        // Assert: the second page that asks for a code, that a code works once, and the tokens
+        var text = page.Markup;
+        Assert.Contains("A second page then asks for a code", text, StringComparison.Ordinal);
+        Assert.Contains("A code works once.", text, StringComparison.Ordinal);
+        Assert.Contains("API tokens are not affected", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the signing and the inbox topics explain what changed since a signature.
+    /// </summary>
+    [Fact]
+    public void HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature()
+    {
+        // Act: render the two topics
+        var signing = Render<HelpSigningPage>().Markup;
+        var inbox = Render<HelpInboxPage>().Markup;
+
+        // Assert: both say that the review page explains what changed since the signature
+        Assert.Contains("explains what changed since they", signing, StringComparison.Ordinal);
+        Assert.Contains("explains what changed since you signed", inbox, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -7,8 +7,9 @@ context to render the real components over a real `UserService` with an in-memor
 hasher, and drive its forms and buttons. The signed-in user of the tests is set by the test authentication state of
 the shared
 helper `PageTestBase`; the action tests sign in as an administrator stored in the fake store, because every action
-re-checks the stored user. The restriction of the page to administrators is verified by the `SignIn` unit. Tests
-locate elements by their `data-testid` attributes. The real database is covered by the `Storage` subsystem.
+re-checks the stored user. The restriction of the page to administrators is verified with the router in component tests
+that render `Routes` at `/users` for a system administrator and for a reviewer, and by the `SignIn` unit over HTTP.
+Tests locate elements by their `data-testid` attributes. The real database is covered by the `Storage` subsystem.
 
 #### Test Environment
 
@@ -33,13 +34,17 @@ N/A - standard test environment.
 - On the creation page, a valid new user is created with the chosen "System administrator" checkbox, the password field
   is emptied, and the browser returns to the list; the page has a Cancel link to the list; a rule violation is shown as
   an error, creates nothing, keeps the typed user name, and drops the typed password.
-- A user is disabled and enabled again, and the system administrator flag is granted and taken away.
+- The list offers no role to choose: its only selection is the status filter; the creation page holds only the form,
+  not the list.
+- A user is disabled and enabled again, and the system administrator flag is granted and taken away, each with the
+  outcome shown as a status.
+- Typing a search or choosing a filter narrows the loaded list and does not read the users again.
 - A new password set for a user works, the old one does not, and the field is emptied.
 - Disabling or demoting the last enabled system administrator is refused with an error.
 - An action is refused with an error, and changes nothing, when the signed-in system administrator lost the flag or was
   disabled after the page was opened; the user list, the typed passwords, and the button that creates a user are then no
   longer rendered, and an administrator who takes the flag from themselves sees the change acknowledged but not the
-  reloaded list.
+  reloaded list; the creation page refuses to create a user for such an administrator, with an error.
 - When the sign-in state of the open page ends because the administrator lost the flag, the page is replaced by the
   "Session ended" message and offers no actions; an action sent after the session ended, before the page learned of
   it, shows an error that says the user is no longer signed in, without the list, and changes nothing.
@@ -49,10 +54,19 @@ N/A - standard test environment.
 - An enrolled local account carries a "TOTP" badge and a reset button for its second factor; a plain account and an
   account of an identity provider have neither; both stay while the feature is switched off, so that a dormant
   enrollment can be cleared; the reset removes the second factor, says so, and removes the badge and the button; a reset
-  sent after the session ended shows the "no longer signed in" error and keeps the enrollment; the service behind the
-  button refuses a caller who is not a system administrator.
+  sent after the session ended shows the "no longer signed in" error and keeps the enrollment, and one sent by an
+  administrator who lost the flag after the page was opened shows the "System administrator" error and keeps the
+  enrollment; the service behind the button refuses a caller who is not a system administrator.
 
 #### Test Scenarios
+
+**UsersPage_Render_SystemAdminThroughRouter_ShowsUserList**: A system administrator is signed in and the router is
+rendered at `/users`; the list is shown with the user, and there is no access denied message. This scenario is tested by
+`UsersPage_Render_SystemAdminThroughRouter_ShowsUserList`.
+
+**UsersPage_Render_ReviewerThroughRouter_ShowsAccessDeniedAndNoAccounts**: A reviewer is signed in, another account
+exists, and the router is rendered at `/users`; the access denied message is shown, and no account or display name is
+rendered. This scenario is tested by `UsersPage_Render_ReviewerThroughRouter_ShowsAccessDeniedAndNoAccounts`.
 
 **UsersPage_Render_ExistingUsers_ListsThemWithControls**: A system administrator and an ordinary user exist; the page
 lists their user names, display names, and enabled states, the "System admin" badge of the administrator only, and the
@@ -61,11 +75,31 @@ administrator) and the button that leads to the creation page, the creation form
 contains neither the password nor the hash. This scenario is tested by
 `UsersPage_Render_ExistingUsers_ListsThemWithControls`.
 
+**UsersPage_Render_ExistingUsers_OffersNoRoleChoice**: A system administrator and a reviewer exist; the page has exactly
+one selection, the status filter, no radio button, and no element whose test id names a role. This scenario is tested
+by `UsersPage_Render_ExistingUsers_OffersNoRoleChoice`.
+
+**NewUserPage_Render_Form_ShowsOnlyTheForm**: A signed-in administrator and one more user exist and the creation page is
+rendered; the form is there, and neither the list nor the row of the other user is. This scenario is tested by
+`NewUserPage_Render_Form_ShowsOnlyTheForm`.
+
+**NewUserPage_Render_FilledForm_CancelIsPlainLinkBackAndCreatesNoUser**: The creation page is rendered and a user name,
+display name, and password are typed but the form is not submitted; the Cancel control is a plain link (an `a` element
+with no type and no click handler of its own, so it cannot submit the form) to the user list, with the text "Cancel",
+and no user is created (the number of users is unchanged and the typed user name is unknown). A plain link cannot be
+followed in a component test, so the test checks what the browser would do with it. This scenario is tested by
+`NewUserPage_Render_FilledForm_CancelIsPlainLinkBackAndCreatesNoUser`.
+
 **NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm**: The creation page is filled in with a user name,
-display name, the "System administrator" checkbox ticked, and a password and submitted; the user is stored as a system
-administrator, there is no error, the
-password field is empty, the browser returns to the list, and the Cancel link leads to the list. This scenario is
-tested by `NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm`.
+display name, the "System administrator" checkbox ticked, and a password and submitted; the user is stored with the
+display name as a system administrator and can sign in with the password, there is no error, the password field is
+empty, the browser returns to the list, and the Cancel link leads to the list. This scenario is tested by
+`NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm`.
+
+**NewUserPage_CreateForm_AdminDemotedAfterOpening_ShowsErrorAndCreatesNothing**: Two system administrators exist and one
+opens the creation page and fills in the form, then loses the flag, and the form is submitted; the error that says
+system administrator rights are required is shown and the user is not stored. This scenario is tested by
+`NewUserPage_CreateForm_AdminDemotedAfterOpening_ShowsErrorAndCreatesNothing`.
 
 **NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing**: The creation page is submitted with a too
 short password; an error that mentions the characters is shown, no user is stored, the user name stays in its field,
@@ -78,8 +112,9 @@ button is used again and the user is stored as enabled and shown as "Enabled" wi
 tested by `UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain`.
 
 **UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag**: The system administrator button of an ordinary user is
-used twice; the user is stored as a system administrator and shown with the "System admin" badge, and then stored
-without the flag and shown without the badge. This scenario is tested by
+used twice; the user is stored as a system administrator, shown with the "System admin" badge, and the status says that
+the user is now a system administrator, and then the user is stored without the flag, shown without the badge, and the
+status says that the user is no longer one. This scenario is tested by
 `UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag`.
 
 **UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField**: A new password is typed in the row of a user
@@ -136,7 +171,10 @@ the second factor "was reset", the badge and the button are gone, and no error i
 `UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus`. With the feature switched off the badge and the
 button are still shown, which is tested by `UsersPage_Render_FeatureDisabled_StillShowsBadgeAndReset`. A reset after the
 session ended shows the error "no longer signed in" and the user stays enrolled, which is tested by
-`UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment`. The service behind the button refuses a
+`UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment`. A reset by an administrator who lost the
+flag after the page was opened shows the error that says system administrator rights are required and the user stays
+enrolled, which is tested by
+`UsersPage_ResetTotp_AdminDemotedAfterOpening_ShowsErrorAndKeepsEnrollment`. The service behind the button refuses a
 caller who is not a system administrator (a project administrator is an ordinary user) with `ActorNotAllowed` and keeps
 the enrollment, which is tested by `TotpService_Reset_NotSystemAdmin_IsRefusedAndKeepsEnrollment`, defined in the same
 file.
@@ -155,7 +193,9 @@ case, and clearing the search lists everybody again, which is tested by
 `UsersPage_Search_TypedText_MatchesUserNameOrDisplayNameIgnoringCase`. Each of the choices Enabled, Disabled, Locked,
 and System administrators lists exactly the matching users, and All lists everybody, which is tested by
 `UsersPage_Filter_EachStatus_ListsOnlyMatchingUsers`. The search and a filter apply together, which is tested by
-`UsersPage_SearchAndFilter_Combined_BothApply`.
+`UsersPage_SearchAndFilter_Combined_BothApply`. A user who is changed in the store after the page was opened is still
+listed as before while a search is typed and a filter is chosen, so that the users are not read again, which is tested
+by `UsersPage_Search_TypedText_DoesNotReloadTheUsers`.
 
 **UsersPage disable confirmation scenarios**: A user who holds an open review slot and the only administrator of a
 project is disabled through the row; the first click only opens the panel, which lists the review and the project as
@@ -173,7 +213,7 @@ no panel opens, which is tested by `UsersPage_Disable_ImpactLoadRefused_ShowsErr
 **UsersPage other confirmation scenarios**: The first click on "Reset two-factor" opens a panel that says that the
 authenticator and the recovery codes are removed and the user has to set up two-factor sign-in again, and removes
 nothing; "Cancel" closes it and the enrollment stays; this is tested by
-`UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing` in `UsersTotpPageTests.cs`. The first click on "Set
+`UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing`. The first click on "Set
 password" with a typed password opens a panel that says that the user must change the password at the next sign-in, can
 only use the Account, Help, and About pages, cannot sign reviews, and that API tokens stop working until then, and
 changes nothing; the second click sets the password and the account has the temporary state, and the status says that

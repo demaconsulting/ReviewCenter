@@ -24,11 +24,14 @@ N/A - standard test environment.
 - The list, at `/projects/{id}/repositories`, shows the name, location, and enabled state of each repository of that
   project, and the user name and token state where they are set; repositories of other projects are not listed; it
   never shows a token and has no delete control, and it has no form but a button that leads to the add page.
-- The add page, at `/projects/{id}/repositories/new`, holds the form and a Cancel link back to the list. The form
-  registers a repository in the project, stores the token only
+- The add page, at `/projects/{id}/repositories/new`, holds only the form (no list and no repository row) and a Cancel
+  link back to the list. The form
+  registers a repository in the project with its name, location, user name, and token, or with the name and the
+  location alone, stores the token only
   through the service, empties the token field, returns to the list, and the token is never in the markup; an invalid
   location is shown as an error, keeps the typed name, and creates nothing.
-- Editing keeps, replaces, or clears the token as chosen, and cancelling closes the form and changes nothing.
+- Editing changes the name, location, and user name, keeps, replaces, or clears the token as chosen, and cancelling
+  closes the form and changes nothing.
 - A repository can be disabled and enabled again.
 - A project administrator manages the repositories of the project; a plain member and a user who is no member see only
   the not-found message of a missing project, with no repositories and no controls, on both pages.
@@ -51,6 +54,11 @@ tested by `RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete`.
 in a second project; the page of the first project lists only its own. This scenario is tested by
 `RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed`.
 
+**RepositoriesPage_Render_SystemAdminWithoutMembership_ShowsRepositoriesAndActions**: A system administrator who holds
+no membership of the project opens the page; the repository is listed with its enable control, and the add button is
+there, and the page is not the not-found message. This scenario is tested by
+`RepositoriesPage_Render_SystemAdminWithoutMembership_ShowsRepositoriesAndActions`.
+
 **RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions**: A user who is no system administrator but a
 project administrator of the project opens the page, sees the repository and the add button, and can disable the
 repository. This scenario is tested by `RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions`.
@@ -60,10 +68,26 @@ and one who is no member, each render the list and the add page; both show only 
 same one as for a missing project, with no repository row, no add button, and no form. This scenario is tested by
 `RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly`.
 
-**NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields**: The add page registers the repository, the
+**NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields**: The add page registers the repository with
+the typed name, location, and user name, the
 token is stored through the service, the token field is emptied, the token is not in the markup, the browser returns to
 the list, and the Cancel link leads to the list. This scenario is tested by
 `NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`.
+
+**NewRepositoryPage_Render_ProjectWithRepository_ShowsOnlyTheForm**: The add page of a project that already has a
+repository is rendered; the form is shown, and neither the list nor a repository row. This scenario is tested by
+`NewRepositoryPage_Render_ProjectWithRepository_ShowsOnlyTheForm`.
+
+**NewRepositoryPage_Render_FilledForm_CancelIsPlainLinkBackAndRegistersNothing**: The add page is rendered and the name
+and the location are typed but the form is not submitted; the Cancel control is a plain link (an `a` element with no
+type and no click handler of its own, so it cannot submit the form) to the repositories of the project, with the text
+"Cancel", and no repository is registered. A plain link cannot be followed in a component test, so the test checks what
+the browser would do with it. This scenario is tested by
+`NewRepositoryPage_Render_FilledForm_CancelIsPlainLinkBackAndRegistersNothing`.
+
+**NewRepositoryPage_CreateForm_NameAndLocationOnly_RegistersRepositoryWithoutTokenOrUserName**: The form is submitted
+with only a name and a location; the repository is registered with no user name and no token, and no error is shown.
+This scenario is tested by `NewRepositoryPage_CreateForm_NameAndLocationOnly_RegistersRepositoryWithoutTokenOrUserName`.
 
 **NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing**: An invalid location is shown as an error,
 the typed name is kept, and nothing is created. This scenario is tested by
@@ -71,6 +95,10 @@ the typed name is kept, and nothing is created. This scenario is tested by
 
 **RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken**: Editing with the default action changes the fields and
 keeps the stored token. This scenario is tested by `RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken`.
+
+**RepositoriesPage_Edit_NameAndLocation_ShowsChangedValues**: The edit form of a repository is opened, a new name and a
+new location are typed, and the form is saved; the row and the stored repository show the new values. This scenario is
+tested by `RepositoriesPage_Edit_NameAndLocation_ShowsChangedValues`.
 
 **RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly**: Replacing the token stores the new one, which never
 appears in the markup. This scenario is tested by `RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly`.
@@ -113,7 +141,9 @@ The page shows only the not-found message, no form field or typed value is in th
 This scenario is tested by `NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing`.
 
 **RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions**: When the sign-in state is re-checked
-after the administrator lost the flag, the page shows the session-ended message and no actions. This scenario is tested
+after the administrator lost the flag, the page shows the session-ended message and no actions, and the repository is
+unchanged. The re-check answers with the session-ended message, whereas an action from a page that is out of step with
+the user's rights is answered with the not-found message (see the scenarios above). This scenario is tested
 by `RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions`.
 
 **RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: An action sent after the session

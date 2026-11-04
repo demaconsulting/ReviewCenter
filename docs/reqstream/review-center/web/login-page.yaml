@@ -8,35 +8,70 @@ sections:
     requirements:
       - id: ReviewCenter-LoginPage-Form
         title: >-
-          The LoginPage unit shall serve at /login, without sign-in, a form with a user name field, a password
-          field, and a Sign in button that posts to the sign-in endpoint with an antiforgery token.
+          The LoginPage unit shall render the sign-in page at /login for a visitor who is not signed in.
         justification: |
-          Users need a page to sign in from, and it must be reachable without being signed in. The antiforgery
-          token stops another site from signing a user in to an account chosen by an attacker.
+          Users need a page to sign in from, and it must be reachable without being signed in.
         tests:
-          - SignIn_PublicPage_Anonymous_IsServed
-          - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
+          - LoginPage_Render_AnonymousThroughRouter_ShowsFormAndNoSignInPrompt
+
+      - id: ReviewCenter-LoginPage-Form-Fields
+        title: >-
+          The LoginPage unit shall show a form with a user name field, a password field, and a Sign in button.
+        justification: |
+          A user needs the two credentials and one way to send them.
+        tests:
+          - LoginPage_Render_Default_ShowsUserNamePasswordAndSignInButton
+
+      - id: ReviewCenter-LoginPage-Form-PostTarget
+        title: >-
+          The LoginPage unit shall post the form to the sign-in endpoint.
+        justification: |
+          The endpoint sets the cookie that makes the user signed in, so the form must reach it with an ordinary post
+          that needs no live connection.
+        tests:
+          - LoginPage_Render_Default_FormPostsToSignInEndpoint
 
       - id: ReviewCenter-LoginPage-Error
         title: >-
-          The LoginPage unit shall show one message for a failed sign-in, whatever the reason, shall show a
-          different message, saying that there were too many attempts and to try again in a few minutes, only
-          when the sign-in was refused by the throttle, and shall keep a local return address through a failed
-          sign-in while ignoring one that leads to another site.
+          The LoginPage unit shall show one message, "Invalid user name or password.", for a failed sign-in, whatever
+          the reason.
         justification: |
-          A message that differed by reason would tell an attacker which user names exist, and a return address
-          that could lead to another site would turn the login page into a way to send users elsewhere. The
-          throttle refuses by client address and not by account, so its message may differ without telling
-          anything about an account, and it tells a real user why the right password does not work now.
+          A message that differed by reason would tell an attacker which user names exist.
         tests:
-          - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
-          - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
-          - SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage
+          - LoginPage_Render_ErrorFlag_ShowsOneMessageWhateverTheReason
+
+      - id: ReviewCenter-LoginPage-Error-Throttled
+        title: >-
+          The LoginPage unit shall show a different message, saying that there were too many attempts and to try again
+          in a few minutes, when the throttle refused the sign-in.
+        justification: |
+          The throttle refuses by client address and not by account, so its message may differ without telling anything
+          about an account, and it tells a real user why the right password does not work now.
+        tests:
+          - LoginPage_Render_ThrottledFlag_ShowsTooManyAttemptsMessageOnly
+
+      - id: ReviewCenter-LoginPage-Error-ReturnAddress
+        title: >-
+          The LoginPage unit shall keep a local return address through a failed sign-in.
+        justification: |
+          A user who was sent to the sign-in page from a place in the application must get back to that place after
+          signing in at the second attempt.
+        tests:
+          - LoginPage_Render_FailureWithLocalReturnAddress_KeepsItInTheForm
+
+      - id: ReviewCenter-LoginPage-Error-ForeignAddress
+        title: >-
+          The LoginPage unit shall ignore a return address that leads to another site.
+        justification: |
+          A return address that could lead to another site would turn the login page into a way to send users
+          elsewhere.
+        tests:
+          - LoginPage_Render_ForeignReturnAddress_IsReplacedByHomePage
 
       - id: ReviewCenter-LoginPage-PasswordChanged
         title: >-
           The LoginPage unit shall show a notice to sign in with the new password only when the address carries the
-          changed flag set to 1, which the account page sets after a temporary password was replaced.
+          changed flag set to 1.
         justification: |
           Replacing a temporary password ends the session that carried it, so the user must sign in again, and the
           notice tells why the sign-in page is shown instead of the next page. It must not appear on a plain visit.
@@ -45,26 +80,51 @@ sections:
 
       - id: ReviewCenter-LoginPage-OidcButton
         title: >-
-          The LoginPage unit shall, only when the sign-in with a provider is on, show a button "Sign in with" and the
-          display name of the provider beside the form for a local account, show a general message next to it when the
-          provider failed, and show no button when it is off.
+          The LoginPage unit shall show, when the sign-in with a provider is on, a button "Sign in with" and the display
+          name of the provider beside the form for a local account.
         justification: |
           People must see at once how to sign in with the provider, and the local form must stay for the accounts that
-          have no provider. The message does not say why, so that it does not help an attacker.
+          have no provider.
         tests:
           - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
+
+      - id: ReviewCenter-LoginPage-OidcButton-Error
+        title: >-
+          The LoginPage unit shall show a general message next to the button when the sign-in with the provider failed.
+        justification: |
+          The message does not say why, so that it does not help an attacker.
+        tests:
           - LoginPage_Render_ProviderFailed_ShowsGenericMessageNextToButton
+
+      - id: ReviewCenter-LoginPage-OidcButton-Off
+        title: >-
+          The LoginPage unit shall show no button to sign in with a provider when the sign-in with a provider is off.
+        justification: |
+          A button that cannot work would only confuse.
+        tests:
           - LoginPage_Render_ProviderOff_ShowsNoButton
-          - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
 
       - id: ReviewCenter-LoginPage-TotpExpiredNotice
         title: >-
           The LoginPage unit shall show a notice that the sign-in with the code has ended and has to be started again
-          when the address carries the totp-expired flag, without a password error, and shall show no such notice for
-          a wrong password.
+          when the address carries the totp-expired flag.
         justification: |
-          A person who waited too long for the code is sent back to the first step, and the notice tells why. It must
-          not appear after a wrong password, where it would suggest that the password was right.
+          A person who waited too long for the code is sent back to the first step, and the notice tells why.
         tests:
           - LoginPage_Render_TotpExpired_ShowsNoticeAndNoPasswordError
+
+      - id: ReviewCenter-LoginPage-TotpExpiredNotice-NoPasswordError
+        title: >-
+          The LoginPage unit shall show no password error when the address carries the totp-expired flag.
+        justification: |
+          The password was right, so a message about it would mislead.
+        tests:
+          - LoginPage_Render_TotpExpired_ShowsNoticeAndNoPasswordError
+
+      - id: ReviewCenter-LoginPage-TotpExpiredNotice-WrongPassword
+        title: >-
+          The LoginPage unit shall show no notice that the sign-in with the code has ended for a wrong password.
+        justification: |
+          The notice must not appear after a wrong password, where it would suggest that the password was right.
+        tests:
           - LoginPage_Render_PasswordFailure_ShowsNoExpiredNotice
