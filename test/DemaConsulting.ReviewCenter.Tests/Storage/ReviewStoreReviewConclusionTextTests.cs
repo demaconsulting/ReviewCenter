@@ -21,6 +21,7 @@
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace DemaConsulting.ReviewCenter.Tests.Storage;
@@ -134,6 +135,49 @@ public class ReviewStoreReviewConclusionTextTests
         Assert.Equal("Looks good.", after!.ReviewConclusionText);
         Assert.NotEqual(RecordDigest.Compute(before), RecordDigest.Compute(after));
         Assert.Equal(1, await AuditCountAsync(db));
+    }
+
+    /// <summary>
+    ///     Runs a SQL statement directly against the database file, as someone with file access would.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="sql">The statement.</param>
+    private static void Execute(TestStore db, string sql)
+    {
+        using var connection = new SqliteConnection(db.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    ///     Test that a change of the text whose audit entry cannot be stored is rolled back: the text stays as it
+    ///     was, and the same change works once the entry can be stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateReviewConclusionTextAsync_AuditInsertFails_LeavesTheTextUnchanged()
+    {
+        // Arrange: a stored text, and a database that refuses every audit entry
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.UpdateReviewConclusionTextAsync(projectId, "REV-1", null, "First.", Draft(projectId), cancellationToken);
+        var auditBefore = await AuditCountAsync(db);
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Store.UpdateReviewConclusionTextAsync(projectId, "REV-1", "First.", "Second.", Draft(projectId), cancellationToken));
+
+        // Assert: the text is as it was and no entry was added
+        Assert.Equal("First.", await ReadTextAsync(db, projectId));
+        Execute(db, "DROP TRIGGER refuse_audit");
+        Assert.Equal(auditBefore, await AuditCountAsync(db));
+
+        // Act, Assert: with the entry storable again, the same change succeeds
+        Assert.True(await db.Store.UpdateReviewConclusionTextAsync(projectId, "REV-1", "First.", "Second.", Draft(projectId), cancellationToken));
+        Assert.Equal("Second.", await ReadTextAsync(db, projectId));
     }
 
     /// <summary>

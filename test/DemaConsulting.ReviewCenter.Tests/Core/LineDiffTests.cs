@@ -736,12 +736,19 @@ public class LineDiffTests
             // Act: pair all the rows
             var paired = LineDiff.Pair(rows, 0, rows.Count);
 
-            // Assert: each row index is in exactly one side-by-side row, and each side is in ascending order
-            var shown = paired
-                .SelectMany(p => new[] { p.LeftIndex, p.RightIndex }.Where(i => i is not null).Select(i => i!.Value).Distinct())
-                .Order()
-                .ToList();
-            Assert.Equal(Enumerable.Range(0, rows.Count), shown);
+            // Assert: an unchanged row is shown once on each side (twice in all), a removed or added row once, and
+            // each side is in ascending order
+            var occurrences = paired
+                .SelectMany(p => new[] { p.LeftIndex, p.RightIndex })
+                .Where(i => i is not null)
+                .GroupBy(i => i!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+            Assert.Equal(rows.Count, occurrences.Count);
+            for (var i = 0; i < rows.Count; i++)
+            {
+                Assert.Equal(pattern[i] == 'c' ? 2 : 1, occurrences[i]);
+            }
+
             var left = paired.Where(p => p.LeftIndex is not null).Select(p => p.LeftIndex!.Value).ToList();
             var right = paired.Where(p => p.RightIndex is not null).Select(p => p.RightIndex!.Value).ToList();
             Assert.Equal(left.Order(), left);
@@ -772,8 +779,17 @@ public class LineDiffTests
         // Assert: the gaps are what Segment collapsed, the replacement pairs 1 removed with 2 added, and the
         // pinned row (index 3) is shown with its context
         Assert.Equal(2, segments.Count(s => s.IsGap));
-        var indexes = paired.SelectMany(p => new[] { p.LeftIndex, p.RightIndex }).Where(i => i is not null).Select(i => i!.Value).Distinct().Order().ToList();
-        Assert.Equal(visible.SelectMany(s => Enumerable.Range(s.Start, s.Count)).ToList(), indexes);
+        var occurrences = paired
+            .SelectMany(p => new[] { p.LeftIndex, p.RightIndex })
+            .Where(i => i is not null)
+            .GroupBy(i => i!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var visibleIndexes = visible.SelectMany(s => Enumerable.Range(s.Start, s.Count)).ToList();
+        Assert.Equal(visibleIndexes, occurrences.Keys.Order().ToList());
+        foreach (var index in visibleIndexes)
+        {
+            Assert.Equal(result.Lines[index].Kind == DiffLineKind.Context ? 2 : 1, occurrences[index]);
+        }
         Assert.Contains(new DiffRow(3, 3), paired);
         var replaced = paired.Single(p => p.LeftIndex is { } l && result.Lines[l].Kind == DiffLineKind.Removed && p.RightIndex is not null && result.Lines[p.LeftIndex.Value].Text == "l15");
         Assert.Equal("n15a", result.Lines[replaced.RightIndex!.Value].Text);

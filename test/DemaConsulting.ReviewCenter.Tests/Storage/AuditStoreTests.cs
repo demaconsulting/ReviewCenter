@@ -350,6 +350,29 @@ public class AuditStoreTests
     }
 
     /// <summary>
+    ///     Test that a review whose audit entry cannot be stored is not stored either: no review, no file, and no
+    ///     entry exist afterwards.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddReviewAsync_AuditInsertFails_StoresNoReview()
+    {
+        // Arrange: a project, and a database that refuses every audit entry
+        using var db = new TestStore();
+        var project = await db.Store.AddProjectAsync(new Project { Name = "A", Created = _created }, TestContext.Current.CancellationToken);
+        var before = (await ReadAll(db)).Count;
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Store.AddReviewAsync(NewReview(project.Id, "rev-1"), Draft("first", project.Id, "rev-1"), TestContext.Current.CancellationToken));
+
+        // Assert: the review is not there, and no entry was added
+        Assert.Null(await db.Store.GetReviewAsync(project.Id, "rev-1", TestContext.Current.CancellationToken));
+        Execute(db, "DROP TRIGGER refuse_audit");
+        Assert.Equal(before, (await ReadAll(db)).Count);
+    }
+
+    /// <summary>
     ///     Test that a failing audit insert also rolls back a user change, and a later append still works.
     /// </summary>
     [Fact]

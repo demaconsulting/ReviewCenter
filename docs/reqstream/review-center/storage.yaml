@@ -584,6 +584,7 @@ sections:
           - ReviewCenter-ReviewStore-ReviewConclusionText-Remove
           - ReviewCenter-ReviewStore-ReviewConclusionText-OnlyThatReview
           - ReviewCenter-ReviewStore-ReviewConclusionText-Audit
+          - ReviewCenter-ReviewStore-ReviewConclusionText-AuditAtomic
           - ReviewCenter-ReviewStore-ReviewConclusionText-ChainIntact
           - ReviewCenter-ReviewStore-ReviewConclusionText-Stale
           - ReviewCenter-ReviewStore-ReviewConclusionText-StaleKept
@@ -1247,6 +1248,8 @@ sections:
           the deadline of a review.
         children:
           - ReviewCenter-ReviewStore-DueDate-Audit
+          - ReviewCenter-ReviewStore-DueDate-Audit
+          - ReviewCenter-ReviewStore-DueDate-AuditAtomic
           - ReviewCenter-ReviewStore-DueDate-ChainIntact
         tests:
           - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
