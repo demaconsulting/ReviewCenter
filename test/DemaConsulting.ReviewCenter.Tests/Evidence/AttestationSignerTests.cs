@@ -406,6 +406,23 @@ public partial class AttestationSignerTests
     }
 
     /// <summary>
+    ///     Test that a missing document, key, or reason is refused with an argument exception.
+    /// </summary>
+    [Fact]
+    public void AttestationSigner_Sign_NullArgument_Throws()
+    {
+        // Arrange: a document, a key, and a signer
+        using var key = TestKeys.SelfSignedRsa();
+        var pdf = CreatePdf(5);
+        var signer = new AttestationSigner();
+
+        // Act and assert: each missing argument is refused, and the exception names it
+        Assert.Equal("pdf", Assert.Throws<ArgumentNullException>(() => signer.Sign(null!, key, _signedAt, "Reason")).ParamName);
+        Assert.Equal("key", Assert.Throws<ArgumentNullException>(() => signer.Sign(pdf, null!, _signedAt, "Reason")).ParamName);
+        Assert.Equal("reason", Assert.Throws<ArgumentNullException>(() => signer.Sign(pdf, key, _signedAt, null!)).ParamName);
+    }
+
+    /// <summary>
     ///     Test that a signature that does not fit the reserved space is reported as a key problem.
     /// </summary>
     [Fact]

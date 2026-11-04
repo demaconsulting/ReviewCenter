@@ -5,146 +5,569 @@
 # that the review is concluded and that every reviewer slot has a current signature, applies the evidence settings of
 # the project, gets the signing key, renders and signs the document, and records the release in the audit trail. It
 # serves a signed-in user and, when the project allows it, a request without a user (for an approved review only).
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: AttestationService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Approved: when an attestation is released, and what is answered when it is not
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Approved
         title: >-
-          The AttestationService class shall release an attestation only for a review that exists and is concluded
-          (Approved or Rejected) with a current signature of the concluding outcome in every reviewer slot for the
-          current record and a submitted ballot in every slot, shall report an unknown review as not found and any
-          other review as not complete, without asking for the signing key, and shall release a signed attestation
-          for a review that was concluded as Rejected that says it was rejected and carries the outcome in the audit
-          event.
+          The AttestationService class shall return a signed attestation PDF for a review that is approved.
         justification: |
-          The attestation is evidence of how a review concluded. It must never be produced for a review that is not
-          concluded, and a record that changed after the signatures must not be attested. A rejected review is
-          concluded and locked, and the reviewers' reasons are a record worth keeping, so it has a signed attestation
-          that says in the document itself that it is a rejection.
+          The attestation is evidence of how a review concluded, and the document that leaves the server is signed so
+          that a reader can tell that it was not changed afterwards.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
+
+      - id: ReviewCenter-AttestationService-Approved-Rejected
+        title: >-
+          The AttestationService class shall return a signed attestation PDF, whose title says that the review is
+          rejected, for a review that was concluded as Rejected.
+        justification: |
+          A rejected review is concluded and locked, and the reasons of the reviewers are a record worth keeping, so it
+          has a signed attestation that says in the document itself that it is a rejection.
+        tests:
+          - AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation
+
+      - id: ReviewCenter-AttestationService-Approved-NotRejectedMark
+        title: >-
+          The AttestationService class shall give the attestation of an approved review neither a rejected title nor
+          reasons for a rejection.
+        justification: |
+          A reader must never take an approval for a rejection.
+        tests:
+          - AttestationService_GenerateAsync_Approved_PrintsConclusionAndBallotsAppendixWithoutRejectedMark
+
+      - id: ReviewCenter-AttestationService-Approved-NotFound
+        title: >-
+          The AttestationService class shall report a review that does not exist as not found.
+        justification: |
+          A request for a review that is not there has nothing to attest, and the answer must say so.
+        tests:
+          - AttestationService_GenerateAsync_UnknownReview_ReturnsNotFound
+
+      - id: ReviewCenter-AttestationService-Approved-NotComplete
+        title: >-
+          The AttestationService class shall report a review that is not complete to a signed-in user as not approved.
+        justification: |
+          The attestation must never be produced for a review that is not concluded, and a signed-in user is told that
+          the review is not complete so that the missing signatures can be found.
+        tests:
+          - AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey
+          - AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail
+          - AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing
+
+      - id: ReviewCenter-AttestationService-Approved-RecordChanged
+        title: >-
+          The AttestationService class shall report a review whose record changed after it was signed as not approved.
+        justification: |
+          A signature covers the record as it was when the reviewer signed, so a record that changed afterwards is not
+          attested.
+        tests:
+          - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
+
+      - id: ReviewCenter-AttestationService-Approved-NoKeyRequest
+        title: >-
+          The AttestationService class shall not ask for the signing key for a review that does not exist or is not
+          complete.
+        justification: |
+          The key is needed only to sign, and asking for it first would use the key for a document that is never
+          released.
         tests:
           - AttestationService_GenerateAsync_UnknownReview_ReturnsNotFound
           - AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey
-          - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
-          - AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation
           - AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail
-          - AttestationService_GenerateAsync_Approved_PrintsConclusionAndBallotsAppendixWithoutRejectedMark
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Visibility: who may ask, and what a request without a user is told
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Visibility
         title: >-
-          The AttestationService class shall check, before it reads the review, that the actor may view the project of
-          the review, and shall report the review as not found, as for a review that does not exist, when the actor may
-          not. For a request without an actor it shall go on only when the project has switched on anonymous
-          attestation PDFs, and otherwise report the review as not found. For a request without an actor it shall also
-          report a review that is not complete, or that was concluded as Rejected, as not found, as for a review that
-          does not exist, so that the answer cannot be used to list review identifiers or their state and an
-          anonymous route serves only evidence that content passed; an actor keeps the not-complete answer.
+          The AttestationService class shall report a review as not found, with the answer for a review that does not
+          exist, to a signed-in user who may not view the project of the review.
         justification: |
-          An attestation contains the whole review. Answering differently for a project the user may not see would
-          tell the user that the project and its review exist. A project may publish its attestations by its own
-          decision, and the service enforces that decision itself. An anonymous caller has no account, so the
-          informative answer for a review that is not complete would let anyone probe which review identifiers exist
-          and which are complete, and the outcome of a rejection is not disclosed to the public.
+          An attestation contains the whole review. Answering differently for a project the user may not see would tell
+          the user that the project and its review exist.
         tests:
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview
+
+      - id: ReviewCenter-AttestationService-Visibility-Member
+        title: >-
+          The AttestationService class shall return the attestation of an approved review to a signed-in user who may
+          view the project of the review.
+        justification: |
+          The people who work in a project read the evidence of its reviews.
+        tests:
+          - AttestationService_GenerateAsync_ActorMayViewProject_ReturnsPdf
+
+      - id: ReviewCenter-AttestationService-Visibility-AnonymousOff
+        title: >-
+          The AttestationService class shall report a review as not found to a request without a user, unless the
+          project has switched on anonymous attestation PDFs.
+        justification: |
+          A project may publish its attestations by its own decision, and the service enforces that decision itself.
+        tests:
           - AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound
+
+      - id: ReviewCenter-AttestationService-Visibility-AnonymousUnknownProject
+        title: >-
+          The AttestationService class shall report a review as not found to a request without a user when the project
+          does not exist.
+        justification: |
+          A project that does not exist has no decision to publish anything, and the answer must not tell it apart
+          from a project that keeps its attestations private.
+        tests:
           - AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound
+
+      - id: ReviewCenter-AttestationService-Visibility-AnonymousOn
+        title: >-
+          The AttestationService class shall return the attestation of an approved review to a request without a user
+          when the project has switched on anonymous attestation PDFs.
+        justification: |
+          A project that publishes its attestations by its own decision must be able to hand them to a reader who has
+          no account.
+        tests:
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
+          - AttestationService_GenerateAsync_AnonymousApprovedAndRejected_OnlyApprovedIsServed
+
+      - id: ReviewCenter-AttestationService-Visibility-AnonymousIncomplete
+        title: >-
+          The AttestationService class shall report a review that is not complete as not found, with the answer for a
+          review that does not exist, to a request without a user.
+        justification: |
+          An anonymous caller has no account, so an informative answer for a review that is not complete would let
+          anyone probe which review identifiers exist and which are complete.
+        tests:
           - AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing
+
+      - id: ReviewCenter-AttestationService-Visibility-AnonymousRejected
+        title: >-
+          The AttestationService class shall report a review that was concluded as Rejected as not found to a request
+          without a user.
+        justification: |
+          The outcome of a rejection is not disclosed to the public, so an anonymous route serves only the evidence of
+          approvals.
+        tests:
           - AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound
           - AttestationService_GenerateAsync_AnonymousApprovedAndRejected_OnlyApprovedIsServed
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Revalidation: the second read of the review between the rendering and the signing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Revalidation
         title: >-
-          The AttestationService class shall read the review and the evidence settings of the project again after the
-          document is rendered and before it is signed, and when the review is no longer complete, or its record
-          digest, its ballot fingerprint (the justifications, answerers, times, and section states that the digest
-          does not cover), its slots, its signers, or the digests they signed differ from what was rendered, or the
-          settings differ from the ones that the document was rendered with, shall report that the review changed, and
-          shall sign nothing, return no document, and record nothing in the audit trail.
+          The AttestationService class shall read the review again after the document is rendered and before it is
+          signed, and report that the review changed when its record digest differs from the one that the document was
+          rendered with.
         justification: |
-          The approval and the content are read in separate steps and rendering takes time. Without the second check a
-          slot added or a record changed in between would yield a signed document that attests a review that was no
-          longer complete when it was signed. A ballot field that the record digest leaves out, such as a
-          justification, would otherwise be printed in the appendix as it was before the change. A setting that was
-          changed in between, for instance a switch that hides
-          the names of the reviewers, would otherwise yield a document that discloses what the project had just
-          decided to keep back.
+          The approval and the content are read in separate steps and rendering takes time. Without the second read a
+          record changed in between would yield a signed document that attests a review other than the one that was
+          approved.
+        tests:
+          - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-Revalidation-BallotFingerprint
+        title: >-
+          The AttestationService class shall report that the review changed when its ballot fingerprint differs from
+          the one that the document was rendered with, even when its record digest is the same.
+        justification: |
+          A ballot field that the record digest leaves out, such as a justification, would otherwise be printed in the
+          appendix as it was before the change.
+        tests:
+          - AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-Revalidation-NoLongerComplete
+        title: >-
+          The AttestationService class shall report that the review changed when it is no longer complete because a
+          reviewer slot without a signature was added after the document was rendered.
+        justification: |
+          A slot added in between would yield a signed document that attests a review that was no longer complete when
+          it was signed.
+        tests:
+          - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-Revalidation-SlotsChanged
+        title: >-
+          The AttestationService class shall report that the review changed when its reviewer slots differ from the
+          ones that the document was rendered with, even when the review is still complete and its record digest is
+          the same.
+        justification: |
+          The sign-offs in the document are those of the slots that were rendered, so a document must not be released
+          with sign-offs that are no longer the current ones.
+        tests:
+          - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-Revalidation-Settings
+        title: >-
+          The AttestationService class shall report that the review changed when the evidence settings of the project
+          differ from the ones that the document was rendered with.
+        justification: |
+          A setting that was changed in between, for instance a switch that hides the names of the reviewers, would
+          otherwise yield a document that discloses what the project had just decided to keep back.
+        tests:
+          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
+
+      - id: ReviewCenter-AttestationService-Revalidation-Unchanged
+        title: >-
+          The AttestationService class shall attest a review that did not change between the rendering and the
+          signing.
+        justification: |
+          The second read must not stand in the way of a request in which nothing changed.
+        tests:
+          - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested
+
+      - id: ReviewCenter-AttestationService-Revalidation-NoDocument
+        title: >-
+          The AttestationService class shall sign nothing and return no document when it reports that the review
+          changed.
+        justification: |
+          A document that was rendered from a review that has since changed must not leave the server.
         tests:
           - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
-          - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested
           - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
 
+      - id: ReviewCenter-AttestationService-Revalidation-NothingRecorded
+        title: >-
+          The AttestationService class shall record nothing in the audit trail when it reports that the review
+          changed.
+        justification: |
+          An event for a document that was never released would be false.
+        tests:
+          - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Document: what the signed PDF holds
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Document
         title: >-
-          The AttestationService class shall return a signed PDF of the review, with its content, the consolidated
-          checklist of the submitted ballots (each agreed check with who answered it in the lowest agreeing slot and
-          when, and never a draft), the findings and comments that the reviewers included in the report, the
-          conclusion, sign-offs, audit head, and key, as far as the evidence settings of the project include them, and
-          a file name that keeps only safe characters, and shall sign the document after the settings were applied so
-          that the signature stays valid.
+          The AttestationService class shall return a PDF of the review that names its project, its review, and its
+          files, with a signature that verifies.
         justification: |
-          The caller needs the finished document and a name that is safe to put in a download header. A project that
-          keeps parts of a review out of its PDFs must get a document whose signature still verifies, because the
-          signature covers the bytes that were released. The document states what the reviewers agreed and handed in,
-          which is the standing that the signatures cover, and so a reader never sees an answer that was still a draft.
+          The caller needs the finished document, and its signature covers the bytes that were released, so that a
+          reader can check that nothing was changed afterwards.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
+
+      - id: ReviewCenter-AttestationService-Document-Checklist
+        title: >-
+          The AttestationService class shall print every check of the checklist in the document with the agreed
+          outcome.
+        justification: |
+          The document states what the reviewers agreed and handed in, which is the standing that the signatures cover.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_PrintsEveryCheckWithItsOutcome
+
+      - id: ReviewCenter-AttestationService-Document-AnswerTime
+        title: >-
+          The AttestationService class shall print for an answered check who answered it and the time of the answer in
+          UTC, and not the time of the signature or of the request.
+        justification: |
+          A reader must see when the answers were given. The time stays correct when the same answers are given again
+          later, because the record digest covers only the agreed outcomes.
+        tests:
           - AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval
+
+      - id: ReviewCenter-AttestationService-Document-SignOffs
+        title: >-
+          The AttestationService class shall print for each reviewer slot its reviewers and who signed it.
+        justification: |
+          The sign-offs are what makes the review approved, so a reader of the document must be able to see them.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_PrintsSignOffOfTheSlot
+
+      - id: ReviewCenter-AttestationService-Document-AuditHead
+        title: >-
+          The AttestationService class shall print the head of the audit chain at the time of the request in the
+          document.
+        justification: |
+          The head of the chain lets a reader place the document in the audit trail of the server.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_PrintsAuditChainHead
+
+      - id: ReviewCenter-AttestationService-Document-Key
+        title: >-
+          The AttestationService class shall print the key that signed the document in the document.
+        justification: |
+          A reader must be able to tell which key to check the signature against.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_PrintsSigningKey
+
+      - id: ReviewCenter-AttestationService-Document-FileName
+        title: >-
+          The AttestationService class shall name the file of the document after the project and the review, keeping
+          only letters, digits, dot, underscore, and hyphen of the review identifier.
+        justification: |
+          The name is put in a download header, so it must be safe there.
+        tests:
           - AttestationService_FileNameFor_ReviewId_KeepsOnlySafeCharacters
+          - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
+
+      - id: ReviewCenter-AttestationService-Document-DefaultSettings
+        title: >-
+          The AttestationService class shall include the names of the people, the files, and the findings and comments
+          of the report in the document, and say that nothing is left out, when the project has the default evidence
+          settings.
+        justification: |
+          A project that has not decided otherwise gets the whole evidence.
+        tests:
           - AttestationService_GenerateAsync_DefaultSettings_IncludesEverything
+
+      - id: ReviewCenter-AttestationService-Document-NamesOff
+        title: >-
+          The AttestationService class shall leave the names of the people out of the document, and say so, when the
+          project keeps reviewer names out of PDFs.
+        justification: |
+          A project that publishes its attestations may not want the names of its reviewers in them.
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Document-ThreadsOff
+        title: >-
+          The AttestationService class shall leave the findings and the comment text out of the document, and say so,
+          when the project keeps review discussion threads out of PDFs.
+        justification: |
+          A project may keep its discussions private while it still publishes the outcome of its reviews.
+        tests:
+          - AttestationService_GenerateAsync_ThreadsOff_OmitsFindingsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Document-FilesOff
+        title: >-
+          The AttestationService class shall leave the list of files and their hashes out of the document, and say so,
+          when the project keeps the files out of PDFs.
+        justification: |
+          A project may not want the names of its files in a document that it publishes.
+        tests:
+          - AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Document-ChecklistWordingOff
+        title: >-
+          The AttestationService class shall leave the question text of the checklist out of the document, keeping the
+          identifiers and the outcomes of the checks, and say so, when the project keeps the checklist wording out of
+          PDFs.
+        justification: |
+          A project may not want to publish the wording of its checklist, and the identifiers still let a reader match
+          the outcomes to it.
+        tests:
+          - AttestationService_GenerateAsync_ChecklistWordingOff_OmitsQuestionTextAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Document-SignedAfterSettings
+        title: >-
+          The AttestationService class shall sign the document after the evidence settings were applied, so that the
+          signature of a document with parts left out verifies.
+        justification: |
+          The signature covers the bytes that were released. A document that was signed before parts were left out
+          would carry a signature that does not verify.
+        tests:
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
           - AttestationService_GenerateAsync_ThreadsOff_OmitsFindingsAndStillVerifies
           - AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies
           - AttestationService_GenerateAsync_ChecklistWordingOff_OmitsQuestionTextAndStillVerifies
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Report: the conclusion, the findings and comments, and the ballots appendix
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Report
         title: >-
-          The AttestationService class shall give the document, for a concluded review, the findings and the included
-          comments: every thread with at least one comment that a reviewer included in the report (the same threads and
-          comments that the record digest binds), each with its location and only its included comments, in full and
-          in the order they were written; shall present a thread whose starting comment was not included as a
-          discussion thread, not as a finding; shall never give it a comment that was not included or a thread without
-          an included comment; shall give it the outcome and the conclusion text of the review; and shall give it the
-          final submitted ballot of every reviewer slot, as a ballots appendix with the fingerprint of the ballots, and
-          nothing of a review that is not concluded.
+          The AttestationService class shall print each finding that a reviewer included in the report in the document
+          with its author, its status, and its resolution note.
         justification: |
-          The report is what a reviewer chose to put in the record, and it is exactly what the record digest binds, so
-          a signature never covers text that the PDF does not show. A question asked in a chat or a comment that was
-          not included stays in the review, and the ballots of the slots are only shown once the review is concluded
-          and locked, when no one can still be influenced by them. The appendix lets a reader of a rejection see
-          who answered what and why, and the fingerprint lets two copies be compared.
+          The report is what a reviewer chose to put in the record, and the document must show it.
         tests:
           - AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly
-          - AttestationService_GenerateAsync_Rejected_BallotFingerprintMatchesRecord
-          - AttestationService_GenerateAsync_RejectedNamesOff_AppendixAndFindingsUseLabels
-          - AttestationService_GenerateAsync_RejectedWordingOff_AppendixPrintsIdentifiersOnly
-          - AttestationService_GenerateAsync_RejectedThreadsOff_PrintsNoFindings
-          - AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail
+
+      - id: ReviewCenter-AttestationService-Report-Conclusion
+        title: >-
+          The AttestationService class shall print the conclusion of the review in the document, with its outcome and,
+          for a rejection, the reasons.
+        justification: |
+          The conclusion is what the attestation attests, and the reasons of a rejection are the part of the record
+          that tells a reader what to fix.
+        tests:
+          - AttestationService_GenerateAsync_Approved_PrintsConclusionAndBallotsAppendixWithoutRejectedMark
+          - AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly
+
+      - id: ReviewCenter-AttestationService-Report-Excluded
+        title: >-
+          The AttestationService class shall print neither a comment that was not included in the report nor a thread
+          without an included comment.
+        justification: |
+          A question asked in a chat, or a comment that was not included, stays in the review and is not part of the
+          report.
+        tests:
+          - AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly
           - AttestationService_GenerateAsync_QuestionThreadWithIncludedReply_PrintsDiscussionWithOnlyIncludedComments
           - AttestationService_GenerateAsync_MixedThreads_PrintsExactlyTheCommentsTheDigestCovers
+
+      - id: ReviewCenter-AttestationService-Report-DigestCoverage
+        title: >-
+          The AttestationService class shall print exactly the threads and comments that the record digest covers.
+        justification: |
+          The report is exactly what the record digest binds, so a signature never covers text that the PDF does not
+          show.
+        tests:
+          - AttestationService_GenerateAsync_MixedThreads_PrintsExactlyTheCommentsTheDigestCovers
+
+      - id: ReviewCenter-AttestationService-Report-Discussion
+        title: >-
+          The AttestationService class shall present a thread whose starting comment was not included in the report as
+          a discussion, not as a finding.
+        justification: |
+          A question and its answer are not a finding, and presenting them as one would misstate what the reviewers
+          found.
+        tests:
+          - AttestationService_GenerateAsync_QuestionThreadWithIncludedReply_PrintsDiscussionWithOnlyIncludedComments
+
+      - id: ReviewCenter-AttestationService-Report-Appendix
+        title: >-
+          The AttestationService class shall print a ballots appendix that names each reviewer slot with the
+          justification of its final ballot.
+        justification: |
+          The appendix lets a reader of a rejection see who answered what and why.
+        tests:
+          - AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly
           - AttestationService_GenerateAsync_RejectedTwoSlots_AppendixPrintsBothBallotsWithTheirOwnJustifications
 
+      - id: ReviewCenter-AttestationService-Report-SlotOrder
+        title: >-
+          The AttestationService class shall list the slots in the ballots appendix in the order of their numbers.
+        justification: |
+          The reviewers refer to a slot by its number, so the appendix follows the numbering.
+        tests:
+          - AttestationService_GenerateAsync_RejectedTwoSlots_AppendixPrintsBothBallotsWithTheirOwnJustifications
+
+      - id: ReviewCenter-AttestationService-Report-BallotFingerprint
+        title: >-
+          The AttestationService class shall print in the ballots appendix the fingerprint of the ballots of the stored
+          record.
+        justification: |
+          The fingerprint lets two copies of the ballots be compared, and a reader can recompute it from the review.
+        tests:
+          - AttestationService_GenerateAsync_Rejected_BallotFingerprintMatchesRecord
+          - AttestationService_GenerateAsync_RejectedTwoSlots_AppendixPrintsBothBallotsWithTheirOwnJustifications
+
+      - id: ReviewCenter-AttestationService-Report-NamesOff
+        title: >-
+          The AttestationService class shall name people in the ballots appendix and in the findings by label, with no
+          user name or display name, when the project keeps reviewer names out of PDFs.
+        justification: |
+          A project that keeps the names of its reviewers out of PDFs must not find them in the appendix or in the
+          findings.
+        tests:
+          - AttestationService_GenerateAsync_RejectedNamesOff_AppendixAndFindingsUseLabels
+
+      - id: ReviewCenter-AttestationService-Report-WordingOff
+        title: >-
+          The AttestationService class shall print the ballots appendix with identifiers and outcomes only, with
+          neither the question text nor the section titles, when the project keeps the checklist wording out of PDFs.
+        justification: |
+          A project that keeps the wording of its checklist out of PDFs must not find it in the appendix.
+        tests:
+          - AttestationService_GenerateAsync_RejectedWordingOff_AppendixPrintsIdentifiersOnly
+
+      - id: ReviewCenter-AttestationService-Report-ThreadsOff
+        title: >-
+          The AttestationService class shall print no finding, and say that it left them out, for a concluded review
+          when the project keeps discussion threads out of PDFs.
+        justification: |
+          A project that keeps its discussions private must not find them in the document of a rejection either.
+        tests:
+          - AttestationService_GenerateAsync_RejectedThreadsOff_PrintsNoFindings
+
+      - id: ReviewCenter-AttestationService-Report-NotConcluded
+        title: >-
+          The AttestationService class shall not reveal the justification of any ballot in the answer for a review that
+          is not concluded.
+        justification: |
+          The ballots of the slots are shown only once the review is concluded and locked, when no one can still be
+          influenced by them.
+        tests:
+          - AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Labels: how people are named when the project keeps names out of PDFs
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Labels
         title: >-
-          The AttestationService class shall, when the evidence settings keep the names of people out of PDFs, give the
-          renderer the labels Reviewer N (primary) and Reviewer N (alternate) for the people of the reviewer slots (the
-          answerer of a check is one of them, because a person answers in the ballot of the own slot),
-          Participant N for anybody else, in the order they are first named, and the labels a signed-in user or an
-          anonymous request for the requester, use one label for one person everywhere in the document, and leave the
-          text that people typed into comments and justifications as it is.
+          The AttestationService class shall name the primary and the alternate reviewer of a reviewer slot in the
+          document as Reviewer N (primary) and Reviewer N (alternate), when the project keeps the names of people out
+          of PDFs.
         justification: |
-          A project that publishes its attestations may not want the names of its reviewers in them. The label of a
-          person must be the same in every section, or the reader would count more people than there are, and the
-          words that people wrote belong to the record and are not changed.
+          A project that publishes its attestations may not want the names of its reviewers in them, and a reader still
+          needs to tell the reviewers apart.
         tests:
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Labels-Participant
+        title: >-
+          The AttestationService class shall name anybody else in the document as Participant N, numbered in the order
+          in which the people are first named, when the project keeps the names of people out of PDFs.
+        justification: |
+          People who write comments need a label too, and a fixed order keeps the numbering the same on every request.
+        tests:
+          - AttestationService_GenerateAsync_NamesOffSeveralParticipants_NumbersThemInOrderOfFirstNaming
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Labels-Answerer
+        title: >-
+          The AttestationService class shall name the person who answered a check in the document by the label of the
+          reviewer slot of that person, when the project keeps the names of people out of PDFs.
+        justification: |
+          A person answers in the ballot of the own slot, so the label of the answerer is the one of the slot.
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Labels-SamePerson
+        title: >-
+          The AttestationService class shall use the same label for one person everywhere in the document, when the
+          project keeps the names of people out of PDFs.
+        justification: |
+          If the label of a person changed from one section to the next, the reader would count more people than there
+          are.
+        tests:
+          - AttestationService_GenerateAsync_NamesOffSeveralParticipants_NumbersThemInOrderOfFirstNaming
+          - AttestationService_GenerateAsync_RejectedNamesOff_AppendixAndFindingsUseLabels
+
+      - id: ReviewCenter-AttestationService-Labels-Requester
+        title: >-
+          The AttestationService class shall name the requester of the document as a signed-in user, with no name, when
+          the project keeps the names of people out of PDFs.
+        justification: |
+          The name of the person who asked is as private as the names of the reviewers.
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Labels-Anonymous
+        title: >-
+          The AttestationService class shall state in the document that the request was anonymous when it had no user.
+        justification: |
+          A request without a user has no name to print, and the reader must not take the missing name for an omission.
+        tests:
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
+      - id: ReviewCenter-AttestationService-Labels-TypedText
+        title: >-
+          The AttestationService class shall print the text that people typed into comments and justifications as it
+          is, when the project keeps the names of people out of PDFs.
+        justification: |
+          The words that people wrote belong to the record and are not changed.
+        tests:
+          - AttestationService_GenerateAsync_RejectedNamesOff_LeavesTypedTextAsItIs
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Check threads, reopen history, key problems, audit trail, arguments, and follow-up
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-CheckThreadLabel
         title: >-
           The AttestationService class shall name the anchor of a finding about a check in the findings section of the
@@ -157,47 +580,124 @@ sections:
 
       - id: ReviewCenter-AttestationService-ReopenHistory
         title: >-
-          The AttestationService class shall still release the attestation of a review that is approved and therefore
-          locked, shall give the renderer the reopenings of the review, so that the document has a Reopen history
-          section with who reopened, when, the reason, and the short digest of the approved record, only for a review
-          that was reopened, and shall, when the evidence settings keep the names of people out of PDFs, leave the name
-          of the person who reopened out of that section.
+          The AttestationService class shall print a Reopen history section in the document of a review that was
+          reopened, with the reason, who reopened it, and the digest of the approved record that was superseded.
         justification: |
           A reader of an attestation must be able to see that the approval it states followed an earlier approval that
-          was reopened, and why. A review that was never reopened has nothing to show, and a project that keeps names
-          out of its PDFs must not find the name of an administrator in this section.
+          was reopened, and why.
         tests:
           - AttestationService_GenerateAsync_ReopenedReview_IncludesReopenHistory
+
+      - id: ReviewCenter-AttestationService-ReopenHistory-NeverReopened
+        title: >-
+          The AttestationService class shall print no Reopen history section in the document of a review that was
+          never reopened.
+        justification: |
+          A review that was never reopened has nothing to show, and an empty section would suggest otherwise.
+        tests:
           - AttestationService_GenerateAsync_NeverReopened_OmitsReopenHistory
+
+      - id: ReviewCenter-AttestationService-ReopenHistory-NoNames
+        title: >-
+          The AttestationService class shall leave the name of the person who reopened the review out of the Reopen
+          history section, keeping the reason, when the project keeps the names of people out of PDFs.
+        justification: |
+          A project that keeps names out of its PDFs must not find the name of an administrator in this section.
+        tests:
           - AttestationService_GenerateAsync_ReopenedWithoutReviewerNames_OmitsReopenedByName
+
+      - id: ReviewCenter-AttestationService-ReopenHistory-Locked
+        title: >-
+          The AttestationService class shall return the attestation of a review that is approved and therefore locked.
+        justification: |
+          An approved review is always locked, and the lock must not stand in the way of the attestation of the
+          approval.
+        tests:
           - AttestationService_GenerateAsync_LockedReview_StillRenders
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # KeyUnavailable: a problem with the signing key
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-KeyUnavailable
         title: >-
-          The AttestationService class shall report that the key is unavailable, and record nothing in the audit trail,
-          when the signing key cannot be obtained or the signing fails.
+          The AttestationService class shall report that the key is unavailable, with the reason, and return no
+          document, when the signing key cannot be obtained.
         justification: |
-          The user must be told that the key is the problem and not the review, and an event for a document that was
-          never released would be false.
+          The user must be told that the key is the problem and not the review.
+        tests:
+          - AttestationService_GenerateAsync_KeyProblem_ReturnsKeyUnavailableAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-KeyUnavailable-SignerFailure
+        title: >-
+          The AttestationService class shall report that the key is unavailable, with the reason, and return no
+          document, when the signing fails.
+        justification: |
+          A document that could not be signed must never be handed out unsigned.
+        tests:
+          - AttestationService_GenerateAsync_SignerFails_ReturnsKeyUnavailableAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-KeyUnavailable-NothingRecorded
+        title: >-
+          The AttestationService class shall record nothing in the audit trail when it reports that the key is
+          unavailable.
+        justification: |
+          An event for a document that was never released would be false.
         tests:
           - AttestationService_GenerateAsync_KeyProblem_ReturnsKeyUnavailableAndRecordsNothing
           - AttestationService_GenerateAsync_SignerFails_ReturnsKeyUnavailableAndRecordsNothing
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit: the record of every release
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Audit
         title: >-
-          The AttestationService class shall record an attestation.generated event in the audit trail for every
-          attestation it releases, with the record digest, the head of the audit chain, the SHA-256 hash of the PDF,
-          and the key, and with the actor anonymous when the request had no actor, and shall release nothing when that
-          record cannot be written.
+          The AttestationService class shall record an attestation.generated event in the audit trail for an
+          attestation it releases, naming the user who asked, the project, and the review, with the record digest, the
+          head of the audit chain, the SHA-256 hash of the PDF, and the key.
         justification: |
-          A document that leaves the server is an action that someone must be able to find later, including a release
-          to a caller without an account. If the trail cannot be written, releasing the document would leave an action
-          without a trace.
+          A document that leaves the server is an action that someone must be able to find later, and the hash of the
+          PDF ties the event to the document that was released.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash
+
+      - id: ReviewCenter-AttestationService-Audit-EveryRelease
+        title: >-
+          The AttestationService class shall record a separate event for every attestation it releases, so that two
+          requests for the same review leave two events.
+        justification: |
+          Every request creates a new document, so every release is an action of its own.
+        tests:
           - AttestationService_GenerateAsync_AskedTwice_RecordsTwoEvents
+
+      - id: ReviewCenter-AttestationService-Audit-AnonymousActor
+        title: >-
+          The AttestationService class shall record the actor anonymous in the event when the request had no user.
+        justification: |
+          A release to a caller without an account must be found later like any other.
+        tests:
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
+      - id: ReviewCenter-AttestationService-Audit-Outcome
+        title: >-
+          The AttestationService class shall name the outcome of the review in the event, as rejected for a review that
+          was concluded as Rejected.
+        justification: |
+          A reader of the audit trail must see that the released document attests a rejection and not an approval.
+        tests:
+          - AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation
+
+      - id: ReviewCenter-AttestationService-Audit-Strict
+        title: >-
+          The AttestationService class shall release no attestation, and leave no event, when the audit record cannot
+          be written.
+        justification: |
+          If the trail cannot be written, releasing the document would leave an action without a trace.
+        tests:
+          - AttestationService_GenerateAsync_AuditRecordFails_ThrowsAndRecordsNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Arguments and follow-up
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationService-Arguments
         title: >-
           The AttestationService class shall reject a missing collaborator when it is created.
@@ -208,13 +708,29 @@ sections:
 
       - id: ReviewCenter-AttestationService-FollowUp
         title: >-
-          The AttestationService class shall give the document the review that the reviewed review follows, with the
-          numbers of answers and threads it carried, and the review that a checklist answer, a not-applicable section
-          and a thread came from, taken from the record that the signatures cover, and nothing of the kind for a
-          review that does not follow another.
+          The AttestationService class shall name in the document the review that the reviewed review follows, with the
+          number of answers that it carried and the number of threads.
         justification: |
           A reader of the attestation must be able to tell which answers the reviewers of this review gave and which
-          they took over from an earlier review, because the signature approves both and the record says which is
-          which.
+          they took over from an earlier review, because the signature approves both. The count of threads is shown
+          by the renderer requirements of the same name.
+        tests:
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
+
+      - id: ReviewCenter-AttestationService-FollowUp-CarriedMarks
+        title: >-
+          The AttestationService class shall mark in the document each checklist answer that came from the followed
+          review, with the review it came from.
+        justification: |
+          The record says which answers were carried, and a reader must see which ones they are.
+        tests:
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
+
+      - id: ReviewCenter-AttestationService-FollowUp-NotFollowing
+        title: >-
+          The AttestationService class shall print neither a follow-up line nor a carried mark in the document of a
+          review that follows no other review.
+        justification: |
+          A review that follows nothing has nothing carried to show.
         tests:
           - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers

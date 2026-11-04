@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -509,6 +510,98 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that the attestation prints every check of the checklist with the agreed outcome.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_CompleteReview_PrintsEveryCheckWithItsOutcome()
+    {
+        // Arrange: a complete review in which every check was answered with Pass
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: every check of the checklist is there with its outcome
+        var lines = new PdfInspector(result.Content!).TextLines;
+        var ids = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).Select(item => item.Id).ToList();
+        Assert.NotEmpty(ids);
+        foreach (var id in ids)
+        {
+            Assert.Contains(lines, l => Regex.IsMatch(l, $@"^{Regex.Escape(id)}\s+Pass\b", RegexOptions.None, TimeSpan.FromSeconds(10)));
+        }
+    }
+
+    /// <summary>
+    ///     Test that the attestation prints the reviewers of each slot and who signed it.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_CompleteReview_PrintsSignOffOfTheSlot()
+    {
+        // Arrange: a complete review whose only slot was signed by ann
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Bob, TestContext.Current.CancellationToken);
+
+        // Assert: the slot, its two reviewers and the signature of the primary
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.Contains("Reviewer sign-offs", lines);
+        Assert.Contains("Slot 1", lines);
+        Assert.Contains("Ann (ann)", lines);
+        Assert.Contains("Bob (bob)", lines);
+        Assert.Contains(lines, l => l.StartsWith("Ann (ann) (", StringComparison.Ordinal) && l.Contains("Primary", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     Test that the attestation prints the head of the audit chain at the time of the request.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_CompleteReview_PrintsAuditChainHead()
+    {
+        // Arrange: a complete review and one audit entry
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        await fixture.Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "x", fixture.ProjectId), cancellationToken);
+        var head = (await fixture.Audit.VerifyAsync(cancellationToken)).HeadHash;
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: the head hash is printed on lines of hexadecimal digits in the audit trail section
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.Contains("Audit trail", lines);
+        Assert.Contains(head, string.Concat(lines.Where(l => l.All(Uri.IsHexDigit))), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that the attestation prints the key that signed it.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_CompleteReview_PrintsSigningKey()
+    {
+        // Arrange: a complete review and a key
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var key = TestKeys.SelfSignedRsa();
+        var thumbprint = key.Info.Thumbprint;
+        using var keys = new FakeAttestationKeyProvider(key);
+        var service = fixture.CreateService(keys);
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the thumbprint of the key is printed on lines of hexadecimal digits in the signature section
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.Contains("Digital signature", lines);
+        Assert.Contains(thumbprint, string.Concat(lines.Where(l => l.All(Uri.IsHexDigit))), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Test that the attestation prints the time each answer was given, not the time of the signature or of the
     ///     request, and that answering again with the same value later changes neither the record digest nor the
     ///     approval: the time is outside the digest.
@@ -641,6 +734,8 @@ public class AttestationServiceTests
         using var keys = new FakeAttestationKeyProvider(key);
         var service = fixture.CreateService(keys);
         var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestContext.Current.CancellationToken))!.Digest;
+        await fixture.Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "x", fixture.ProjectId), TestContext.Current.CancellationToken);
+        var head = (await fixture.Audit.VerifyAsync(TestContext.Current.CancellationToken)).HeadHash;
 
         // Act: ask for the attestation as bob
         var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Bob, TestContext.Current.CancellationToken);
@@ -655,7 +750,7 @@ public class AttestationServiceTests
         Assert.Contains($"pdf sha256 {pdfHash}", entry.Detail, StringComparison.Ordinal);
         Assert.Contains($"key {thumbprint}", entry.Detail, StringComparison.Ordinal);
         Assert.Contains("selfSigned=True", entry.Detail, StringComparison.Ordinal);
-        Assert.Contains("chain head ", entry.Detail, StringComparison.Ordinal);
+        Assert.Contains($"chain head {head}", entry.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -717,6 +812,93 @@ public class AttestationServiceTests
         Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, null!, new AttestationSigner(), fixture.Clock));
         Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, new AttestationRenderer(), null!, fixture.Clock));
         Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), null!));
+    }
+
+    /// <summary>
+    ///     Test that a signed-in user who may not view the project gets the answer for a review that does not exist,
+    ///     whether the review exists or not, and that the key is not asked for and nothing is recorded.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview()
+    {
+        // Arrange: a complete review, a user who is no member of its project, and the real access rules
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        await fixture.Users.CreateAsync("dan", "Dan", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = CreateServiceWithProjectAccess(fixture, keys);
+
+        // Act: the outsider asks for the existing review, and a member asks for a review that does not exist
+        var outsider = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, new Actor("dan", "Dan"), cancellationToken);
+        var missing = await service.GenerateAsync(fixture.ProjectId, "nope", TestActors.Ann, cancellationToken);
+
+        // Assert: the outsider gets the answer for a missing review, nothing is released, recorded or signed
+        Assert.Equal(AttestationStatus.NotFound, outsider.Status);
+        Assert.Equal(missing.Status, outsider.Status);
+        Assert.Equal(missing.Message, outsider.Message);
+        Assert.Null(outsider.Content);
+        Assert.Equal(0, keys.Requests);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
+    ///     Test that a signed-in user who may view the project gets the attestation of a complete review.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ActorMayViewProject_ReturnsPdf()
+    {
+        // Arrange: a complete review, and the real access rules, under which ann is a member of the project
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = CreateServiceWithProjectAccess(fixture, keys);
+
+        // Act: the member asks for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the signed PDF is delivered
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        Assert.NotNull(new PdfInspector(result.Content!).VerifySignature());
+    }
+
+    /// <summary>
+    ///     Test that nothing is released when the audit event of the release cannot be written.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_AuditRecordFails_ThrowsAndRecordsNothing()
+    {
+        // Arrange: a complete review and an audit store that refuses the next entry
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+        fixture.AuditStore.FailNextAppend = new InvalidOperationException("The audit store is down.");
+
+        // Act: ask for the attestation
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken));
+
+        // Assert: the failure reached the caller, so no document was returned, and no event exists
+        Assert.Equal("The audit store is down.", failure.Message);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
+    ///     Creates the service over the real project access rules instead of the double that lets everybody in.
+    /// </summary>
+    /// <param name="fixture">The fixture.</param>
+    /// <param name="keys">The key provider.</param>
+    /// <returns>The service.</returns>
+    private static AttestationService CreateServiceWithProjectAccess(AttestationFixture fixture, IAttestationKeyProvider keys)
+    {
+        return new AttestationService(
+            fixture.Store,
+            fixture.Signing,
+            new ProjectAccess(fixture.UserStore, fixture.Store),
+            fixture.Audit,
+            keys,
+            new AttestationRenderer(),
+            new AttestationSigner(),
+            fixture.Clock);
     }
 
     /// <summary>

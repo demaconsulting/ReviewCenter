@@ -846,6 +846,48 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that the answer to the creation of a review from a repository lists the entries that were left out
+    ///     with their path and reason, and still counts only the files that were reviewed.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_CreateReview_Repository_SkippedEntries_AreListedWithTheirReason()
+    {
+        // Arrange: a registered repository whose changes include a symbolic link that is not reviewed
+        var git = new FakeGitRepositoryProvider();
+        git.Revisions["main"] = HeadSha;
+        git.Revisions["v1"] = BaseSha;
+        git.Script(
+            BaseSha,
+            HeadSha,
+            [("src/new.txt", ChangeKind.Added, null, "world\n")],
+            new SkippedEntry("src/link", "Symbolic links are not reviewed."));
+        await using var app = await StartAsync(configureServices: services => services.AddSingleton<IGitRepositoryProvider>(git));
+        var token = await CreateTokenAsync(app);
+        await EnsureUserAsync(app, "adm", UserRole.Admin);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var repository = await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, new Actor("adm", "Adm"), TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        var body = new
+        {
+            id = "REV-S",
+            title = "With a link",
+            repository = new { repositoryId = repository.Id, headRevision = "main", baselineRevision = "v1", selection = "**/*" }
+        };
+
+        // Act: create the review
+        var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(body), TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: created with the one file, and the link listed with its reason
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(1, json.RootElement.GetProperty("review").GetProperty("counts").GetProperty("files").GetInt32());
+        var skipped = Assert.Single(json.RootElement.GetProperty("skipped").EnumerateArray());
+        Assert.Equal("src/link", skipped.GetProperty("path").GetString());
+        Assert.Equal("Symbolic links are not reviewed.", skipped.GetProperty("reason").GetString());
+    }
+
+    /// <summary>
     ///     Test that a request body that is not well formed is refused with 400 and the name of the field, and
     ///     that nothing is created.
     /// </summary>

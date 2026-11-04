@@ -217,9 +217,43 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         var key = provider.GetSigningKey();
 
         // Assert: a warning about the key, the thumbprint is logged, nothing else of the key
-        Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("self-signed", StringComparison.Ordinal));
+        Assert.Contains(
+            logs.Entries,
+            e => e.Level == LogLevel.Warning
+                 && e.Message.Contains("self-signed", StringComparison.Ordinal)
+                 && e.Message.Contains("development and test only", StringComparison.Ordinal));
         Assert.Contains(logs.Entries, e => e.Message.Contains(key.Info.Thumbprint, StringComparison.Ordinal));
         Assert.DoesNotContain(logs.Entries, e => e.Message.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     Test that the warning that the key is self-signed is also logged when the key is loaded from an existing
+    ///     file and not created.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_ExistingFile_LogsSelfSignedWarning()
+    {
+        // Arrange: a folder with a key created by a first provider, and a second provider with a capturing logger
+        var folder = NewFolder();
+        using (var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
+        {
+            first.GetSigningKey();
+        }
+
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        using var second = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, factory.CreateLogger("test"), Ring);
+
+        // Act: load the key
+        second.GetSigningKey();
+
+        // Assert: the key was loaded and not created, and the warning is logged
+        Assert.Single(Directory.GetFiles(folder));
+        Assert.Contains(
+            logs.Entries,
+            e => e.Level == LogLevel.Warning
+                 && e.Message.Contains("self-signed", StringComparison.Ordinal)
+                 && e.Message.Contains("development and test only", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -259,7 +293,9 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         // Assert: the folder and the setting are named, and the failure is not remembered
         Assert.Contains(folder, exception.Message, StringComparison.Ordinal);
         Assert.Contains("Attestation:SelfSignedFolder", exception.Message, StringComparison.Ordinal);
-        Assert.False(provider.Describe().IsAvailable);
+        var status = provider.Describe();
+        Assert.False(status.IsAvailable);
+        Assert.Equal(exception.Message, status.Problem);
     }
 
     /// <summary>
@@ -391,6 +427,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
 
         // Assert: the file is named with the remedy, flagged unreadable, left alone, and not echoed
         Assert.Contains(path, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Restore that key ring", exception.Message, StringComparison.Ordinal);
         Assert.Contains("delete the file", exception.Message, StringComparison.Ordinal);
         Assert.True(exception.IsUnreadable);
         Assert.False(exception.WillBeCreated);

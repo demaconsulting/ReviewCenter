@@ -504,6 +504,85 @@ public class AttestationKeyPolicyTests
     }
 
     /// <summary>
+    ///     Test that the default warning period is 30 days: a certificate that ends in 29 days is warned about, and
+    ///     one that ends in 31 days is not, when the number of days is not set.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderBase_Describe_DefaultWarningDays_WarnsAt29DaysAndNotAt31Days()
+    {
+        // Arrange: one provider whose clock is 29 days before the end of its certificate and one 31 days before,
+        // both with the settings at their defaults
+        var nearKey = TestKeys.Organization();
+        var farKey = TestKeys.Organization();
+        using var near = new FixedKeyProvider(
+            nearKey, new AttestationOptions(), NullLogger.Instance, new FixedTimeProvider(nearKey.Info.NotAfter.AddDays(-29)));
+        using var far = new FixedKeyProvider(
+            farKey, new AttestationOptions(), NullLogger.Instance, new FixedTimeProvider(farKey.Info.NotAfter.AddDays(-31)));
+
+        // Act: describe both
+        var nearStatus = near.Describe();
+        var farStatus = far.Describe();
+
+        // Assert: only the first has a warning
+        Assert.Single(nearStatus.Warnings, w => w.Contains("expires", StringComparison.Ordinal));
+        Assert.Empty(farStatus.Warnings);
+    }
+
+    /// <summary>
+    ///     Test that a key that is found is described as available, with the public description of the key and
+    ///     without a problem.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderBase_Describe_KeyFound_ReportsAvailableWithTheDescription()
+    {
+        // Arrange: a provider that holds a key
+        using var provider = new FixedKeyProvider(TestKeys.Organization(), new AttestationOptions(), NullLogger.Instance);
+
+        // Act: describe the key and fetch it
+        var status = provider.Describe();
+        var key = provider.GetSigningKey();
+
+        // Assert: available, with the provider name and the description of that key, and no problem
+        Assert.True(status.IsAvailable);
+        Assert.Equal("Fixed", status.Provider);
+        Assert.NotNull(status.Info);
+        Assert.Equal(key.Info.Thumbprint, status.Info.Thumbprint);
+        Assert.Equal(key.Info.Subject, status.Info.Subject);
+        Assert.Null(status.Problem);
+    }
+
+    /// <summary>
+    ///     Test that the refusal messages of the trusted-key policy do not claim that the chain of trust or the
+    ///     revocation of the certificate was checked.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyPolicy_Enforce_RefusalMessages_DoNotMentionChainOrRevocation()
+    {
+        // Arrange: a self-signed key, one that may not sign, and one that is checked outside its validity
+        using var selfSigned = TestKeys.SelfSignedRsa(requireTrusted: true);
+        using var noUsage = TestKeys.Organization(X509KeyUsageFlags.KeyEncipherment);
+        using var expired = TestKeys.Organization();
+
+        // Act: enforce the policy for each
+        var messages = new[]
+        {
+            Assert.Throws<AttestationKeyException>(() => AttestationKeyPolicy.Enforce(selfSigned.Info, true, DateTimeOffset.UtcNow)).Message,
+            Assert.Throws<AttestationKeyException>(() => AttestationKeyPolicy.Enforce(noUsage.Info, true, DateTimeOffset.UtcNow)).Message,
+            Assert.Throws<AttestationKeyException>(
+                () => AttestationKeyPolicy.Enforce(expired.Info, true, DateTimeOffset.UtcNow.AddDays(5000))).Message,
+        };
+
+        // Assert: none of the messages says anything about a chain or a revocation
+        Assert.All(
+            messages,
+            message =>
+            {
+                Assert.DoesNotContain("chain", message, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("revocation", message, StringComparison.OrdinalIgnoreCase);
+            });
+    }
+
+    /// <summary>
     ///     Test that the self-signed provider does not add an expiry warning of its own to the one it logs when it
     ///     replaces a key that has expired, however long the warning period is.
     /// </summary>

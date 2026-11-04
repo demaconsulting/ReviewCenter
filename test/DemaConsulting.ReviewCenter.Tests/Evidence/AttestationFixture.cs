@@ -50,6 +50,7 @@ internal sealed class AttestationFixture
         AuditStore = new FakeAuditStore(Clock);
         Audit = new AuditService(AuditStore);
         var userStore = new FakeUserStore();
+        UserStore = userStore;
         Users = new UserService(userStore, new FakePasswordHasher(), Clock);
         Access = new AllowAllProjectAccess(Store);
         Signing = TestServices.Signing(Store, Users, Clock);
@@ -80,6 +81,11 @@ internal sealed class AttestationFixture
     ///     Gets the audit service.
     /// </summary>
     public AuditService Audit { get; }
+
+    /// <summary>
+    ///     Gets the user store, for a test that needs the real project access rules.
+    /// </summary>
+    public FakeUserStore UserStore { get; }
 
     /// <summary>
     ///     Gets the user service.

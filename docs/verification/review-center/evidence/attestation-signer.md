@@ -32,6 +32,7 @@ N/A - standard test environment (keys and certificates are created in memory by 
 - A change of a signed byte makes the verification fail, and appended data is not covered.
 - The chain is embedded, and one that does not fit is an `AttestationKeyException`.
 - The same input gives the same bytes, and a signed or a foreign document is refused.
+- A missing document, key, or reason is refused with an argument exception that names it.
 
 #### Test Scenarios
 
@@ -92,6 +93,10 @@ scenario is tested by `AttestationSigner_Sign_AlreadySignedPdf_Throws`.
 **AttestationSigner_Sign_NotAnAttestationPdf_ThrowsInvalidOperation**: A PDF that the writer did not make is signed.
 `InvalidOperationException` is raised. This scenario is tested by
 `AttestationSigner_Sign_NotAnAttestationPdf_ThrowsInvalidOperation`.
+
+**AttestationSigner_Sign_NullArgument_Throws**: A document, a key, and a reason are each passed as missing in turn. Each
+call raises an `ArgumentNullException` that names the argument. This scenario is tested by
+`AttestationSigner_Sign_NullArgument_Throws`.
 
 **AttestationSigner_Sign_ChainTooLargeForTheReservedSpace_ThrowsKeyException**: A key with a chain that does not fit
 in the

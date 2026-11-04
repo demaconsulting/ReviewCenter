@@ -10,228 +10,789 @@ sections:
     requirements:
       - id: ReviewCenter-ApiEndpoints-Read
         title: >-
-          The ApiEndpoints unit shall return, to a client with a valid token, the list of projects the owner of the
-          token may see, the review summaries of such a project, and the details of one review as JSON, answer 404
-          for a project or a review that does not exist, and answer 401 to a request without a valid token (these
-          routes are never open to a request without credentials).
+          The ApiEndpoints unit shall return the list of projects to a client with a valid token as JSON in camel
+          case, with the identifier, name, description, and creation time of each project.
         justification: |
-          A script that files and follows reviews needs to find them, and an unknown project or review must be told
-          from an empty list. A script sees what its owner sees and no more.
+          A script that files and follows reviews needs to find the project it works on, and a stable JSON shape
+          lets it read the answer without scraping a page.
         tests:
           - ApiEndpoints_ListProjects_Token_ReturnsProjects
+
+      - id: ReviewCenter-ApiEndpoints-Read-Reviews
+        title: >-
+          The ApiEndpoints unit shall return the review summaries of a project to a client with a valid token as
+          JSON, with the identifier and title of each review and whether it was created through the API.
+        justification: |
+          A script that follows reviews needs to list them before it opens one, and the flag tells it which reviews
+          another script made.
+        tests:
           - ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound
+
+      - id: ReviewCenter-ApiEndpoints-Read-ReviewsNotFound
+        title: >-
+          The ApiEndpoints unit shall answer a request for the reviews of a project that does not exist with status
+          404 and a problem document.
+        justification: |
+          An unknown project must be told from a project without reviews, which is an empty list.
+        tests:
+          - ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound
+
+      - id: ReviewCenter-ApiEndpoints-Read-Details
+        title: >-
+          The ApiEndpoints unit shall return the details of one review to a client with a valid token as JSON, with
+          the approval state and approval digest, the number of files, the reviewer slots, and the next step.
+        justification: |
+          A script that waits for a review needs the same standing the review page shows, without reading the page.
+        tests:
           - ApiEndpoints_GetReview_CompleteReview_ReturnsDetails
+
+      - id: ReviewCenter-ApiEndpoints-Read-DetailsNotFound
+        title: >-
+          The ApiEndpoints unit shall answer a request for a review that does not exist with status 404 and a
+          problem document.
+        justification: |
+          A mistyped review identifier must be told from a review that exists.
+        tests:
+          - ApiEndpoints_GetReview_CompleteReview_ReturnsDetails
+
+      - id: ReviewCenter-ApiEndpoints-Read-CheckThreadCounts
+        title: >-
+          The ApiEndpoints unit shall count the open and the resolved threads about a checklist item in the thread
+          counts of the details of a review, as questions, without changing the shape of the answer.
+        justification: |
+          A discussion about a check is open work like any other thread, and a script that leaves it out would call a
+          review quiet while a reviewer still waits for an answer.
+        tests:
           - ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads
-          - ApiEndpoints_Request_NoToken_Answers401
-          - ApiEndpoints_CreateReview_NoTokenOddBody_Answers401
+
+      - id: ReviewCenter-ApiEndpoints-Read-ThreadKinds
+        title: >-
+          The ApiEndpoints unit shall give the numbers of open and resolved threads of a review per kind in its
+          details, counting a thread that is in the report as a finding and any other thread as a question.
+        justification: |
+          The counts per kind tell a script how much work is open and of what sort, without naming the discussions.
+        tests:
           - ApiEndpoints_GetReview_ThreadKindCounts_FindingsAndQuestions
+
+      - id: ReviewCenter-ApiEndpoints-Read-NoToken
+        title: >-
+          The ApiEndpoints unit shall answer a request without a valid token for the list of projects, the reviews of
+          a project or one review with status 401, never serving them to a request without credentials.
+        justification: |
+          These routes show what the owner of a token may see, so a request that proves no identity gets nothing.
+        tests:
+          - ApiEndpoints_Request_NoToken_Answers401
+          - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
 
       - id: ReviewCenter-ApiEndpoints-Masking
         title: >-
-          The ApiEndpoints unit shall, in the details of a review and in the answer to the creation of a review, read
-          the approval status, the threads and the consolidated checklist for the actor of the token, never without
-          one, so that a token (which is never the lead of a review, a system administrator or an auditor) gets the
-          consolidated standing of a review with several reviewer slots that is not concluded only when the owner of the
-          token holds a slot whose ballot is handed in; shall otherwise mark the details masked and give no failed
-          count, no answered count, no check thread in the thread counts, no wording about a dispute or a failed check
-          in the blockers or the next step, no outcome and no conclusion text; shall give the outcome (approved or
-          rejected) and the conclusion text only when the review is concluded and not masked; shall give the counts of
-          the threads per kind (findings and questions) and no per-reviewer ballot, no dispute and no thread text; and
-          shall answer as before when the project is not visible to the token owner or no token is sent.
+          The ApiEndpoints unit shall mark the details of a review with several reviewer slots that is not concluded as
+          masked, and give no failed count, no answered count, no check thread in the thread counts, no wording about
+          a dispute or a failed check in the blockers or the next step, no outcome, and no conclusion text, to the
+          token of a project member who holds no slot.
         justification: |
           The pages hide the answers of the other reviewers until a reviewer has handed in their own ballot, so that a
           reviewer is not swayed. A script with a token is a second way to read the same review, and a token that is
           not masked would hand the standing to anyone who can create a token, so the API follows the rules of the
-          pages and fails closed. The outcome is a decision that is public once it is made, and the kind counts
-          tell a script how much work is open without naming the discussions.
+          pages and fails closed, and a scan of the source that every read names the actor guards this.
         tests:
           - ApiEndpoints_GetReview_TokenNonSubmitterMultiSlot_HidesFailedDisputeBlockersAndCheckThreads
-          - ApiEndpoints_GetReview_TokenOfLeadOrDraftOwner_StillMasked
-          - ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts
-          - ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts
-          - ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome
-          - ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText
-          - ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails
-          - ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields
-          - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
           - ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail
+
+      - id: ReviewCenter-ApiEndpoints-Masking-LeadOrOwner
+        title: >-
+          The ApiEndpoints unit shall mask the details of a review with several reviewer slots that is not concluded
+          also for the token of the lead of the review and for the token of a reviewer whose ballot is still a draft.
+        justification: |
+          A token is never the lead, an administrator, or an auditor, and a draft ballot shows nothing on the pages,
+          so neither may be a way to read the standing early.
+        tests:
+          - ApiEndpoints_GetReview_TokenOfLeadOrDraftOwner_StillMasked
+
+      - id: ReviewCenter-ApiEndpoints-Masking-SubmittedOwner
+        title: >-
+          The ApiEndpoints unit shall give the consolidated standing, the check threads, and their kinds in the
+          details of a review with several reviewer slots that is not concluded to the token of a reviewer who has
+          handed in the ballot of a slot.
+        justification: |
+          A reviewer who has handed in is no longer swayed by the others, and sees the standing on the review page,
+          so the token of that reviewer sees the same.
+        tests:
+          - ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts
+
+      - id: ReviewCenter-ApiEndpoints-Masking-Concluded
+        title: >-
+          The ApiEndpoints unit shall give the outcome (approved or rejected), the conclusion text, and the counts in
+          the details of a concluded review to the token of a project member who holds no slot.
+        justification: |
+          The outcome is a decision that is public to everyone who may see the project once it is made.
+        tests:
+          - ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts
+
+      - id: ReviewCenter-ApiEndpoints-Masking-SingleSlot
+        title: >-
+          The ApiEndpoints unit shall not mask the details of a review with a single reviewer slot.
+        justification: |
+          With one reviewer there is no other ballot to hide from the reader, as on the review page.
+        tests:
+          - ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome
+
+      - id: ReviewCenter-ApiEndpoints-Masking-NoOutcome
+        title: >-
+          The ApiEndpoints unit shall give no outcome in the details of a review that is not concluded, also to the
+          token of a reviewer who sees the standing.
+        justification: |
+          A verdict before the conclusion would tell a script a result that can still change.
+        tests:
+          - ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome
+
+      - id: ReviewCenter-ApiEndpoints-Masking-StoredText
+        title: >-
+          The ApiEndpoints unit shall give no conclusion text in the details of a review that is not concluded, also
+          when a text is stored.
+        justification: |
+          A stored text is a draft until the review is concluded, and must not be readable before.
+        tests:
+          - ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText
+
+      - id: ReviewCenter-ApiEndpoints-Masking-CreateResponse
+        title: >-
+          The ApiEndpoints unit shall reduce the answer to the creation of a review like the details of the review,
+          with no outcome, no conclusion text, and no failed checks.
+        justification: |
+          The answer to a creation is a second way to read a review, and must hide what the details hide.
+        tests:
+          - ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails
+
+      - id: ReviewCenter-ApiEndpoints-Masking-NoSlotFields
+        title: >-
+          The ApiEndpoints unit shall give in the details of a review only the documented fields, with no field for
+          the ballots of a single reviewer, for a per-reviewer answer, or for a dispute.
+        justification: |
+          A list of the allowed fields makes a new field that could leak a ballot fail a test instead of passing
+          unnoticed.
+        tests:
+          - ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields
+
+      - id: ReviewCenter-ApiEndpoints-Masking-AgreedFail
+        title: >-
+          The ApiEndpoints unit shall name neither the failed check nor the provisional rejection, in any text field of
+          the details of a review whose ballots agree on a failure, to the token of a member who has not handed in a
+          ballot.
+        justification: |
+          Naming the failed check would reveal the ballots of the others before the reader has answered.
+        tests:
           - ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote
+
+      - id: ReviewCenter-ApiEndpoints-Masking-AgreedFailSubmitted
+        title: >-
+          The ApiEndpoints unit shall name the rejection in the next step of the details of a review whose ballots
+          agree on a failure to the token of a reviewer who has handed in a ballot, while the stored state stays
+          draft.
+        justification: |
+          A reviewer who has handed in sees the standing on the review page, and the script of that reviewer must
+          be told what happens next.
+        tests:
+          - ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote
+
+      - id: ReviewCenter-ApiEndpoints-Masking-NextStep
+        title: >-
+          The ApiEndpoints unit shall name in the next step who has signed once a reviewer has signed, for a token
+          that may see the standing.
+        justification: |
+          A script that waits for the remaining signatures needs to know whose are missing.
+        tests:
+          - ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly
+
+      - id: ReviewCenter-ApiEndpoints-Masking-NextStepMasked
+        title: >-
+          The ApiEndpoints unit shall keep the sentence about handing in the ballot as the next step for a masked
+          token, so that a signature changes nothing in the next step it reads.
+        justification: |
+          A next step that changed with the first signature would tell a masked reader that someone has signed.
+        tests:
           - ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly
 
       - id: ReviewCenter-ApiEndpoints-ProjectAccess
         title: >-
-          The ApiEndpoints unit shall check, before anything else, on every route that names a project (the reviews of
-          the project, one review, the creation of a review, the attestation, the evidence index, and the checklist
-          template), that the owner
-          of the token may see the project, and shall answer an owner who may not with the 404 problem document, and the
-          same body, that it answers for a project that does not exist, for a bearer token and for HTTP Basic
-          credentials, and shall list only the projects the owner may see. This applies to a request that carries a
-          token; a request without credentials to the two open routes is decided by the setting of the project (see
-          OpenRoutes).
+          The ApiEndpoints unit shall answer a request for one review from the token of a user who may not see the
+          project with status 404 and a problem document.
         justification: |
-          Every route that names a project is a way to find out whether the project exists. Checking first, and
-          answering with the body of a missing project, closes all of them, and checking before the body of a
-          creation is read keeps a non-member from learning anything from the validation of a request.
+          A review route is a way to find out whether a project exists, so a user who may not see the project gets
+          the answer for a project that is not there.
         tests:
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
-          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
-          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+          - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
+
+      - id: ReviewCenter-ApiEndpoints-ProjectAccess-Create
+        title: >-
+          The ApiEndpoints unit shall answer the creation of a review from the token of a user who may not see the
+          project with status 404 and a problem document, and create nothing.
+        justification: |
+          Checking the project before the body is read keeps a non-member from learning anything from the validation
+          of a request.
+        tests:
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
 
       - id: ReviewCenter-ApiEndpoints-Create
         title: >-
-          The ApiEndpoints unit shall create a review draft from files that are sent in the request, or from the
-          changes of a repository that is registered with the project (reviewing every changed file when the request
-          gives no selection), with the same rules as the web pages, mark the
-          review as created through the API, and answer with the review and the files that were skipped.
+          The ApiEndpoints unit shall create a review draft from files that are sent in the request, and answer with
+          status 201, the address of the review, the review, and an empty list of skipped files.
         justification: |
-          Creating a draft for every pull request from a pipeline is the main use of the API. The same rules keep
-          the record consistent, and the mark lets the reviewers see that a script made the draft. The selection is
-          optional in the API, so a request that leaves it out must not be refused.
+          Creating a draft for every pull request from a pipeline is the main use of the API, and the address in the
+          answer lets the pipeline follow the review it made.
+        tests:
+          - ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi
+
+      - id: ReviewCenter-ApiEndpoints-Create-Flag
+        title: >-
+          The ApiEndpoints unit shall mark a review that is created through the API as created through the API, with
+          the owner of the token as its creator, in the answer and in every later reading of the review.
+        justification: |
+          The mark lets the reviewers see that a script made the draft, and who is responsible for the script.
         tests:
           - ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi
           - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
+
+      - id: ReviewCenter-ApiEndpoints-Create-Audit
+        title: >-
+          The ApiEndpoints unit shall record the creation of a review through the API in the audit trail, with an entry
+          that names the token that made it.
+        justification: |
+          The trail must show which token created a review, so that a script that creates drafts can be found and
+          stopped.
+        tests:
+          - ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi
+          - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
+
+      - id: ReviewCenter-ApiEndpoints-Create-Repository
+        title: >-
+          The ApiEndpoints unit shall create a review draft from the changes between two revisions of a repository
+          that is registered with the project, with the name of the repository and the head and baseline commits in
+          the review.
+        justification: |
+          A pipeline that builds a pull request knows the revisions, and should not have to upload the files again.
+        tests:
+          - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
+
+      - id: ReviewCenter-ApiEndpoints-Create-AllChanges
+        title: >-
+          The ApiEndpoints unit shall review every changed file when a request that creates a review from a
+          repository leaves out the selection, or gives it as null, instead of refusing the request.
+        justification: |
+          The selection is optional in the API, so a request that leaves it out must not be refused.
+        tests:
           - ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange
+
+      - id: ReviewCenter-ApiEndpoints-Create-Skipped
+        title: >-
+          The ApiEndpoints unit shall list in the answer to the creation of a review from a repository the entries
+          that were left out, each with its path and the reason, and count only the files that were reviewed.
+        justification: |
+          A symbolic link or a submodule cannot be reviewed, and a pipeline must be told what the review leaves out
+          instead of assuming it covers everything that changed.
+        tests:
+          - ApiEndpoints_CreateReview_Repository_SkippedEntries_AreListedWithTheirReason
+
+      - id: ReviewCenter-ApiEndpoints-Create-NoToken
+        title: >-
+          The ApiEndpoints unit shall answer a request to create a review that has no valid token with status 401,
+          whatever the content type and the body of the request are.
+        justification: |
+          Authentication comes before the body is looked at, so a caller without a token learns nothing from a 415
+          or a 400.
+        tests:
+          - ApiEndpoints_Request_NoToken_Answers401
+          - ApiEndpoints_CreateReview_NoTokenOddBody_Answers401
 
       - id: ReviewCenter-ApiEndpoints-CreateDueDate
         title: >-
-          The ApiEndpoints unit shall accept an optional due date (a calendar day in UTC, written like 2030-01-31)
-          in the request that creates a review, with the same rules as the web pages, answer a text that is not such
-          a date, or a date that is before today or more than two years ahead, with status 400 and a problem
-          document, creating no review, and show the due date and whether the review is overdue in the review that
-          it returns, in the detail of a review, and in the list of reviews.
+          The ApiEndpoints unit shall accept an optional due date, a calendar day in UTC written like 2030-01-31, in
+          the request that creates a review, and show it in the review that it returns.
         justification: |
           A pipeline that creates a draft for every pull request knows when the change is expected to be reviewed.
-          A date that cannot be read, or that the rules refuse, must be reported to the caller instead of being
-          dropped, and a script that polls the reviews needs the date and the overdue flag without reading a page.
         tests:
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
+      - id: ReviewCenter-ApiEndpoints-CreateDueDate-Audit
+        title: >-
+          The ApiEndpoints unit shall name the due date in the audit entry of a review that is created with one.
+        justification: |
+          The trail must show the date a review was created with, so that a later change of the date is visible.
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
+      - id: ReviewCenter-ApiEndpoints-CreateDueDate-List
+        title: >-
+          The ApiEndpoints unit shall show the due date of each review in the list of the reviews of a project, with
+          no date for a review that was created without one.
+        justification: |
+          A script that polls the reviews needs the date without reading a page.
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
+      - id: ReviewCenter-ApiEndpoints-CreateDueDate-OverdueFlag
+        title: >-
+          The ApiEndpoints unit shall show a review as not overdue before its due date has passed, and as overdue in
+          the details and in the list of reviews once it has passed.
+        justification: |
+          A script that polls the reviews needs the overdue flag without comparing dates itself.
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
+      - id: ReviewCenter-ApiEndpoints-CreateDueDate-Invalid
+        title: >-
+          The ApiEndpoints unit shall answer a due date that is not such a date, that is before today, or that is
+          too far ahead with status 400 and a problem document that names the due date, and create no review.
+        justification: |
+          A date that cannot be read, or that the rules refuse, must be reported to the caller instead of being
+          dropped.
+        tests:
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
-          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
 
       - id: ReviewCenter-ApiEndpoints-CreateFollowUp
         title: >-
-          The ApiEndpoints unit shall accept an optional followsReviewId, and an optional acknowledgeDroppedThreads,
-          in the request that creates a review, with the same rules as the creation by hand, answer a review that
-          cannot be followed, or open threads that would be dropped without the acknowledgement, with status 400 and a
-          problem document, creating no review, and show the followed review (null when there is none) and the
-          numbers of carried answers and threads in the detail of a review, and the followed review in the list.
+          The ApiEndpoints unit shall accept an optional followsReviewId in the request that creates a review, and
+          create the review as a follow-up of that earlier review of the project.
         justification: |
           A pipeline that creates the next draft after a review failed should not make the reviewers answer again what
-          they have answered. A script must be told why a follow-up was refused instead of getting a review without
-          the carry, and must see which reviews are follow-ups without reading a page.
+          they have answered.
         tests:
           - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
-          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-CreateFollowUp-Shown
+        title: >-
+          The ApiEndpoints unit shall show the followed review, or null when there is none, and the number of carried
+          answers in the details of a review, and the followed review in the list of reviews.
+        justification: |
+          A script must see which reviews are follow-ups without reading a page.
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+
+      - id: ReviewCenter-ApiEndpoints-CreateFollowUp-Invalid
+        title: >-
+          The ApiEndpoints unit shall answer a followsReviewId that names a review that does not exist, or a review
+          that has no file in common with the new one, with status 400 and a problem document that names the reason,
+          and create no review.
+        justification: |
+          A script must be told why a follow-up was refused instead of getting a review without the carry.
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
 
       - id: ReviewCenter-ApiEndpoints-Validation
         title: >-
-          The ApiEndpoints unit shall answer a request body that is not valid, including one that is not JSON or not
-          JSON of the right shape, with a status of 400 (415 for a content type that is not JSON) and a problem document
-          that names the field where there is one, and shall answer a domain rule that refuses the request with the
-          status of that rule, including 409 for the removal of the last project administrator, 429 for too many
-          attempts, 403 for an account that has to change its password or for a rejection that has no conclusion
-          text, and 400 for a checklist definition that is
-          not valid.
+          The ApiEndpoints unit shall answer a request to create a review that has no source of files, or both files
+          and a repository, with status 400 and a problem document that names the field source, and create no review.
         justification: |
           A script cannot read a page, so the cause of a refusal must be in the answer. Naming the field tells the
           author which part of the request to fix.
         tests:
           - ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField
+
+      - id: ReviewCenter-ApiEndpoints-Validation-Base64
+        title: >-
+          The ApiEndpoints unit shall answer a file whose content is not valid Base64 with status 400 and a problem
+          document that names the field of that file, and create no review.
+        justification: |
+          The name of the field, with the position of the file, tells the author which file to fix.
+        tests:
+          - ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField
+
+      - id: ReviewCenter-ApiEndpoints-Validation-EmptyBody
+        title: >-
+          The ApiEndpoints unit shall answer a request to create a review with an empty body with status 400 and a
+          problem document that names the field body, and create no review.
+        justification: |
+          An empty body is the most common mistake of a script, and the answer must say what is missing.
+        tests:
+          - ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField
+
+      - id: ReviewCenter-ApiEndpoints-Validation-Malformed
+        title: >-
+          The ApiEndpoints unit shall answer a request body that is not JSON of the right shape with status 400 and
+          a problem document that does not leak details of the server, and create nothing.
+        justification: |
+          The author needs to know the body is wrong, and a reader of the answer must learn nothing about the server.
+        tests:
           - ApiEndpoints_CreateReview_MalformedJson_Answers400Problem
+
+      - id: ReviewCenter-ApiEndpoints-Validation-ContentType
+        title: >-
+          The ApiEndpoints unit shall answer a request to create a review whose content type is not JSON, or is
+          missing, with status 415 and a problem document, also when the body is a valid review, and create nothing.
+        justification: |
+          A body that does not say it is JSON is read by no one, and the status tells the author to fix the header.
+        tests:
           - ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem
+
+      - id: ReviewCenter-ApiEndpoints-Validation-DuplicateId
+        title: >-
+          The ApiEndpoints unit shall answer the creation of a review whose identifier is already used in the project
+          with status 409 and a problem document that carries the reason.
+        justification: |
+          A script that retries a creation must be able to tell the duplicate from a mistake in its request.
+        tests:
           - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-InvalidIdOrTitle
+        title: >-
+          The ApiEndpoints unit shall answer the creation of a review with an identifier that is not valid, or with
+          an empty title, with status 400 and a problem document.
+        justification: |
+          The rules of the identifier and the title keep the record consistent, and the cause of the refusal must be
+          in the answer.
+        tests:
+          - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-UnknownProject
+        title: >-
+          The ApiEndpoints unit shall answer the creation of a review in a project that does not exist with status
+          404 and a problem document.
+        justification: |
+          A script that names a wrong project must be told, and not be given a review in another one.
+        tests:
+          - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-LastAdmin
+        title: >-
+          The ApiEndpoints unit shall answer the refusal to remove the last administrator of a project with status
+          409.
+        justification: |
+          A project without an administrator cannot be managed, and the conflict tells the script why it was refused.
+        tests:
           - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-TooManyAttempts
+        title: >-
+          The ApiEndpoints unit shall answer the refusal for too many attempts with status 429.
+        justification: |
+          A script that is throttled must be able to tell it from a mistake in its request, so that it can wait.
+        tests:
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-PasswordChange
+        title: >-
+          The ApiEndpoints unit shall answer the refusal for an account that has to change its password with status
+          403.
+        justification: |
+          The account may not act until the password is changed, which is a refusal of the caller and not a conflict.
+        tests:
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-ConclusionRequired
+        title: >-
+          The ApiEndpoints unit shall answer the refusal of a rejection that has no conclusion text with status 403.
+        justification: |
+          A rejection needs its reasons, and the refusal tells the caller what is missing.
+        tests:
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-InvalidInput
+        title: >-
+          The ApiEndpoints unit shall answer the refusal of a checklist definition, a due date, or a followed review
+          that is not valid with status 400.
+        justification: |
+          These refusals are mistakes in the request, which the status 400 tells the script to correct.
+        tests:
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
+      - id: ReviewCenter-ApiEndpoints-Validation-ChecklistInvalid
+        title: >-
+          The ApiEndpoints unit shall answer the refusal of a checklist definition that is not valid with status 400
+          and a problem document that carries the message of the rule.
+        justification: |
+          The message says which part of the definition is wrong, so the author can fix it.
+        tests:
           - ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage
 
       - id: ReviewCenter-ApiEndpoints-Limits
         title: >-
           The ApiEndpoints unit shall refuse a request to create a review whose body is larger than the limit of the
-          endpoint with status 413, and a file count, file size or total size beyond the review limits with status 400
-          and a problem document, shall refuse a file count above the review limit, or a Base64 text longer than that
-          of the largest file, before decoding it, and shall create no review in any of these cases.
+          endpoint with status 413, and create no review.
         justification: |
-          A script can send far more than a person can upload by hand. The body limit, which is derived from the
-          review limits, keeps the server from reading an unbounded body, and the review limits must hold for the API
-          exactly as they do for the web pages. Bounding the count and the text length before decoding keeps the
-          caller's numbers from sizing allocations or loops.
+          A script can send far more than a person can upload by hand, and the limit keeps the server from reading an
+          unbounded body.
+        tests:
+          - ApiEndpoints_CreateReview_BodyOverLimit_Answers413
+
+      - id: ReviewCenter-ApiEndpoints-Limits-BodySize
+        title: >-
+          The ApiEndpoints unit shall give the endpoint that creates a review a body size limit that is large enough
+          for the Base64 text of the largest upload the review limits allow and far below an unbounded body.
+        justification: |
+          The limit is derived from the review limits, so the API accepts every upload the review limits allow and
+          nothing much larger.
+        tests:
+          - ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit
+
+      - id: ReviewCenter-ApiEndpoints-Limits-FileCount
+        title: >-
+          The ApiEndpoints unit shall refuse a request to create a review with more files than the review limit with
+          status 400 and a problem document that names the limit, and create no review.
+        justification: |
+          The review limits must hold for the API exactly as they do for the web pages.
         tests:
           - ApiEndpoints_CreateReview_FileLimits_Answer400Problem
+
+      - id: ReviewCenter-ApiEndpoints-Limits-FileSize
+        title: >-
+          The ApiEndpoints unit shall refuse a request to create a review with a file that is larger than the review
+          limit for one file with status 400 and a problem document that names the limit, and create no review.
+        justification: |
+          The review limits must hold for the API exactly as they do for the web pages.
+        tests:
+          - ApiEndpoints_CreateReview_FileLimits_Answer400Problem
+
+      - id: ReviewCenter-ApiEndpoints-Limits-TotalSize
+        title: >-
+          The ApiEndpoints unit shall refuse a request to create a review whose files together are larger than the
+          review limit for the total size with status 400 and a problem document that names the limit, and create no
+          review.
+        justification: |
+          The review limits must hold for the API exactly as they do for the web pages.
+        tests:
+          - ApiEndpoints_CreateReview_FileLimits_Answer400Problem
+
+      - id: ReviewCenter-ApiEndpoints-Limits-DecodeCount
+        title: >-
+          The ApiEndpoints unit shall refuse a request to create a review with more files than the review limit before
+          decoding any file, with status 400 and a problem document that names the field files, and create no review.
+        justification: |
+          Bounding the count before decoding keeps the number the caller sends from sizing allocations or loops.
+        tests:
           - ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField
-          - ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit
-          - ApiEndpoints_CreateReview_BodyOverLimit_Answers413
+
+      - id: ReviewCenter-ApiEndpoints-Limits-DecodeLength
+        title: >-
+          The ApiEndpoints unit shall refuse a file whose Base64 text is longer than that of the largest file the
+          review limits allow, before decoding it, with status 400 and a problem document that names only the
+          position of the entry and does not repeat its content, and create no review.
+        justification: |
+          Bounding the text length before decoding keeps the caller's numbers from sizing allocations, and the answer
+          must not echo what the caller sent.
+        tests:
+          - ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField
+
+      - id: ReviewCenter-ApiEndpoints-Limits-DecodeOrder
+        title: >-
+          The ApiEndpoints unit shall measure the Base64 text of every file before it decodes any of them, so that a
+          file that is too long is named even when an earlier file is not valid Base64.
+        justification: |
+          A request must not make the server decode anything until every text is known to be within the bound.
+        tests:
+          - ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField
 
       - id: ReviewCenter-ApiEndpoints-Attestation
         title: >-
-          The ApiEndpoints unit shall return the signed attestation PDF of a concluded review (every reviewer slot has
-          signed and the review is approved or rejected), with the same release rules and audit record as the download
-          from the web pages, to a client with a valid token or, when the project allows it, to a client without a
-          token, and shall answer
-          with a problem document, status 409, for a review that is not concluded, and status 401 to a request without
-          a valid token when the project does not allow anonymous attestation PDFs.
+          The ApiEndpoints unit shall return the signed attestation PDF of a concluded review to a client with a valid
+          token, as a file of type application/pdf.
         justification: |
-          Fetching the attestation after the sign-off lets a pipeline file it with a release. Using the same
-          mapping as the page keeps what is released, and what is recorded, the same. A project that publishes its
-          attestations lets a caller without an account fetch them, and one that does not publish them answers a
-          caller without a token as before.
+          Fetching the attestation after the sign-off lets a pipeline file it with a release.
         tests:
           - ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem
+
+      - id: ReviewCenter-ApiEndpoints-Attestation-NotFound
+        title: >-
+          The ApiEndpoints unit shall answer a request for the attestation of a review that does not exist with
+          status 404 and a problem document.
+        justification: |
+          A mistyped review identifier must be told from a review that is not concluded yet.
+        tests:
+          - ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem
+
+      - id: ReviewCenter-ApiEndpoints-Attestation-NotSigned
+        title: >-
+          The ApiEndpoints unit shall answer a request for the attestation of a review that is not concluded with
+          status 409 and a problem document.
+        justification: |
+          A review that is not signed has no attestation yet, and the conflict tells the script to wait and ask again.
+        tests:
           - ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem
-          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
-          - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
+
+      - id: ReviewCenter-ApiEndpoints-Attestation-NoToken
+        title: >-
+          The ApiEndpoints unit shall answer a request for the attestation of a review that has no valid token with
+          status 401 when the project does not allow anonymous attestation PDFs.
+        justification: |
+          A project that does not publish its attestations answers a caller without a token as it does for every
+          other route.
+        tests:
+          - ApiEndpoints_Request_NoToken_Answers401
 
       - id: ReviewCenter-ApiEndpoints-EvidenceIndex
         title: >-
           The ApiEndpoints unit shall return the evidence index of a project at
-          GET /projects/{projectId}/evidence/index.json, to a client with a valid token or, when the project allows it,
-          to a client without a token, as a JSON object with a reviews list in the format that
-          ReviewMark reads, with the absolute address of the attestation of each entry built from the scheme, host and
-          path base of the request, with a response that no cache keeps, answer 404 with a problem document for a
-          project that does not exist, and answer 401 to a request without a valid token when the project does not
-          allow an anonymous evidence index.
+          GET /projects/{projectId}/evidence/index.json to a client with a valid token, as a JSON object with a
+          reviews list, with the review-set identifier, the fingerprint of the review, and the day of completion of
+          each entry.
         justification: |
-          ReviewMark takes the evidence of a review from an index. The file address in it must be one that the client
-          can open, whatever address it used to reach the server, a cached index would show a review that has since
-          changed, and an unknown project must be told from a project without evidence. A project that publishes its
-          index lets a pipeline without an account read it.
+          ReviewMark takes the evidence of a review from an index, and a pipeline reads it from the server instead of
+          from a file in the repository.
         tests:
           - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
-          - ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList
-          - ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-OnlyPlanned
+        title: >-
+          The ApiEndpoints unit shall leave a review that has no review-set identifier out of the evidence index.
+        justification: |
+          A review that is not planned from a review set has no entry ReviewMark could match.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-Result
+        title: >-
+          The ApiEndpoints unit shall give the result pass in every entry of the evidence index.
+        justification: |
+          The index lists only complete and approved reviews, and ReviewMark reads the result of each entry.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-File
+        title: >-
+          The ApiEndpoints unit shall give in every entry of the evidence index the absolute address of the
+          attestation PDF of the review.
+        justification: |
+          ReviewMark opens the file address of an entry, so the address must be one the client can open whatever
+          address it used to reach the server.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-UrlBuild
+        title: >-
+          The ApiEndpoints unit shall build the address of an attestation in the evidence index from the scheme, the
+          host, and the path base of the request, and escape the review identifier in it.
+        justification: |
+          A server behind a proxy or under a path base is reached by another address than the one it listens on, and
+          an identifier must not change the meaning of the address.
+        tests:
           - ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-RequestHost
+        title: >-
+          The ApiEndpoints unit shall build the address of an attestation in the evidence index from the host of the
+          request that asked for the index.
+        justification: |
+          A client that reaches the server by another name must get addresses it can open.
+        tests:
           - ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-Basic
+        title: >-
+          The ApiEndpoints unit shall return the evidence index also to a client that sends the token as the password
+          of HTTP Basic credentials.
+        justification: |
+          ReviewMark and other tools can send only Basic credentials, so the index must be readable that way.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-NoStore
+        title: >-
+          The ApiEndpoints unit shall answer a request for the evidence index with JSON and a response that no cache
+          keeps.
+        justification: |
+          A cached index would show a review that has since changed.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-Empty
+        title: >-
+          The ApiEndpoints unit shall answer a request for the evidence index of a project that has no complete review
+          with a review-set identifier with status 200 and an empty list.
+        justification: |
+          A project without evidence is not an error, and a pipeline must be able to tell it from a project that does
+          not exist.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-UnknownProject
+        title: >-
+          The ApiEndpoints unit shall answer a request for the evidence index of a project that does not exist with
+          status 404, a problem document, and a response that no cache keeps.
+        justification: |
+          An unknown project must be told from a project without evidence.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem
+
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex-NoToken
+        title: >-
+          The ApiEndpoints unit shall answer a request for the evidence index that has no valid token with status
+          401 when the project does not allow an anonymous evidence index.
+        justification: |
+          A project that does not publish its index answers a caller without a token as it does for every other
+          route.
+        tests:
           - ApiEndpoints_Request_NoToken_Answers401
-          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
 
       - id: ReviewCenter-ApiEndpoints-Checklist
         title: >-
           The ApiEndpoints unit shall return the checklist template of a project at
-          GET /projects/{projectId}/checklist, to a client with a valid token whose owner may see the project, as a
-          JSON object with the definition (version label, sections, and checks), the version label, whether it is the
-          built-in default, the SHA-256 hash of the definition text, and the number of sections and checks, and shall
-          answer 404 with the problem document of a missing project for a project that does not exist or that the
-          owner may not see, answer 400 with a problem document for a stored definition that cannot be read, answer
-          401 to a request without a valid token, return a section that has no applicability hint with an empty string
-          for the hint, and offer no route that changes the template.
+          GET /projects/{projectId}/checklist to the token of a member of the project or of a system administrator, as
+          a JSON object with the definition (version label, sections, and checks), the version label, whether it is
+          the built-in default, the SHA-256 hash of the definition text, and the number of sections and checks.
         justification: |
           A pipeline that files reviews can need to know which checklist new reviews of the project start with, for
           example to check it against an approved version or to show it to the reviewers. Reading is the same right
-          as seeing the project, and changing the template stays a decision of a person who administers the project,
-          made on the web pages.
+          as seeing the project.
         tests:
           - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-Custom
+        title: >-
+          The ApiEndpoints unit shall return the checklist of the project itself, not marked as the default and with
+          another hash, once the project has one.
+        justification: |
+          A project that has its own checklist must show that one, and the hash lets a script see that it changed.
+        tests:
+          - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-EmptyHint
+        title: >-
+          The ApiEndpoints unit shall return a section of the checklist that has no applicability hint with an empty
+          string for the hint, not with null.
+        justification: |
+          The documented contract and the schema say the hint is a required string, so a client may rely on it.
+        tests:
           - ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-NonMember
+        title: >-
+          The ApiEndpoints unit shall answer a request for the checklist of a project from the token of a user who
+          may not see the project with status 404 and a problem document.
+        justification: |
+          A checklist route is a way to find out whether a project exists, so the answer is that of a missing project.
+        tests:
           - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-UnknownProject
+        title: >-
+          The ApiEndpoints unit shall answer a request for the checklist of a project that does not exist with status
+          404 and a problem document.
+        justification: |
+          A script that names a wrong project must be told so.
+        tests:
+          - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-Unreadable
+        title: >-
+          The ApiEndpoints unit shall answer a request for the checklist of a project whose stored definition cannot
+          be read with status 400 and a problem document that carries the message of the rule.
+        justification: |
+          The message says what is wrong with the stored definition, so a person can repair it.
+        tests:
+          - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
+
+      - id: ReviewCenter-ApiEndpoints-Checklist-NoToken
+        title: >-
+          The ApiEndpoints unit shall answer a request for the checklist of a project that has no valid token with
+          status 401.
+        justification: |
+          The checklist is shown only to a caller who may see the project.
+        tests:
           - ApiEndpoints_Request_NoToken_Answers401
-          - ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
 
       - id: ReviewCenter-ApiEndpoints-Errors
         title: >-
-          The ApiEndpoints unit shall answer an address under /api that does not exist, with any standard HTTP method
-          (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS), with a JSON problem document and status 404, not with a web
-          page.
+          The ApiEndpoints unit shall answer a request under /api to an address that does not exist, for any method and
+          with or without a token, with status 404 and a JSON problem document, not with a web page.
         justification: |
           A script that mistypes an address must get an answer it can read, not the HTML of the not-found page.
         tests:
@@ -249,24 +810,19 @@ sections:
 
       - id: ReviewCenter-ApiEndpoints-LockedReview
         title: >-
-          The ApiEndpoints unit shall answer a request that a service refuses because the review is concluded
-          (approved or rejected) and
-          locked (ReviewLocked), or because it is not locked (ReviewNotLocked), with status 409 and a problem document
-          that carries the message of the rule, and shall keep a locked review readable, whether approved or rejected,
-          and, for an approved review only, with its attestation and its evidence index entry (a rejected review has
-          neither), and offer no route that reopens a review.
+          The ApiEndpoints unit shall answer a request that a service refuses because the review is concluded and
+          locked, or because it is not locked, with status 409 and a problem document that carries the message of the
+          rule.
         justification: |
-          A script that meets the lock must be able to tell it from a mistake in its request, which status 409 does,
-          and must be able to keep reading the concluded review and its evidence. Reopening is a decision of a person
-          who administers the project, so the API has no way to do it with a token.
+          A script that meets the lock must be able to tell it from a mistake in its request, which status 409 does.
         tests:
           - ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409
 
       - id: ReviewCenter-ApiEndpoints-OutOfDateConflict
         title: >-
           The ApiEndpoints unit shall answer a request that a service refuses because the change would make a
-          current signature out of date and has not been acknowledged (SignaturesWouldBecomeOutOfDate) with status
-          409 and a problem document that carries the message of the rule, which names the affected slots.
+          current signature out of date and has not been acknowledged with status 409 and a problem document that
+          carries the message of the rule, which names the affected slots.
         justification: |
           A script that changes a review that is signed in part must be able to tell the refusal from a mistake in its
           request, and learn whose signatures it would withdraw, in a form it can act on.
@@ -286,101 +842,291 @@ sections:
         tests:
           - ApiProblems_StatusOf_ReviewRuleRefusals_Is409
 
-      - id: ReviewCenter-ApiEndpoints-OpenRoutes
-        title: >-
-          The ApiEndpoints unit shall put exactly two routes, the evidence index and the attestation PDF, behind a
-          policy
-          that a request without credentials can satisfy, and every other route under /api behind the policy that
-          needs a valid token, so that no third route is open to a caller without a token (except the OpenAPI document
-          and the answer for an address that does not exist), and shall refuse a request without credentials to any
-          other route of a project with 401 even when the project has switched both routes on.
-        justification: |
-          The exception to "an API needs a token" must stay as small as its documentation says. A test that
-          enumerates the routes makes a new route that is open by mistake fail, instead of leaving it to review.
-        tests:
-          - AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies
-          - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
-
-      - id: ReviewCenter-ApiEndpoints-AnonymousLimit
-        title: >-
-          The ApiEndpoints unit shall answer a request without credentials to the evidence index route or the
-          attestation PDF route from a client address that is over its limit with status 429, a problem document, a
-          Retry-After header, and a response that no cache keeps, and shall not apply that limit to a request with a
-          valid token.
-        justification: |
-          A caller without an account must be slowed down by address, and has to be told when to come back, but a
-          script that holds a token is counted by the throttle of tokens and must not be refused by this limit.
-        tests:
-          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
-
       - id: ReviewCenter-ApiEndpoints-ListProgress
         title: >-
           The ApiEndpoints unit shall return for every review in the list of the reviews of a project whether it is
-          approved, the number of its reviewer slots, of valid signatures, and of out-of-date signatures, the time of
-          its last activity, and its due date and overdue flag, taking them from the same service as the project
-          page, and shall add the fields without changing any existing field. The list shall read the reviews of the
-          project once and give that same list to the progress service. The outcome (approved or rejected) shall be
-          given only for a concluded review, for a token as for any viewer.
+          approved, the number of its reviewer slots, of valid signatures, and of out-of-date signatures, and the time
+          of its last activity, as fields that are added without changing any existing field.
         justification: |
           A script that watches a project needs the progress that the project page shows, without opening every
-          review. The fields are added and nothing is renamed, so existing clients keep working. One read of the
-          review list keeps a project with many reviews fast. The progress service masks the standing for the token
-          actor like for any viewer, so the list reveals no verdict before the conclusion.
+          review. The fields are added and nothing is renamed, so existing clients keep working.
         tests:
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
+
+      - id: ReviewCenter-ApiEndpoints-ListProgress-ReadOnce
+        title: >-
+          The ApiEndpoints unit shall read the reviews of the project once for the list of reviews and give that same
+          list to the progress, and still return every review with its progress.
+        justification: |
+          One read of the review list keeps a project with many reviews fast.
+        tests:
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
+
+      - id: ReviewCenter-ApiEndpoints-ListProgress-Outcome
+        title: >-
+          The ApiEndpoints unit shall give the outcome (approved or rejected) of a review in the list of reviews only
+          when the review is concluded, for a token as for any viewer, and reveal no verdict of a review whose standing
+          the token may not see.
+        justification: |
+          The progress is masked for the token actor like for any viewer, so the list reveals no verdict before the
+          conclusion.
+        tests:
           - ApiEndpoints_ListReviews_TokenActor_OutcomeShownOnlyWhenConcluded
-          - ApiDocument_Get_MatchesCommittedSnapshot
 
       - id: ReviewCenter-ApiEndpoints-ReadOnlyRole
         title: >-
-          The ApiEndpoints unit shall let a token of a member whose role is Auditor read everything that the member may
-          see, shall refuse every change by that token with a 403 problem document and change nothing, shall answer a
-          token of a user who is no member of the project with 404 for reads and changes, and shall map the rule that
-          refuses a role change while the member holds open review work to 409.
+          The ApiEndpoints unit shall let the token of a member whose role is Auditor read the project, the list of
+          its reviews with their progress, a review, and the checklist, like the token of any member.
         justification: |
-          A script that acts for an auditor must be as read-only as the auditor, and a project that the token owner may
-          not see must read like a missing one.
+          A script that acts for an auditor must be able to read everything the auditor may read.
         tests:
           - ApiAuditor_Reads_Token_ServeTheProject
+
+      - id: ReviewCenter-ApiEndpoints-ReadOnlyRole-Auditor403
+        title: >-
+          The ApiEndpoints unit shall refuse the creation of a review by the token of an Auditor with status 403 and a
+          problem document, and change nothing.
+        justification: |
+          A script that acts for an auditor must be as read-only as the auditor.
+        tests:
           - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+
+      - id: ReviewCenter-ApiEndpoints-ReadOnlyRole-NonMember404
+        title: >-
+          The ApiEndpoints unit shall answer the token of a user who is no member of the project with status 404, for
+          a read and for the creation of a review, and store nothing.
+        justification: |
+          A project that the token owner may not see must read like a missing one.
+        tests:
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+
+      - id: ReviewCenter-ApiEndpoints-ReadOnlyRole-OpenWork
+        title: >-
+          The ApiEndpoints unit shall answer the refusal of a role change for a member who still has open review work
+          with status 409.
+        justification: |
+          The refusal is a conflict with the state of the project, which the script can tell from a mistake in its
+          request.
+        tests:
           - ApiAuditor_MemberHasOpenReviewWork_Is409
 
       - id: ReviewCenter-ApiEndpoints-AuditExport
         title: >-
-          The ApiEndpoints unit shall serve, in the file AuditExportEndpoints.cs, the cookie-authenticated routes
-          GET /projects/{project}/audit/export and GET /audit/export, which stream the audit trail that matches the
-          filter of the query (actor, action, review, from, and to, and on the whole trail also project, all read like
-          the audit pages so that an unusable value falls back and never fails) as CSV or, with format=json, as JSON,
-          never accepting a request without a signed-in session (it is redirected to the sign-in page), answering for
-          a project the 404 of a project that the user may not see and the 403 problem for a user who may see it but
-          not read its audit trail (the audit-read access of the project), answering the whole trail to system
-          administrators only with 403 for everybody else, answering an unknown format with 400 after the access
-          check, and sending the status of the chain before the body in the headers X-ReviewCenter-Audit-Chain
-          (intact or broken) and, when broken, X-ReviewCenter-Audit-Chain-Broken-At with the first broken sequence,
-          together with the attachment file name audit-<project-N|all>-<yyyyMMddTHHmmssZ>-chain-<status>.<ext>, the
-          content type, Cache-Control no-store, and X-Content-Type-Options nosniff, and shall not be part of the
-          OpenAPI document.
+          The ApiEndpoints unit shall serve GET /projects/{project}/audit/export to a signed-in project administrator
+          as a CSV file of the audit entries of that project only, with a header row and a UTF-8 byte order mark.
         justification: |
-          The export is for people with a signed-in session (a token cannot read the audit trail), so it uses the
-          same access rules as the audit pages, answered like the other cookie routes. The status of the chain is in
-          the headers because the body is streamed, so a script or a browser knows it before the first byte. A
-          project that a user may not see must not be told apart from one that does not exist, and a trail that
-          names every user is for system administrators.
+          The export is for people with a signed-in session (a token cannot read the audit trail), and it lets them
+          keep the audit trail of a project outside the application.
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-FileName
+        title: >-
+          The ApiEndpoints unit shall send an audit export as an attachment with the file name
+          audit-<project-N|all>-<yyyyMMddTHHmmssZ>-chain-<status>.<ext>, and the content type of the format.
+        justification: |
+          The name tells the person who keeps the file which trail it holds, when it was taken, and whether the chain
+          was intact.
         tests:
           - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
           - AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Chain
+        title: >-
+          The ApiEndpoints unit shall send the status of the audit chain before the body of an export, in the header
+          X-ReviewCenter-Audit-Chain, with the value intact for a chain that is not broken and without the header
+          that names a broken sequence.
+        justification: |
+          The status is in a header because the body is streamed, so a script or a browser knows it before the first
+          byte.
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-NoStore
+        title: >-
+          The ApiEndpoints unit shall send an audit export with Cache-Control no-store and X-Content-Type-Options
+          nosniff.
+        justification: |
+          The trail names users and actions, so no cache may keep it and no browser may guess its type.
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-System
+        title: >-
+          The ApiEndpoints unit shall let a system administrator export the trail of any project.
+        justification: |
+          A system administrator may see every project.
+        tests:
+          - AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-WholeTrail
+        title: >-
+          The ApiEndpoints unit shall serve GET /audit/export to a system administrator as the whole audit trail,
+          including the entries that belong to no project.
+        justification: |
+          A trail that names every user and every project is for system administrators.
+        tests:
+          - AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Json
+        title: >-
+          The ApiEndpoints unit shall serve an export as JSON, with the content type application/json and a file name
+          that ends in .json, when the request asks for the format json.
+        justification: |
+          A script reads JSON more easily than CSV.
+        tests:
           - AuditExportEndpoints_JsonFormat_ServesEnvelopeWithChainStatus
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-JsonEnvelope
+        title: >-
+          The ApiEndpoints unit shall give a JSON export as an object that carries the status of the chain and the
+          filter that the export used, with the entries.
+        justification: |
+          The reader of the file must see which entries it holds and whether the chain was intact without the headers.
+        tests:
+          - AuditExportEndpoints_JsonFormat_ServesEnvelopeWithChainStatus
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Filter
+        title: >-
+          The ApiEndpoints unit shall export only the audit entries that match the actor, the action, and the start
+          of the period of the query, and only the header row when none matches.
+        justification: |
+          A person who needs one actor or one period should not have to filter the file afterwards.
+        tests:
           - AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-ReversedRange
+        title: >-
+          The ApiEndpoints unit shall answer an export whose period ends before it starts with status 200, as if the
+          request had no dates.
+        justification: |
+          An unusable range falls back like on the audit pages and never fails.
+        tests:
+          - AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Audited
+        title: >-
+          The ApiEndpoints unit shall record every export in the audit trail with an entry that names the format and
+          the user who exported.
+        justification: |
+          The trail must show who took a copy of it.
+        tests:
+          - AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-ProjectRouteScope
+        title: >-
+          The ApiEndpoints unit shall ignore a project in the query on the route of a project, and export the trail of
+          the project of the route.
+        justification: |
+          The project of the route is the one the access check was made for.
+        tests:
           - AuditExportEndpoints_ProjectRoute_IgnoresProjectInQuery
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-GlobalScope
+        title: >-
+          The ApiEndpoints unit shall limit the export of the whole trail to the project in the query when there is
+          one, and name that scope in the audit entry of the export.
+        justification: |
+          A system administrator who asks for one project gets that project, and the trail shows what was exported.
+        tests:
           - AuditExportEndpoints_GlobalExport_ProjectInQuery_LimitsAndScopesTheAuditEntry
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Forbidden
+        title: >-
+          The ApiEndpoints unit shall answer a user who may see the project but may not read its audit trail with
+          status 403 and a problem document, and send no file, no chain header, and no audit entry.
+        justification: |
+          The export follows the access rules of the audit pages.
+        tests:
           - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-NotFound
+        title: >-
+          The ApiEndpoints unit shall answer a user who may not see the project, and a request for a project that does
+          not exist, with status 404, and send no file, no chain header, and no audit entry.
+        justification: |
+          A project that a user may not see must not be told apart from one that does not exist.
+        tests:
+          - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Auditor
+        title: >-
+          The ApiEndpoints unit shall let an auditor of a project export the audit trail of that project and no other.
+        justification: |
+          An auditor reads the trail of the project, and must learn nothing of the others.
+        tests:
           - AuditExportEndpoints_ProjectExport_Auditor_ServesTheProjectTrailOnly
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-SignedOut
+        title: >-
+          The ApiEndpoints unit shall redirect a request for an export without a signed-in session to the sign-in
+          page, and send no chain header.
+        justification: |
+          The export routes use a session and not a token, and answer like the other pages of the application.
+        tests:
           - AuditExportEndpoints_SignedOut_RedirectsToLogin
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-GlobalRefused
+        title: >-
+          The ApiEndpoints unit shall answer a request for the whole audit trail from a user who is not a system
+          administrator with status 403, and send no chain header and no entries.
+        justification: |
+          A trail that names every user is for system administrators only.
+        tests:
           - AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Hostile
+        title: >-
+          The ApiEndpoints unit shall treat the text filters of the query as plain values that match nothing when they
+          are hostile, and drop a value that cannot be read, so that the export never fails and sets no cookie.
+        justification: |
+          The query is written by the caller, so an unusable value must fall back like on the audit pages and never
+          fail.
+        tests:
           - AuditExportEndpoints_HostileQueryValues_AreSafe
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-UnknownFormat
+        title: >-
+          The ApiEndpoints unit shall answer a request for an export in a format it does not know with status 400,
+          after the access check, so that a user who may not see the project gets the 404.
+        justification: |
+          The format must not tell a user who is refused anything about the project.
+        tests:
           - AuditExportEndpoints_UnknownFormat_Answers400ToAllowedUsersOnly
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-Broken
+        title: >-
+          The ApiEndpoints unit shall report a broken audit chain in the header X-ReviewCenter-Audit-Chain, give the
+          first broken sequence in the header X-ReviewCenter-Audit-Chain-Broken-At, and show broken in the file name
+          and in the JSON of the export.
+        justification: |
+          A person who keeps the file must see at once that the trail was tampered with, and where.
+        tests:
           - AuditExportEndpoints_TamperedChain_ReportsBrokenInHeadersAndFileName
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-NotInApiDocument
+        title: >-
+          The ApiEndpoints unit shall leave the export routes out of the OpenAPI document.
+        justification: |
+          The routes use a session and are not part of the API that tokens call.
+        tests:
           - AuditExportEndpoints_Routes_AreNotInTheApiDocument
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-ClientAbort
+        title: >-
+          The ApiEndpoints unit shall end an export quietly when the client goes away while the body is written, and
+          record the export in the audit trail as incomplete.
+        justification: |
+          A client that closes the connection is not an error of the server, but the trail must show that the copy is
+          not whole.
+        tests:
           - AuditExportEndpoints_StreamAsync_ClientAbortedDuringWrite_EndsQuietlyAndAuditsIncomplete
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport-WriteFailure
+        title: >-
+          The ApiEndpoints unit shall not hide a failure to write an export that is not a client abort, and shall
+          record the export as incomplete.
+        justification: |
+          A real failure must reach the error handling, and the trail must show that the copy is not whole.
+        tests:
           - AuditExportEndpoints_StreamAsync_WriteFailsWithoutAbort_IsNotSwallowed
