@@ -1024,36 +1024,117 @@ sections:
 
       - id: ReviewCenter-ProjectPage-Selection
         title: >-
-          The ProjectPage unit shall list the name and size of each file the user selects for a new review, and
-          a new selection shall replace the previous one. When the page is reused for another project, it shall
-          show that project and discard the previous form values and selection.
+          The ProjectPage unit shall list the name and size of each file the user selects for a new review.
         justification: |
-          Users must see exactly which files they are about to submit before they submit them, and must be able
-          to correct a wrong selection. Files chosen for one project must never be submitted into another.
+          Users must see exactly which files they are about to submit before they submit them.
         tests:
           - NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
+
+      - id: ReviewCenter-ProjectPage-Selection-Replacement
+        title: >-
+          The ProjectPage unit shall replace the previous file selection of a new review with a new selection.
+        justification: |
+          Users must be able to correct a wrong selection by choosing again.
+        tests:
           - NewReviewPage_FileInput_SecondSelection_ReplacesFirst
+
+      - id: ReviewCenter-ProjectPage-Selection-OtherProject
+        title: >-
+          The ProjectPage unit shall show the other project when the page for a new review is reused for another
+          project.
+        justification: |
+          A reused page that kept showing the first project would send the user's work to the wrong place.
+        tests:
+          - NewReviewPage_ParametersChange_OtherProject_ClearsFormAndSelection
+
+      - id: ReviewCenter-ProjectPage-Selection-OtherProjectReset
+        title: >-
+          The ProjectPage unit shall discard the previous form values and the file selection when the page for a new
+          review is reused for another project.
+        justification: |
+          Files chosen for one project must never be submitted into another.
+        tests:
           - NewReviewPage_ParametersChange_OtherProject_ClearsFormAndSelection
 
       - id: ReviewCenter-ProjectPage-Create
         title: >-
-          The ProjectPage unit shall offer, on its page for a new review, a form with a review identifier, a
-          title, and selected files that creates a review from the file names and contents, and then shows the
-          review page.
+          The ProjectPage unit shall offer, on its page for a new review, a form with a review identifier, a title and
+          selected files that creates a review from the file names and contents.
         justification: |
-          Creating a review from files is the central action of the product. Only the file name is used as the
-          path, because a browser does not reveal the folder a file came from.
+          Creating a review from files is the central action of the product. Only the file name is used as the path,
+          because a browser does not reveal the folder a file came from.
+        tests:
+          - NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+
+      - id: ReviewCenter-ProjectPage-Create-ShowsReview
+        title: >-
+          The ProjectPage unit shall show the review page after it has created a review from the form.
+        justification: |
+          The creator continues with the review that was just created.
         tests:
           - NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
 
       - id: ReviewCenter-ProjectPage-Error
         title: >-
-          The ProjectPage unit shall show the reason when a review cannot be created, naming the identifier for
-          a duplicate identifier, and shall create nothing, including when no files are selected, two selected
-          files have the same name, or the sign-in state of the user has ended or the user has lost the access to the
-          project while the form is open (the page then shows the page of a project that does not exist).
+          The ProjectPage unit shall show the reason on its page for a new review when a review cannot be created from
+          the form.
         justification: |
-          A rejected form must tell users what to correct, and must not leave a partial review.
+          A rejected form must tell users what to correct.
+        tests:
+          - NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
+          - NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
+
+      - id: ReviewCenter-ProjectPage-Error-NoFiles
+        title: >-
+          The ProjectPage unit shall refuse a form without selected files and show an error that mentions the files.
+        justification: |
+          A review needs files, and the user is told that they are missing.
+        tests:
+          - NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-Error-DuplicateId
+        title: >-
+          The ProjectPage unit shall refuse a review identifier that the project already uses and name that identifier
+          in the error.
+        justification: |
+          Identifiers are unique within a project, and naming the identifier shows what to change.
+        tests:
+          - NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
+
+      - id: ReviewCenter-ProjectPage-Error-DuplicateFileNames
+        title: >-
+          The ProjectPage unit shall refuse selected files that have the same name and name the duplicated path in the
+          error.
+        justification: |
+          Only the file name is used as the path, so two files with the same name cannot both be part of a review.
+        tests:
+          - NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
+
+      - id: ReviewCenter-ProjectPage-Error-SessionEnded
+        title: >-
+          The ProjectPage unit shall show the page of a project that does not exist when the sign-in state of the user
+          has ended while the form is open.
+        justification: |
+          An ended session must not be able to create a review, and the page must not reveal the project.
+        tests:
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-Error-AccessLost
+        title: >-
+          The ProjectPage unit shall show the page of a project that does not exist when the user has lost the access to
+          the project while the form is open.
+        justification: |
+          A user who was removed from the project must not be able to create a review, and must not see the project.
+        tests:
+          - NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-Error-NothingCreated
+        title: >-
+          The ProjectPage unit shall leave the reviews of the project unchanged when it refuses the form or shows the
+          page of a project that does not exist.
+        justification: |
+          A rejected form must not leave a partial review.
         tests:
           - NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
           - NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
@@ -1063,29 +1144,88 @@ sections:
 
       - id: ReviewCenter-ProjectPage-ReservedId
         title: >-
-          The ProjectPage unit shall refuse the review identifier "new", in any letter case, with a message that
-          it is reserved, and shall create nothing.
+          The ProjectPage unit shall refuse the review identifier "new", in any letter case, with a message that it is
+          reserved.
         justification: |
-          The address of the page for a new review ends in "new", so a review with that identifier could never
-          be opened. Users are told to choose another identifier instead of creating an unreachable review.
+          The address of the page for a new review ends in "new", so a review with that identifier could never be
+          opened. Users are told to choose another identifier instead.
+        tests:
+          - NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-ReservedId-NothingCreated
+        title: >-
+          The ProjectPage unit shall create no review for the reserved review identifier "new".
+        justification: |
+          A refused identifier must not leave an unreachable review behind.
         tests:
           - NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-ProjectPage-Limits
         title: >-
-          The ProjectPage unit shall refuse a selection that has more files than the review file-count limit,
-          a file larger than the per-file size limit, or files that together are larger than the total size
-          limit, with an error message, before reading any content, and shall keep no selection from that
-          attempt and create no review.
+          The ProjectPage unit shall refuse a selection of more files than the review file-count limit allows and name
+          the limit in the error.
         justification: |
-          Files are uploaded over the live connection into server memory. Refusing a selection by its reported
-          count and sizes protects the server before any content is transferred, and refusing it as a whole
-          ensures a partly read file set is never submitted.
+          Files are uploaded over the live connection into server memory, so the number of files must be bounded.
+        tests:
+          - NewReviewPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
+
+      - id: ReviewCenter-ProjectPage-Limits-FileSize
+        title: >-
+          The ProjectPage unit shall refuse a selection that contains a file larger than the per-file size limit and
+          name that file in the error.
+        justification: |
+          A single large file must not be read into server memory.
+        tests:
+          - NewReviewPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
+
+      - id: ReviewCenter-ProjectPage-Limits-TotalSize
+        title: >-
+          The ProjectPage unit shall refuse a selection whose files are together larger than the total size limit and
+          say so in the error.
+        justification: |
+          The sum of the files must be bounded too, because each file may be within its own limit.
+        tests:
+          - NewReviewPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
+
+      - id: ReviewCenter-ProjectPage-Limits-ReceivedBytes
+        title: >-
+          The ProjectPage unit shall refuse files whose received bytes exceed the limits although the browser declared
+          smaller sizes.
+        justification: |
+          The sizes that a client declares cannot be trusted, so the bytes actually received are checked.
+        tests:
+          - NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
+
+      - id: ReviewCenter-ProjectPage-Limits-BeforeReading
+        title: >-
+          The ProjectPage unit shall refuse a selection that breaks the file-count limit or a declared size limit before
+          it reads the content of any file.
+        justification: |
+          Refusing a selection by its reported count and sizes protects the server before any content is transferred.
+        tests:
+          - NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream
+
+      - id: ReviewCenter-ProjectPage-Limits-NoSelectionKept
+        title: >-
+          The ProjectPage unit shall keep no file in the selection after it has refused a selection because of a limit.
+        justification: |
+          A refused selection as a whole must never be submitted, and a partly read file set must not remain.
         tests:
           - NewReviewPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
           - NewReviewPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
           - NewReviewPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
           - NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
+          - NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream
+
+      - id: ReviewCenter-ProjectPage-Limits-NothingCreated
+        title: >-
+          The ProjectPage unit shall create no review from a selection that it has refused because of a limit.
+        justification: |
+          A refused selection must leave the project unchanged.
+        tests:
+          - NewReviewPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
+          - NewReviewPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
+          - NewReviewPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
 
       - id: ReviewCenter-ProjectPage-SourceChoice
         title: >-
@@ -1206,44 +1346,214 @@ sections:
 
       - id: ReviewCenter-ProjectPage-NewReviewDueDate
         title: >-
-          The ProjectPage unit shall offer on its page for a new review an optional due date, which it states is a
-          calendar day in UTC, for an upload and for a repository alike, shall create the review with that date, and
-          shall show the reason and create nothing when the date is not a date that the rules accept.
+          The ProjectPage unit shall offer on its page for a new review an optional due date field that may stay empty.
         justification: |
-          The person who creates a review often knows when it is expected. Stating the time basis keeps a date
-          from being read in another time zone, and a refused date must be corrected, not dropped.
+          The person who creates a review often knows when it is expected, but does not have to say.
+        tests:
+          - NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc
+          - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate-UtcStatement
+        title: >-
+          The ProjectPage unit shall state next to the due date field that the date is a calendar day in UTC.
+        justification: |
+          Stating the time basis keeps a date from being read in another time zone.
+        tests:
+          - NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc
+
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate-Stored
+        title: >-
+          The ProjectPage unit shall create a review from an upload with the due date that was entered.
+        justification: |
+          The date is the point of the field, and it must reach the review that is created from files.
+        tests:
+          - NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate
+
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate-StoredFromRepository
+        title: >-
+          The ProjectPage unit shall create a review from a repository with the due date that was entered.
+        justification: |
+          The date is the point of the field, and it must reach the review that is created from a repository too.
         tests:
           - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
+
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate-PastDate
+        title: >-
+          The ProjectPage unit shall refuse a due date in the past and name the due date in the error.
+        justification: |
+          A date in the past is a mistake that must be corrected, not dropped.
+        tests:
+          - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate
+
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate-PastDateNothingCreated
+        title: >-
+          The ProjectPage unit shall create no review when it has refused the due date.
+        justification: |
+          A refused date must leave the project unchanged.
+        tests:
           - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
           - NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate
 
       - id: ReviewCenter-ProjectPage-FollowUp
         title: >-
-          The ProjectPage unit shall offer on its page for a new review, when the project has an earlier review of
-          the chosen kind of source, a choice of the review to follow up, shall show for an upload what the
-          follow-up would carry (the Pass and N/A answers, the not-applicable sections, the open threads, the
-          resolved threads that are not carried, the check discussions that are not carried, and the open threads of
-          files that the new review does not have),
-          shall suggest the title Follow-up to the identifier without replacing a title that was typed, shall require
-          a confirmation before dropping open threads and pass it on, shall pass the choice on when it creates the
-          review from files or from a repository, shall show the message of the rule when the service refuses the
-          follow-up, shall offer nothing when the project has no earlier review, and shall mark a follow-up on the
-          list of reviews with a link to the review it follows.
+          The ProjectPage unit shall offer on its page for a new review, when the project has an earlier review of the
+          chosen kind of source, a choice of the review to follow up.
         justification: |
-          The creator decides what the new review is a follow-up of, and should see what that takes over before
-          creating it, and must confirm anything that would be dropped. The service decides what is allowed, so the
-          page shows its refusal instead of repeating its rules.
+          The creator decides what the new review is a follow-up of, and only an earlier review that suits the chosen
+          source can be followed.
+        tests:
+          - NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource
+
+      - id: ReviewCenter-ProjectPage-FollowUp-NoEarlierReview
+        title: >-
+          The ProjectPage unit shall offer no choice of a review to follow up when the project has no earlier review.
+        justification: |
+          There is nothing to choose, so the page must not show an empty selector.
         tests:
           - NewReviewPage_FollowUp_NoEligibleReview_HidesSelectorOrShowsEmptyHint
-          - NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource
+
+      - id: ReviewCenter-ProjectPage-FollowUp-Answers
+        title: >-
+          The ProjectPage unit shall show in the follow-up preview how many Pass and N/A answers the follow-up would
+          carry.
+        justification: |
+          The creator should see what the new review takes over before creating it.
+        tests:
           - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-ProjectPage-FollowUp-NotApplicableSections
+        title: >-
+          The ProjectPage unit shall show in the follow-up preview how many sections marked not applicable the follow-up
+          would carry.
+        justification: |
+          The creator should see what the new review takes over before creating it.
+        tests:
+          - NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt
+
+      - id: ReviewCenter-ProjectPage-FollowUp-OpenThreads
+        title: >-
+          The ProjectPage unit shall show in the follow-up preview how many open threads the follow-up would carry.
+        justification: |
+          The creator should see what the new review takes over before creating it.
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-ProjectPage-FollowUp-ResolvedThreads
+        title: >-
+          The ProjectPage unit shall show in the follow-up preview how many resolved threads the follow-up would not
+          carry.
+        justification: |
+          The creator should see what the new review leaves behind.
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-ProjectPage-FollowUp-CheckDiscussions
+        title: >-
+          The ProjectPage unit shall show in the follow-up preview how many check discussions the follow-up would not
+          carry.
+        justification: |
+          The creator should see what the new review leaves behind.
+        tests:
           - NewReviewPage_FollowUp_CheckThreads_PreviewCountsThemAsNotCarried
-          - NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion
+
+      - id: ReviewCenter-ProjectPage-FollowUp-DroppedFiles
+        title: >-
+          The ProjectPage unit shall list in the follow-up preview the files of the earlier review that the new review
+          does not have and whose open threads would be dropped.
+        justification: |
+          The creator must see which open threads are lost before confirming the loss.
+        tests:
           - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+
+      - id: ReviewCenter-ProjectPage-FollowUp-Title
+        title: >-
+          The ProjectPage unit shall suggest the title "Follow-up to" followed by the identifier of the review that is
+          followed.
+        justification: |
+          A suggested title saves typing and names the relation.
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-ProjectPage-FollowUp-TypedTitle
+        title: >-
+          The ProjectPage unit shall keep a title that the user typed instead of replacing it with the suggestion.
+        justification: |
+          Text typed by the user must never be overwritten.
+        tests:
+          - NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion
+
+      - id: ReviewCenter-ProjectPage-FollowUp-Acknowledgement
+        title: >-
+          The ProjectPage unit shall refuse to create a follow-up that would drop open threads until the user confirms
+          that the threads were checked.
+        justification: |
+          Dropped threads are lost, so the creator must confirm deliberately, and the confirmation starts unchecked.
+        tests:
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+
+      - id: ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+        title: >-
+          The ProjectPage unit shall pass the confirmation of dropped threads on when it creates the follow-up.
+        justification: |
+          The service decides what is allowed and needs the confirmation to accept the follow-up.
+        tests:
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+
+      - id: ReviewCenter-ProjectPage-FollowUp-UploadCreation
+        title: >-
+          The ProjectPage unit shall create the review from files as a follow-up of the chosen earlier review.
+        justification: |
+          The relation to the earlier review is recorded when the files are uploaded.
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-ProjectPage-FollowUp-RepositoryCreation
+        title: >-
+          The ProjectPage unit shall create the review from a repository as a follow-up of the chosen earlier review.
+        justification: |
+          The relation to the earlier review is recorded when the files come from a repository.
+        tests:
+          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+
+      - id: ReviewCenter-ProjectPage-FollowUp-PlainReview
+        title: >-
+          The ProjectPage unit shall remove the follow-up preview and create a plain review when the choice of the
+          review to follow up is cleared.
+        justification: |
+          Following up is optional, and a cleared choice must not leave anything carried behind.
+        tests:
+          - NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview
+
+      - id: ReviewCenter-ProjectPage-FollowUp-Refusal
+        title: >-
+          The ProjectPage unit shall show the message of the service instead of the follow-up preview when the service
+          refuses the follow-up, for example for files that do not fit the earlier review or for a path that appears
+          more than once.
+        justification: |
+          The service decides what is allowed, so the page shows its refusal instead of repeating its rules or failing.
+        tests:
           - NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal
           - NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing
-          - NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview
-          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+
+      - id: ReviewCenter-ProjectPage-FollowUp-RefusalOnCreate
+        title: >-
+          The ProjectPage unit shall show the same message of the service and create no review when the user creates a
+          follow-up that the service refuses.
+        justification: |
+          A refused follow-up must be explained and must leave the project unchanged.
+        tests:
+          - NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal
+          - NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing
+
+      - id: ReviewCenter-ProjectPage-FollowUp-FollowTag
+        title: >-
+          The ProjectPage unit shall mark a follow-up in the list of reviews of a project with a tag that links to the
+          review it follows.
+        justification: |
+          The list shows the relation between reviews, and the link leads to the earlier review.
+        tests:
           - ProjectPage_Render_FollowUpReview_ShowsFollowTag
 
       - id: ReviewCenter-ProjectPage-Interactive
@@ -1288,290 +1598,1080 @@ sections:
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsLink
         title: >-
-          The ProjectPage unit shall show an Evidence settings button that leads to the evidence settings page of the
-          project to a system administrator and to a project admin of the project only.
+          The ProjectPage unit shall show a project admin an Evidence settings button that leads to the evidence
+          settings page of the project.
         justification: |
-          The evidence settings decide who may read the evidence of the project without signing in, so they are
-          reached from the project page by the people who may change them. A plain member does not change them and
-          is not offered a page that would show only a not-found message.
+          The evidence settings decide who may read the evidence of the project without signing in, so the people who
+          may change them reach them from the project page.
         tests:
           - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsLink-SystemAdmin
+        title: >-
+          The ProjectPage unit shall show a system administrator an Evidence settings button that leads to the evidence
+          settings page of the project.
+        justification: |
+          A system administrator administers every project, including the ones without a membership.
+        tests:
+          - ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsLink-Hidden
+        title: >-
+          The ProjectPage unit shall show a plain member no Evidence settings button.
+        justification: |
+          A plain member does not change the settings and is not offered a page that would show only a not-found
+          message.
+        tests:
           - ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsAccess
         title: >-
-          The ProjectPage unit shall provide the page /projects/{project}/evidence-settings, which shows whoever
-          administers the project (a system administrator or a project admin of it) the evidence settings form with a
-          Save settings button and a Back to project button, and shows the not-found message and no form to a plain
-          member, to a user who is no member, and for a project that does not exist.
+          The ProjectPage unit shall show the evidence settings form of a project to a project admin and to a system
+          administrator.
         justification: |
-          Anonymous access and the content of the evidence are decisions of the people who answer for the project, so
-          nobody else may see or change them. The same message as for a missing project keeps the page from revealing
-          that the project exists.
+          Anonymous access and the content of the evidence are decisions of the people who answer for the project.
         tests:
           - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsAccess-BackButton
+        title: >-
+          The ProjectPage unit shall show a Back to project button on the evidence settings page that leads to the
+          project.
+        justification: |
+          The user returns to the project without using the browser.
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsAccess-NotFound
+        title: >-
+          The ProjectPage unit shall show the not-found message and no settings form on the evidence settings page to a
+          user who does not administer the project.
+        justification: |
+          Nobody else may see or change the settings, and the page must not reveal that the project exists.
+        tests:
+          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsAccess-MissingProject
+        title: >-
+          The ProjectPage unit shall show the same not-found message and no settings form on the evidence settings page
+          for a project that does not exist.
+        justification: |
+          The same message as for a hidden project keeps the page from telling the two apart.
+        tests:
           - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsSwitches
         title: >-
-          The ProjectPage unit shall show on the evidence settings page the stored settings of the project, or the
-          defaults when none are stored, as seven switches each with a short description: the anonymous evidence index
-          and the anonymous attestation PDFs, both off by default, where the description of the index says that the
-          index alone is useless to ReviewMark unless anonymous PDFs are on or the client has credentials, and the
-          review discussion threads, the reviewer names, the checklist wording, the file list and hashes, and the git
-          context of the PDFs, all on by default.
+          The ProjectPage unit shall show the stored evidence settings of the project as switches on the evidence
+          settings page.
+        justification: |
+          The person who changes a setting must see what is in force now.
+        tests:
+          - EvidenceSettingsPage_Render_StoredSettings_AreShown
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSwitches-Defaults
+        title: >-
+          The ProjectPage unit shall show the default settings when none are stored: the anonymous evidence index and
+          the anonymous attestation PDFs off, and the five content switches on.
         justification: |
           The defaults keep everything behind a sign-in and keep the PDFs complete, so nothing is opened or left out
-          unless someone chooses it. A person who turns a switch must be told in one sentence what it does, and the
-          index switch must not promise more than it gives, because the index without the PDFs or credentials does not
-          let ReviewMark verify anything.
+          unless someone chooses it.
         tests:
           - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSwitches-Descriptions
+        title: >-
+          The ProjectPage unit shall show a short description with each of the seven switches.
+        justification: |
+          A person who turns a switch must be told in one sentence what it does.
+        tests:
           - EvidenceSettingsPage_Render_EverySwitchHasADescription
-          - EvidenceSettingsPage_Render_StoredSettings_AreShown
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSwitches-IndexDescription
+        title: >-
+          The ProjectPage unit shall say in the description of the anonymous evidence index that the index alone is
+          useless to ReviewMark unless credentials are used.
+        justification: |
+          The index switch must not promise more than it gives, because the index alone does not let ReviewMark verify
+          anything.
+        tests:
+          - EvidenceSettingsPage_Render_EverySwitchHasADescription
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings
         title: >-
-          The ProjectPage unit shall, while the switches are changed and before anything is saved, show below each
-          content switch that is off a warning of its own that omitting it may not satisfy the regulatory regime and
-          that says to confirm with the quality or compliance lead, show a summary at the top that names every
-          section left out of the PDFs, and show an exposure warning while an anonymous switch is on that says that
-          anyone who reaches the server can read what was opened, and in addition says
-          that the PDFs still contain the review discussion or the reviewer names, whichever are on, while the
-          anonymous PDFs are on; and shall show none of these when nothing is left out and nothing is anonymous.
+          The ProjectPage unit shall show, as soon as a content switch is turned off and before anything is saved, a
+          warning below that switch that says that omitting it may not satisfy the regulatory regime and to confirm with
+          the quality or compliance lead.
         justification: |
-          Leaving content out of the evidence, or opening it to anyone, can break the obligations of a regulated
-          project. The warning belongs next to the switch that causes it and appears at once, so the person sees the
-          consequence before saving instead of finding it out afterwards.
+          Leaving content out of the evidence can break the obligations of a regulated project, and the person should
+          see the consequence before saving.
         tests:
-          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+          - EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Removed
+        title: >-
+          The ProjectPage unit shall remove the warning of a content switch when the switch is turned on again.
+        justification: |
+          A warning for a condition that no longer holds would mislead.
+        tests:
+          - EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Banner
+        title: >-
+          The ProjectPage unit shall show a summary at the top of the evidence settings page that names every section
+          that is left out of the PDFs.
+        justification: |
+          One summary tells the person what the PDFs will lack without reading every switch.
+        tests:
           - EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner
           - EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-ReviewerNames
+        title: >-
+          The ProjectPage unit shall word the warning for omitted reviewer names as "Omitting reviewer names may not
+          satisfy your regulatory regime" followed by the advice to confirm with the quality or compliance lead.
+        justification: |
+          Reviewer names are what identifies the signers, so their omission has its own warning.
+        tests:
+          - EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Exposure
+        title: >-
+          The ProjectPage unit shall show an exposure warning, that anyone who can reach the server can read what was
+          opened, while an anonymous switch is on.
+        justification: |
+          Anonymous evidence can be read by anyone, and the person must know that before saving.
+        tests:
           - EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-PeopleLine
+        title: >-
+          The ProjectPage unit shall say, while the anonymous attestation PDFs are on, that the PDFs still contain the
+          review discussion and the reviewer names, naming only the ones that are on.
+        justification: |
+          Anonymous PDFs can show people data, and the person must know which data would be public.
+        tests:
+          - EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings-NoneByDefault
+        title: >-
+          The ProjectPage unit shall show no warning and no summary for the default settings.
+        justification: |
+          Settings that need no attention must not raise an alarm.
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsSave
         title: >-
-          The ProjectPage unit shall save all seven switches together with one Save settings button, confirm the
-          saved settings in words and stay open on the page, say that there is nothing to save and record nothing when
-          nothing changed, and, for a change, cause one audit entry of the project with the action
-          project.evidence-settings-changed that names the changed settings with their old and new values and the
-          user who saved them, so that it shows on the audit page of the project.
+          The ProjectPage unit shall store the changed evidence switches when the user saves them with the Save settings
+          button.
         justification: |
-          The settings decide what leaves the system, so a change must be accountable: who changed what, from what, to
-          what, and when. One save for all switches keeps the stored settings consistent, and the confirmation tells
-          the person what happened.
+          The settings decide what leaves the system, and one save keeps the stored settings consistent.
         tests:
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave-StaysOpen
+        title: >-
+          The ProjectPage unit shall stay open on the evidence settings page, showing the saved choices, after a save.
+        justification: |
+          The person sees the result and can continue.
+        tests:
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave-Confirmation
+        title: >-
+          The ProjectPage unit shall confirm a saved change with the text "Evidence settings saved.".
+        justification: |
+          The confirmation tells the person what happened.
+        tests:
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingToSave
+        title: >-
+          The ProjectPage unit shall say that there is nothing to save when the user saves without a change.
+        justification: |
+          A save without a change must not look like it did something.
+        tests:
           - EvidenceSettingsPage_Save_NoChange_SaysNothingToSaveAndRecordsNothing
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingRecorded
+        title: >-
+          The ProjectPage unit shall record no audit entry when the user saves without a change.
+        justification: |
+          An empty entry would make the audit trail harder to read.
+        tests:
+          - EvidenceSettingsPage_Save_NoChange_SaysNothingToSaveAndRecordsNothing
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave-Audit
+        title: >-
+          The ProjectPage unit shall cause for a saved change one audit entry of the project with the action
+          project.evidence-settings-changed that names the changed settings with their old and new values and the user
+          who saved them.
+        justification: |
+          The settings decide what leaves the system, so a change must be accountable: who changed what, from what, to
+          what.
+        tests:
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsConflict
         title: >-
-          The ProjectPage unit shall, when the settings were changed by someone else after the page loaded them,
-          store nothing on save, say that the settings were changed by someone else, and show the settings that are
-          stored now.
+          The ProjectPage unit shall say that the settings were changed by someone else when the user saves after
+          somebody else changed them following the loading of the page.
         justification: |
-          Two administrators must not overwrite each other without knowing it, least of all for settings that open
-          the evidence to anonymous readers. Showing the current settings lets the person decide again.
+          Two administrators must not overwrite each other without knowing it.
+        tests:
+          - EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsConflict-NothingStored
+        title: >-
+          The ProjectPage unit shall leave the stored settings and the audit trail unchanged when it refuses a save
+          because the settings were changed by someone else.
+        justification: |
+          The refused change must not take effect, least of all for settings that open the evidence to anonymous
+          readers.
+        tests:
+          - EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsConflict-ShowsStored
+        title: >-
+          The ProjectPage unit shall show the settings that are stored now, instead of the unsaved choices, after it
+          refused a save because the settings were changed by someone else.
+        justification: |
+          The person can decide again from the current state.
         tests:
           - EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost
         title: >-
-          The ProjectPage unit shall check on every switch change and every save that the user still administers the
-          project and, when the
-          right was lost while the page was open (the membership was revoked, the user was demoted, or the sign-in
-          state ended), store and record nothing and replace the page with the not-found message and none of the
-          settings or messages, and shall drop the choices and the project when the page is reused for another
-          project.
+          The ProjectPage unit shall replace the evidence settings page with the not-found message, without form, error
+          or status, when the user saves after the right to administer the project was lost while the page was open.
         justification: |
-          An open page keeps its state after the user is demoted or removed, and a stale page must not be able to open
-          the evidence of a project to anonymous readers. Choices made for one project must not follow the user to
-          another.
+          An open page keeps its state after the user is demoted or removed, and a stale page must not act.
+        tests:
+          - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost-NothingChanged
+        title: >-
+          The ProjectPage unit shall store and record nothing when the user saves or changes a switch after the right to
+          administer the project was lost while the page was open.
+        justification: |
+          A stale page must not be able to open the evidence of a project to anonymous readers.
         tests:
           - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
           - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost-Switch
+        title: >-
+          The ProjectPage unit shall replace the evidence settings with the not-found message, without warning, summary
+          or settings, when the user changes a switch after the right to administer the project was lost while the page
+          was open.
+        justification: |
+          The right is checked on every change, not only when saving.
+        tests:
+          - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost-OtherProject
+        title: >-
+          The ProjectPage unit shall show the not-found message and nothing of the previous project when the evidence
+          settings page is reused for a project that the user does not administer.
+        justification: |
+          Nothing of one project may follow the user to another.
+        tests:
           - EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject
 
       - id: ReviewCenter-ProjectPage-ChecklistLink
         title: >-
-          The ProjectPage unit shall show a Checklist button that leads to the checklist template page of the
-          project to a system administrator and to a project admin of the project only, and shall show them in the
-          Review rules card one line that names the version label of the checklist that new reviews start with, its
-          number of sections and checks, and whether it is the built-in default or a custom checklist, with a link to
-          that page, and shall show a plain member neither the button nor the line.
+          The ProjectPage unit shall show a project admin a Checklist button that leads to the checklist page of the
+          project.
         justification: |
-          The checklist that new reviews start with is decided by the people who answer for the project, so the page
-          that changes it is reached from the project page by them only. The summary tells them at a glance whether
-          the project still uses the default, without opening the page. A plain member does not change the template
-          and is not offered a page that would show only a not-found message.
+          The checklist that new reviews start with is decided by the people who answer for the project.
         tests:
           - ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink-SystemAdmin
+        title: >-
+          The ProjectPage unit shall show a system administrator a Checklist button that leads to the checklist page of
+          the project.
+        justification: |
+          A system administrator administers every project, including the ones without a membership.
+        tests:
+          - ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink-Hidden
+        title: >-
+          The ProjectPage unit shall show a plain member no Checklist button.
+        justification: |
+          A plain member does not change the checklist and is not offered a page that would show only a not-found
+          message.
+        tests:
+          - ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink-Summary
+        title: >-
+          The ProjectPage unit shall show a project admin, in the Review rules card, one line with the version label of
+          the checklist that new reviews start with, its number of sections and checks, and whether it is the built-in
+          default or a custom checklist.
+        justification: |
+          The summary tells the administrator at a glance whether the project still uses the default.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary
+          - ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink-SummaryLink
+        title: >-
+          The ProjectPage unit shall link the checklist summary in the Review rules card to the checklist page.
+        justification: |
+          The administrator can open the checklist from the card.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink-SummaryHidden
+        title: >-
+          The ProjectPage unit shall show a plain member no checklist summary.
+        justification: |
+          The card and its summary are for the administrators of the project.
+        tests:
           - ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary
 
       - id: ReviewCenter-ProjectPage-ChecklistAccess
         title: >-
-          The ProjectPage unit shall provide the page /projects/{project}/checklist, which shows whoever administers
-          the project (a system administrator or a project admin of it) the current checklist template of the project
-          with its version label, its number of sections and checks, a badge when it is the built-in default, and a Back
-          to project button, and shows the not-found message and nothing of the template to a plain member, to a user
-          who is no member, and for a project that does not exist.
+          The ProjectPage unit shall show a project admin and a system administrator the current checklist of the
+          project with its version label and its numbers of sections and checks.
         justification: |
-          The wording of the checklist is a decision of the people who answer for the project, so nobody else may see
-          or change it there. The same message as for a missing project keeps the page from revealing that the project
-          exists.
+          The wording of the checklist is a decision of the people who answer for the project.
         tests:
           - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
           - ProjectChecklistPage_Render_CustomChecklist_ShowsLabelWithoutBadgeAndOffersReset
+
+      - id: ReviewCenter-ProjectPage-ChecklistAccess-DefaultBadge
+        title: >-
+          The ProjectPage unit shall show a badge on the checklist page when the current checklist is the built-in
+          default and none when it is a custom checklist.
+        justification: |
+          The administrator sees which checklist is in use.
+        tests:
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+          - ProjectChecklistPage_Render_CustomChecklist_ShowsLabelWithoutBadgeAndOffersReset
+
+      - id: ReviewCenter-ProjectPage-ChecklistAccess-BackButton
+        title: >-
+          The ProjectPage unit shall show a Back to project button on the checklist page that leads to the project.
+        justification: |
+          The user returns to the project without using the browser.
+        tests:
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistAccess-NotFound
+        title: >-
+          The ProjectPage unit shall show the not-found message and nothing of the checklist on the checklist page to a
+          user who does not administer the project.
+        justification: |
+          Nobody else may see or change the checklist there, and the page must not reveal that the project exists.
+        tests:
+          - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+
+      - id: ReviewCenter-ProjectPage-ChecklistAccess-MissingProject
+        title: >-
+          The ProjectPage unit shall show the same not-found message and nothing of the checklist on the checklist page
+          for a project that does not exist.
+        justification: |
+          The same message as for a hidden project keeps the page from telling the two apart.
+        tests:
           - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
 
       - id: ReviewCenter-ProjectPage-ChecklistExport
         title: >-
-          The ProjectPage unit shall let whoever may open the checklist template page download the checklist template
-          of the project, and the built-in default checklist, as indented JSON files named after the version label,
-          and shall download nothing once the right to administer the project was lost while the page was open.
+          The ProjectPage unit shall let an administrator download the current checklist of the project as a JSON file
+          named after its version label.
         justification: |
-          An export is the starting point for a custom template and the way to keep a copy of what the project uses.
-          The built-in default is offered too, so a project that still uses the default can start from it. A page
-          that stayed open after the user was demoted must not hand out the wording.
+          An export is the starting point for a custom checklist and the way to keep a copy of what the project uses.
         tests:
           - ProjectChecklistPage_Export_Current_DownloadsTheDefinition
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport-Default
+        title: >-
+          The ProjectPage unit shall let an administrator download the built-in default checklist as a JSON file named
+          after its version label.
+        justification: |
+          A project that still uses the default can start from it.
+        tests:
           - ProjectChecklistPage_Export_Default_DownloadsTheBuiltInDefault
-          - ProjectChecklistPage_Export_RightLostWhileOpen_DownloadsNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport-IndentedJson
+        title: >-
+          The ProjectPage unit shall write an exported checklist as indented JSON.
+        justification: |
+          An indented file can be read and edited by a person.
+        tests:
           - ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator
+          - ProjectChecklistPage_Export_Current_DownloadsTheDefinition
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport-ReadsBack
+        title: >-
+          The ProjectPage unit shall write an exported checklist so that the checklist validator accepts it and finds
+          the same checklist.
+        justification: |
+          An export that cannot be imported again would be useless as a starting point.
+        tests:
+          - ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator
+          - ProjectChecklistPage_Export_Current_DownloadsTheDefinition
+          - ProjectChecklistPage_Export_Default_DownloadsTheBuiltInDefault
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport-LineBreak
+        title: >-
+          The ProjectPage unit shall end an exported checklist file with a line break.
+        justification: |
+          A file that ends with a line break behaves well in editors and in version control.
+        tests:
+          - ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport-RightLost
+        title: >-
+          The ProjectPage unit shall download nothing when the user exports after the right to administer the project
+          was lost while the page was open.
+        justification: |
+          A page that stayed open after the user was demoted must not hand out the wording.
+        tests:
+          - ProjectChecklistPage_Export_RightLostWhileOpen_DownloadsNothing
 
       - id: ReviewCenter-ProjectPage-ChecklistImport
         title: >-
-          The ProjectPage unit shall let an administrator of the project bring a checklist definition into the page by
-          pasting JSON text or by choosing a file of at most the size limit of a checklist (256 KiB), refuse a larger
-          file, check the definition with the checklist validator when the Validate button is used, show every error
-          with its path in a list (a single error for text that is not JSON or when nothing was imported), and store
-          nothing while it only checks.
+          The ProjectPage unit shall let an administrator paste a checklist definition as JSON text into the checklist
+          page and check it with the Validate button.
         justification: |
-          A checklist is written outside the tool, so it must be possible to bring it in and to learn everything that
-          is wrong with it at once, with the place of each error, instead of one error per attempt. Checking must not
-          change what new reviews use.
+          A checklist is written outside the tool, so it must be possible to bring it in.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+          - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-File
+        title: >-
+          The ProjectPage unit shall let an administrator choose a JSON file as the checklist definition and check its
+          text like a pasted one.
+        justification: |
+          A file is the usual source of a checklist.
+        tests:
+          - ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-FileName
+        title: >-
+          The ProjectPage unit shall show the name of the chosen checklist file.
+        justification: |
+          The administrator sees which file is being checked.
+        tests:
+          - ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-FileTooLarge
+        title: >-
+          The ProjectPage unit shall refuse a chosen checklist file larger than 256 KiB and name the limit in the error.
+        justification: |
+          The size of the text that is read must be bounded.
+        tests:
+          - ProjectChecklistPage_Import_FileTooLarge_IsRefused
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-RefusedFileDropsImport
+        title: >-
+          The ProjectPage unit shall drop the earlier import when it refuses a chosen checklist file.
+        justification: |
+          An old import must not be mistaken for the content of the refused file.
+        tests:
+          - ProjectChecklistPage_Import_FileTooLarge_IsRefused
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-AllErrors
+        title: >-
+          The ProjectPage unit shall list every error of an invalid checklist definition with its path.
+        justification: |
+          The administrator learns everything that is wrong at once, with the place of each error, instead of one error
+          per attempt.
         tests:
           - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
-          - ProjectChecklistPage_Validate_NothingImported_ShowsOneError
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-NothingChangedNotice
+        title: >-
+          The ProjectPage unit shall say that nothing was changed when it shows the errors of an invalid checklist
+          definition.
+        justification: |
+          The administrator must know that the checklist of the project is still the old one.
+        tests:
+          - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-NoPreview
+        title: >-
+          The ProjectPage unit shall show no preview for an invalid checklist definition.
+        justification: |
+          A preview would suggest that the definition can be used.
+        tests:
+          - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-NotJson
+        title: >-
+          The ProjectPage unit shall show a single error with the path "json" for a text that is not JSON.
+        justification: |
+          A text that is not JSON has one cause, which is clearest when named once.
+        tests:
           - ProjectChecklistPage_Validate_NotJson_ShowsOneError
-          - ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed
-          - ProjectChecklistPage_Import_FileTooLarge_IsRefused
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-NothingImported
+        title: >-
+          The ProjectPage unit shall show a single error when the administrator validates and nothing was imported.
+        justification: |
+          An empty import has one cause, which is clearest when named once.
+        tests:
+          - ProjectChecklistPage_Validate_NothingImported_ShowsOneError
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-NothingStored
+        title: >-
+          The ProjectPage unit shall store and audit nothing while it only checks a checklist definition.
+        justification: |
+          Checking is a dry run that must not change what new reviews use.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport-Sample
+        title: >-
+          The ProjectPage unit shall accept the IEC 62304 example checklist definition of the user guide as valid.
+        justification: |
+          The example in the documentation must work.
+        tests:
           - ProjectChecklistPage_Sample_Iec62304ExampleIsValid
 
       - id: ReviewCenter-ProjectPage-ChecklistPreview
         title: >-
-          The ProjectPage unit shall show, for a definition that is valid, a read-only preview of its sections and
-          checks with their counts, and a short summary of the differences from the current checklist (the version
-          label, and the sections and checks that are added, removed, or reworded, by identifier), and shall say that
-          there is nothing to replace, and offer no replacement, when the definition is the same as the current one.
+          The ProjectPage unit shall show for a valid checklist definition a preview with its version label and its
+          numbers of sections and checks.
         justification: |
-          An administrator replaces the wording that new reviews use, so they must see what they are about to
-          introduce and how it differs from what is in use before they confirm. A compact summary by identifier is
-          enough to notice an unintended change.
+          The administrator sees what would be used before replacing anything.
         tests:
           - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
-          - ProjectChecklistPage_Validate_SameAsCurrent_SaysNothingToReplaceAndDisablesReplace
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Sections
+        title: >-
+          The ProjectPage unit shall list in the preview every section and check of a valid checklist definition with
+          its wording.
+        justification: |
+          The administrator reads the wording before replacing the checklist.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Version
+        title: >-
+          The ProjectPage unit shall state in the preview how the version label changes from the current checklist to
+          the definition, or that it is unchanged.
+        justification: |
+          Version labels identify checklists, so a change or a missing change must be visible.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
           - ProjectChecklistPage_Validate_SameLabelOtherWording_WarnsAboutTheLabel
-          - ChecklistDiff_Compare_Identical_FindsNoChange
           - ChecklistDiff_Compare_OnlyVersion_ReportsVersionChange
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Added
+        title: >-
+          The ProjectPage unit shall list in the preview, by identifier, the sections and checks that the definition
+          adds to the current checklist.
+        justification: |
+          A compact list by identifier is enough to notice an unintended addition.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
           - ChecklistDiff_Compare_AddedAndRemoved_ListsIdentifiers
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Removed
+        title: >-
+          The ProjectPage unit shall list in the preview, by identifier, the sections and checks that the definition
+          removes from the current checklist.
+        justification: |
+          A compact list by identifier is enough to notice an unintended removal.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+          - ChecklistDiff_Compare_AddedAndRemoved_ListsIdentifiers
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Reworded
+        title: >-
+          The ProjectPage unit shall list in the preview the sections and checks of the definition whose wording differs
+          from the current checklist.
+        justification: |
+          A reworded check changes what the reviewers are asked, so it must be visible.
+        tests:
+          - ProjectChecklistPage_Validate_SameLabelOtherWording_WarnsAboutTheLabel
           - ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Moved
+        title: >-
+          The ProjectPage unit shall report a check that the definition moves to another section as changed and not as
+          added or removed.
+        justification: |
+          A moved check is the same check, and reporting it twice would hide that.
+        tests:
           - ChecklistDiff_Compare_MovedItem_IsChangedNotAddedOrRemoved
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-Ignored
+        title: >-
+          The ProjectPage unit shall report no difference for a change of letter case, of order or of a missing hint
+          only.
+        justification: |
+          Differences that do not change the questions would hide the real ones.
+        tests:
           - ChecklistDiff_Compare_CaseOrderAndMissingHint_AreNotDifferences
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-NoChange
+        title: >-
+          The ProjectPage unit shall find no difference between identical checklists.
+        justification: |
+          Without a baseline of no difference every other difference would be doubtful.
+        tests:
+          - ChecklistDiff_Compare_Identical_FindsNoChange
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-NothingToReplace
+        title: >-
+          The ProjectPage unit shall say that there is nothing to replace when the definition equals the current
+          checklist.
+        justification: |
+          An empty replacement must not look like a change.
+        tests:
+          - ProjectChecklistPage_Validate_SameAsCurrent_SaysNothingToReplaceAndDisablesReplace
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-LabelWarning
+        title: >-
+          The ProjectPage unit shall warn when the definition keeps the version label of the current checklist but
+          differs in content.
+        justification: |
+          The label must change when the wording changes, or two checklists would share one label.
+        tests:
+          - ProjectChecklistPage_Validate_SameLabelOtherWording_WarnsAboutTheLabel
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview-NullArgument
+        title: >-
+          The ProjectPage unit shall refuse a missing checklist when it compares two checklists or writes one as JSON.
+        justification: |
+          A missing checklist is a programming error that must fail loudly.
+        tests:
           - ChecklistDiff_Compare_NullArgument_Throws
 
       - id: ReviewCenter-ProjectPage-ChecklistReplace
         title: >-
-          The ProjectPage unit shall enable the Replace button only for a definition that is valid and differs from the
-          current one, ask for a confirmation that says that existing reviews keep the checklist they were created with
-          and only new reviews use the new one, store nothing when the confirmation is declined, replace the checklist
-          of the project through the project checklist service from the hash that was read when the page loaded when it
-          is confirmed, confirm the replacement in words and show the new checklist, cause one audit entry of the
-          project with the action project.checklist-changed, and show the message of the rule, with nothing stored,
-          when the service refuses the definition (for example a changed wording that keeps the version label).
+          The ProjectPage unit shall enable the Replace button only for a checklist definition that is valid and differs
+          from the current checklist.
         justification: |
-          The replacement changes what every later review of the project is checked against, so it must be deliberate,
-          must say what it does not change, and must be accountable. A review that exists keeps its own copy, which the
-          confirmation states so that nobody expects the open reviews to change.
+          An invalid or identical definition cannot be a replacement.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+          - ProjectChecklistPage_Validate_SameAsCurrent_SaysNothingToReplaceAndDisablesReplace
+          - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Confirmation
+        title: >-
+          The ProjectPage unit shall ask for a confirmation that says that existing reviews keep their checklist and
+          only reviews created afterwards use the new one.
+        justification: |
+          The replacement changes what every later review is checked against, so the administrator must know what it
+          does not change.
         tests:
           - ProjectChecklistPage_Replace_Cancelled_ChangesNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Cancelled
+        title: >-
+          The ProjectPage unit shall store and audit nothing when the administrator cancels the confirmation of a
+          replacement.
+        justification: |
+          Cancelling must be safe.
+        tests:
+          - ProjectChecklistPage_Replace_Cancelled_ChangesNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Confirmed
+        title: >-
+          The ProjectPage unit shall store the definition as the checklist of the project when the administrator
+          confirms the replacement.
+        justification: |
+          The confirmed definition is what later reviews start with.
+        tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Shown
+        title: >-
+          The ProjectPage unit shall show the stored definition as the current checklist, with its version label and its
+          numbers of sections and checks, and without the default badge, after a replacement.
+        justification: |
+          The administrator sees the result at once.
+        tests:
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Status
+        title: >-
+          The ProjectPage unit shall say after a replacement which checklist was stored and that existing reviews keep
+          the checklist they were created with.
+        justification: |
+          The confirmation tells the administrator what happened and what did not.
+        tests:
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Audit
+        title: >-
+          The ProjectPage unit shall cause for a confirmed replacement one audit entry of the project with the action
+          project.checklist-changed that names the new version and the user.
+        justification: |
+          A change of the checklist must be accountable.
+        tests:
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-Refusal
+        title: >-
+          The ProjectPage unit shall show the message that the version label must change when the service refuses a
+          replacement that keeps the version label with other wording.
+        justification: |
+          The service decides what is allowed, so the page shows its refusal.
+        tests:
+          - ProjectChecklistPage_Replace_SameLabelOtherWording_ShowsTheRefusalAndStoresNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-RefusalNothingStored
+        title: >-
+          The ProjectPage unit shall leave the stored checklist unchanged when the service refuses a replacement.
+        justification: |
+          A refused definition must not take effect.
+        tests:
+          - ProjectChecklistPage_Replace_SameLabelOtherWording_ShowsTheRefusalAndStoresNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace-RefusalKeepsCandidate
+        title: >-
+          The ProjectPage unit shall keep the definition and its preview on the page after the service refused the
+          replacement.
+        justification: |
+          The administrator corrects the definition instead of typing it again.
+        tests:
           - ProjectChecklistPage_Replace_SameLabelOtherWording_ShowsTheRefusalAndStoresNothing
 
       - id: ReviewCenter-ProjectPage-ChecklistReset
         title: >-
-          The ProjectPage unit shall offer, for a project that has a checklist of its own, a Reset to default button
-          that asks for a confirmation that says that existing reviews keep their checklist, returns the project to
-          the built-in default checklist through the project checklist service when it is confirmed, confirms it in
-          words, and causes one audit entry of the project with the action project.checklist-changed; the button is
-          disabled while the project uses the default.
+          The ProjectPage unit shall offer a Reset to default button for a project that has a checklist of its own.
         justification: |
           A project must be able to go back to the standard wording without help from the person who runs the server.
-          The change is recorded like a replacement, and the confirmation says what it does not touch.
+        tests:
+          - ProjectChecklistPage_Render_CustomChecklist_ShowsLabelWithoutBadgeAndOffersReset
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Disabled
+        title: >-
+          The ProjectPage unit shall disable the Reset to default button while the project uses the built-in default.
+        justification: |
+          There is nothing to reset.
+        tests:
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Confirmation
+        title: >-
+          The ProjectPage unit shall ask for a confirmation that says that existing reviews keep the checklist they were
+          created with before it resets the checklist.
+        justification: |
+          The reset changes what later reviews start with, so the administrator must know what it does not change.
         tests:
           - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
-          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Cancelled
+        title: >-
+          The ProjectPage unit shall leave the checklist unchanged when the administrator cancels the confirmation of a
+          reset.
+        justification: |
+          Cancelling must be safe.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Confirmed
+        title: >-
+          The ProjectPage unit shall return the project to the built-in default checklist when the administrator
+          confirms the reset.
+        justification: |
+          The project goes back to the standard wording.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Shown
+        title: >-
+          The ProjectPage unit shall show the default badge and the numbers of sections and checks of the default, and
+          disable the Reset to default button, after a reset.
+        justification: |
+          The administrator sees the result at once.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Status
+        title: >-
+          The ProjectPage unit shall say after a reset that the project uses the built-in default checklist.
+        justification: |
+          The confirmation tells the administrator what happened.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset-Audit
+        title: >-
+          The ProjectPage unit shall cause for a confirmed reset one audit entry of the project with the action
+          project.checklist-changed that says that the checklist was reset to default.
+        justification: |
+          A change of the checklist must be accountable.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
 
       - id: ReviewCenter-ProjectPage-ChecklistConflict
         title: >-
-          The ProjectPage unit shall, when the checklist template was changed by someone else after the page read it,
-          store nothing on replace or reset, say that the checklist was changed by someone else, and show the
-          checklist that is stored now.
+          The ProjectPage unit shall say that the checklist was changed by someone else when the administrator replaces
+          it after somebody else changed it following the loading of the page.
         justification: |
-          Two administrators must not overwrite each other without knowing it. Showing the current checklist lets the
-          person decide again with the real state in front of them.
+          Two administrators must not overwrite each other without knowing it.
         tests:
           - ProjectChecklistPage_Replace_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-NothingStored
+        title: >-
+          The ProjectPage unit shall leave the stored checklist and the audit trail unchanged when it refuses a
+          replacement because the checklist was changed by someone else.
+        justification: |
+          The refused replacement must not take effect.
+        tests:
+          - ProjectChecklistPage_Replace_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-ShowsStored
+        title: >-
+          The ProjectPage unit shall show the checklist that is stored now as the current checklist after it refused a
+          replacement because the checklist was changed by someone else.
+        justification: |
+          The administrator decides again with the real state in front of them.
+        tests:
+          - ProjectChecklistPage_Replace_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-Differences
+        title: >-
+          The ProjectPage unit shall compare the definition with the checklist that is stored now, not with the one that
+          was loaded, after it refused a replacement because the checklist was changed by someone else.
+        justification: |
+          The differences must describe what a replacement would do now.
+        tests:
+          - ProjectChecklistPage_Replace_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-Reset
+        title: >-
+          The ProjectPage unit shall say that the checklist was changed by someone else when the administrator resets it
+          after somebody else changed it following the loading of the page.
+        justification: |
+          Two administrators must not overwrite each other without knowing it.
+        tests:
+          - ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-ResetNothingStored
+        title: >-
+          The ProjectPage unit shall leave the stored checklist unchanged when it refuses a reset because the checklist
+          was changed by someone else.
+        justification: |
+          The refused reset must not take effect.
+        tests:
+          - ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict-ResetShowsStored
+        title: >-
+          The ProjectPage unit shall show the checklist that is stored now as the current checklist after it refused a
+          reset because the checklist was changed by someone else.
+        justification: |
+          The administrator decides again with the real state in front of them.
+        tests:
           - ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
 
       - id: ReviewCenter-ProjectPage-ChecklistRightLost
         title: >-
-          The ProjectPage unit shall check on every validation, replacement, and reset that the user still administers
-          the project and, when the right was lost while the page was open (the membership was revoked, the user was
-          demoted, or the sign-in state ended), store and record nothing and replace the page with the not-found message
-          and none of the checklist or messages, and shall drop the imported text and the project when the page is
-          reused for another project.
+          The ProjectPage unit shall replace the checklist page with the not-found message, without checklist or
+          messages, when the user validates, replaces or resets after the right to administer the project was lost while
+          the page was open.
         justification: |
-          An open page keeps its state after the user is demoted or removed, and a stale page must not be able to change
-          what the reviews of a project are checked against. Text imported for one project must not follow the user to
-          another.
+          An open page keeps its state after the user is demoted or removed, and a stale page must not act.
         tests:
           - ProjectChecklistPage_Action_RightLostWhileOpen_DropsThePageAndChangesNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistRightLost-NothingChanged
+        title: >-
+          The ProjectPage unit shall store and record nothing when the user validates, replaces or resets after the
+          right to administer the project was lost while the page was open.
+        justification: |
+          A stale page must not be able to change what the reviews of a project are checked against.
+        tests:
+          - ProjectChecklistPage_Action_RightLostWhileOpen_DropsThePageAndChangesNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistRightLost-OtherProject
+        title: >-
+          The ProjectPage unit shall show the not-found message and nothing of the previous project when the checklist
+          page is reused for a project that the user does not administer.
+        justification: |
+          Nothing of one project may follow the user to another.
+        tests:
           - ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject
 
       - id: ReviewCenter-ProjectPage-ReviewRules
         title: >-
-          The ProjectPage unit shall show to an administrator of the project or a system administrator, and to nobody
-          else, a Review rules card with a switch that requires independent reviewers, with an explanation that the
-          person who created the review cannot be a reviewer or sign it and that the authors of commits are not
-          matched, shall save a changed switch through the project service from the value that was loaded, and shall
-          show the confirmation or the message of the rule, for example when someone else changed the setting first.
+          The ProjectPage unit shall show a project admin a Review rules card with a switch that requires independent
+          reviewers.
         justification: |
-          The rule belongs to the people who administer the project, and a project that must let one person do both has
-          to be able to switch it off. The explanation states what the tool can and cannot know about authors, so that
-          nobody reads the rule as a guarantee about commits.
+          The rule belongs to the people who administer the project.
         tests:
           - ProjectPage_ReviewRules_AdminSavesToggle
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-SystemAdmin
+        title: >-
+          The ProjectPage unit shall show a system administrator the Review rules card with the switches.
+        justification: |
+          A system administrator administers every project, including the ones without a membership.
+        tests:
+          - ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Hidden
+        title: >-
+          The ProjectPage unit shall show a plain member no Review rules card.
+        justification: |
+          Members who do not administer the project must not change its rules.
+        tests:
           - ProjectPage_ReviewRules_NonAdmin_HidesCard
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Explanation
+        title: >-
+          The ProjectPage unit shall explain with the independent-reviewers switch that the person who created a review
+          cannot be one of its reviewers and cannot sign it, and that the authors of commits are not matched.
+        justification: |
+          The explanation states what the tool can and cannot know about authors, so that nobody reads the rule as a
+          guarantee about commits.
+        tests:
+          - ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Save
+        title: >-
+          The ProjectPage unit shall store the independent-reviewers switch when the administrator changes it and saves.
+        justification: |
+          A project that must let one person do both has to be able to switch the rule off.
+        tests:
+          - ProjectPage_ReviewRules_AdminSavesToggle
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Confirmation
+        title: >-
+          The ProjectPage unit shall confirm a saved independent-reviewers switch with "Independent reviewers are no
+          longer required." or "Independent reviewers are now required.".
+        justification: |
+          The confirmation tells the administrator what happened.
+        tests:
+          - ProjectPage_ReviewRules_AdminSavesToggle
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Audit
+        title: >-
+          The ProjectPage unit shall cause for a saved independent-reviewers switch an audit entry of the project that
+          names the old and the new value.
+        justification: |
+          A change of a rule must be accountable.
+        tests:
+          - ProjectPage_ReviewRules_AdminSavesToggle
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-Conflict
+        title: >-
+          The ProjectPage unit shall show the message of the rule when the administrator saves an independent-reviewers
+          switch that somebody else changed following the loading of the page.
+        justification: |
+          Two administrators must not overwrite each other without knowing it.
+        tests:
+          - ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-ConflictShowsStored
+        title: >-
+          The ProjectPage unit shall show the stored values of the review rules, instead of the unsaved choices, after
+          it refused a save because somebody else changed a rule.
+        justification: |
+          Showing the stored values keeps the page true.
+        tests:
+          - ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads
+
+      - id: ReviewCenter-ProjectPage-ReviewRules-ConflictNothingRecorded
+        title: >-
+          The ProjectPage unit shall record no audit entry when it refuses a save because somebody else changed a rule.
+        justification: |
+          The refused change must not take effect.
+        tests:
+          - ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads
 
       - id: ReviewCenter-ProjectPage-ReviewRuleSwitches
         title: >-
-          The ProjectPage unit shall show to an administrator of the project or a system administrator, and to nobody
-          else, two further switches in the Review rules card (authors answering the checklist of their own review,
-          and the person who reopened a review signing it again), on for a project that was not given another value,
-          each with the statement that the rule is on by default and applies to every project, also one that was
-          created before, shall save each changed switch through
-          the project service from the value that was loaded, and shall show the confirmation or the message of the
-          rule, for example when someone else changed the setting first, and the stored values after a refusal.
+          The ProjectPage unit shall show a project admin, in the Review rules card, a switch that stops authors from
+          answering the checklist of their own review and a switch that stops the person who reopened a review from
+          signing it again.
         justification: |
-          The rules are enforced for every project, so the page must say that an existing project is affected too, or an
-          administrator would be surprised by a refusal. Saving from the loaded value keeps two administrators from
-          silently overwriting each other, and showing the stored values after a refusal keeps the page true.
+          The rules belong to the people who administer the project.
         tests:
           - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
-          - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
-          - ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
+        title: >-
+          The ProjectPage unit shall show both of these switches on for a project that was not given another value.
+        justification: |
+          The rules are enforced for every project unless an administrator switches them off.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
+        title: >-
+          The ProjectPage unit shall show a plain member none of the review rule switches.
+        justification: |
+          Members who do not administer the project must not change its rules.
+        tests:
           - ProjectPage_ReviewRules_NonAdmin_HidesCard
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+        title: >-
+          The ProjectPage unit shall say with each of these switches that the rule applies to every project, including a
+          project that was created before the rule was enforced.
+        justification: |
+          An administrator would be surprised by a refusal in an old project unless the page says that the rule reaches
+          it too.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-Save
+        title: >-
+          The ProjectPage unit shall store each of these switches that the administrator changes when saving.
+        justification: |
+          Each rule must be changeable on its own.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-Confirmation
+        title: >-
+          The ProjectPage unit shall confirm each saved one of these switches by naming the rule and its new state.
+        justification: |
+          The confirmation tells the administrator what happened.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-Audit
+        title: >-
+          The ProjectPage unit shall cause for each changed one of these switches one audit entry of the project that
+          names the rule and the old and new value.
+        justification: |
+          A change of a rule must be accountable.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+        title: >-
+          The ProjectPage unit shall show the message of the rule when the administrator saves a switch that somebody
+          else changed following the loading of the page.
+        justification: |
+          Two administrators must not overwrite each other without knowing it.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+        title: >-
+          The ProjectPage unit shall show the stored values of these switches, instead of the unsaved choices, after it
+          refused a save because somebody else changed a rule.
+        justification: |
+          Showing the stored values keeps the page true.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
+
+      - id: ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
+        title: >-
+          The ProjectPage unit shall record no audit entry when it refuses a save of these switches because somebody
+          else changed a rule.
+        justification: |
+          The refused change must not take effect.
+        tests:
+          - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
 
       - id: ReviewCenter-ProjectPage-BallotMasking
         title: >-

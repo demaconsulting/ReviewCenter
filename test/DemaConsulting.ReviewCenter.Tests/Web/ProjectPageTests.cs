@@ -452,15 +452,20 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the review id "new" is refused, because the address of the form would hide that review.
+    ///     Test that the review id "new" is refused in any letter case, because the address of the form would hide
+    ///     that review.
     /// </summary>
-    [Fact]
-    public async Task NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing()
+    /// <param name="reservedId">The reserved word in one letter case.</param>
+    [Theory]
+    [InlineData("New")]
+    [InlineData("NEW")]
+    [InlineData("new")]
+    public async Task NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing(string reservedId)
     {
-        // Arrange: a project and a filled form whose review id is the reserved word, in any letter case
+        // Arrange: a project and a filled form whose review id is the reserved word, in the given letter case
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         var cut = RenderPage(project.Id);
-        await cut.Find("[data-testid='review-id-input']").InputAsync("New");
+        await cut.Find("[data-testid='review-id-input']").InputAsync(reservedId);
         await cut.Find("[data-testid='review-title-input']").InputAsync("Reserved");
         SelectFiles(cut, ("a.txt", TestContent.A));
         await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
@@ -958,6 +963,31 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a system administrator who is no member of the project is offered the evidence settings button,
+    ///     the checklist button and the review rules card with the checklist summary.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls()
+    {
+        // Arrange: a system administrator who is signed in and no member of the project
+        var projectId = await ArrangeSystemAdminAsync(rootIsMember: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: both buttons lead to their pages, and the review rules card shows the checklist summary
+        Assert.Equal(
+            $"/projects/{projectId}/evidence-settings",
+            cut.Find("[data-testid='evidence-settings-link']").GetAttribute("href"));
+        Assert.Equal($"/projects/{projectId}/checklist", cut.Find("[data-testid='checklist-link']").GetAttribute("href"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-rules-card']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='independent-reviewers-switch']"));
+        Assert.Equal(
+            "default-1 (14 sections, 58 checks), built-in default",
+            cut.Find("[data-testid='project-checklist-summary']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that a project administrator can make a member a project admin and remove a member.
     /// </summary>
     [Fact]
@@ -1178,10 +1208,58 @@ public class ProjectPageTests : PageTestBase
         Assert.Contains("applies to every project", author, StringComparison.Ordinal);
         Assert.Contains("created before it was enforced", author, StringComparison.Ordinal);
         Assert.Contains("applies to every project", reopener, StringComparison.Ordinal);
+        Assert.Contains("created before it was enforced", reopener, StringComparison.Ordinal);
         Assert.Contains("nobody may sign", reopener, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='author-checklist-pending']"));
         Assert.Empty(cut.FindAll("[data-testid='reopener-signing-pending']"));
         Assert.DoesNotContain("Not applied yet", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the independent-reviewers switch explains the rule: the person who created a review cannot be
+    ///     one of its reviewers or sign it, and the authors of commits are not matched.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule()
+    {
+        // Arrange and act: a project administrator with the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: the hint of the switch states the rule and what it does not know
+        var hint = cut.Find("[data-testid='review-rule-independent-reviewers'] .hint").TextContent;
+        Assert.Contains("The person who created a review cannot be one of its reviewers and cannot sign it", hint, StringComparison.Ordinal);
+        Assert.Contains("it does not match the authors of commits", hint, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an independent-reviewers switch that somebody else changed after the page was loaded is refused
+    ///     with the message of the rule, the page shows the stored values again (an unsaved change of another switch
+    ///     is dropped), and nothing more is audited.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads()
+    {
+        // Arrange: a project administrator with the page open, and another administrator who switches the rule off
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+        await Projects.SetReviewRuleAsync(
+            TestActors.Bob, projectId, ReviewRule.IndependentReviewers, true, false, TestContext.Current.CancellationToken);
+        var auditBefore = Store.Audits.Count;
+
+        // Act: the page still shows "on"; switch the independence rule and the author rule off and save
+        await cut.Find("[data-testid='independent-reviewers-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='author-checklist-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: the stale message is shown, the switches show the stored values again, and nothing was audited
+        Assert.Equal(
+            ProjectService.IndependentReviewersChangedByOthersMessage,
+            cut.Find("[data-testid='review-rules-error']").TextContent);
+        Assert.False(cut.Find("[data-testid='independent-reviewers-switch']").HasAttribute("checked"));
+        Assert.True(cut.Find("[data-testid='author-checklist-switch']").HasAttribute("checked"));
+        Assert.Empty(cut.FindAll("[data-testid='review-rules-status']"));
+        Assert.Equal(auditBefore, Store.Audits.Count);
     }
 
     /// <summary>
