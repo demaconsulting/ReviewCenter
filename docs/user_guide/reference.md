@@ -119,10 +119,12 @@ Example validation report:
 ✓ ReviewCenter_Totp - Passed (12 ms): RFC 6238 SHA-1 vectors, window +/-1, replay step returned
 ✓ ReviewCenter_AuditChain - Passed (1152 ms): 3 entries intact; change of entry 2 detected
 ✓ ReviewCenter_AttestationPdf - Passed (343 ms): CMS signature and DocMDP verified; changed byte detected (75964 bytes)
+✓ ReviewCenter_NotificationMail - Passed (41 ms): 2 items composed; 1 .eml file written; project and link present;
+    no ballot content; subject names no review
 ✓ ReviewCenter_HostStart - Passed (1590 ms): 127.0.0.1:58493; /login and /_framework/blazor.web.js 200; stopped cleanly
 
-Total Tests: 9
-Passed: 9
+Total Tests: 10
+Passed: 10
 Skipped: 0
 Failed: 0
 Total Time: 8.1 s
@@ -159,6 +161,11 @@ JUnit files.
 - **`ReviewCenter_AuditChain`** - the audit trail verifies, and a changed entry is reported by the verifier.
 - **`ReviewCenter_AttestationPdf`** - a signed attestation PDF is produced with a temporary key, its signature and
   its change-prevention certification verify independently, and a changed byte makes the verification fail.
+- **`ReviewCenter_NotificationMail`** - a notification mail is composed for two example inbox items and written as a
+  file by the file transport of the server, in a temporary folder and with no mail server and no network. The test
+  shows that exactly one file is written, that the mail names the project and links to the review, and that it holds
+  none of the text of the items, nor any outcome word, so a mail never carries review content. The report names no
+  address and no folder.
 - **`ReviewCenter_HostStart`** - the real web host starts from temporary settings alone on a free loopback port,
   answers `/login` and a static asset with 200, and stops cleanly. The host ignores an `appsettings.json`, the
   `ASPNETCORE_` and `DOTNET_` environment variables and any other ambient configuration, so a broken or unusual
@@ -181,8 +188,8 @@ the e-mail notification settings are usable, add
 reviewcenter --validate --check-config
 ```
 
-This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**, an eleventh, **`ReviewCenter_ConfiguredKeys`**, and a
-twelfth, **`ReviewCenter_ConfiguredNotifications`**, so that the run has twelve tests instead of nine.
+This adds an eleventh test, **`ReviewCenter_ConfiguredDatabase`**, a twelfth, **`ReviewCenter_ConfiguredKeys`**, and a
+thirteenth, **`ReviewCenter_ConfiguredNotifications`**, so that the run has thirteen tests instead of ten.
 The first loads the configuration the way `serve` does
 (`appsettings.json` and the environment variables), recognizes the database provider, opens the database
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the

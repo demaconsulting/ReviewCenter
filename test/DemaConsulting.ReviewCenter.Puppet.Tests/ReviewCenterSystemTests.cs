@@ -1115,6 +1115,107 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that, with the file sender, a user confirms an e-mail address on the Account page with the code from
+    ///     the mailed message, that the mode choice then works, and that the mode is still shown after the page is
+    ///     opened again.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates()
+    {
+        // Arrange: a server that writes its mail as files into a private folder, and a signed-in browser; the
+        // scenario needs neither git nor a review
+        var cancellation = TestContext.Current.CancellationToken;
+        var directory = Directory.CreateTempSubdirectory("reviewcenter-mail-");
+        using var cleanup = new PuppetEndToEndTests.TemporaryFolder(directory);
+        var mailFolder = Path.Combine(directory.FullName, "mail");
+        const string address = "alice@example.com";
+        using var server = await PuppetEndToEndTests.TestServer.StartAsync(
+            cancellation, seedUser: true, notificationFolder: mailFolder);
+        await using var browser = new Browser(Path.Combine(directory.FullName, "control-mail.json"), cancellation);
+        var start = await PuppetEndToEndTests.StartPuppetAsync(args => browser.RunAsync(args), server.Url);
+        Assert.True(start.Code == 0, start.Error);
+
+        // Act: open the Account page and look at the card before an address is given
+        await browser.SignInAsync(PuppetEndToEndTests.UserName);
+        await browser.GotoAsync("/account", "account-page");
+        var cardIsThere = await browser.ExistsAsync("notifications-card");
+        var notSetUp = await browser.ExistsAsync("notifications-unavailable");
+        var addressFormIsThere = await browser.ExistsAsync("notifications-address-form");
+        var modeDisabledBefore = await browser.IsDisabledAsync("notifications-mode-select");
+        var needsAddress = await browser.ExistsAsync("notifications-mode-needs-address");
+        var helpLink = await browser.EvalAsync(
+            "document.querySelector('[data-testid=\"notifications-help-link\"]')?.getAttribute('href') ?? ''");
+
+        // Act: ask for a code; the mail is written before the page shows the form for the code
+        await browser.OkAsync("fill", "notifications-address-input", address);
+        await browser.OkAsync("click", "notifications-send-code-button");
+        await browser.OkAsync("wait", "notifications-confirm-form");
+        var pending = await browser.TextOfAsync("notifications-pending-address");
+        var sentMessage = await browser.TextOfAsync("notifications-message");
+        await browser.WaitUntilAsync(
+            () => Task.FromResult(Directory.Exists(mailFolder) && Directory.GetFiles(mailFolder, "*.eml").Length == 1),
+            "the mailed confirmation code");
+        var mailFiles = Directory.GetFiles(mailFolder, "*.eml");
+        var temporaryFiles = Directory.GetFiles(mailFolder, "*.tmp");
+        var mail = await File.ReadAllTextAsync(mailFiles[0], cancellation);
+        var codeMatch = System.Text.RegularExpressions.Regex.Match(mail, @"confirmation code is (\d{6})");
+
+        // Assert: the mail has the subject of a confirmation and a 6-digit code, and no temporary file is left over
+        Assert.Contains("Subject: ReviewCenter: your confirmation code", mail, StringComparison.Ordinal);
+        Assert.True(codeMatch.Success, "The mailed message must hold the 6-digit confirmation code.");
+        Assert.Empty(temporaryFiles);
+
+        // Act: type the mailed code and confirm
+        await browser.OkAsync("fill", "notifications-code-input", codeMatch.Groups[1].Value);
+        await browser.OkAsync("click", "notifications-confirm-button");
+        await browser.OkAsync("wait", "notifications-confirmed-address");
+        var confirmed = await browser.TextOfAsync("notifications-confirmed-address");
+        var confirmedMessage = await browser.TextOfAsync("notifications-message");
+        var modeDisabledAfter = await browser.IsDisabledAsync("notifications-mode-select");
+        var needsAddressAfter = await browser.ExistsAsync("notifications-mode-needs-address");
+        var removeIsThere = await browser.ExistsAsync("notifications-remove-button");
+
+        // Act: choose a mode, save, and open the page again
+        await browser.OkAsync("select", "notifications-mode-select", "Every");
+        await browser.OkAsync("click", "notifications-mode-save");
+        await browser.OkAsync("wait", "notifications-mode-saved");
+        var saved = await browser.TextOfAsync("notifications-mode-saved");
+        await browser.GotoAsync("/account", "account-page");
+        await browser.OkAsync("wait", "notifications-confirmed-address");
+        var modeAfterReload = await browser.EvalAsync(
+            "document.querySelector('[data-testid=\"notifications-mode-select\"]').value");
+        var confirmedAfterReload = await browser.TextOfAsync("notifications-confirmed-address");
+
+        // Assert: before the address the card is set up, the mode cannot be chosen yet, and the help link is there
+        Assert.True(cardIsThere, "The Account page must show the e-mail notifications card.");
+        Assert.False(notSetUp, "The card must not say that mail is not set up.");
+        Assert.True(addressFormIsThere, "The card must ask for an address.");
+        Assert.True(modeDisabledBefore, "The mode cannot be chosen before an address is confirmed.");
+        Assert.True(needsAddress, "The card must say that an address is needed first.");
+        Assert.Equal("/help/email-notifications", helpLink);
+
+        // Assert: after the request the card shows the pending address and says that a code was sent
+        Assert.Equal(address, pending.Trim());
+        Assert.Contains("A confirmation code was sent", sentMessage, StringComparison.Ordinal);
+
+        // Assert: the mailed code confirms the address, which unlocks the mode choice and the removal
+        Assert.Equal(address, confirmed.Trim());
+        Assert.Contains("Your e-mail address is confirmed.", confirmedMessage, StringComparison.Ordinal);
+        Assert.False(modeDisabledAfter, "The mode can be chosen once the address is confirmed.");
+        Assert.False(needsAddressAfter, "The hint about the missing address must be gone.");
+        Assert.True(removeIsThere, "A confirmed address can be removed.");
+
+        // Assert: the saved mode is shown and is still chosen after the page was opened again
+        Assert.Contains("Your e-mail setting was saved.", saved, StringComparison.Ordinal);
+        Assert.Equal("Every", modeAfterReload);
+        Assert.Equal(address, confirmedAfterReload.Trim());
+
+        // Assert: choosing a mode mailed nothing
+        Assert.Single(Directory.GetFiles(mailFolder, "*.eml"));
+    }
+
+    /// <summary>
     ///     Test that a member whose role is auditor can read the review and the audit trail of the project but change
     ///     nothing: the review page shows a read-only notice and no reopening, slot or comment controls, the auditor is
     ///     not offered as a reviewer, an API token of the auditor reads but is refused every write, and a user who is

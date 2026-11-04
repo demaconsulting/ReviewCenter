@@ -74,7 +74,10 @@ shows an explanation that says an e-mail never contains review text, comments, o
 confirmed address receives mail, followed by the state that applies: the confirmed address with a form to use a
 different one, the address that waits for its code with a field for the 6-digit code and a button to send a new code,
 or the address form. A remove button is shown while there is a confirmed or a waiting address. The code itself is never
-shown by the page: only the mailed copy holds it, and the page learns nothing about it from Core.
+shown by the page: only the mailed copy holds it, and the page learns nothing about it from Core. Right after the
+explanation, in the same branch (so only while notifications are set up), the card shows a link "About e-mail
+notifications" to the help topic at `/help/email-notifications`; the card with the sentence of the administrator has no
+link.
 
 The explanation also says what a mail contains (it names the kind of news, the project and the review, and links to
 the review), what it never contains (comments, answers, verdicts, outcomes), and what each mode does. **NotificationModeChoice**
@@ -118,7 +121,8 @@ in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`
 `totp-disable-button`, `totp-regen-form`, `totp-regen-password`, `totp-regen-code`, `totp-regen-button`, and for the
 recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{index}`, `totp-recovery-copy`,
 `totp-recovery-dismiss`, and `totp-copy-status`; and for the notifications card `notifications-card`,
-`notifications-unavailable`, `notifications-explanation`, `notifications-error`, `notifications-message`,
+`notifications-unavailable`, `notifications-explanation`, `notifications-help-link`, `notifications-error`,
+`notifications-message`,
 `notifications-confirmed-address`, `notifications-pending-address`, `notifications-address-form`,
 `notifications-address-input`, `notifications-send-code-button`, `notifications-confirm-form`,
 `notifications-code-input`, `notifications-confirm-button`, `notifications-resend-button`,

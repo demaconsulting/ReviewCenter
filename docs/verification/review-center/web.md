@@ -432,6 +432,13 @@ chosen mode, and explains what is and is not mailed, which is tested by
 `WebSubsystem_AccountPage_ChoosesNotificationMode`. The disabled selector, the refusals, and the case that the feature is
 not set up are tested in the unit tests of `AccountPage` in `AccountNotificationModeTests.cs`.
 
+**Notification help topic and link**: The help topic on e-mail notifications is rendered by the component tests of
+`HelpPage` (see the requirements `ReviewCenter-Web-NotificationHelpTopic` and its children in `web.yaml`), which is
+tested by `HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever`. The card on the account page links to it
+while notifications are set up, which is tested by `AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic`
+(the requirement `ReviewCenter-Web-NotificationHelpLink`). The journey in a browser is verified by the system test
+`ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates`.
+
 **Inbox**: A signed-in user who requests the inbox route is served the inbox page, which waits for its live
 connection and carries the interactive marker, which is tested by
 `WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is the evidence of the requirement

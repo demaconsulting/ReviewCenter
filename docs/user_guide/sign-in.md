@@ -210,7 +210,8 @@ provider.
 ## Account
 
 Open `/account` (the Account link in the header) to choose how ReviewCenter looks, to change your password, to turn on
-two-factor sign-in, and to manage your API tokens.
+two-factor sign-in, to manage your API tokens, and, when your administrator has set up mail, to choose e-mail
+notifications.
 
 The **Appearance** card offers **System**, **Light**, and **Dark**. **System** is the default and follows the light or
 dark setting of your device; **Light** and **Dark** always use that theme. The choice applies as soon as you select
@@ -246,6 +247,14 @@ The **API tokens** card creates and revokes the personal access tokens that let 
 
 A user has at most 20 active tokens; expired and revoked tokens do not count. The card has an **About API tokens**
 button that opens the Help topic.
+
+The **E-mail notifications** card is there only when your administrator has set up mail (otherwise it says so in one
+sentence). You enter an e-mail address, ReviewCenter mails a 6-digit confirmation code to it, and you type the code
+into the card to confirm the address. Then you choose **No e-mail** (the default), **Daily summary**, or **Every
+change**, and press **Save**. A notification mail names the kind of news, the project, and the review, and links to
+the review; it never holds a comment, an answer, a verdict, an outcome, or the contents of a file. **Remove my address**
+forgets the address. The card has an **About e-mail notifications** link that opens the Help topic
+(`/help/email-notifications`).
 
 ## Two-Factor Sign-in
 

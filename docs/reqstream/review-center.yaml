@@ -1393,6 +1393,18 @@ sections:
         tests:
           - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
 
+      - id: ReviewCenter-System-NotificationSelfCheck
+        title: >-
+          The tool shall prove in the self-validation run that a notification mail holds no ballot content.
+        tags: [system]
+        justification: |
+          An operator must see in the self-validation that a mail holds no ballot content, without a database, a mail
+          server or a network.
+        children:
+          - ReviewCenter-SelfTest-NotificationMail
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
       - id: ReviewCenter-System-NotificationModeDefaultNone
         title: >-
           While a user has not chosen a notification mode, or has chosen the mode None, the tool shall send that user
@@ -1537,6 +1549,50 @@ sections:
           - ReviewCenter-Web-NotificationExplainsMail-Modes
         tests:
           - AccountPage_Render_Card_ExplainsModes
+
+      - id: ReviewCenter-System-NotificationHelpTopic
+        title: >-
+          The tool shall explain e-mail notifications in a help topic.
+        tags: [system]
+        justification: |
+          A person who reads about the mail before turning it on needs a page that tells in plain words what is sent
+          and what is never sent, without a visit to the administrator.
+        children:
+          - ReviewCenter-Web-NotificationHelpTopic
+        tests:
+          - HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever
+
+      - id: ReviewCenter-System-NotificationHelpLink
+        title: >-
+          The tool shall link the notification card of the Account page to the help topic.
+        tags: [system]
+        justification: |
+          A person who reads the card must reach the full explanation in one step.
+        children:
+          - ReviewCenter-Web-NotificationHelpLink
+        tests:
+          - AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic
+
+      - id: ReviewCenter-System-NotificationBrowserConfirmation
+        title: >-
+          When the file transport is selected, the tool shall confirm an address on the Account page with the code
+          from the mailed message.
+        tags: [system]
+        justification: |
+          The confirmation of an address is the first step of the opt-in and must work in a real browser against the
+          real server, with the mail read from the folder of the file transport.
+        tests:
+          - ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates
+
+      - id: ReviewCenter-System-NotificationBrowserMode
+        title: >-
+          When the file transport is selected, the tool shall show the saved mode on the Account page after the user
+          saves it.
+        tags: [system]
+        justification: |
+          The choice of the mode must survive a reload of the page in a real browser.
+        tests:
+          - ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates
 
       - id: ReviewCenter-System-NotificationOwnInboxOnly
         title: >-

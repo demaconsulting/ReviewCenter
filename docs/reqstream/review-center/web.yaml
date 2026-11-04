@@ -3106,3 +3106,29 @@ sections:
           - ReviewCenter-AccountPage-NotificationExplainsModes
         tests:
           - AccountPage_Render_Card_ExplainsModes
+
+      - id: ReviewCenter-Web-NotificationHelpTopic
+        title: >-
+          The Web subsystem shall explain e-mail notifications in a help topic.
+        justification: |
+          A person who reads about the mail before turning it on needs a page that tells in plain words what is sent
+          and what is never sent.
+        children:
+          - ReviewCenter-HelpPage-NotificationsTopic
+          - ReviewCenter-HelpPage-NotificationsTopic-WhatIsMailed
+          - ReviewCenter-HelpPage-NotificationsTopic-NeverMailed
+          - ReviewCenter-HelpPage-NotificationsTopic-Confirmation
+          - ReviewCenter-HelpPage-NotificationsTopic-Modes
+          - ReviewCenter-HelpPage-NotificationsTopic-HowToStop
+        tests:
+          - HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever
+
+      - id: ReviewCenter-Web-NotificationHelpLink
+        title: >-
+          The Web subsystem shall link the notification card of the Account page to the help topic.
+        justification: |
+          A person who reads the card must reach the full explanation in one step.
+        children:
+          - ReviewCenter-AccountPage-NotificationHelpLink
+        tests:
+          - AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic
