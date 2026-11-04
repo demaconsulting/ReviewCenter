@@ -13,104 +13,329 @@ sections:
     requirements:
       - id: ReviewCenter-BallotConsolidation-PerCheck
         title: >-
-          The BallotConsolidation class shall, for each check of a section that applies, report the check as agreed with
-          its outcome when every submitted ballot answers it with the same outcome, as disputed when the submitted
-          ballots answer it with different outcomes (a pass against a not-applicable answer included), and as pending
-          when no ballot is submitted or a submitted ballot does not answer it, shall treat an agreed not-applicable
-          answer as neither a failure nor a block, shall never let a justification or a note decide between agreement
-          and dispute, and shall list the outcome that each submitted ballot gave, by the slot of the ballot.
+          The BallotConsolidation class shall report a check of a section that applies as agreed, with its outcome,
+          when every submitted ballot answers it with the same outcome.
         justification: |
           Reviewers agree when they reach the same verdict, not when they use the same words, so only the outcome is
-          compared. A check that is not applicable is a valid verdict and must not stop a review, while a check that
-          one reviewer passes and another marks as not applicable is a real disagreement that has to be settled.
+          compared.
+        tests:
+          - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-Disputed
+        title: >-
+          The BallotConsolidation class shall report a check as disputed when the submitted ballots answer it with
+          different outcomes.
+        justification: |
+          Different verdicts are a real disagreement that the reviewers have to settle.
+        tests:
+          - BallotConsolidation_Consolidate_DifferentOutcomes_Disputed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-PassVsNa
+        title: >-
+          The BallotConsolidation class shall report a check as disputed when one submitted ballot passes it and
+          another marks it as not applicable.
+        justification: |
+          A check that one reviewer passes and another marks as not applicable is a real disagreement that has to be
+          settled.
+        tests:
+          - BallotConsolidation_Consolidate_ItemNaVsPass_Disputed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-Pending
+        title: >-
+          The BallotConsolidation class shall report a check as pending when a submitted ballot does not answer it.
+        justification: |
+          A check that is not answered by every submitted ballot is not decided yet.
+        tests:
+          - BallotConsolidation_Consolidate_PendingCheck_OutcomeNull
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-NoBallot
+        title: >-
+          The BallotConsolidation class shall report every check as pending when no ballot is submitted, whether the
+          only ballot is a draft or there is no ballot.
+        justification: |
+          Nothing is decided without a submitted ballot, and a slot that has no ballot is the same as no ballot at all.
+        tests:
+          - BallotConsolidation_Consolidate_NoSubmittedBallots_AllPending_OutcomeNull
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-NotFailure
+        title: >-
+          The BallotConsolidation class shall not count a check that every submitted ballot marks as not applicable as
+          a failed check.
+        justification: |
+          A check that is not applicable is a valid verdict and not a failure.
+        tests:
+          - BallotConsolidation_Consolidate_AllItemNa_AgreedNotFailed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-NotBlocking
+        title: >-
+          The BallotConsolidation class shall report a check that every submitted ballot marks as not applicable as
+          agreed, so that it does not stop the outcome from being approved.
+        justification: |
+          A check that is not applicable is a valid verdict and must not stop a review.
+        tests:
+          - BallotConsolidation_Consolidate_AllItemNa_AgreedNotFailed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-NoteIgnored
+        title: >-
+          The BallotConsolidation class shall never let a justification or a note decide between agreement and
+          dispute.
+        justification: |
+          Reviewers agree when they reach the same verdict, so the words that they use for it are not compared.
+        tests:
+          - BallotConsolidation_Consolidate_NotesDiffer_StillAgreed
+
+      - id: ReviewCenter-BallotConsolidation-PerCheck-Outcomes
+        title: >-
+          The BallotConsolidation class shall list the outcome that each submitted ballot gave for a check, by the
+          slot of the ballot, and no entry for a slot that did not answer it.
+        justification: |
           Listing what each slot answered lets a page show the differences side by side.
         tests:
           - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
           - BallotConsolidation_Consolidate_DifferentOutcomes_Disputed
-          - BallotConsolidation_Consolidate_NotesDiffer_StillAgreed
-          - BallotConsolidation_Consolidate_ItemNaVsPass_Disputed
-          - BallotConsolidation_Consolidate_AllItemNa_AgreedNotFailed
           - BallotConsolidation_Consolidate_PendingCheck_OutcomeNull
 
       - id: ReviewCenter-BallotConsolidation-SubmittedOnly
         title: >-
-          The BallotConsolidation class shall let only submitted ballots take part, so that the answers and section
-          states of a draft, and a slot that has no ballot, never change the result, and shall give the same result
-          for the same ballots in any order, in the order of the checklist.
+          The BallotConsolidation class shall let only submitted ballots take part, so that the answers of a draft
+          never change the result.
         justification: |
           The record of a review, and so what a signature binds to, must depend only on what the reviewers have handed
-          in. If a draft or a slot that has not started could change it, a reviewer who is still working could change
-          the result under the feet of those who have signed. A result that depended on the order in which ballots are
-          read would give different records for the same content.
+          in. If a draft could change it, a reviewer who is still working could change the result under the feet of
+          those who have signed.
         tests:
-          - BallotConsolidation_Consolidate_NoSubmittedBallots_AllPending_OutcomeNull
           - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts
           - BallotConsolidation_Consolidate_DraftAnswers_Ignored
+
+      - id: ReviewCenter-BallotConsolidation-SubmittedOnly-DraftSections
+        title: >-
+          The BallotConsolidation class shall let the section states of a draft ballot never change the result.
+        justification: |
+          A draft that marks a section as not applicable must not dispute a section that the submitted ballots agree
+          on.
+        tests:
+          - BallotConsolidation_Consolidate_DraftAnswers_Ignored
+
+      - id: ReviewCenter-BallotConsolidation-SubmittedOnly-Order
+        title: >-
+          The BallotConsolidation class shall give the same result for the same ballots in any order.
+        justification: |
+          A result that depended on the order in which ballots are read would give different records for the same
+          content.
+        tests:
+          - BallotConsolidation_Consolidate_BallotOrder_DoesNotMatter
+
+      - id: ReviewCenter-BallotConsolidation-SubmittedOnly-ChecklistOrder
+        title: >-
+          The BallotConsolidation class shall list the checks of the result in the order of the checklist.
+        justification: |
+          Pages show the checks in the order of the checklist, and a fixed order keeps the result the same on every
+          run.
+        tests:
           - BallotConsolidation_Consolidate_BallotOrder_DoesNotMatter
 
       - id: ReviewCenter-BallotConsolidation-Applicability
         title: >-
           The BallotConsolidation class shall report a section as not applicable when every submitted ballot marks it
-          not applicable, as disputed when some submitted ballots mark it not applicable and others do not, and as
-          applicable otherwise, and shall leave out the checks of a section that is not applicable or disputed, counting
-          the dispute of a section once.
+          not applicable.
         justification: |
-          Whether a section applies is a verdict like any other. When reviewers agree that a section does not apply its
-          checks need no answer, and when they disagree the review cannot go on until they settle it. A dispute that was
-          counted once for the section, and not for each check, shows the reviewers the one question that they have to
+          Whether a section applies is a verdict like any other. When reviewers agree that a section does not apply,
+          its checks need no answer.
+        tests:
+          - BallotConsolidation_Consolidate_AllSectionsNa_ChecksOmitted
+
+      - id: ReviewCenter-BallotConsolidation-Applicability-Disputed
+        title: >-
+          The BallotConsolidation class shall report a section as disputed when some submitted ballots mark it not
+          applicable and others do not.
+        justification: |
+          When reviewers disagree about whether a section applies, the review cannot go on until they settle it.
+        tests:
+          - BallotConsolidation_Consolidate_SectionNaVsApplicable_SectionDisputed
+
+      - id: ReviewCenter-BallotConsolidation-Applicability-Applicable
+        title: >-
+          The BallotConsolidation class shall report a section as applicable when no submitted ballot marks it not
+          applicable.
+        justification: |
+          The default is that a section applies, also when no ballot is submitted.
+        tests:
+          - BallotConsolidation_Consolidate_DraftAnswers_Ignored
+          - BallotConsolidation_Consolidate_NoSubmittedBallots_AllPending_OutcomeNull
+
+      - id: ReviewCenter-BallotConsolidation-Applicability-ChecksOmitted
+        title: >-
+          The BallotConsolidation class shall leave out the checks of a section that is not applicable.
+        justification: |
+          Such checks need no answer, so they must not wait for one.
+        tests:
+          - BallotConsolidation_Consolidate_AllSectionsNa_ChecksOmitted
+
+      - id: ReviewCenter-BallotConsolidation-Applicability-DisputedChecksOmitted
+        title: >-
+          The BallotConsolidation class shall leave out the checks of a section that is disputed.
+        justification: |
+          The one question to settle is whether the section applies, so its checks are not listed meanwhile.
+        tests:
+          - BallotConsolidation_Consolidate_SectionNaVsApplicable_SectionDisputed
+
+      - id: ReviewCenter-BallotConsolidation-Applicability-DisputeCount
+        title: >-
+          The BallotConsolidation class shall count the dispute of a section once, and not once for each of its
+          checks.
+        justification: |
+          A dispute that is counted once for the section shows the reviewers the one question that they have to
           resolve.
         tests:
           - BallotConsolidation_Consolidate_SectionNaVsApplicable_SectionDisputed
-          - BallotConsolidation_Consolidate_AllSectionsNa_ChecksOmitted
-          - BallotConsolidation_Consolidate_DraftAnswers_Ignored
+          - BallotConsolidation_Consolidate_Counts_AreConsistent
 
       - id: ReviewCenter-BallotConsolidation-Outcome
         title: >-
-          The BallotConsolidation class shall give no outcome while no ballot is submitted or any check is pending or
-          disputed or any section is disputed, and otherwise the outcome rejected when an agreed check is a fail and
-          approved if none is, also for a checklist without checks that has a submitted ballot.
+          The BallotConsolidation class shall give no outcome while no ballot is submitted.
         justification: |
-          A signature attests an outcome, so the outcome must exist only when the reviewers agree on everything, and a
-          single agreed failure must make it a rejection. A review that cannot yet be decided must say so and not
-          guess.
+          A signature attests an outcome, so with nothing handed in there is nothing to attest.
+        tests:
+          - BallotConsolidation_Consolidate_NoChecklistItems_NoSubmittedBallot_OutcomeNull
+          - BallotConsolidation_Consolidate_NoSubmittedBallots_AllPending_OutcomeNull
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-Pending
+        title: >-
+          The BallotConsolidation class shall give no outcome while a check is pending.
+        justification: |
+          A review that cannot yet be decided must say so and not guess.
+        tests:
+          - BallotConsolidation_Consolidate_PendingCheck_OutcomeNull
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-DisputedCheck
+        title: >-
+          The BallotConsolidation class shall give no outcome while a check is disputed.
+        justification: |
+          A review that cannot yet be decided must say so and not guess.
+        tests:
+          - BallotConsolidation_Consolidate_DisputedCheck_OutcomeNull
+          - BallotConsolidation_Consolidate_ItemNaVsPass_Disputed
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-DisputedSection
+        title: >-
+          The BallotConsolidation class shall give no outcome while a section is disputed.
+        justification: |
+          A review that cannot yet be decided must say so and not guess.
+        tests:
+          - BallotConsolidation_Consolidate_SectionNaVsApplicable_SectionDisputed
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-Rejected
+        title: >-
+          The BallotConsolidation class shall give the outcome rejected when an agreed check is a fail.
+        justification: |
+          A single agreed failure must make the review a rejection.
         tests:
           - BallotConsolidation_Consolidate_AgreedFail_Rejected
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-Approved
+        title: >-
+          The BallotConsolidation class shall give the outcome approved when every check is agreed and none of the
+          agreed checks is a fail.
+        justification: |
+          The outcome must exist only when the reviewers agree on everything, and agreement without a failure is an
+          approval.
+        tests:
           - BallotConsolidation_Consolidate_AllPass_Approved
-          - BallotConsolidation_Consolidate_DisputedCheck_OutcomeNull
-          - BallotConsolidation_Consolidate_PendingCheck_OutcomeNull
+          - BallotConsolidation_Consolidate_AllItemNa_AgreedNotFailed
+
+      - id: ReviewCenter-BallotConsolidation-Outcome-NoChecks
+        title: >-
+          The BallotConsolidation class shall give the outcome approved for a checklist without checks that has a
+          submitted ballot.
+        justification: |
+          With no check there is nothing to fail, so a submitted ballot approves.
+        tests:
           - BallotConsolidation_Consolidate_NoChecklistItems_OneSubmittedBallot_Approved
-          - BallotConsolidation_Consolidate_NoChecklistItems_NoSubmittedBallot_OutcomeNull
 
       - id: ReviewCenter-BallotConsolidation-Counts
         title: >-
-          The BallotConsolidation class shall count the agreed, disputed, pending, and failed checks, with a disputed
-          section counted as one dispute, so that the three standings add up to the listed checks plus the disputed
-          sections, and shall count the submitted ballots and all ballots.
+          The BallotConsolidation class shall count the agreed, disputed, pending, and failed checks.
         justification: |
-          Pages and reports show a summary such as how many checks are still in dispute. The numbers must add up with
-          the list that they summarize, or a reader cannot trust either.
+          Pages and reports show a summary such as how many checks are still in dispute.
         tests:
           - BallotConsolidation_Consolidate_Counts_AreConsistent
+
+      - id: ReviewCenter-BallotConsolidation-Counts-Sum
+        title: >-
+          The BallotConsolidation class shall make the agreed, disputed, and pending counts add up to the listed
+          checks plus the disputed sections.
+        justification: |
+          The numbers must add up with the list that they summarize, or a reader cannot trust either.
+        tests:
+          - BallotConsolidation_Consolidate_Counts_AreConsistent
+
+      - id: ReviewCenter-BallotConsolidation-Counts-BallotCounts
+        title: >-
+          The BallotConsolidation class shall count the submitted ballots and all ballots.
+        justification: |
+          Pages show how many of the ballots are in.
+        tests:
           - BallotConsolidation_Consolidate_BallotCounts
+
+      - id: ReviewCenter-BallotConsolidation-ReadOnly
+        title: >-
+          The BallotConsolidation class shall give a result whose check list, section list, and outcomes cannot be
+          changed by the caller, with the outcomes in ascending slot order.
+        justification: |
+          A caller that changed a result would corrupt the standing that others share, so the result must stay as it
+          was computed.
+        tests:
+          - BallotConsolidation_Consolidate_ResultCollections_CannotBeMutated
 
       - id: ReviewCenter-BallotConsolidation-Complete
         title: >-
-          The BallotConsolidation class shall tell that a ballot is complete when every check of every section that the
-          ballot treats as applicable has an answer of any outcome, whatever the status of the ballot, and shall ask for
-          no answer in a section that the ballot marks as not applicable.
+          The BallotConsolidation class shall tell that a ballot is complete when every check of every section that
+          the ballot treats as applicable has an answer of any outcome.
         justification: |
-          A reviewer may hand a ballot in only when it is complete. Skipping a section that the reviewer has marked as
-          not applicable is what that mark means, and the test must not depend on whether the ballot was submitted
-          already, so that a draft can be asked whether it is ready.
+          A reviewer may hand a ballot in only when it is complete, and a fail or a not-applicable answer is an answer
+          like a pass.
+        tests:
+          - BallotConsolidation_IsComplete_AllAnswered_True
+
+      - id: ReviewCenter-BallotConsolidation-Complete-Missing
+        title: >-
+          The BallotConsolidation class shall tell that a ballot is not complete when a check of a section that applies
+          has no answer.
+        justification: |
+          Handing in must wait until every check that applies is answered.
+        tests:
+          - BallotConsolidation_IsComplete_MissingAnswer_False
+
+      - id: ReviewCenter-BallotConsolidation-Complete-NotApplicableSection
+        title: >-
+          The BallotConsolidation class shall ask for no answer in a section that the ballot marks as not applicable.
+        justification: |
+          Skipping a section that the reviewer has marked as not applicable is what that mark means.
+        tests:
+          - BallotConsolidation_IsComplete_NaSectionSkipsItems_True
+
+      - id: ReviewCenter-BallotConsolidation-Complete-Status
+        title: >-
+          The BallotConsolidation class shall tell whether a ballot is complete whatever the status of the ballot.
+        justification: |
+          The test must not depend on whether the ballot was submitted already, so that a draft can be asked whether it
+          is ready.
         tests:
           - BallotConsolidation_IsComplete_AllAnswered_True
           - BallotConsolidation_IsComplete_MissingAnswer_False
-          - BallotConsolidation_IsComplete_NaSectionSkipsItems_True
 
       - id: ReviewCenter-BallotConsolidation-BallotState
         title: >-
-          The Ballot record shall show a submitted ballot as submitted and every other ballot as a draft, and shall
-          never show an existing ballot as not started.
+          The Ballot record shall show a submitted ballot as submitted.
+        justification: |
+          The stored status of a ballot tells its display state.
+        tests:
+          - BallotConsolidation_BallotState_DraftAndSubmitted_ReflectsStatus
+
+      - id: ReviewCenter-BallotConsolidation-BallotState-Draft
+        title: >-
+          The Ballot record shall show every ballot that is not submitted as a draft, and never show an existing
+          ballot as not started.
         justification: |
           Only the two stored statuses can belong to a ballot that exists. A slot that has no ballot at all is shown as
           not started by the callers, which keeps the display state from claiming that a stored ballot does not exist.
@@ -119,57 +344,312 @@ sections:
 
       - id: ReviewCenter-BallotConsolidation-Arguments
         title: >-
-          The BallotConsolidation class shall refuse a null checklist, a null list of ballots, a list that holds a null
-          ballot, and a list that holds two ballots of one slot.
+          The BallotConsolidation class shall refuse a null checklist.
         justification: |
           Missing input has no meaningful standing. Refusing it at the door keeps a wrong call from being mistaken for
-          an empty review, and a repeated slot would let one outcome overwrite another and hide a dispute.
+          an empty review.
+        tests:
+          - BallotConsolidation_NullArguments_Throws
+
+      - id: ReviewCenter-BallotConsolidation-Arguments-NullBallots
+        title: >-
+          The BallotConsolidation class shall refuse a null list of ballots.
+        justification: |
+          Missing input must not be mistaken for a review without ballots.
+        tests:
+          - BallotConsolidation_NullArguments_Throws
+
+      - id: ReviewCenter-BallotConsolidation-Arguments-NullBallot
+        title: >-
+          The BallotConsolidation class shall refuse a list of ballots that holds a null ballot.
+        justification: |
+          A missing ballot has no standing and must not be skipped silently.
+        tests:
+          - BallotConsolidation_NullArguments_Throws
+
+      - id: ReviewCenter-BallotConsolidation-Arguments-DuplicateSlot
+        title: >-
+          The BallotConsolidation class shall refuse a list of ballots that holds two ballots of one slot.
+        justification: |
+          A repeated slot would let one outcome overwrite another and hide a dispute.
+        tests:
+          - BallotConsolidation_NullArguments_Throws
+
+      - id: ReviewCenter-BallotConsolidation-Arguments-CompleteArguments
+        title: >-
+          The BallotConsolidation class shall refuse a null checklist or a null ballot when it tells whether a ballot
+          is complete.
+        justification: |
+          Missing input has no completeness, so it must not be answered as if it were complete or incomplete.
         tests:
           - BallotConsolidation_NullArguments_Throws
 
       - id: ReviewCenter-BallotConsolidation-Projection
         title: >-
-          The BallotProjection class shall give the rest of the application one view of the consolidated standing of a
-          record, built from its submitted ballots only, in which an agreed check is answered with the row of the lowest
-          slot that answered it, an agreed not-applicable section has the row of the lowest slot that marked it, and a
-          pending or disputed check has no answer, shall read the sole ballot of a review with exactly one slot as
-          submitted, for progress and blockers only, when the caller gives the number of slots, shall give no view for a
-          record without a checklist, shall show a viewer the state of the viewer's own ballot, a draft included (not
-          started when there is none), and shall refuse a missing record or definition.
+          The BallotProjection class shall build the consolidated view of a record from its submitted ballots only, so
+          that a draft ballot of any slot takes no part.
         justification: |
           Progress, blockers, the attestation, and the carry-over of a follow-up must all see the same agreed standing
-          that the digest covers, so one projection builds it from the submitted ballots by the rule of the
-          consolidation. A review with one slot has nobody to agree with and no separate hand-in step, so its sole draft
-          shows its true progress, while the digest never counts a draft. A reviewer needs to see and edit own
-          draft, and the page must never show a draft of another slot.
+          that the digest covers. The page must never show a draft of another slot.
+        tests:
+          - BallotProjection_Consolidate_DraftBallots_AreIgnored
+
+      - id: ReviewCenter-BallotConsolidation-Projection-AgreedRow
+        title: >-
+          The BallotProjection class shall answer an agreed check with the row of the lowest slot that answered it.
+        justification: |
+          Progress and the carry-over need one row for an agreed check, and the lowest slot gives the same row on every
+          run.
+        tests:
+          - BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot
+
+      - id: ReviewCenter-BallotConsolidation-Projection-NoAnswer
+        title: >-
+          The BallotProjection class shall give a pending or disputed check no answer.
+        justification: |
+          Nothing is agreed for such a check, so no row may stand for it.
+        tests:
+          - BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot
+
+      - id: ReviewCenter-BallotConsolidation-Projection-SectionRow
+        title: >-
+          The BallotProjection class shall give a section that every submitted ballot marks as not applicable the row
+          of the lowest slot that marked it.
+        justification: |
+          Progress and the carry-over need one state for an agreed section, and the lowest slot gives the same state on
+          every run.
+        tests:
+          - BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed
+
+      - id: ReviewCenter-BallotConsolidation-Projection-SingleSlot
+        title: >-
+          The BallotProjection class shall read the sole draft ballot of a review with exactly one slot as submitted,
+          for progress and blockers only, when the caller gives the number of slots.
+        justification: |
+          A review with one slot has nobody to agree with and no separate hand-in step, so its sole draft shows its
+          true progress.
+        tests:
+          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
+
+      - id: ReviewCenter-BallotConsolidation-Projection-SingleSlotOnly
+        title: >-
+          The BallotProjection class shall not read a draft ballot as submitted when the caller gives no number of
+          slots or a number of slots greater than one.
+        justification: |
+          The digest never counts a draft, so only a caller that knows that the review has exactly one slot may read a
+          draft as submitted.
+        tests:
+          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
+
+      - id: ReviewCenter-BallotConsolidation-Projection-NoChecklist
+        title: >-
+          The BallotProjection class shall give no view for a record without a checklist.
+        justification: |
+          There is nothing to consolidate without a checklist.
         tests:
           - BallotProjection_Consolidate_NoChecklist_ReturnsNull
-          - BallotProjection_NullArguments_Throw
-          - BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot
-          - BallotProjection_Consolidate_DraftBallots_AreIgnored
-          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
-          - BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed
+
+      - id: ReviewCenter-BallotConsolidation-Projection-OwnBallot
+        title: >-
+          The BallotProjection class shall show a viewer the state of the viewer's own ballot, a draft included,
+          marked as the viewer's own.
+        justification: |
+          A reviewer needs to see and edit the own draft.
+        tests:
           - BallotProjection_ForBallot_ShowsTheOwnDraft
+
+      - id: ReviewCenter-BallotConsolidation-Projection-NotStarted
+        title: >-
+          The BallotProjection class shall show a slot that has no ballot as an empty state that is not started.
+        justification: |
+          A reviewer who has begun nothing must see an empty checklist and not another slot's answers.
+        tests:
           - BallotProjection_ForBallot_NoBallot_IsNotStarted
+
+      - id: ReviewCenter-BallotConsolidation-Projection-Arguments
+        title: >-
+          The BallotProjection class shall refuse a missing record with an ArgumentNullException.
+        justification: |
+          Missing input has no view, and refusing it keeps a wrong call from being mistaken for a review without a
+          checklist.
+        tests:
+          - BallotProjection_NullArguments_Throw
+
+      - id: ReviewCenter-BallotConsolidation-Projection-DefinitionArgument
+        title: >-
+          The BallotProjection class shall refuse a missing checklist definition with an ArgumentNullException when it
+          builds the state of one ballot.
+        justification: |
+          The state of a ballot cannot be built without the checklist that it answers.
+        tests:
+          - BallotProjection_NullArguments_Throw
 
       - id: ReviewCenter-BallotConsolidation-Edits
         title: >-
-          The BallotEdits class shall give the record or ballot that a ballot edit or a slot change would lead to
-          without changing its input: it shall replace or add the ballot of a slot in slot order, remove the ballot of
-          a slot, put an answer or a section state in a ballot as a draft, and revert the ballot of a slot that a
-          reviewer leaves to a draft that drops the rows the departing reviewer gave (user names compared ignoring
-          case) while keeping the rows carried from an earlier review, and shall refuse missing arguments.
+          The BallotEdits class shall replace the ballot of a slot that already has one, keeping the ballots in slot
+          order.
         justification: |
           The signature impact of a ballot edit is computed before anything is stored, so the preview must follow the
-          same rules as the stored rows: an edit that reverts a ballot to a draft, or a reviewer who leaves a slot, must
-          show the same signatures as out of date that the stored change will. Leaving the input untouched keeps the
-          preview from changing the record that the caller still holds.
+          same rules as the stored rows.
+        tests:
+          - BallotEdits_WithBallot_ExistingSlot_ReplacesTheBallotInSlotOrder
+
+      - id: ReviewCenter-BallotConsolidation-Edits-AddBallot
+        title: >-
+          The BallotEdits class shall add the ballot of a slot that has none, in slot order.
+        justification: |
+          The preview of a new ballot must follow the same rules as the stored rows.
+        tests:
+          - BallotEdits_WithBallot_NewSlot_AddsTheBallotInSlotOrder
+
+      - id: ReviewCenter-BallotConsolidation-Edits-RemoveBallot
+        title: >-
+          The BallotEdits class shall remove only the ballot of the named slot.
+        justification: |
+          The preview of a removal must leave the ballots of the other slots as they are stored.
+        tests:
+          - BallotEdits_WithoutBallot_RemovesOnlyThatSlot
+
+      - id: ReviewCenter-BallotConsolidation-Edits-RemoveUnknown
+        title: >-
+          The BallotEdits class shall remove nothing for a slot that has no ballot.
+        justification: |
+          Removing a ballot that does not exist must not change the record.
+        tests:
+          - BallotEdits_WithoutBallot_RemovesOnlyThatSlot
+
+      - id: ReviewCenter-BallotConsolidation-Edits-AnswerReplaced
+        title: >-
+          The BallotEdits class shall replace the earlier answer for the same check with a stored answer and keep the
+          other answers.
+        justification: |
+          The preview of an answer must follow the stored rule that one check has one answer.
+        tests:
+          - BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-AnswerOrder
+        title: >-
+          The BallotEdits class shall keep the answers of a ballot in check order after a stored answer.
+        justification: |
+          A fixed order keeps the preview the same as what is stored and read back.
+        tests:
+          - BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-AnswerDraft
+        title: >-
+          The BallotEdits class shall make the ballot a draft, without submission time and submitter, when an answer is
+          stored.
+        justification: |
+          An edit of a submitted ballot reverts it to a draft, and the preview must show the signatures that this makes
+          out of date.
+        tests:
+          - BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-AnswerNewBallot
+        title: >-
+          The BallotEdits class shall create a draft that holds just the answer when a slot has no ballot and an
+          answer is stored.
+        justification: |
+          The first answer of a slot starts its ballot, and the preview must show that ballot.
+        tests:
+          - BallotEdits_WithAnswer_NoBallotYet_CreatesADraftWithTheAnswer
+
+      - id: ReviewCenter-BallotConsolidation-Edits-SectionReplaced
+        title: >-
+          The BallotEdits class shall replace the earlier state of the same section with a stored section state and
+          keep the answers.
+        justification: |
+          The preview of a section state must follow the stored rule that one section has one state.
+        tests:
+          - BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-SectionDraft
+        title: >-
+          The BallotEdits class shall make the ballot a draft when a section state is stored.
+        justification: |
+          An edit of a submitted ballot reverts it to a draft, and the preview must show the signatures that this makes
+          out of date.
+        tests:
+          - BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-SectionNewBallot
+        title: >-
+          The BallotEdits class shall create a draft that holds just the section state when a slot has no ballot and a
+          section state is stored.
+        justification: |
+          The first section state of a slot starts its ballot, and the preview must show that ballot.
+        tests:
+          - BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignAnswers
+        title: >-
+          The BallotEdits class shall drop the answers that a departing reviewer gave when a slot is reassigned.
+        justification: |
+          A reviewer who leaves a slot must not leave answers behind in the preview, as the stored change removes them.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignSections
+        title: >-
+          The BallotEdits class shall drop the section states that a departing reviewer gave when a slot is
+          reassigned.
+        justification: |
+          A reviewer who leaves a slot must not leave section states behind in the preview, as the stored change
+          removes them.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignCase
+        title: >-
+          The BallotEdits class shall compare the user names of departing reviewers ignoring case.
+        justification: |
+          User names are the same user whatever their case, so a differently cased row of the departing reviewer must
+          be dropped too.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignKeepsCarried
+        title: >-
+          The BallotEdits class shall keep the rows that were carried from an earlier review when a slot is
+          reassigned.
+        justification: |
+          A carried row was not given by the departing reviewer, so the stored change keeps it and the preview must too.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignKeepsOthers
+        title: >-
+          The BallotEdits class shall keep the rows that other reviewers gave when a slot is reassigned.
+        justification: |
+          Only the rows of the departing reviewer are dropped, so the rows of the others stay.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-ReassignDraft
+        title: >-
+          The BallotEdits class shall revert the ballot of a slot that a reviewer leaves to a draft.
+        justification: |
+          A reviewer who leaves a slot must show the same signatures as out of date that the stored change will.
+        tests:
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-InputUnchanged
+        title: >-
+          The BallotEdits class shall leave its input record or ballot unchanged.
+        justification: |
+          Leaving the input untouched keeps the preview from changing the record that the caller still holds.
         tests:
           - BallotEdits_WithBallot_ExistingSlot_ReplacesTheBallotInSlotOrder
           - BallotEdits_WithBallot_NewSlot_AddsTheBallotInSlotOrder
           - BallotEdits_WithoutBallot_RemovesOnlyThatSlot
           - BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft
-          - BallotEdits_WithAnswer_NoBallotYet_CreatesADraftWithTheAnswer
           - BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft
           - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+
+      - id: ReviewCenter-BallotConsolidation-Edits-Arguments
+        title: >-
+          The BallotEdits class shall refuse missing arguments with an ArgumentNullException.
+        justification: |
+          Missing input has no edit, and refusing it keeps a wrong call from being mistaken for an unchanged record.
+        tests:
           - BallotEdits_NullArguments_Throw

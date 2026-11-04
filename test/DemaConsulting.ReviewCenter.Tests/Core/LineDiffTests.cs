@@ -710,6 +710,36 @@ public class LineDiffTests
     }
 
     /// <summary>
+    ///     Test that every row of random patterns of unchanged, removed, and added rows appears in exactly one
+    ///     side-by-side row, and that the rows keep their order on each side.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_RandomPatterns_ShowEveryRowExactlyOnceInOrder()
+    {
+        // Arrange: a fixed seed and random patterns of unchanged (c), removed (-) and added (+) rows
+        var random = new Random(31);
+        for (var round = 0; round < 200; round++)
+        {
+            var pattern = new string(Enumerable.Range(0, random.Next(0, 30)).Select(_ => "c-+"[random.Next(0, 3)]).ToArray());
+            var rows = Pattern(pattern);
+
+            // Act: pair all the rows
+            var paired = LineDiff.Pair(rows, 0, rows.Count);
+
+            // Assert: each row index is in exactly one side-by-side row, and each side is in ascending order
+            var shown = paired
+                .SelectMany(p => new[] { p.LeftIndex, p.RightIndex }.Where(i => i is not null).Select(i => i!.Value).Distinct())
+                .Order()
+                .ToList();
+            Assert.Equal(Enumerable.Range(0, rows.Count), shown);
+            var left = paired.Where(p => p.LeftIndex is not null).Select(p => p.LeftIndex!.Value).ToList();
+            var right = paired.Where(p => p.RightIndex is not null).Select(p => p.RightIndex!.Value).ToList();
+            Assert.Equal(left.Order(), left);
+            Assert.Equal(right.Order(), right);
+        }
+    }
+
+    /// <summary>
     ///     Test that pairing the visible segments of a real diff keeps three lines of context, collapsed gaps stay
     ///     out of the rows, a pinned unchanged row keeps its place, and every visible row appears exactly once.
     /// </summary>

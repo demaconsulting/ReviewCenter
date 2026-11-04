@@ -247,6 +247,44 @@ public class RecordDigestBallotFingerprintTests
     }
 
     /// <summary>
+    ///     Test that a change of only the justification of an answer changes the fingerprint, although the record digest
+    ///     does not cover the justification.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_ComputeBallotFingerprint_ChangedJustification_ChangesFingerprint()
+    {
+        // Arrange: two records that differ only in the justification of one answer
+        var first = Record(new Ballot(1, BallotStatus.Submitted, _then, "bob", [Answer(1, "a-01", ChecklistOutcome.Fail, "One reason")], []));
+        var second = Record(new Ballot(1, BallotStatus.Submitted, _then, "bob", [Answer(1, "a-01", ChecklistOutcome.Fail, "Another reason")], []));
+
+        // Act
+        var firstFingerprint = RecordDigest.ComputeBallotFingerprint(first);
+        var secondFingerprint = RecordDigest.ComputeBallotFingerprint(second);
+
+        // Assert
+        Assert.NotEqual(firstFingerprint, secondFingerprint);
+    }
+
+    /// <summary>
+    ///     Test that the section states of a ballot are written in the order of the section identifier, whatever the
+    ///     order they are held in.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_CanonicalizeBallots_SectionStates_AreSortedBySectionId()
+    {
+        // Arrange: a ballot that holds the states of section b and then section a, both not applicable
+        var ballot = new Ballot(1, BallotStatus.Submitted, _then, "bob", [], [NotApplicable(1, "b"), NotApplicable(1, "a")]);
+
+        // Act
+        var lines = RecordDigest.CanonicalizeBallots(Record(ballot)).Split('\n');
+
+        // Assert: header, ballot, then the section lines in the order a, b
+        Assert.Equal(4, lines.Length);
+        Assert.StartsWith("section 1:a ", lines[2], StringComparison.Ordinal);
+        Assert.StartsWith("section 1:b ", lines[3], StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a null record is refused.
     /// </summary>
     [Fact]

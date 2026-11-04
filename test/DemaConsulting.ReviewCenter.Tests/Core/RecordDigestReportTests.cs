@@ -357,6 +357,25 @@ public class RecordDigestReportTests
     }
 
     /// <summary>
+    ///     Test that a carried thread that has only chat is not written, so the digest is that of a record without the
+    ///     thread.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_CarriedChatThread_WritesNothing()
+    {
+        // Arrange: a record with a carried thread that has only chat comments, and a record without the thread
+        var chatOnly = Record([Thread(1, "a.txt", [Comment(1, "Why?", "Ann", false), Comment(2, "Because", "Bob", false)], carriedFrom: "rev-0")]);
+        var without = Record();
+
+        // Act
+        var chatText = RecordDigest.Canonicalize(chatOnly);
+
+        // Assert
+        Assert.Equal(RecordDigest.Compute(without), RecordDigest.Compute(chatOnly));
+        Assert.DoesNotContain("carried", chatText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that chat added to a Finding does not change the digest, and that an included reply does.
     /// </summary>
     [Fact]

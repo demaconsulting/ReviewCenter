@@ -257,9 +257,20 @@ applicable (with different reasons) give the line `applicability 1:b not-applica
 and one that answers it give the line `applicability 1:b disputed`. This scenario is tested by
 `RecordDigest_Canonicalize_DisputedSection_Line`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
 
+**RecordDigest_Canonicalize_DisputedSection_ListsNoCheckOfTheSection**: A submitted ballot that marks the section `b`
+as not applicable and one that answers it give the line `applicability 1:b disputed` and no `check` line for the check
+`b-01`. This scenario is tested by `RecordDigest_Canonicalize_DisputedSection_ListsNoCheckOfTheSection`, and covers
+`ReviewCenter-RecordDigest-ConsolidatedChecks-DisputedSectionChecks`.
+
 **RecordDigest_Canonicalize_ChecksSortedOrdinal**: A submitted ballot whose answers are in the order `b-01`, `a-02`,
 `a-01` gives the `check` lines in the order `a-01`, `a-02`, `b-01`. This scenario is tested by
 `RecordDigest_Canonicalize_ChecksSortedOrdinal`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_SectionLines_SortedBySectionId**: A checklist that lists the section `b` before the section
+`a`, with a submitted ballot that marks both as not applicable, gives the line `applicability 1:a not-applicable`
+before the line `applicability 1:b not-applicable`. This scenario is tested by
+`RecordDigest_Canonicalize_SectionLines_SortedBySectionId`, and covers
+`ReviewCenter-RecordDigest-ConsolidatedChecks-SectionsSorted`.
 
 **RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected**: A record without a submitted ballot gives
 `outcome none`, one whose submitted ballot answers every check Pass gives `outcome approved`, and one with a Fail
@@ -295,6 +306,16 @@ section, so there is no last row to choose there. This scenario is tested by
 `RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted`, and covers
 `ReviewCenter-RecordDigest-BallotFingerprint`.
 
+**RecordDigest_ComputeBallotFingerprint_ChangedJustification_ChangesFingerprint**: Two records that differ only in the
+justification of one answer give two different fingerprints. This scenario is tested by
+`RecordDigest_ComputeBallotFingerprint_ChangedJustification_ChangesFingerprint`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint-Justification`.
+
+**RecordDigest_CanonicalizeBallots_SectionStates_AreSortedBySectionId**: A submitted ballot that holds the states of
+the sections `b` and `a`, both not applicable, gives the `section` lines in the order `a`, `b`. This scenario is tested
+by `RecordDigest_CanonicalizeBallots_SectionStates_AreSortedBySectionId`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint-SectionOrder`.
+
 **RecordDigest_CanonicalizeBallots_NullRecord_Throws**: A null record is passed. `ArgumentNullException` is raised. This
 scenario is tested by `RecordDigest_CanonicalizeBallots_NullRecord_Throws`, and covers
 `ReviewCenter-RecordDigest-BallotFingerprint`.
@@ -323,6 +344,11 @@ with the same Fail, another justification, and another person give the same dige
 an earlier review and without the marker gives the same digest. This scenario is tested by
 `RecordDigest_Compute_CarriedMarker_NotCovered`, and covers `ReviewCenter-RecordDigest-NoBallotContent`.
 
+**RecordDigest_Compute_CarriedSectionMarker_NotCovered**: The same submitted ballot with the section `b` not
+applicable, once fresh and once marked as carried from an earlier review, gives the same digest. This scenario is
+tested by `RecordDigest_Compute_CarriedSectionMarker_NotCovered`, and covers
+`ReviewCenter-RecordDigest-NoBallotContent-CarriedSection`.
+
 **The report block** is verified in `RecordDigestReportTests.cs` with the same hand-built records.
 
 **RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue**: A record without an included thread
@@ -349,6 +375,10 @@ scenario is tested by `RecordDigest_Compute_BaselineFinding_MatchesKnownValue`.
 
 **RecordDigest_Compute_CarriedFinding_MatchesKnownValue**: A carried Finding has the `carried` suffix on its thread
 line and a known digest. This scenario is tested by `RecordDigest_Compute_CarriedFinding_MatchesKnownValue`.
+
+**RecordDigest_Compute_CarriedChatThread_WritesNothing**: A carried thread that has only chat comments gives the digest
+of a record without the thread, and the canonical text does not contain `carried`. This scenario is tested by
+`RecordDigest_Compute_CarriedChatThread_WritesNothing`, and covers `ReviewCenter-RecordDigest-FollowUp-CarriedNoComment`.
 
 **RecordDigest_Compute_Reopens_MatchesKnownValueAfterReport**: A record with reopens has the `reopens` line after the
 `report` block and a known digest. This scenario is tested by
