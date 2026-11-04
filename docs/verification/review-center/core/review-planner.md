@@ -198,6 +198,11 @@ named in the audit detail. In a second batch, a default date in the past fails o
 names the due date, nothing is stored for it), and the row with a valid date of its own is created. This scenario is
 tested by `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
 
+**ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A project has a checklist of its own (the version
+`plan-1` with one check). A review is filed for a review-set from a plan; the review that the planner creates carries the
+checklist of the project, with its version and its definition text. This scenario is tested by
+`ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`.
+
 **ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId**: Unsafe characters, runs, leading and trailing punctuation, empty
 results, and taken identifiers give the expected safe and unique identifiers. This scenario is tested by
 `ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId`.

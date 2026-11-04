@@ -442,7 +442,7 @@ sections:
 
       - id: ReviewCenter-ReviewProgressService-Performance-Bound
         title: >-
-          The ReviewProgressService class shall answer for a project with 300 reviews within a loose time bound.
+          The ReviewProgressService class shall answer for a project with 300 reviews within ten seconds.
         justification: |
           The bound guards against one query per review and is not a benchmark.
         tests:
@@ -598,10 +598,17 @@ sections:
 
       - id: ReviewCenter-ReviewProgressService-BallotProgress-Concluded
         title: >-
-          The ReviewProgressService class shall name no missing reviewer for a review that is concluded, while its
-          ballot counts stay.
+          The ReviewProgressService class shall name no missing reviewer for a review that is concluded.
         justification: |
-          A concluded review waits for nobody, and the counts still show how many ballots it had.
+          A concluded review waits for nobody.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-ConcludedCounts
+        title: >-
+          The ReviewProgressService class shall keep the ballot counts of a review that is concluded.
+        justification: |
+          The counts still show how many ballots the review had.
         tests:
           - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
 

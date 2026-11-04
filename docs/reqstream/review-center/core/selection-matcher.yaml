@@ -31,13 +31,19 @@ sections:
 
       - id: ReviewCenter-SelectionMatcher-Match-Star
         title: >-
-          The SelectionMatcher class shall match any characters inside one path segment with a star and shall never
-          match a path separator with it.
+          The SelectionMatcher class shall match any characters inside one path segment with a star.
+        justification: |
+          Authors name a family of files in one folder with one pattern.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Match-StarSeparator
+        title: >-
+          The SelectionMatcher class shall never match a path separator with a star.
         justification: |
           A star that crossed folders would select files that the author did not name.
         tests:
           - SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators
-          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
 
       - id: ReviewCenter-SelectionMatcher-Match-Question
         title: >-
