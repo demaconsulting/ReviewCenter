@@ -19,7 +19,7 @@ skip by throwing `ValidationSkippedException`. The checks hold no state. The hel
 
 #### Key Methods
 
-The default run has nine checks:
+The default run has ten checks:
 
 - **GitAvailableCheck** (`ReviewCenter_GitAvailable`): runs one `git --version` through the production
   `GitRunner.CheckVersionAsync`, which enforces the minimum version and returns the version text; the same
@@ -64,6 +64,18 @@ The default run has nine checks:
   an attestation with the production renderer and signer, verifies the CMS signature and the DocMDP certification
   independently with `System.Security.Cryptography.Pkcs`, then changes one byte and requires the verification to
   fail.
+- **NotificationMailCheck** (`ReviewCenter_NotificationMail`): proves the path of a notification mail without a
+  database, a configuration file or a network. It builds the `NotificationOptions` in memory (the File sender, a
+  throw-away folder inside a `TemporaryDirectory`, titles switched off) and two fixture inbox items of one project, one
+  to answer and one that is news. The items carry marker texts for their titles and details. The check classifies them
+  and composes the mail with the production `NotificationComposer`, builds the message for a fixed fixture address, and
+  sends it with the production `FileNotificationSender`. It then reads the single `.eml` file back with MimeKit and
+  requires exactly one `.eml` file and no leftover `.tmp` file, a text part and an HTML part, the project name, the
+  link to the review page, a subject that names neither a review nor a project, and none of the marker texts or the
+  words `approved` and `rejected` in the subject, the text, or the HTML. It fails with `ValidationFailedException`
+  for each unmet expectation. The detail text names only counts and facts (two items composed, one `.eml` file
+  written, project and link present, no ballot content, a subject without a review); it names no address and no
+  folder, because the report is archived. The folder is removed at the end.
 - **HostStartCheck** (`ReviewCenter_HostStart`): starts the production host (`ServerHost.CreateApplication`) in
   isolated mode (`ServerHostOptions.IsolatedSettings` holds the in-memory settings and a temporary SQLite database;
   the host is built from an empty builder, so no `appsettings.json`, environment variable or host default is read)
@@ -72,7 +84,7 @@ The default run has nine checks:
   static asset, expects HTTP 200 for both, and stops the host cleanly before the temporary folder is disposed. The
   host is started once.
 
-The opt-in tenth, eleventh, and twelfth checks are run only with `--validate --check-config`:
+The opt-in eleventh, twelfth, and thirteenth checks are run only with `--validate --check-config`:
 
 - **ConfiguredDatabaseCheck** (`ReviewCenter_ConfiguredDatabase`): loads the configuration the way the server does
   (`appsettings.json` and the environment variables), recognizes the provider, opens the database read-only, and
@@ -82,7 +94,7 @@ The opt-in tenth, eleventh, and twelfth checks are run only with `--validate --c
   exist yet (a fresh installation creates it at the first start), it throws `ValidationSkippedException` with that
   reason; a database file that exists but cannot be opened or has the wrong schema still fails.
   The database has no schema version number, so the comparison of tables and columns is the version check.
-- **ConfiguredKeysCheck** (`ReviewCenter_ConfiguredKeys`, the eleventh): answers whether the key ring that the server is
+- **ConfiguredKeysCheck** (`ReviewCenter_ConfiguredKeys`, the twelfth): answers whether the key ring that the server is
   configured to use belongs to the database, which is the question after a restore. It loads the configuration the way
   the server does, registers the production services with automatic key generation of Data Protection switched off, and
   reads the ring and the database read-only. It runs `KeyRingProtection.CheckRing` when the key folder exists (the
@@ -115,19 +127,18 @@ The opt-in tenth, eleventh, and twelfth checks are run only with `--validate --c
   never printed. The store provider is not covered by a test of the check; it relies on the describe path of the
   provider itself (`GetSigningKey` and its trust policy), which is tested in the `Evidence` subsystem. The clause is
   only added when the check runs, not when it is skipped.
-- **ConfiguredNotificationsCheck** (`ReviewCenter_ConfiguredNotifications`, the twelfth and last): answers whether the
-  e-mail notification settings of the server are usable. It loads the configuration the way the server does, binds the
-  `Notifications` section, and throws `ValidationSkippedException` ("E-mail notifications are not enabled
+- **ConfiguredNotificationsCheck** (`ReviewCenter_ConfiguredNotifications`, the thirteenth and last): answers whether
+  the e-mail notification settings of the server are usable. It loads the configuration the way the server does, binds
+  the `Notifications` section, and throws `ValidationSkippedException` ("E-mail notifications are not enabled
   (Notifications:Enabled).") while `Enabled` is false. A value that cannot be converted to its type (for example text
   for a port) fails with a fixed message that does not show the value, because the exception text can hold it. Otherwise
   it runs `NotificationOptionsValidator`, the check of the server start-up, whose failure message names the setting and
   never a value, and fails with that message. A passing run reports one line: for the SMTP sender the server name, the
   port, the connection protection (`None`, `StartTls`, or `Implicit`), and where the password comes from (from a file,
-  inline in the configuration, or not set); for the File sender the sentence that mails are written as `.eml` files
-  into the configured folder. Each warning of `NotificationOptions.GetWarnings` (a password written into the
-  configuration, an unencrypted connection to another machine) is appended as " Warning: ..." without the password. The
-  check never opens a network connection and never sends a mail, and it prints no password, no folder path, and no
-  address.
+  inline in the configuration, or not set); for the File sender the sentence that mails are written as `.eml` files into
+  the configured folder. Each warning of `NotificationOptions.GetWarnings` (a password written into the configuration,
+  an unencrypted connection to another machine) is appended as " Warning: ..." without the password. The check never
+  opens a network connection and never sends a mail, and it prints no password, no folder path, and no address.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
 `synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review

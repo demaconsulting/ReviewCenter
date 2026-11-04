@@ -33,8 +33,9 @@ N/A - standard test environment.
   and a late exception of an abandoned check is observed.
 - TRX and JUnit XML result files are created with the correct XML root elements.
 - An unsupported result file extension produces no file and an error message on the context.
-- `Validation.CreateChecks` lists the nine default checks, and adds the configured-database, the configured-key-ring and
-  the configured-notifications checks last, in that order, twelve in all, only for `--check-config`.
+- `Validation.CreateChecks` lists the ten default checks (the `NotificationMail` check follows `AttestationPdf`), and
+  adds the configured-database, the configured-key-ring and
+  the configured-notifications checks last, in that order, thirteen in all, only for `--check-config`.
 
 #### Test Scenarios
 
@@ -99,12 +100,13 @@ results file; its test case records a duration of at least that long. This scena
 others; the report still lists the checks in the listed order. This scenario is tested by
 `Validation_Run_SlowFirstCheck_ReportsInListedOrder`.
 
-**Validation_CreateChecks_Default_ListsNineHermeticChecks**: `Validation.CreateChecks(false)`
-returns the nine default checks, in order, with the `ReviewCenter_` names (`ReviewCenter_Totp` follows
-`ReviewCenter_PasswordHash`). This scenario is tested by `Validation_CreateChecks_Default_ListsNineHermeticChecks`.
+**Validation_CreateChecks_Default_ListsTenHermeticChecks**: `Validation.CreateChecks(false)`
+returns the ten default checks, in order, with the `ReviewCenter_` names (`ReviewCenter_Totp` follows
+`ReviewCenter_PasswordHash`, and `ReviewCenter_NotificationMail` sits between `ReviewCenter_AttestationPdf` and
+`ReviewCenter_HostStart`). This scenario is tested by `Validation_CreateChecks_Default_ListsTenHermeticChecks`.
 
 **Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast**: `Validation.CreateChecks(true)`
-returns twelve checks with `ReviewCenter_ConfiguredDatabase`, `ReviewCenter_ConfiguredKeys` and
+returns thirteen checks with `ReviewCenter_ConfiguredDatabase`, `ReviewCenter_ConfiguredKeys` and
 `ReviewCenter_ConfiguredNotifications` last, in that order. This scenario is tested by
 `Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast`.
 

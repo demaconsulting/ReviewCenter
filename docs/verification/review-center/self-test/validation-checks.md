@@ -41,12 +41,15 @@ every supported platform provides, and no network beyond it.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- The real default run reports nine passed tests, with elapsed times, and none skipped or failed.
+- The real default run reports ten passed tests, with elapsed times, and none skipped or failed.
 - The `Fingerprint` check passes and compares with the literal
   `13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2`.
 - The `PasswordHash` check accepts the right password and rejects a wrong one.
 - The `Totp` check passes with the published RFC 6238 vectors and reports them in its detail.
 - The `AuditChain` check reports that a changed entry was detected.
+- The `NotificationMail` check passes without a database, a configuration file or a network, writes exactly one `.eml`
+  file that names the project and links to the review, holds no text of the fixture items, and reports neither an
+  address nor a folder path.
 - `ConfiguredDatabase` is skipped when nothing is configured, passes for a database with the
   current schema without changing the file, fails naming the missing table for a database with a
   table dropped, fails for a missing file without creating it, and fails naming an unsupported
@@ -96,6 +99,20 @@ the algorithm are fixed in the check. This scenario is tested by `ValidationChec
 **ValidationChecks_AuditChain_Run_DetectsTamperedEntry**: The log of the real run is read; the audit chain check shows
 a passed line that reports that the change of an entry was detected by the verifier. This scenario is tested by
 `ValidationChecks_AuditChain_Run_DetectsTamperedEntry`.
+
+**ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile**: The notification mail check is run on its
+own; it is named `ReviewCenter_NotificationMail`, it passes, and its detail says that one `.eml` file was written and
+that the mail holds no ballot content. The check throws unless the production composer and the production file sender
+produced exactly one `.eml` file and no leftover temporary file, a text part and an HTML part, the project name and the
+link to the review page, a subject that names neither a review nor a project, and none of the marker texts of the two
+fixture items or the words approved and rejected. So the passed run shows each of these facts, and a change that lets
+text of an item into the mail makes the check, and so this test, fail. This scenario is tested by
+`ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile`.
+
+**ValidationChecks_NotificationMail_Run_ReportsNoAddressOrPath**: The notification mail check is run; its detail text
+holds no at sign, no example domain, no path separator, and not the path of the temporary folder of the machine, so the
+archived report names neither the address of the fixture nor a folder. This scenario is tested by
+`ValidationChecks_NotificationMail_Run_ReportsNoAddressOrPath`.
 
 **ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails**: The log of the real run is read; the
 git, git round trip, review workflow (`embedded SQLite; author answer refused; review answered and signed by a
@@ -296,7 +313,7 @@ The check fails and the message does not hold that text. This scenario is tested
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.
 
 **ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient**: The child process
-described above runs the default validation in the hostile environment; it exits with 0 and reports nine passed
+described above runs the default validation in the hostile environment; it exits with 0 and reports ten passed
 checks, the `HostStart` line names a loopback address and a port that differs from the poisoned one, the sentinel
 folder and the private temporary folder are empty. This scenario is tested by
 `ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient`.

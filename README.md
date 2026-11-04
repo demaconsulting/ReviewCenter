@@ -40,6 +40,7 @@ hash-chained audit trail.
 - 💬 **Questions and Findings** - Discuss files, lines, or checks
 - 🧭 **Where Are We?** - Shows ballots, disputes, and next step
 - 📥 **Inbox** - What waits for you, by section
+- 📧 **E-mail Notifications** - Optional mail, never with answers
 - ✅ **Review Checklist** - Per-reviewer ballots consolidated into agreed answers
 - 👥 **Reviewer Slots** - Primary and alternate reviewers per slot
 - 🙈 **Independent Ballots** - Answers stay hidden until you submit

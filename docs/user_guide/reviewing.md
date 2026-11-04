@@ -291,6 +291,10 @@ nothing in a review.
 The read state is kept for each user and review, so it is yours alone. It is not part of the signed record of a review
 and not an entry of the audit trail, so looking at a review never changes whether a signature is current.
 
+If your administrator has set up mail, you can also be told about news by e-mail, so that you do not have to keep the
+inbox open: choose it on the **Account** page (see Account in the Users and Sign-in chapter). The mail only says that
+there is news, for which project and review, and links to the review; the inbox stays the full list.
+
 ## Where Are We?
 
 The top of every review page is the **Where are we?** panel, so that nobody has to read every card to know the standing.

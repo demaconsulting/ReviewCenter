@@ -49,7 +49,7 @@ internal static class Validation
     ///     <c>true</c> to append the opt-in read-only checks of the configured database, of the configured key
     ///     ring and its secrets, and of the configured e-mail notification settings (<c>--check-config</c>).
     /// </param>
-    /// <returns>The checks; the default run has nine, the opt-in run twelve.</returns>
+    /// <returns>The checks; the default run has ten, the opt-in run thirteen.</returns>
     public static IReadOnlyList<ValidationCheck> CreateChecks(bool includeConfigured)
     {
         var checks = new List<ValidationCheck>
@@ -62,6 +62,7 @@ internal static class Validation
             new(TotpCheck.Name, TotpCheck.RunAsync),
             new(AuditChainCheck.Name, AuditChainCheck.RunAsync),
             new(AttestationPdfCheck.Name, AttestationPdfCheck.RunAsync),
+            new(NotificationMailCheck.Name, NotificationMailCheck.RunAsync),
             new(HostStartCheck.Name, HostStartCheck.RunAsync)
         };
 

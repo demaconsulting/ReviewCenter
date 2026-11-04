@@ -10,7 +10,8 @@
    sign in again with the new password. A user of an identity provider has no password: the change-password card is
    replaced by a sentence that says who manages it. The e-mail notification card shows one sentence and no field while
    the feature is not set up, and then does not read the notification tables; otherwise it shows the address
-   steps: enter an address, confirm it with the code that was mailed, change or remove it. *@
+   steps: enter an address, confirm it with the code that was mailed, change or remove it, and a link to the help
+   topic "E-mail notifications". *@
 @page "/account"
 @rendermode InteractiveServer
 @attribute [Authorize]
@@ -257,6 +258,8 @@
                 new for you. With "Every change" you get an e-mail a few minutes after something new needs your
                 attention, with several changes collected into one e-mail.
             </p>
+            <p><a class="action outline small" href="/help/email-notifications"
+                  data-testid="notifications-help-link">About e-mail notifications</a></p>
 
             @if (NotificationError is not null)
             {

@@ -77,6 +77,10 @@ internal static class HelpTopics
             "checklist-template",
             "Checklist template",
             "Export, import, replace or reset the checklist that new reviews of a project start with."),
+        new(
+            "email-notifications",
+            "E-mail notifications",
+            "Get news by e-mail, confirm your address with a code, choose when, and stop it."),
     ];
 
     /// <summary>

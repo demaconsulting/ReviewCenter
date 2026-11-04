@@ -64,6 +64,11 @@ N/A - standard test environment.
 - The Inbox topic follows the Getting started topic in the list (second), explains the eight groups, the New marker and
   Mark all as read, says that a reviewer who has not handed in never sees how the others answered, and links to the
   inbox.
+- The E-mail notifications topic follows the Checklist template topic in the list (last), is headed "E-mail
+  notifications", says in plain words that the mail is optional and exists only when the administrator has set up mail,
+  what a mail names, that it never holds comments, answers, verdicts, outcomes, file contents or a password, how an
+  address is confirmed with a code, the three settings, and how to stop the mail; it contains no link that begins
+  with `#` and none of the technical words that the test lists.
 - The Signed attestation topic says that the signature proves integrity and origin, that the signing time is the server
   clock, and shows its screenshot; the Reviewers and signing topic says that a rejection needs a conclusion text; the
   Reading a review topic names who sees the conclusion at once; the API tokens topic says that a token does not open
@@ -262,3 +267,22 @@ tested by `HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens`.
 **HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature**: The Reviewers and signing page and the Your inbox page
 are rendered; both say that the review page explains what changed since the signature. This scenario is tested by
 `HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature`.
+
+**HelpPage_Render_ListsEmailNotificationsTopicAfterChecklistTemplate**: The topic list is read; the topic
+`email-notifications` follows `checklist-template` and is the last one. The index is rendered; it has a link to
+`/help/email-notifications` with the text "E-mail notifications", and the summary of the topic. This scenario is tested
+by `HelpPage_Render_ListsEmailNotificationsTopicAfterChecklistTemplate`.
+
+**HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever**: The E-mail notifications page is rendered; the
+heading is "E-mail notifications", and the text says that the mail exists only when the administrator has set up mail
+for the server, what a mail names, and that the subject line never names a review. The list of what is never mailed has
+one entry each for comments and answers, for verdicts and outcomes, for the contents of files, and for passwords. The
+text holds no phrase that says that such content is mailed, and no link begins with `#`. This scenario is tested by
+`HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever`.
+
+**HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop**: The E-mail notifications page is rendered; the
+text names the buttons "Send confirmation code" and "Confirm address", the 6-digit code that works for 30 minutes, and
+that only the newest code works. It names the three settings "No e-mail" (first, nothing is sent), "Daily summary", and
+"Every change", the button "Remove my address" as the way to stop, and what it means when the administrator has not
+switched on e-mail. None of the technical words SMTP, token, hash, TLS, IMAP or a setting name with a colon appears.
+This scenario is tested by `HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop`.

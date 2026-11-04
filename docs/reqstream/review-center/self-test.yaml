@@ -186,6 +186,24 @@ sections:
         tests:
           - ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection
 
+      - id: ReviewCenter-SelfTest-NotificationMail
+        title: >-
+          The self-validation run shall check a notification mail without a database or a network.
+        justification: |
+          An operator must see in the default run that a notification mail is composed from a fixture, holds no ballot
+          content and is written as a file, on every machine and without a mail server.
+        children:
+          - ReviewCenter-ValidationChecks-NotificationMail
+          - ReviewCenter-ValidationChecks-NotificationMail-FileWritten
+          - ReviewCenter-ValidationChecks-NotificationMail-ProjectNamed
+          - ReviewCenter-ValidationChecks-NotificationMail-ReviewLinked
+          - ReviewCenter-ValidationChecks-NotificationMail-NoBallotContent
+          - ReviewCenter-ValidationChecks-NotificationMail-NoAddressInReport
+          - ReviewCenter-ValidationChecks-NotificationMail-NoPathInReport
+        tests:
+          - Validation_CreateChecks_Default_ListsTenHermeticChecks
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
       - id: ReviewCenter-SelfTest-ResultsOutput
         title: The tool shall write self-validation results to a standard test result file when --results is provided.
         justification: |
