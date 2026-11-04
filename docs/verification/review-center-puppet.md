@@ -40,6 +40,9 @@ it creates its repository and the server's clone cache in a temporary folder tha
 - `puppet start` returns with the browser ready: the first command after it works.
 - `puppet start` while Puppet is already running (the same control file) fails with exit code 1; `puppet stop` exits
   with 0 and removes the control file, and a second `puppet stop` exits with code 2 because nothing is running.
+- `puppet start` while no Chromium is installed (the test points `PLAYWRIGHT_BROWSERS_PATH` at an empty folder for
+  that one start) fails with exit code 1, prints the reason with the install command and leaves no control file; the
+  normal start that follows works.
 - A hover stays in effect for later commands: after `hover`, a separate `screenshot` and `eval` still see the
   element hovered, until `mouse-move` moves the mouse away.
 - `goto` reports the HTTP status and every result ends with the `@ <url>  "<title>"` line of the current page.
@@ -71,8 +74,9 @@ the whole page) show the project page. On the account page a
 setting. An `eval` of `console.error('probe')` is reported once, by the `! console.error: probe` line of the
 same command, and not by the two commands after it. A click on a missing element exits with 1 and names the selector;
 `screenshot` writes a PNG of the page and of one element (`--selector`); `viewport` sets the inner width and
-`theme light` and `theme dark` set the emulated color scheme (checked with `eval`); `console` succeeds; `start` while
-running exits with 1; `stop` exits with 0
+`theme light` and `theme dark` set the emulated color scheme (checked with `eval`); `console` succeeds; a `start`
+with a missing Chromium (an empty browser folder for that one start) exits with 1, prints the reason and leaves no
+control file; a `start` while running exits with 1; `stop` exits with 0
 and removes the control file; a second `stop` exits with 2. It is the evidence for the lifecycle, the interaction
 commands, and the visual-check system requirements. Tested by
 `windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer` and

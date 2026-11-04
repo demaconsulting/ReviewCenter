@@ -64,16 +64,15 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
-    ///     Test that a directory created with the parameterless constructor keeps retrying a delete that fails, with
-    ///     pauses of 75 ms, for about a third of a second before it gives up.
+    ///     Test that a directory created with the parameterless constructor keeps retrying a delete that fails for at
+    ///     least a quarter of a second and for less than three seconds before it gives up.
     /// </summary>
     [Fact]
-    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond()
+    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for the whole test in a directory with the default policy, which is five
-        // attempts with four pauses of 75 ms
+        // Arrange: a file that stays open for the whole test in a directory with the default policy
         using var directory = new TemporaryDirectory();
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
@@ -83,8 +82,7 @@ public class TemporaryDirectoryTests
         var exception = Record.Exception(directory.Dispose);
         watch.Stop();
 
-        // Assert: nothing is thrown, the four pauses were taken (300 ms, with a little slack for the timer) and the
-        // wait is bounded well below what a larger default would take
+        // Assert: nothing is thrown, the wait lasted at least a quarter of a second and is bounded below three seconds
         Assert.Null(exception);
         Assert.True(Directory.Exists(directory.DirectoryPath));
         Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(250), $"Gave up too early: {watch.Elapsed}");

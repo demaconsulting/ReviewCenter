@@ -78,6 +78,27 @@ public class PuppetEndToEndTests
 
         try
         {
+            // Act and assert: with an empty browser folder Chromium is missing, so the start fails with exit code 1,
+            // prints the reason with the install command and leaves no control file behind
+            var browsersVariable = "PLAYWRIGHT_BROWSERS_PATH";
+            var previousBrowsers = Environment.GetEnvironmentVariable(browsersVariable);
+            var emptyBrowsers = Directory.CreateDirectory(Path.Combine(directory.FullName, "no-browsers"));
+            Environment.SetEnvironmentVariable(browsersVariable, emptyBrowsers.FullName);
+            (int Code, string Output, string Error) badStart;
+            try
+            {
+                badStart = await Run("start", "--url", server.Url, "--viewport", "1280x800");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(browsersVariable, previousBrowsers);
+            }
+
+            Assert.Equal(1, badStart.Code);
+            Assert.Contains("Chromium is not installed for Playwright", badStart.Error, StringComparison.Ordinal);
+            Assert.Contains("install chromium", badStart.Error, StringComparison.Ordinal);
+            Assert.False(File.Exists(controlFile));
+
             // Act and assert: start; a missing browser is a skip locally and a failure where Chromium is required
             var start = await StartPuppetAsync(Run, server.Url);
             Assert.True(start.Code == 0, start.Error);

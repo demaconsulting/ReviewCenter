@@ -26,7 +26,8 @@ the test still confirms that disposal never throws.
 - `Dispose` can be called twice without an exception (`Dispose-Repeated`).
 - `Dispose` retries a locked directory and removes it when the lock is released within the retry time
   (`BoundedRetry`).
-- The default retry policy is five attempts with a pause of 75 ms between them (`BoundedRetry-Default`).
+- The default retry policy keeps retrying a failing delete for at least 250 ms and less than 3 seconds before giving
+  up (`BoundedRetry-Default`).
 - A permanent lock is given up quietly after the bounded attempts, in bounded time (`BoundedRetry-GiveUp`).
 - No pause is taken after the last attempt (`BoundedRetry-NoFinalPause`).
 - A retry policy with fewer than one attempt or a negative pause is refused (`BoundedRetry-InvalidPolicy`).
@@ -42,11 +43,11 @@ GUID. This scenario is tested by
 created at the same time; their paths differ. This scenario is tested by
 `TemporaryDirectory_Constructor_TwoInstances_UseDifferentDirectories`.
 
-**TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond**: On Windows a file
+**TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime**: On Windows a file
 stays held open for the whole disposal of a directory created with the constructor without arguments; no exception is
-thrown, the directory stays, and the call takes at least 250 ms (the four pauses of 75 ms were taken, with a little slack
-for the timer) and less than 3 seconds. This scenario is tested by
-`TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond`.
+thrown, the directory stays, and the call takes at least 250 ms and less than 3 seconds. The test measures only this
+time window, not the number of attempts or the length of each pause. This scenario is tested by
+`TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime`.
 
 **TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents**: A file
 two folders down is requested; the returned path is the full path of that file inside the directory, its

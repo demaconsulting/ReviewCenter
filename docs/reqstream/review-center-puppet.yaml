@@ -12,10 +12,10 @@
 #   installs Chromium and makes a missing browser fail those tests.
 # - Every requirement states one criterion. The first criterion of a topic keeps the original id; the further
 #   criteria of the same topic are named <original id>-<Aspect>.
-# - The unit requirements are children of the system requirement that shows the same behavior: starts and start
-#   failures under the start requirements, rejections and failure results under the failure requirements, and result
-#   lines under the result requirements. Units with no system counterpart stay with the main requirement of their
-#   topic.
+# - The unit requirements are children of the system requirement that shows the same behavior: starts under the
+#   start requirement, start failures under the start-failure requirement, rejections and failure results under the
+#   failure requirements, and result lines under the result requirements. Units with no system counterpart stay
+#   with the main requirement of their topic.
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -53,6 +53,19 @@ sections:
         tags: [system]
         justification: |
           Two browsers behind one control file would leave the commands talking to an unpredictable one.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-StartFailure
+        title: >-
+          The tool shall exit with code 1 and print the reason when the browser cannot be started, and leave
+          no control file behind.
+        tags: [system]
+        justification: |
+          A start that fails must tell the agent why, in the start command itself, and must not leave a control
+          file that makes the next command think a browser is there. The end-to-end test shows it with a start
+          whose Chromium is missing (an empty browser folder), where the message names the install command.
         children:
           - ReviewCenterPuppet-BrowserDaemon-Lifecycle
           - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
