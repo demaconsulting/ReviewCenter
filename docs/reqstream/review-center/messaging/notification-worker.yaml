@@ -1,0 +1,143 @@
+---
+# Software Unit Requirements for the NotificationWorker Class
+#
+# The NotificationWorker class is the background service that runs a notification pass at a fixed interval while the
+# server runs. It lives in the Messaging subsystem because it is the host part of the notification feature: it knows
+# the clock and the logger, and it knows nothing of the rules of the mails. A failed pass must never stop the worker or
+# bring the server down, and the log of the worker holds no personal data. Each requirement states one rule, so that
+# each rule can be traced to its own test case.
+
+sections:
+  - title: NotificationWorker Unit Requirements
+    requirements:
+      - id: ReviewCenter-NotificationWorker-RunsPassOnStart
+        title: >-
+          The NotificationWorker class shall run a notification pass when it is started.
+        justification: |
+          News that arrived while the server was down must not wait for a whole interval.
+        tests:
+          - NotificationWorker_ExecuteAsync_Started_RunsPass
+
+      - id: ReviewCenter-NotificationWorker-RunsPassEachInterval
+        title: >-
+          The NotificationWorker class shall run another notification pass each time the polling interval has elapsed.
+        justification: |
+          The mails of the server are only sent if the passes recur.
+        tests:
+          - NotificationWorker_ExecuteAsync_IntervalElapsed_RunsNextPass
+
+      - id: ReviewCenter-NotificationWorker-WaitsBetweenPasses
+        title: >-
+          The NotificationWorker class shall run no further pass before the polling interval has elapsed.
+        justification: |
+          A pass that runs in a tight loop would load the server and the database for no reason.
+        tests:
+          - NotificationWorker_ExecuteAsync_BeforeInterval_NoSecondPass
+
+      - id: ReviewCenter-NotificationWorker-StopCompletes
+        title: >-
+          The NotificationWorker class shall complete its task when it is stopped.
+        justification: |
+          A server that stops must not hang on a background service.
+        tests:
+          - NotificationWorker_StopAsync_Running_Completes
+
+      - id: ReviewCenter-NotificationWorker-StopWhileWaiting
+        title: >-
+          The NotificationWorker class shall stop without waiting for the interval to end when it is stopped while it
+          waits for the next interval.
+        justification: |
+          The interval is minutes long, and a shutdown must not wait for it.
+        tests:
+          - NotificationWorker_StopAsync_Waiting_ReturnsPromptly
+
+      - id: ReviewCenter-NotificationWorker-CancelRunningPass
+        title: >-
+          The NotificationWorker class shall cancel the running pass when it is stopped.
+        justification: |
+          A shutdown must not wait for a pass that may take long.
+        tests:
+          - NotificationWorker_StopAsync_PassRunning_CancelsPass
+
+      - id: ReviewCenter-NotificationWorker-CancelRunningPass-NothingLogged
+        title: >-
+          The NotificationWorker class shall log nothing for a pass that it canceled because it is stopped.
+        justification: |
+          A shutdown is no failure, so it must not leave an error in the log.
+        tests:
+          - NotificationWorker_StopAsync_PassRunning_NothingLogged
+
+      - id: ReviewCenter-NotificationWorker-SurvivesFailedPass
+        title: >-
+          The NotificationWorker class shall run the next pass after a pass failed.
+        justification: |
+          A failure of the mail server or the database for a while must not end the notifications until the next
+          restart.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_RunsNextPass
+
+      - id: ReviewCenter-NotificationWorker-FailedPassNoFault
+        title: >-
+          The NotificationWorker class shall keep its task from failing when a pass fails.
+        justification: |
+          A failed background task can end the whole server.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_TaskNotFaulted
+
+      - id: ReviewCenter-NotificationWorker-LogFailureTypeOnly
+        title: >-
+          The NotificationWorker class shall log the type of the error when a pass fails.
+        justification: |
+          The operator must see that a pass failed and what kind of failure it was.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_LogHasType
+
+      - id: ReviewCenter-NotificationWorker-LogFailureTypeOnly-NoMessage
+        title: >-
+          The NotificationWorker class shall keep the message of the error out of its log when a pass fails.
+        justification: |
+          The message of an error can hold an address, so the log must not copy it.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassThrows_LogHasNoMessage
+
+      - id: ReviewCenter-NotificationWorker-LogNoAddress
+        title: >-
+          The NotificationWorker class shall keep the address of a recipient out of its log.
+        justification: |
+          A log is kept and read by operators, and must hold no personal data.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassResultWithAddress_NotLogged
+          - NotificationWorker_ExecuteAsync_PassThrowsWithAddress_NoAddressAnywhereInLog
+
+      - id: ReviewCenter-NotificationWorker-LogCounts
+        title: >-
+          The NotificationWorker class shall log the numbers of sent, failed, and deferred mails of a pass that sent or
+          failed a mail.
+        justification: |
+          The operator sees that the notifications work and how often they fail.
+        tests:
+          - NotificationWorker_ExecuteAsync_PassSent_LogsCounts
+
+      - id: ReviewCenter-NotificationWorker-LogNothingIdle
+        title: >-
+          The NotificationWorker class shall log nothing for a pass that sent and failed no mail.
+        justification: |
+          A pass at each interval would fill the log of an idle server.
+        tests:
+          - NotificationWorker_ExecuteAsync_IdlePass_NothingLogged
+
+      - id: ReviewCenter-NotificationWorker-RefuseNullArgument
+        title: >-
+          The NotificationWorker class shall refuse a missing constructor argument with an argument error.
+        justification: |
+          A worker that lacks its pass, its clock or its logger could never run, so the mistake must show at once.
+        tests:
+          - NotificationWorker_Constructor_NullArgument_Throws
+
+      - id: ReviewCenter-NotificationWorker-RefuseNonPositivePoll
+        title: >-
+          The NotificationWorker class shall refuse a polling interval that is not positive with an argument error.
+        justification: |
+          Such an interval would turn the loop into a busy loop.
+        tests:
+          - NotificationWorker_Constructor_NonPositivePoll_Throws

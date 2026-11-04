@@ -123,8 +123,8 @@ internal sealed class FileNotificationOptions
 ///     <c>appsettings.json</c> or from environment variables such as <c>Notifications__Smtp__Host</c>. Every value
 ///     is bounded and checked at start-up by <see cref="NotificationOptionsValidator"/>. The settings of the
 ///     schedule (<see cref="DigestHour"/>, <see cref="TimeZone"/>, <see cref="BatchWindowSeconds"/>,
-///     <see cref="PollSeconds"/>, <see cref="IncludeTitles"/> and <see cref="BaseUrl"/>) are accepted and validated
-///     here; they take effect when the server starts to send notifications. The type is a plain settings holder
+///     <see cref="PollSeconds"/>, <see cref="IncludeTitles"/> and <see cref="BaseUrl"/>) are validated
+///     here and drive the notification worker (see <see cref="NotificationWorker"/>). The type is a plain settings holder
 ///     that is not thread-safe while it is being bound, and it prints nothing: the password never reaches a log, a
 ///     message or a page.
 /// </remarks>

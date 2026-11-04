@@ -2,8 +2,8 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, comments, checklists, users, memberships, reviewer slots, signatures, and the e-mail address and
-# send log for notifications to database tables.
+# files, threads, comments, checklists, users, memberships, reviewer slots, signatures, and the e-mail address, mode,
+# dispatch state, notified items, and send log for notifications to database tables.
 #
 # The schema is created from the model without migrations while the product is not released, so a development
 # database that was created before a table, column, or index existed has to be recreated.
@@ -800,6 +800,104 @@ sections:
         tests:
           - NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue
           - NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse
+
+      - id: ReviewCenter-DbContext-NotificationDispatchColumns-Mode
+        title: >-
+          The ReviewCenterDbContext class shall map the notification mode of a user to a column of the notification
+          preference row.
+        justification: |
+          The mode decides whether mail is sent, so it is read and changed together with the address. The schema is
+          created from the model without a migration, so a database from before the column existed has to be
+          recreated; the store reports such a database as not available.
+        tests:
+          - NotificationStore_SetMode_Persisted_ReadBack
+
+      - id: ReviewCenter-DbContext-NotificationDispatchColumns
+        title: >-
+          The ReviewCenterDbContext class shall map the dispatch state of a user to columns of the notification
+          preference row.
+        justification: |
+          The batch window, the retry state, and the daily slot are read and changed together with the address. The
+          schema is created from the model without a migration, so a database from before the columns existed has to
+          be recreated; the store reports such a database as not available.
+        tests:
+          - NotificationStore_ListRecipients_State_RoundTrips
+          - NotificationStore_Apply_State_TimestampsRoundTrip
+
+      - id: ReviewCenter-DbContext-NotificationDispatchColumns-DefaultNone
+        title: >-
+          The ReviewCenterDbContext class shall give the notification mode of a new preference row the default None.
+        justification: |
+          A row that was written without a mode must mean that no mail is sent.
+        tests:
+          - NotificationStore_Get_NewRow_ModeNone
+          - NotificationStore_IsAvailable_NoModeColumn_False
+
+      - id: ReviewCenter-DbContext-NotificationDispatchColumns-Generation
+        title: >-
+          The ReviewCenterDbContext class shall map the generation of the notification preference of a user to a column
+          of the preference row.
+        justification: |
+          The generation lets the store tell a commit that was prepared before the user changed the mode or the
+          address. The schema is created from the model without a migration, so a database from before the column
+          existed has to be recreated; the store reports such a database as not available.
+        tests:
+          - NotificationStore_SetMode_Changed_RaisesGeneration
+          - NotificationStore_IsAvailable_NoGenerationColumn_False
+
+      - id: ReviewCenter-DbContext-NotifiedItemsTable
+        title: >-
+          The ReviewCenterDbContext class shall map the items that a user was told about to a table with one row for
+          each item.
+        justification: |
+          The rows decide on every pass which items are news. The schema is created from the model without a migration,
+          so a database from before the table existed has to be recreated; the store reports such a database as not
+          available.
+        tests:
+          - NotificationStore_Create_Database_HasNotifiedItems
+          - NotificationStore_IsAvailable_NoNotifiedItems_False
+
+      - id: ReviewCenter-DbContext-NotifiedItemsGaveUp
+        title: >-
+          The ReviewCenterDbContext class shall map the give-up flag of a notified item to a column with the default
+          false.
+        justification: |
+          The flag tells an item that was mailed from an item on which the server gave up. A row that was written
+          without the flag means a mail that was delivered. The schema is created from the model without a migration,
+          so a database from before the column existed has to be recreated; the store reports such a database as not
+          available.
+        tests:
+          - NotificationStore_IsAvailable_NoGaveUpColumn_False
+          - NotificationStore_Create_Database_NotifiedItemsKeyUnique
+
+      - id: ReviewCenter-DbContext-NotifiedItemsUniqueIndex
+        title: >-
+          The ReviewCenterDbContext class shall enforce a unique index on the user, the project, the review, the
+          section, and the kind of a notified item.
+        justification: |
+          The database is the last defense against two rows for one key, which would make the decision about news
+          ambiguous. The kind keeps a question and a standing item to answer of one review apart.
+        tests:
+          - NotificationStore_Create_Database_NotifiedItemsKeyUnique
+
+      - id: ReviewCenter-DbContext-NotifiedItemsReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the notified items of a review together with the review.
+        justification: |
+          Having the database own the relationship keeps the rows consistent, and the items of a deleted review must
+          not suppress the first mail of a review that is created again under the same id.
+        tests:
+          - NotificationStore_Delete_Review_CascadesNotifiedItems
+          - NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems
+
+      - id: ReviewCenter-DbContext-NotifiedItemsCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the notified items of a user together with the user.
+        justification: |
+          Having the database own the relationship keeps the rows consistent when requests overlap, and items must not
+          outlive their user.
+        tests:
+          - NotificationStore_Delete_User_CascadesNotifiedItems
 
       - id: ReviewCenter-DbContext-ExternalIdentity
         title: >-

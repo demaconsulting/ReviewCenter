@@ -37,6 +37,16 @@ public sealed class NotificationSendLogEntry
     public const string KindConfirmation = "confirmation";
 
     /// <summary>
+    ///     The kind of a mail that tells a user in the mode <see cref="NotificationMode.Every"/> about news.
+    /// </summary>
+    public const string KindUpdate = "update";
+
+    /// <summary>
+    ///     The kind of a daily summary mail.
+    /// </summary>
+    public const string KindDigest = "digest";
+
+    /// <summary>
     ///     Gets the identity of the row, assigned by the database.
     /// </summary>
     public int Id { get; init; }

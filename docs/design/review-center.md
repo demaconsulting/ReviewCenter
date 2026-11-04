@@ -91,11 +91,15 @@ flowchart TD
         NotificationAddress
         NotificationMessage
         NotificationPreferenceService
+        NotificationComposer
+        DigestSchedule
+        NotificationDispatcher
     end
     subgraph Messaging
         NotificationOptions
         SmtpNotificationSender
         FileNotificationSender
+        NotificationWorker
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -319,6 +323,16 @@ flowchart TD
     NotificationPreferenceService --> NotificationMessage
     NotificationPreferenceService --> AuditService
     NotificationPreferenceService --> UserService
+    NotificationDispatcher --> NotificationStore
+    NotificationDispatcher --> InboxService
+    NotificationDispatcher --> AuditStore
+    NotificationDispatcher --> NotificationComposer
+    NotificationDispatcher --> DigestSchedule
+    NotificationWorker --> NotificationDispatcher
+    NotificationOptions --> NotificationWorker
+    NotificationOptions --> NotificationDispatcher
+    NotificationOptions --> NotificationComposer
+    NotificationOptions --> DigestSchedule
     SmtpNotificationSender --> NotificationOptions
     SmtpNotificationSender --> NotificationMessage
     FileNotificationSender --> NotificationOptions
@@ -436,9 +450,20 @@ The `Messaging` subsystem delivers the e-mail of the optional e-mail notificatio
 checks the `Notifications` section, which is off by default; `SmtpNotificationSender` delivers a message through an SMTP
 server with MailKit, and `FileNotificationSender` writes it to a folder. Both implement the Core interface
 `INotificationSender`, and while the feature is off the sender is the Core `NoNotificationSender`, so nothing else in
-the system changes. `NotificationPreferenceService` of `Core` keeps the notification address of a user and its
-confirmation by a code, with `NotificationStore` of `Storage` holding the state; the `Account` page lets a user manage
-them. `ServerHost` registers these pieces, and a mail goes only to a confirmed address.
+the system changes. `NotificationPreferenceService` of `Core` keeps the notification address of a user, its
+confirmation by a code, and the notification mode (none by default, a daily summary, or every change), with
+`NotificationStore` of `Storage` holding the state; the `Account` page lets a user manage them. `ServerHost` registers
+these pieces, and a mail goes only to a confirmed address.
+
+The mails that tell users about their reviews come from the `NotificationDispatcher` of `Core`. It runs in passes: for
+each user who chose a mode and has a confirmed address, it reads the inbox as that user through `InboxService` (so
+a mail never tells more than the user sees after signing in), asks `NotificationComposer` which items are new and for
+the text of the mail, asks `DigestSchedule` when the summary of the day is due, sends through the
+`INotificationSender`, and records what was sent in `NotificationStore` in one transaction. A change of the audit trail
+tells it that something may have changed, so an idle server reads nothing. The `NotificationWorker` of `Messaging` calls
+a pass at each polling interval and survives a failed pass. `NotificationRegistration` (in `NotificationOptions`) builds
+these parts from the settings, and `ServerHost` calls it for the web host only and only when the feature is switched on
+with a transport, so a command-line run, the self-test, and a server with the feature off start no loop.
 
 The `ContentSources` subsystem reads content from outside the system. Its units run the git command-line tool
 (`GitRunner`), maintain a local mirror of each registered repository and answer the questions the Core contract asks

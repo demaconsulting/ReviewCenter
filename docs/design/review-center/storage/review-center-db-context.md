@@ -132,12 +132,31 @@ repository registry is the one exception, see `Repositories`).
   optional, at most 254 characters (`NotificationAddress.MaxLength`); `PendingCodeHash` and `PendingCodeSalt` are
   optional, at most 64; `PendingCodeExpiresUtc` (stored as fixed-width UTC text through a value converter, like
   `SentUtc` below, so the store can compare it with the current time in a query), `PendingAttempts`,
-  `PendingSentUtc`, and `Updated`. A foreign key to
+  `PendingSentUtc`, and `Updated`. The mode and the state of the dispatcher are columns of the same row: `Mode` (the
+  enumeration `NotificationMode` stored as an integer, so `None` is 0 and is what a row that was written without a
+  choice means), `BaselinePending` (a flag), `BatchStartedUtc`, `DigestHandledUtc`, and `NextAttemptUtc` (all optional,
+  fixed-width UTC text through the same kind of value converter, in the form `yyyy-MM-ddTHH:mm:ss.fffffffZ`), and
+  `FailureCount`, and `Generation` (an integer, default 0, that the store raises by one with every change of the mode
+  and every confirmed address; the dispatcher state does not change it). A foreign key to
   `Users` deletes the row with its user. The state is a table of its own, not columns of the user, for the same reason
   as the second factor. The code itself is never a column, only its salted hash.
+- **NotifiedItems** (`NotifiedItem`): key `Id`, assigned by the database. It is the memory of the dispatcher of what a
+  user was already told: one row per user, project, review, inbox section, and kind. `UserId` is a foreign key to
+  `Users` with cascade delete, so the rows go with the user. `ProjectId` and `ReviewId` are a composite foreign key to
+  `Reviews` with cascade delete, like the other per-review tables, so the rows go with the review and a review that is
+  created again under the same identifier is news again. `ReviewId` is required, at most the length of a review
+  identifier; `Section` is stored as text, at most the width of a state column; `Kind` is the required kind of the
+  item (the state token before its first colon), at most the width of a state column, which keeps a "Question for you"
+  item apart from the standing item to answer of the same section; `State` is the required state token of the item, at
+  most the width of a state column; `NotifiedUtc` is fixed-width UTC text; `GaveUp` is a boolean (default false) that
+  tells that the server gave up mailing `State`, so the user was not told: the row then only keeps the same state from
+  being mailed again, and a mail of a later state records the row with false. A unique index on `UserId`, `ProjectId`,
+  `ReviewId`, `Section`, and `Kind` makes a second row for one item impossible, so the database is the last defense of
+  the question "is this news?". The rows hold no text of a review, only identifiers and tokens.
 - **NotificationSendLog** (`NotificationSendLogEntry`): key `Id`, assigned by the database. `UserId` is a foreign key to
   `Users` with cascade delete. `ToAddress` is required, at most 254; `Kind` is required, at most the width of a state
-  column (the value `confirmation`); `SentUtc` is stored as fixed-width UTC text through a value converter, because the
+  column (the values `confirmation`, `update`, and `digest`); `SentUtc` is stored as fixed-width UTC text through a
+  value converter, because the
   limits compare times and the SQLite provider cannot compare an unconverted `DateTimeOffset`. Three indexes serve the
   counts of the limits: `UserId` plus `SentUtc`, `ToAddress` plus `SentUtc`, and `SentUtc`. The table only counts
   mails; the application never updates a row.
@@ -257,6 +276,12 @@ reviewer slots and on the creator of the reviews, and the `NOCASE` collation of 
 is no migration, so a development database created before them must be deleted and created again. The same holds for
 the `NotificationPreferences` and `NotificationSendLog` tables (e-mail notifications): a development database created
 before them must be deleted and created again, and until then the `NotificationStore` reports itself as not available.
+The same holds for the `NotifiedItems` table and the `Mode`, `BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`,
+`FailureCount`, `NextAttemptUtc`, and `Generation` columns of `NotificationPreferences` (the notification mode and its
+dispatcher), and for the `Kind` and `GaveUp` columns, the unique index, and the relationship to `Reviews` of
+`NotifiedItems`:
+a database of an earlier version of the notifications lacks them, must be deleted and created again, and is reported as
+not available in the meantime.
 The checklist keys
 are what makes "one answer per check" a rule of the database.
 The section and
@@ -282,7 +307,8 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 - **Core domain types** — `Project`, `EvidenceSettings`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
   `ProjectMembership`, `ProjectRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewReopen`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`,
-  `UserTotp`, `TotpRecoveryCode`, `NotificationPreference`, `NotificationSendLogEntry`, `NotificationAddress` (the
+  `UserTotp`, `TotpRecoveryCode`, `NotificationPreference`, `NotifiedItem`, `NotificationMode`,
+  `NotificationSendLogEntry`, `NotificationAddress` (the
   address column limit), `ReviewUserState`, `AuditText` (the column
   limits), and
   `ReviewLimits`, and `RepositoryService` (the length limits of the repository columns).

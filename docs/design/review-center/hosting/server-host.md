@@ -50,7 +50,9 @@ components; registers the persistence and the Core services with `AddServices`; 
 the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
 that its provider replaces the framework default); applies the options callback; registers sign-in with an OpenID
 Connect provider with `OidcSignIn.AddOidcSignIn` after the callback, because only then is the configuration final (it
-registers nothing unless `Identity:Oidc:Enabled` is true); loads static web assets
+registers nothing unless `Identity:Oidc:Enabled` is true); registers the notification worker with
+`NotificationRegistration.AddNotificationWorker`, also after the callback and for the same reason (it registers
+nothing unless `Notifications:Enabled` is true and the transport is `Smtp` or `File`); loads static web assets
 when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateOidcOptions`,
 `ValidateTotpOptions`, `ValidateNotificationOptions`,
 `ValidateGitOptions`, and
@@ -107,7 +109,9 @@ response.
   `AuditService`
   as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings. The `Notifications`
   settings and the sender that they choose are registered by `NotificationRegistration.AddNotifications`; no hosted
-  service or other background work is registered.
+  service or other background work is registered. The notification worker is deliberately not registered here: this
+  method is shared with the commands and the self-test, which must never mail, so `CreateApplication` registers the
+  worker for the web host only.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
@@ -311,7 +315,8 @@ whose key is in a hardware module that is not present does not start.
 - *Returns*: `Task<int>` — 0 for a clean stop, 1 when the server could not start.
 - *Preconditions*: `context` is not null.
 - *Postconditions*: The application is stopped and disposed; a start-up failure has been
-  reported through `context.WriteError`.
+  reported through `context.WriteError`. When the notification worker is registered, it stops with the application:
+  its timer ends and a pass that is running is canceled by the host shutdown.
 
 **LogStarted**: Writes the structured start-up entry.
 
@@ -373,8 +378,10 @@ always disposed.
   (registered, validated at the start, and mapped only when enabled) and the Identity implementations of the second
   factor interfaces.
 - **NotificationRegistration**, **NotificationOptions**, **INotificationSender**, **INotificationStore** — the
-  `Messaging` registration of the settings and the sender, validated at the start only while the feature is on, and the
-  store that tells whether the notification tables exist. — `WebApplication`, Kestrel, endpoint routing,
+  `Messaging` registration of the settings, the sender and (web host only) the worker; the settings are validated at
+  the start only while the feature is on, and the store tells whether the notification tables exist. A transport `None`
+  while notifications are enabled is refused by that validation, so it never reaches the worker registration.
+  — `WebApplication`, Kestrel, endpoint routing,
   authentication, authorization,
   request forgery protection, Blazor Server components, and `Microsoft.Extensions.Logging`.
 - **Entity Framework Core** — the database context factory registration.

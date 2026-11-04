@@ -121,6 +121,9 @@ words:
   - reauthentication
   - resignable
   - upserts
+  - upserted
+  - dedupe
+  - onmouseover
   - reqdoc
   - reqimp
   - reqtest

@@ -248,17 +248,21 @@
         else if (NotificationInfo is not null)
         {
             <p class="muted hint" data-testid="notifications-explanation">
-                ReviewCenter sends e-mail only to an address you have confirmed with a code. An e-mail never contains
-                review text, comments or file contents; it only tells you that something happened and where to look.
-                Apart from the confirmation code, no e-mail contains a code or a password. No page of ReviewCenter
-                shows your address to other users or to administrators.
+                ReviewCenter sends e-mail only to an address you have confirmed with a code. An e-mail names the kind
+                of item (for example a review to answer or to sign), the project and the review, and links to the
+                review; it never contains comments, answers, verdicts, outcomes or file contents, and the subject
+                never names a review. Apart from the confirmation code, no e-mail contains a code or a password. No
+                page of ReviewCenter shows your address to other users or to administrators.
+                With "No e-mail" nothing is sent. With "Daily summary" you get at most one e-mail a day with what is
+                new for you. With "Every change" you get an e-mail a few minutes after something new needs your
+                attention, with several changes collected into one e-mail.
             </p>
 
             @if (NotificationError is not null)
             {
                 <p class="error" role="alert" data-testid="notifications-error">@NotificationError</p>
             }
-            @if (NotificationNotice is not null)
+            @if (NotificationNotice is not null && !NotificationModeSaved)
             {
                 <p class="notice" role="status" data-testid="notifications-message">@NotificationNotice</p>
             }
@@ -270,6 +274,32 @@
                     <strong data-testid="notifications-confirmed-address">@NotificationInfo.ConfirmedAddress</strong>
                 </p>
             }
+
+            <form data-testid="notifications-mode-form" @onsubmit="SaveNotificationModeAsync">
+                <div class="field">
+                    <label for="notifications-mode">When do you want e-mail?</label>
+                    <select id="notifications-mode" data-testid="notifications-mode-select"
+                            disabled="@(NotificationInfo.ConfirmedAddress is null)" @bind="NotificationModeChoice">
+                        <option value="@NotificationMode.None">No e-mail</option>
+                        <option value="@NotificationMode.Daily">Daily summary</option>
+                        <option value="@NotificationMode.Every">Every change</option>
+                    </select>
+                </div>
+                @if (NotificationInfo.ConfirmedAddress is null)
+                {
+                    <p class="muted hint" data-testid="notifications-mode-needs-address">
+                        Confirm an e-mail address first; then you can choose when to get e-mail.
+                    </p>
+                }
+                else
+                {
+                    <button type="submit" data-testid="notifications-mode-save">Save</button>
+                }
+                @if (NotificationModeSaved)
+                {
+                    <p class="notice" role="status" data-testid="notifications-mode-saved">@NotificationNotice</p>
+                }
+            </form>
 
             @if (NotificationInfo.PendingAddress is not null)
             {

@@ -20,6 +20,7 @@
 
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Messaging;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -140,6 +141,57 @@ public sealed class MessagingSubsystemTests : IDisposable
 
         // Assert: the setting is named
         Assert.Contains("Notifications:Smtp:Host", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an enabled worker runs the dispatcher at the poll interval, mails through the sender chosen by
+    ///     the settings, and survives a failing pass.
+    /// </summary>
+    [Fact]
+    public async Task MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure()
+    {
+        // Arrange: the file sender, a window of 30 seconds, passes every 10 seconds, ann has a review to answer
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        var clock = new StepClock();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Every);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Notifications:Enabled"] = "true",
+            ["Notifications:Sender"] = "File",
+            ["Notifications:FromAddress"] = "reviews@example.com",
+            ["Notifications:BaseUrl"] = "https://reviewcenter.example.com/",
+            ["Notifications:File:Directory"] = _folder,
+            ["Notifications:PollSeconds"] = "10",
+            ["Notifications:BatchWindowSeconds"] = "30"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<Microsoft.Extensions.Logging.ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>), typeof(NullLogger<>));
+        services.AddNotifications(configuration);
+        services.AddNotificationWorker(configuration);
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddSingleton<INotificationStore>(world.Store);
+        services.AddSingleton<IAuditStore>(world.Audit);
+        services.AddSingleton(world.Inbox.Inbox);
+        using var provider = services.BuildServiceProvider();
+        var worker = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>().Single();
+
+        // Act: the first pass starts the window, the second pass fails, the third and fourth pass go on
+        await worker.StartAsync(cancellationToken);
+        await clock.WaitForTimersAsync(1);
+        world.Audit.FailLatestSequence = new IOException("disk");
+        await clock.AdvanceAsync(TimeSpan.FromSeconds(10), expectPass: true);
+        world.Audit.FailLatestSequence = null;
+        await clock.AdvanceAsync(TimeSpan.FromSeconds(10), expectPass: true);
+        var early = Directory.Exists(_folder) ? Directory.GetFiles(_folder, "*.eml").Length : 0;
+        await clock.AdvanceAsync(TimeSpan.FromSeconds(10), expectPass: true);
+
+        // Assert: nothing within the window, then one mail written by the real file sender
+        Assert.Equal(0, early);
+        Assert.Single(Directory.GetFiles(_folder, "*.eml"));
+        await worker.StopAsync(cancellationToken);
     }
 
     /// <summary>

@@ -295,11 +295,25 @@ public partial class AccountPage : ComponentBase
         try
         {
             NotificationInfo = await Notifications.GetStatusAsync(await AuthenticationState.GetActorAsync());
+            NotificationModeChoice = NotificationInfo.Mode;
         }
         catch (DomainRuleException)
         {
             // The account is gone; SessionGate shows the "session ended" message
         }
+    }
+
+    /// <summary>
+    ///     Saves the chosen notification mode.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task SaveNotificationModeAsync()
+    {
+        var mode = NotificationModeChoice;
+        await RunNotificationActionAsync(
+            actor => Notifications.SetModeAsync(actor, mode),
+            "Your e-mail setting was saved.");
+        NotificationModeSaved = NotificationError is null;
     }
 
     /// <summary>
@@ -361,6 +375,7 @@ public partial class AccountPage : ComponentBase
     {
         NotificationError = null;
         NotificationNotice = null;
+        NotificationModeSaved = false;
         try
         {
             await action(await AuthenticationState.GetActorAsync());
@@ -400,6 +415,16 @@ public partial class AccountPage : ComponentBase
     ///     Gets the confirmation of the last notification address action, or <c>null</c>.
     /// </summary>
     private string? NotificationNotice { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether <see cref="NotificationNotice"/> confirms a saved notification mode.
+    /// </summary>
+    private bool NotificationModeSaved { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the mode chosen in the mode selector.
+    /// </summary>
+    private NotificationMode NotificationModeChoice { get; set; }
 
     /// <summary>
     ///     Gets or sets the address typed into the address form.

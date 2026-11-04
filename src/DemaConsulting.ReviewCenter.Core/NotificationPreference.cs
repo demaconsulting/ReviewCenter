@@ -79,6 +79,46 @@ public sealed class NotificationPreference
     public DateTimeOffset? PendingSentUtc { get; init; }
 
     /// <summary>
+    ///     Gets the notification mode the user chose; <see cref="NotificationMode.None"/> until the user chooses one.
+    /// </summary>
+    public NotificationMode Mode { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the items that exist now must be recorded as already known, without a
+    ///     mail, at the next pass of the dispatcher; set when a mode is switched on.
+    /// </summary>
+    public bool BaselinePending { get; init; }
+
+    /// <summary>
+    ///     Gets the moment the batch window of the mode <see cref="NotificationMode.Every"/> started (UTC), or
+    ///     <c>null</c> while none runs.
+    /// </summary>
+    public DateTimeOffset? BatchStartedUtc { get; init; }
+
+    /// <summary>
+    ///     Gets the moment the last daily slot was handled (UTC), or <c>null</c> when none was.
+    /// </summary>
+    public DateTimeOffset? DigestHandledUtc { get; init; }
+
+    /// <summary>
+    ///     Gets the number of notification mails in a row that could not be sent.
+    /// </summary>
+    public int FailureCount { get; init; }
+
+    /// <summary>
+    ///     Gets the earliest moment of the next attempt to send after a failure (UTC), or <c>null</c> while none
+    ///     waits.
+    /// </summary>
+    public DateTimeOffset? NextAttemptUtc { get; init; }
+
+    /// <summary>
+    ///     Gets the generation of the row: a counter that rises by one every time the mode changes and every time a
+    ///     new address is confirmed, and never when the dispatcher records a pass. The dispatcher prepares a mail for
+    ///     one generation, and the store refuses its result after the generation moved on.
+    /// </summary>
+    public int Generation { get; init; }
+
+    /// <summary>
     ///     Gets the moment the row last changed (UTC).
     /// </summary>
     public DateTimeOffset Updated { get; init; }

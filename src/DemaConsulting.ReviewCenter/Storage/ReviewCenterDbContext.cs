@@ -37,8 +37,12 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
 ///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
-///     <c>TotpRecoveryCodes</c>) and for the e-mail notification tables (<c>NotificationPreferences</c> and
-///     <c>NotificationSendLog</c>): a database from before them must be deleted and recreated. The same is true for
+///     <c>TotpRecoveryCodes</c>) and for the e-mail notification tables (<c>NotificationPreferences</c>,
+///     <c>NotificationSendLog</c> and <c>NotifiedItems</c>) and the mode and dispatch state columns of
+///     <c>NotificationPreferences</c> (<c>Mode</c>, <c>BaselinePending</c>, <c>BatchStartedUtc</c>,
+///     <c>DigestHandledUtc</c>, <c>FailureCount</c>, <c>NextAttemptUtc</c> and <c>Generation</c>) and the <c>Kind</c>
+///     column and the review relationship of <c>NotifiedItems</c>: a database from before them must be
+///     deleted and recreated. The same is true for
 ///     the <c>ReviewReopens</c> table, for the <c>RequireIndependentReviewers</c>,
 ///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
 ///     <c>DueDate</c> column of reviews, and for the follow-up columns (<c>FollowsReviewId</c>, <c>CarriedAnswerCount</c>
@@ -218,6 +222,26 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the table of mails counted against the sending limits.
     /// </summary>
     public DbSet<NotificationSendLogEntry> NotificationSendLog => Set<NotificationSendLogEntry>();
+
+    /// <summary>
+    ///     Gets the table of inbox items users were already told about by e-mail.
+    /// </summary>
+    public DbSet<NotifiedItem> NotifiedItems => Set<NotifiedItem>();
+
+    /// <summary>
+    ///     Creates the converter that stores a time as fixed-width UTC text, so that text order is time order and the
+    ///     SQLite provider can compare it.
+    /// </summary>
+    /// <returns>The converter.</returns>
+    private static ValueConverter<DateTimeOffset, string> UtcTextConverter()
+    {
+        return new ValueConverter<DateTimeOffset, string>(
+            value => value.UtcDateTime.ToString(TimestampFormat, CultureInfo.InvariantCulture),
+            text => DateTimeOffset.Parse(
+                text,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal));
+    }
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -435,7 +459,36 @@ internal sealed class ReviewCenterDbContext : DbContext
                         text,
                         CultureInfo.InvariantCulture,
                         DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)));
+
+            // The mode and the state of the dispatcher; the times use the same sortable text form
+            preference.Property(p => p.Mode).HasConversion<int>();
+            preference.Property(p => p.BatchStartedUtc).HasConversion(UtcTextConverter());
+            preference.Property(p => p.DigestHandledUtc).HasConversion(UtcTextConverter());
+            preference.Property(p => p.NextAttemptUtc).HasConversion(UtcTextConverter());
             preference.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Items a user was already told about (the dedupe memory of the notification dispatcher): one row per user,
+        // project, review, inbox section and kind of reason, with the state token the user was told (or, when the flag
+        // GaveUp is set, the state the server gave up mailing). The kind keeps the
+        // two reasons that one section can show for one review apart (the standing of a reviewer and a question for
+        // the user). They go away with the user and with the review: a review that is deleted and created again under
+        // the same identifier is new to every user, so nothing of the old one may suppress its first mail
+        modelBuilder.Entity<NotifiedItem>(item =>
+        {
+            item.HasKey(i => i.Id);
+            item.Property(i => i.ReviewId).IsRequired().HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            item.Property(i => i.Section).HasConversion<string>().HasMaxLength(StateColumnLength);
+            item.Property(i => i.Kind).IsRequired().HasMaxLength(StateColumnLength);
+            item.Property(i => i.State).IsRequired().HasMaxLength(StateColumnLength);
+            item.Property(i => i.NotifiedUtc).HasConversion(UtcTextConverter());
+            item.Property(i => i.GaveUp).HasDefaultValue(false);
+            item.HasIndex(i => new { i.UserId, i.ProjectId, i.ReviewId, i.Section, i.Kind }).IsUnique();
+            item.HasOne<User>().WithMany().HasForeignKey(i => i.UserId).OnDelete(DeleteBehavior.Cascade);
+            item.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(i => new { i.ProjectId, i.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<NotificationSendLogEntry>(entry =>
