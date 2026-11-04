@@ -302,7 +302,7 @@ sections:
         tests:
           - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
 
-      - id: ReviewCenter-HelpPage-ApiTokensTopic-Bearer
+      - id: ReviewCenter-HelpPage-ApiTokensTopic-CurlExample
         title: >-
           The HelpPage unit shall explain in the API tokens topic how to send the token as a bearer token, with a curl
           example.

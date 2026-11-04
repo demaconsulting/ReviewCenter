@@ -1909,7 +1909,7 @@ sections:
           A help topic tells how a token is used and what it cannot do.
         children:
           - ReviewCenter-HelpPage-ApiTokensTopic
-          - ReviewCenter-HelpPage-ApiTokensTopic-Bearer
+          - ReviewCenter-HelpPage-ApiTokensTopic-CurlExample
           - ReviewCenter-HelpPage-ApiTokensTopic-Endpoints
           - ReviewCenter-HelpPage-ApiTokensTopic-ReviewMark
           - ReviewCenter-HelpPage-ApiTokensTopic-NeverSigns
