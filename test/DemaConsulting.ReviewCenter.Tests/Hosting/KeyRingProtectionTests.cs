@@ -1102,6 +1102,37 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that the key folder is restricted to its owner on Unix, whether it exists with the mode of a shared
+    ///     folder or does not exist yet.
+    /// </summary>
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void KeyRingProtection_PrepareKeyFolder_UnixFolder_IsOwnerOnly()
+    {
+        // Arrange: a key folder that the group and others may read, a folder that does not exist yet, and a plan
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
+        using var folder = new TemporaryDirectory();
+        var shared = folder.GetFilePath("shared");
+        Directory.CreateDirectory(shared);
+        File.SetUnixFileMode(
+            shared,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        var created = folder.GetFilePath("created");
+        using var plan = KeyRingProtection.Prepare(new KeyRingSettings { Protection = "PermissionsOnly" }, UnixPlatform);
+
+        // Act
+        KeyRingProtection.PrepareKeyFolder(plan, shared);
+        KeyRingProtection.PrepareKeyFolder(plan, created);
+
+        // Assert: both folders are readable, writable, and searchable by their owner only
+        var ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        Assert.Equal(ownerOnly, File.GetUnixFileMode(shared));
+        Assert.Equal(ownerOnly, File.GetUnixFileMode(created));
+    }
+
+    /// <summary>
     ///     Test that a key file that Data Protection stores while the server runs is restricted as it is stored, and
     ///     that the repository still returns what was stored. A recording call stands in for the change of the mode, so
     ///     the test runs on every platform.

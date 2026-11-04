@@ -3,45 +3,158 @@
 #
 # The UserCommand class runs the user add verb: it creates a user in the configured database, with the password
 # taken from the environment, from redirected standard input, or from a prompt, and reports the outcome.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
+#
+# The clause of the original password requirement about the command line option belongs to the Context unit
+# (ReviewCenter-Context-UserAddMisuse). Reading the password from redirected standard input can only be shown by a
+# test that starts the program, so that criterion is a requirement of the Hosting subsystem
+# (ReviewCenter-Hosting-UserAdd-StandardInput).
 
 sections:
   - title: UserCommand Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Create: the user, the administrator switch, the report
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserCommand-Create
         title: >-
-          The UserCommand class shall create a user with the given user name and display name in the configured
-          database, as a system administrator when the `--system-admin` switch is given and as an ordinary user
-          otherwise, and shall report the created user name and whether the user is a system administrator without
-          printing the password.
+          The UserCommand class shall create the user with the given user name and display name in the configured
+          database and return exit code 0.
         justification: |
-          Creating the first system administrator is the way into a new installation, and a message that echoed
-          the password would put it in logs and terminal history.
+          Creating the first user is the way into a new installation, before anyone can sign in.
         tests:
           - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
+
+      - id: ReviewCenter-UserCommand-Create-SystemAdmin
+        title: >-
+          The UserCommand class shall create the user as a system administrator when the `--system-admin` switch is
+          given.
+        justification: |
+          The first administrator of a new installation can only be created from the command line.
+        tests:
+          - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
+
+      - id: ReviewCenter-UserCommand-Create-OrdinaryUser
+        title: >-
+          The UserCommand class shall create an ordinary user, not a system administrator, when the `--system-admin`
+          switch is not given.
+        justification: |
+          Administrator rights must never be granted by default.
+        tests:
           - UserCommand_Run_NoSwitch_CreatesOrdinaryUser
+
+      - id: ReviewCenter-UserCommand-Create-Report
+        title: >-
+          The UserCommand class shall report the name of the created user, and whether the user is a system
+          administrator, on its output.
+        justification: |
+          The operator needs the confirmation of what was created.
+        tests:
+          - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
+          - UserCommand_Run_NoSwitch_ReportsUserWithoutAdministratorMark
+
+      - id: ReviewCenter-UserCommand-Create-NoPasswordPrinted
+        title: >-
+          The UserCommand class shall not write the password of the created user to its output.
+        justification: |
+          A message that echoed the password would put it in logs and terminal history.
+        tests:
+          - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
+
+      - id: ReviewCenter-UserCommand-Create-NoKeyRing
+        title: >-
+          The UserCommand class shall create the user without creating a Data Protection key file or the key folder.
+        justification: |
+          Adding a user must not change the key ring, because a key ring that appears next to a database that already
+          holds secrets would hide that the original ring is lost.
+        tests:
+          - UserCommand_Run_ValidUser_CreatesNoKeyFile
+
+      - id: ReviewCenter-UserCommand-Create-Arguments
+        title: >-
+          The UserCommand class shall throw an ArgumentNullException when it is run without a context.
+        justification: |
+          A missing context is a programming error that must fail at once, not later with an unrelated exception.
+        tests:
           - UserCommand_Run_NullContext_ThrowsArgumentNullException
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Password: where it comes from, and what happens without one
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserCommand-Password
         title: >-
-          The UserCommand class shall take the password from the REVIEWCENTER_PASSWORD environment variable, or
-          else from the first line of redirected standard input, or else from a prompt that is asked twice, never
-          from a command line option, and shall report an error with exit code 1 when no password is obtained.
+          The UserCommand class shall take the password of the new user from the REVIEWCENTER_PASSWORD environment
+          variable when that variable is set to a non-empty value.
         justification: |
-          A password on the command line is visible to other processes and is kept in shell history. An
-          environment variable and standard input suit scripts, and a prompt suits a person.
+          A password on the command line is visible to other processes and is kept in shell history, so scripts and
+          containers need a source that is not the command line.
+        tests:
+          - UserCommand_Run_PasswordInEnvironment_CreatesUserWithThatPassword
+
+      - id: ReviewCenter-UserCommand-Password-NoPassword
+        title: >-
+          The UserCommand class shall report the error "No password was provided." and return exit code 1 when no
+          password source supplies a password.
+        justification: |
+          The command must never create an account without a password, and a script needs the exit code to notice.
         tests:
           - UserCommand_Run_NoPassword_ReportsErrorWithExitCodeOne
-          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
-          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
-          - Context_Create_PasswordOption_IsNotSupported
 
+      - id: ReviewCenter-UserCommand-Password-NoDatabase
+        title: >-
+          The UserCommand class shall not create the database file when no password is provided.
+        justification: |
+          A command that is refused for a missing password must leave no trace, not even an empty database.
+        tests:
+          - UserCommand_Run_NoPassword_ReportsErrorWithExitCodeOne
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Errors: a request that breaks a rule is refused and stores nothing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserCommand-Errors
         title: >-
-          The UserCommand class shall report a user name that is taken, a password that is too short, or any other
-          rule violation as an error with exit code 1, creating nothing.
+          The UserCommand class shall report an error and return exit code 1 when the user name is already taken,
+          whatever the letter case.
         justification: |
-          Scripts rely on the exit code to notice that the user was not created, and the message must tell the
-          operator what to change.
+          Two accounts with the same name would make the entries of the audit trail ambiguous, and scripts rely on the
+          exit code to notice that the user was not created.
         tests:
           - UserCommand_Run_UserNameTaken_ReportsErrorWithExitCodeOne
+
+      - id: ReviewCenter-UserCommand-Errors-PasswordTooShort
+        title: >-
+          The UserCommand class shall report an error and return exit code 1 when the password is shorter than the
+          minimum length.
+        justification: |
+          A weak password is refused when the account is created, and the message must tell the operator what to
+          change.
+        tests:
           - UserCommand_Run_PasswordTooShort_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UserCommand-Errors-PasswordNotPrinted
+        title: >-
+          The UserCommand class shall not write a rejected password to its output.
+        justification: |
+          A refused password is still a secret that the operator typed, and it must not reach logs or terminal
+          history.
+        tests:
+          - UserCommand_Run_PasswordTooShort_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UserCommand-Errors-NothingCreated
+        title: >-
+          The UserCommand class shall not create a user when it rejects the password.
+        justification: |
+          A refused command must have no effect, or a retry would meet a half-created account.
+        tests:
+          - UserCommand_Run_PasswordTooShort_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UserCommand-Errors-InvalidUserName
+        title: >-
+          The UserCommand class shall report an error and return exit code 1 when the user name breaks the user name
+          rules, and shall create no user.
+        justification: |
+          A user name that the rules refuse must not get into the database by way of the command line.
+        tests:
+          - UserCommand_Run_InvalidUserName_ReportsErrorAndCreatesNothing

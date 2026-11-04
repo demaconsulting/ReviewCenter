@@ -348,6 +348,41 @@ public class GitSourceTests
     }
 
     /// <summary>
+    ///     Test that the first open of each repository clones one bare mirror folder for it, named for the repository,
+    ///     and leaves no temporary folder behind.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository()
+    {
+        // Arrange: an origin, a source with an empty cache folder, and two registered repositories at that location
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        var cache = Path.Combine(root.Path, "cache");
+        var source = NewSource(cache);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: open each repository for the first time
+        await OpenAndCloseAsync(source, Access(origin.Folder, 1), cancellationToken);
+        await OpenAndCloseAsync(source, Access(origin.Folder, 2), cancellationToken);
+
+        // Assert: each repository has a bare mirror folder of its own and no temporary folder is left
+        foreach (var name in new[] { "repo-1", "repo-2" })
+        {
+            var folder = Path.Combine(cache, name);
+            Assert.True(Directory.Exists(folder));
+            Assert.True(File.Exists(Path.Combine(folder, "HEAD")));
+            Assert.True(Directory.Exists(Path.Combine(folder, "objects")));
+            Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
+            Assert.Contains(
+                "bare = true",
+                await File.ReadAllTextAsync(Path.Combine(folder, "config"), cancellationToken),
+                StringComparison.Ordinal);
+            Assert.False(Directory.Exists(folder + ".tmp"));
+        }
+    }
+
+    /// <summary>
     ///     Test that opening again fetches new commits and prunes deleted branches.
     /// </summary>
     [Fact]

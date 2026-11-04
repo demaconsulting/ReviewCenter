@@ -276,6 +276,12 @@ reports that the user already exists; the password appears in neither output. Th
 environment while standard input is closed; it exits with code 1 and reports "No password was provided." instead of
 waiting for input. This scenario is tested by `ReviewCenter_UserAddVerb_NoPassword_ReturnsError`.
 
+**ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser**: The tool is run with `user add`, a user name and a
+display name, on a new temporary database, with the environment variable `REVIEWCENTER_PASSWORD` empty and the password
+piped to standard input; it exits with code 0, reports "Created user 'ann'." without the password, and a server started
+over the same database authenticates the user with the piped password. This scenario is tested by
+`ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser`.
+
 **ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers**: A real server runs with a temporary
 database and a git repository; a system administrator (`puppet`) creates a project, adds the user names `puppet`,
 `second`, and `third` as members (a fourth user, `outsider`, is not added), and plans a review from the repository. In

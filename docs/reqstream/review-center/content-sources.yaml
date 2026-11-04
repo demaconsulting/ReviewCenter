@@ -23,7 +23,15 @@ sections:
           hanging a request, or exhausting the memory of the server.
         children:
           - ReviewCenter-GitRunner-NoShell
+          - ReviewCenter-GitRunner-NoShell-Environment
+          - ReviewCenter-GitRunner-NoShell-Prompts
+          - ReviewCenter-GitRunner-NoShell-Configuration
+          - ReviewCenter-GitRunner-NoShell-CredentialHelper
+          - ReviewCenter-GitRunner-NoShell-Protocols
+          - ReviewCenter-GitRunner-NoShell-Hooks
+          - ReviewCenter-GitRunner-NoShell-Result
           - ReviewCenter-GitRunner-Timeout
+          - ReviewCenter-GitRunner-Timeout-Ends
           - ReviewCenter-GitRunner-OutputLimit
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
@@ -38,7 +46,14 @@ sections:
           mirror under a reader.
         children:
           - ReviewCenter-GitSource-Mirror
+          - ReviewCenter-GitSource-Mirror-Refresh
+          - ReviewCenter-GitSource-Mirror-Prune
+          - ReviewCenter-GitSource-Mirror-LocationChange
+          - ReviewCenter-GitSource-Mirror-FailedClone
+          - ReviewCenter-GitSource-Mirror-CloneError
+          - ReviewCenter-GitSource-Mirror-NoToken
           - ReviewCenter-GitSource-Serialization
+          - ReviewCenter-GitSource-Serialization-Parallel
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -50,6 +65,17 @@ sections:
           A review is made of exact commits, and the user must be told when the name they gave matches nothing.
         children:
           - ReviewCenter-GitSource-Revision
+          - ReviewCenter-GitSource-Revision-Unknown
+          - ReviewCenter-GitSource-Revision-Unsafe
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Revisions-Branch
+        title: >-
+          The ContentSources subsystem shall resolve the branch name of a registered repository to the commit at the
+          tip of the branch.
+        justification: |
+          A review is made of exact commits, so a branch name must lead to the commit that the branch points to.
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -62,7 +88,23 @@ sections:
           A review covers what changed, or the whole head. Only plain files can be reviewed byte for byte.
         children:
           - ReviewCenter-GitSource-Changes
+          - ReviewCenter-GitSource-Changes-Rename
+          - ReviewCenter-GitSource-Changes-NoBaseline
+          - ReviewCenter-GitSource-Changes-ModeOnly
+          - ReviewCenter-GitSource-Changes-Order
+          - ReviewCenter-GitSource-Changes-Blobs
           - ReviewCenter-GitSource-SpecialEntries
+          - ReviewCenter-GitSource-SpecialEntries-Reported
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Changes-Between
+        title: >-
+          The ContentSources subsystem shall list the file that changed between two commits of a registered
+          repository.
+        justification: |
+          A review covers what changed between the baseline and the head, so the change of a file must show in the
+          list.
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -75,6 +117,19 @@ sections:
           protects the server.
         children:
           - ReviewCenter-GitSource-Content
+          - ReviewCenter-GitSource-Content-Limit
+          - ReviewCenter-GitSource-Content-ObjectIds
+          - ReviewCenter-GitSource-Content-Size
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Content-Bytes
+        title: >-
+          The ContentSources subsystem shall read the content of a file of a commit of a registered repository as it
+          was committed.
+        justification: |
+          The fingerprint of a review is calculated over the bytes of the file, so the content must come out the way it
+          went in.
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -89,11 +144,56 @@ sections:
           the process list, in the cache folder, or in any message, while the server must still be able to use it.
         children:
           - ReviewCenter-CredentialProtector-Encrypt
+          - ReviewCenter-CredentialProtector-Encrypt-Decrypt
+          - ReviewCenter-CredentialProtector-Encrypt-Arguments
           - ReviewCenter-CredentialProtector-Persistence
           - ReviewCenter-CredentialProtector-Unreadable
+          - ReviewCenter-CredentialProtector-Unreadable-NotEncrypted
+          - ReviewCenter-CredentialProtector-Unreadable-Message
           - ReviewCenter-CredentialProtector-Isolation
+          - ReviewCenter-CredentialProtector-Isolation-Foreign
           - ReviewCenter-GitRunner-TokenEnvironment
+          - ReviewCenter-GitRunner-TokenEnvironment-Arguments
+          - ReviewCenter-GitRunner-TokenEnvironment-Header
+          - ReviewCenter-GitRunner-TokenEnvironment-Anonymous
           - ReviewCenter-GitRunner-Redaction
+          - ReviewCenter-GitRunner-Redaction-EncodedHeader
+          - ReviewCenter-GitRunner-Redaction-UrlCredentials
+          - ReviewCenter-GitRunner-Redaction-Location
+          - ReviewCenter-GitRunner-Redaction-Cut
+          - ReviewCenter-GitRunner-Redaction-BufferStart
+          - ReviewCenter-GitRunner-Redaction-ErrorLimit
+          - ReviewCenter-GitRunner-Redaction-Unchanged
+          - ReviewCenter-GitRunner-Redaction-NoLocation
+          - ReviewCenter-GitRunner-Redaction-MissingText
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials-Encrypted
+        title: >-
+          The ContentSources subsystem shall store the access token of a registered repository only as encrypted text
+          that does not contain the token.
+        justification: |
+          A copy of the database must not reveal the token that grants access to the source code.
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials-Access
+        title: >-
+          The ContentSources subsystem shall give the readable token of a registered repository in the access that it
+          builds for the repository.
+        justification: |
+          The server must be able to use the token that it keeps encrypted, so the access that git is given carries it
+          in readable form.
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials-Display
+        title: >-
+          The ContentSources subsystem shall keep the access token out of the text form of the access of a repository.
+        justification: |
+          The text form of an access is what ends up in logs and messages when somebody prints the access, so it must
+          not hold the token.
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -108,7 +208,22 @@ sections:
           slow server, and must be able to act on the message.
         children:
           - ReviewCenter-GitRunner-Errors
+          - ReviewCenter-GitRunner-Errors-OldGit
+          - ReviewCenter-GitRunner-Errors-Failure
+          - ReviewCenter-GitRunner-Errors-FirstLine
+          - ReviewCenter-GitRunner-Errors-ExitCode
+          - ReviewCenter-GitRunner-Errors-Length
+          - ReviewCenter-GitRunner-Errors-Denied
+          - ReviewCenter-GitRunner-Errors-Secrets
+          - ReviewCenter-GitRunner-Errors-LocalPath
+          - ReviewCenter-GitRunner-Errors-WebAddress
+          - ReviewCenter-GitRunner-Errors-CacheFolder
+          - ReviewCenter-GitRunner-Errors-CacheMalformed
+          - ReviewCenter-GitRunner-Errors-CacheMessage
           - ReviewCenter-GitSource-CacheFolder
+          - ReviewCenter-GitSource-CacheFolder-Malformed
+          - ReviewCenter-GitSource-CacheFolder-Message
+          - ReviewCenter-GitSource-CacheFolder-Lock
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
@@ -124,9 +239,54 @@ sections:
           the baseline of a new one only when that is sound.
         children:
           - ReviewCenter-ReviewSetParser-Read
+          - ReviewCenter-ReviewSetParser-Read-UnknownKeys
+          - ReviewCenter-ReviewSetParser-Read-Styles
+          - ReviewCenter-ReviewSetParser-Read-Trimmed
+          - ReviewCenter-ReviewSetParser-Read-ByteOrderMark
+          - ReviewCenter-ReviewSetParser-Read-WindowsLineEnds
+          - ReviewCenter-ReviewSetParser-Read-EmptyPaths
           - ReviewCenter-ReviewSetParser-Limits
+          - ReviewCenter-ReviewSetParser-Limits-Alias
+          - ReviewCenter-ReviewSetParser-Limits-SetCount
+          - ReviewCenter-ReviewSetParser-Limits-IdLength
+          - ReviewCenter-ReviewSetParser-Limits-TitleLength
+          - ReviewCenter-ReviewSetParser-Limits-IdControl
+          - ReviewCenter-ReviewSetParser-Limits-TitleControl
+          - ReviewCenter-ReviewSetParser-Limits-PathCount
+          - ReviewCenter-ReviewSetParser-Limits-PathValue
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit
           - ReviewCenter-ReviewSetParser-Errors
+          - ReviewCenter-ReviewSetParser-Errors-NotYaml
+          - ReviewCenter-ReviewSetParser-Errors-MissingId
+          - ReviewCenter-ReviewSetParser-Errors-MissingTitle
+          - ReviewCenter-ReviewSetParser-Errors-DuplicateId
+          - ReviewCenter-ReviewSetParser-Errors-PlainMessage
+          - ReviewCenter-ReviewSetParser-Errors-Content
           - ReviewCenter-GitSource-Ancestry
+          - ReviewCenter-GitSource-Ancestry-NotAncestor
+          - ReviewCenter-GitSource-Ancestry-Itself
+          - ReviewCenter-GitSource-Ancestry-UnknownCommit
+          - ReviewCenter-GitSource-Ancestry-NoPaths
+        tests:
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+
+      - id: ReviewCenter-ContentSources-ReviewSets-Read
+        title: >-
+          The ContentSources subsystem shall read the review-set, with its identifier and paths, that the ReviewMark
+          configuration file of a commit of a registered repository defines.
+        justification: |
+          The planner offers one review for each set that the repository itself defines, so the set must come out of
+          the repository exactly as written.
+        tests:
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+
+      - id: ReviewCenter-ContentSources-ReviewSets-Ancestry
+        title: >-
+          The ContentSources subsystem shall tell that a commit is in the history of a later commit and that the later
+          commit is not in the history of the earlier one.
+        justification: |
+          The head of an earlier review may serve as the baseline of a new one only when it is in the history of the
+          new head, so the answer must be right in both directions.
         tests:
           - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
 
@@ -136,5 +296,14 @@ sections:
         justification: |
           Disabling a repository is how an administrator of its project stops its use, for example after a token was
           exposed.
+        tests:
+          - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading
+
+      - id: ReviewCenter-ContentSources-DisabledRepository-NotOffered
+        title: >-
+          The ContentSources subsystem shall leave a disabled repository out of the repositories offered for use.
+        justification: |
+          A repository that an administrator has disabled must not appear among the choices for a review, so that
+          nobody picks it by mistake.
         tests:
           - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading

@@ -3,50 +3,216 @@
 #
 # The ReviewMarkConfigParser class reads the review-sets (identifier, title, and paths) from the bytes of the
 # ReviewMark configuration file of a repository, so that the planner can offer one review per set.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ReviewSetParser Unit Requirements
     requirements:
       - id: ReviewCenter-ReviewSetParser-Read
         title: >-
-          The ReviewSetParser shall read the review-sets of a ReviewMark configuration file as the list of the
-          entries of its reviews key, in file order, each with its identifier, its title, and its ordered paths,
-          trimmed, shall ignore every other key at every level, and shall understand the block, flow, quoted, and
-          folded styles of YAML, a byte order mark, and Windows line endings.
+          The ReviewSetParser class shall read the review-sets of a ReviewMark configuration file as the entries of its
+          reviews key, in file order, each with its identifier, title, and ordered paths.
         justification: |
-          The configuration file belongs to ReviewMark and has many keys that ReviewCenter does not need. Reading only
-          what is needed, and reading it as YAML defines it, lets the same file serve both tools, and the file order
-          is the order the planner shows.
+          The planner offers one review for each set, in the order of the file.
         tests:
           - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
           - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
+
+      - id: ReviewCenter-ReviewSetParser-Read-UnknownKeys
+        title: >-
+          The ReviewSetParser class shall ignore every key other than reviews, and in each entry every key other than
+          id, title, and paths, at every level.
+        justification: |
+          The configuration file belongs to ReviewMark and has many keys that ReviewCenter does not need.
+        tests:
+          - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
+          - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+
+      - id: ReviewCenter-ReviewSetParser-Read-Styles
+        title: >-
+          The ReviewSetParser class shall understand the block, flow, quoted, and folded styles of YAML.
+        justification: |
+          Reading the file as YAML defines it lets the same file serve both tools.
+        tests:
+          - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+
+      - id: ReviewCenter-ReviewSetParser-Read-Trimmed
+        title: >-
+          The ReviewSetParser class shall trim the white space around the identifier of a review-set.
+        justification: |
+          An identifier written with padding and the same identifier without it must name the same set.
+        tests:
+          - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+
+      - id: ReviewCenter-ReviewSetParser-Read-ByteOrderMark
+        title: >-
+          The ReviewSetParser class shall read a file that starts with a byte order mark.
+        justification: |
+          Editors on Windows add a byte order mark to files.
+        tests:
+          - ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped
+
+      - id: ReviewCenter-ReviewSetParser-Read-WindowsLineEnds
+        title: >-
+          The ReviewSetParser class shall read a file that uses Windows line endings.
+        justification: |
+          A file from a checkout on Windows has Windows line endings.
+        tests:
+          - ReviewMarkConfigParser_Parse_WindowsLineEnds_AreUnderstood
+
+      - id: ReviewCenter-ReviewSetParser-Read-EmptyPaths
+        title: >-
+          The ReviewSetParser class shall give a review-set that has no paths an empty list of paths.
+        justification: |
+          A review-set without paths is allowed.
+        tests:
           - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
 
       - id: ReviewCenter-ReviewSetParser-Limits
         title: >-
-          The ReviewSetParser shall refuse a file larger than 256 KiB before reading it as YAML, a file that uses a
-          YAML alias, a file with more than 500 review-sets, an identifier longer than 100 characters, a title longer
-          than 200 characters, an identifier or a title that contains a control character, a set with more paths than
-          a selection allows, and a path that is empty, too long, or contains a control character, while accepting a
-          file exactly at each limit.
+          The ReviewSetParser class shall refuse a file larger than 256 KiB before reading it as YAML.
         justification: |
-          The file is written by other people and is read by the server. Bounding its size, its counts and its
-          lengths, and refusing aliases that can expand a small file into an enormous document, keeps a hostile file
-          from using unbounded time or memory.
+          The file is written by other people and is read by the server. Bounding its size keeps a hostile file from
+          using unbounded time or memory.
+        tests:
+          - ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Limits-Alias
+        title: >-
+          The ReviewSetParser class shall refuse a file that uses a YAML alias.
+        justification: |
+          An alias can expand a small file into an enormous document.
+        tests:
+          - ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Limits-SetCount
+        title: >-
+          The ReviewSetParser class shall refuse a file with more than 500 review-sets.
+        justification: |
+          The count bounds the work of the server and the size of the planner page.
+        tests:
+          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-IdLength
+        title: >-
+          The ReviewSetParser class shall refuse a review-set whose identifier is longer than 100 characters.
+        justification: |
+          The length bounds the text that the server stores and shows.
+        tests:
+          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-TitleLength
+        title: >-
+          The ReviewSetParser class shall refuse a review-set whose title is longer than 200 characters.
+        justification: |
+          The length bounds the text that the server stores and shows.
+        tests:
+          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-IdControl
+        title: >-
+          The ReviewSetParser class shall refuse a review-set whose identifier contains a control character.
+        justification: |
+          A control character could forge lines in logs and messages.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Limits-TitleControl
+        title: >-
+          The ReviewSetParser class shall refuse a review-set whose title contains a control character.
+        justification: |
+          A control character could forge lines in logs and messages.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Limits-PathCount
+        title: >-
+          The ReviewSetParser class shall refuse a review-set with more than 100 paths.
+        justification: |
+          A selection allows only 100 patterns.
+        tests:
+          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-PathValue
+        title: >-
+          The ReviewSetParser class shall refuse a path that is empty, longer than 400 characters, or contains a control
+          character.
+        justification: |
+          The paths of a set are joined into one selection text with line breaks, so a path must be one plain line of
+          limited length.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit
+        title: >-
+          The ReviewSetParser class shall accept a file whose size, review-set count, identifier length, title length,
+          path count, and path length are exactly at their limits.
+        justification: |
+          The limits must not refuse a file that is allowed.
         tests:
           - ReviewMarkConfigParser_Parse_Limits_AreEnforced
-          - ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid
-          - ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
+          - ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead
 
       - id: ReviewCenter-ReviewSetParser-Errors
         title: >-
-          The ReviewSetParser shall report a file that is empty, has no review-sets, is not valid YAML, or has a
-          review-set without an identifier or a title, or with a repeated identifier, as a domain rule exception
-          with the rule ReviewSetConfigInvalid and a plain message that names the position of the problem and shows
-          nothing of the YAML library, and shall refuse missing content.
+          The ReviewSetParser class shall refuse a file that is empty or defines no review-sets with the rule
+          ReviewSetConfigInvalid.
         justification: |
-          The user who sees the message has to correct the file. A position and a plain sentence tell them where to
-          look, and the text and the stack of a library would only confuse them or reveal the inner workings.
+          The user who sees the message has to correct the file.
         tests:
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-NotYaml
+        title: >-
+          The ReviewSetParser class shall refuse a file that is not valid YAML with the rule ReviewSetConfigInvalid and
+          a message that names the line of the problem.
+        justification: |
+          A position tells the user where to look.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-MissingId
+        title: >-
+          The ReviewSetParser class shall refuse a review-set without an identifier with a message that names its
+          position.
+        justification: |
+          A position tells the user which entry to correct.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-MissingTitle
+        title: >-
+          The ReviewSetParser class shall refuse a review-set without a title with a message that names its position.
+        justification: |
+          A position tells the user which entry to correct.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-DuplicateId
+        title: >-
+          The ReviewSetParser class shall refuse a review-set that repeats the identifier of an earlier one with a
+          message that names its position.
+        justification: |
+          The identifiers of the review-sets must be unique, and a position tells the user which entry to correct.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-PlainMessage
+        title: >-
+          The ReviewSetParser class shall show nothing of the text or the stack of the YAML library in the message of a
+          refused file.
+        justification: |
+          The text and the stack of a library would only confuse the user or reveal the inner workings.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors-Content
+        title: >-
+          The ReviewSetParser class shall refuse missing content with an argument-null error.
+        justification: |
+          Missing file content is a programming error that must not become an unclear failure later.
+        tests:
           - ReviewMarkConfigParser_Parse_Null_Throws

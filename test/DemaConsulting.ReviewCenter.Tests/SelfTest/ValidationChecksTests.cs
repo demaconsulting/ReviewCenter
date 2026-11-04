@@ -1189,6 +1189,23 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the settings of the self-validation and of the isolated hosts choose permissions only, so that no
+    ///     test and no self-validation ever uses the key store of the operating system.
+    /// </summary>
+    [Fact]
+    public void SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection()
+    {
+        // Arrange
+        using var folder = new TemporaryDirectory();
+
+        // Act
+        var settings = SelfTestServices.CreateSettings(folder);
+
+        // Assert
+        Assert.Equal("PermissionsOnly", settings["DataProtection:Protection"]);
+    }
+
+    /// <summary>
     ///     Test that the services the checks build run their throw-away database with the fast commit settings.
     /// </summary>
     [Fact]

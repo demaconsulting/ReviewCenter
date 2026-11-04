@@ -29,8 +29,10 @@ key store is used because the key files are not encrypted).
 - A database without secrets succeeds with zero counts.
 - A null context is rejected with an `ArgumentNullException`.
 - A failure while re-protecting (the second table cannot be written) makes the command stop with exit code 1 and a
-  message that says that a new key was created, how many secrets of the completed table were re-protected, which
-  table is unchanged, and that the command can be run again, without a secret.
+  message that says that a new key was created and names it, how many secrets of the completed table were
+  re-protected, which table is unchanged, and that the command can be run again, without a secret.
+- A table whose re-protection fails is left unchanged as a whole, also when the failure hits a later row.
+- A new key file is protected with the configured protection, for example encrypted with a certificate.
 - Key ring settings that cannot be used make the command refuse with exit code 1, no key and no change.
 
 #### Test Scenarios
@@ -58,10 +60,22 @@ secrets; the command refuses and creates no key. This scenario is tested by
 
 **KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable**: A database trigger makes every update of the
 second-factor table fail, which is deterministic and needs no timing. The repository table is committed, the command
-stops with exit code 1, and the message says that a new key was created, that one repository token was
+stops with exit code 1, and the message says that a new key was created and names its id (the id of the one new key
+file), that one repository token was
 re-protected, that the second-factor table is unchanged and that the command can be run again; it holds no secret
 and not the refusal wording "nothing was changed"; the stored second-factor value is as before, and the token is
 readable with the new key. This scenario is tested by `KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable`.
+
+**KeysCommand_Run_FailureInTable_LeavesWholeTableUnchanged**: A repository token and two second-factor secrets (users
+7 and 8) are stored and a trigger makes the update of user 8 fail, so that user 7 is changed before the failure. The
+command stops with exit code 1, the rows of both users are as before (the change of user 7 was rolled back), and the
+repository token has changed, because its table was committed. This scenario is tested by
+`KeysCommand_Run_FailureInTable_LeavesWholeTableUnchanged`.
+
+**KeysCommand_Run_CertificateConfigured_NewKeyFileIsEncrypted**: The settings select certificate protection with a
+certificate file and its password; the command succeeds, the folder holds one key file, the file holds an
+`encryptedSecret` element and no `masterKey` element. This scenario is tested by
+`KeysCommand_Run_CertificateConfigured_NewKeyFileIsEncrypted`.
 
 **KeysCommand_Run_KeyRingSettingsProblem_RefusesAndCreatesNoKey**: The settings require encrypted keys while the
 protection is permissions only, so the key ring plan has a problem; the command refuses with exit code 1, names the

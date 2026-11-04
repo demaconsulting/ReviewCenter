@@ -126,6 +126,8 @@ sections:
         children:
           - ReviewCenter-Core-PlanReviews
           - ReviewCenter-ContentSources-ReviewSets
+          - ReviewCenter-ContentSources-ReviewSets-Read
+          - ReviewCenter-ContentSources-ReviewSets-Ancestry
           - ReviewCenter-Hosting-PlannerServices
           - ReviewCenter-Web-PlanReviews
           - ReviewCenter-Web-PlanReviews-Summary
@@ -1573,6 +1575,7 @@ sections:
           - ReviewCenter-Program-UserAdd
           - ReviewCenter-Cli-UserAdd
           - ReviewCenter-Hosting-UserAdd
+          - ReviewCenter-Hosting-UserAdd-StandardInput
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
@@ -1629,10 +1632,14 @@ sections:
           - ReviewCenter-ContentSources-GitAccess
           - ReviewCenter-ContentSources-Mirror
           - ReviewCenter-ContentSources-Revisions
+          - ReviewCenter-ContentSources-Revisions-Branch
           - ReviewCenter-ContentSources-Changes
+          - ReviewCenter-ContentSources-Changes-Between
           - ReviewCenter-ContentSources-Content
+          - ReviewCenter-ContentSources-Content-Bytes
           - ReviewCenter-ContentSources-Errors
           - ReviewCenter-ContentSources-DisabledRepository
+          - ReviewCenter-ContentSources-DisabledRepository-NotOffered
           - ReviewCenter-Core-FileSelection
           - ReviewCenter-Hosting-GitSettings
         tests:
@@ -1653,6 +1660,9 @@ sections:
           protection of the keys is part of the promise.
         children:
           - ReviewCenter-ContentSources-Credentials
+          - ReviewCenter-ContentSources-Credentials-Encrypted
+          - ReviewCenter-ContentSources-Credentials-Access
+          - ReviewCenter-ContentSources-Credentials-Display
           - ReviewCenter-Hosting-KeyRingFailure
         tests:
           - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
@@ -1930,7 +1940,9 @@ sections:
           - ReviewCenter-Cli-Serve
           - ReviewCenter-Cli-Urls
           - ReviewCenter-Hosting-Health
+          - ReviewCenter-Hosting-Health-Routes
           - ReviewCenter-Hosting-Logging
+          - ReviewCenter-Hosting-Logging-FrameworkEntries
         tests:
           - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
           - ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl
@@ -1981,7 +1993,9 @@ sections:
           request, so failing at start-up with a clear message lets the operator correct the setting.
         children:
           - ReviewCenter-Hosting-Database
+          - ReviewCenter-Hosting-Database-Restart
           - ReviewCenter-Hosting-DatabaseFailure
+          - ReviewCenter-Hosting-DatabaseFailure-ExitCode
           - ReviewCenter-Storage-Persistence
           - ReviewCenter-Storage-Persistence-Reviews
           - ReviewCenter-Storage-Persistence-FileContent

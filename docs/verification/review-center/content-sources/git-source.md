@@ -68,6 +68,10 @@ to `IsAncestorAsync`, that are not object ids
 (an option, a revision name, a wrong length, or uppercase) are refused with an `ArgumentException` before git runs. This
 scenario is tested by `GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException`.
 
+**GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository**: Opening two registered repositories for the first time
+makes one bare mirror folder for each, named for the repository, with no working tree, and leaves no temporary folder.
+This scenario is tested by `GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository`.
+
 **GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches**: After a commit is added and a branch is deleted in the
 origin, opening again makes the new commit resolvable and the deleted branch unknown. This scenario is tested by
 `GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches`.

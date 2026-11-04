@@ -120,6 +120,26 @@ public class CredentialProtectorTests
     }
 
     /// <summary>
+    ///     Test that text protected for another purpose of the same key ring is reported as credentials that cannot
+    ///     be read.
+    /// </summary>
+    [Fact]
+    public void CredentialProtector_Unprotect_OtherPurpose_ThrowsCredentialsUnreadable()
+    {
+        // Arrange: text protected for another purpose of the key ring, and the credential protector over the same ring
+        using var keys = new TempFolder();
+        var provider = Provider(keys.Path);
+        var foreignText = provider.CreateProtector("Some.Other.Purpose").Protect("tok");
+        var protector = new CredentialProtector(provider);
+
+        // Act: read the foreign text with the credential protector
+        var exception = Assert.Throws<DomainRuleException>(() => protector.Unprotect(foreignText));
+
+        // Assert: the credentials are reported as unreadable
+        Assert.Equal(DomainRule.CredentialsUnreadable, exception.Rule);
+    }
+
+    /// <summary>
     ///     Test that null arguments are refused.
     /// </summary>
     [Fact]

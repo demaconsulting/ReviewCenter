@@ -38,8 +38,8 @@ proves the decision (restrict on Unix, do nothing on Windows) without touching t
 - `RequireEncryptedKeys` refuses `PermissionsOnly` and a plain key file.
 - `AllowNewKeyRing` is false by default, and the inspection of a ring counts its key files by kind, counts a missing
   folder as zero, and creates and changes nothing.
-- On Linux and macOS the key files are restricted to the owner, also when Data Protection stores a new key file while
-  the server runs. The warning of `PermissionsOnly` is logged.
+- On Linux and macOS the key folder is restricted to its owner (mode 0700) and the key files to the owner (mode 0600),
+  also when Data Protection stores a new key file while the server runs. The warning of `PermissionsOnly` is logged.
 - On Windows the `PermissionsOnly` protection restricts the key folder to the current account and the system, without
   inheritance, and the files created in it inherit that; the other protections leave the rules of the folder alone.
 - On Windows a ring protected with DPAPI holds an encrypted secret and is read again after a restart.
@@ -141,6 +141,10 @@ This scenario is tested by the test of the same name, which lives with the `Serv
 
 **KeyRingProtection_RestrictKeyFiles_UnixKeyFiles_AreOwnerReadWriteOnly**: On Linux and macOS only, key files that were
 created with wider modes are restricted to 0600. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_PrepareKeyFolder_UnixFolder_IsOwnerOnly**: On Linux and macOS only, a key folder that the group and
+others may read is restricted to its owner (mode 0700), and a key folder that does not exist yet is created with that
+mode. This scenario is tested by the test of the same name.
 
 **KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile** and
 **KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes**: A key is stored through the

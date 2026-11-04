@@ -41,6 +41,14 @@ gives the two sets in file order with their ordered paths. This scenario is test
 style, quoting, a folded block scalar, and padded values gives the values as YAML defines them, trimmed. This scenario is
 tested by `ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood`.
 
+**ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped**: A small file whose bytes start with a UTF-8 byte order mark is
+read, and its one review-set has the expected identifier and title. This scenario is tested by
+`ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped`.
+
+**ReviewMarkConfigParser_Parse_WindowsLineEnds_AreUnderstood**: A small file with Windows line endings is read, and its
+review-set and path have the expected values. This scenario is tested by
+`ReviewMarkConfigParser_Parse_WindowsLineEnds_AreUnderstood`.
+
 **ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid**: A theory over files that are empty, have no `reviews`
 list, an empty list, an entry without an identifier or a title, a repeated identifier, broken YAML, entries of the wrong
 shape, and empty or control-character paths, identifiers, or titles; each gives the rule `ReviewSetConfigInvalid` and a
@@ -50,6 +58,14 @@ part that shows no library text. This scenario is tested by `ReviewMarkConfigPar
 **ReviewMarkConfigParser_Parse_Limits_AreEnforced**: Files exactly at the identifier, title, path count, path length, and
 set count limits are read; files one past each limit are refused with the rule. This scenario is tested by
 `ReviewMarkConfigParser_Parse_Limits_AreEnforced`.
+
+**ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit**: A theory over files that are one past the
+set count, identifier length, title length, path count, and path length limits; each gives the rule
+`ReviewSetConfigInvalid` and a message that names its own limit. This scenario is tested by
+`ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit`.
+
+**ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead**: A valid file that is exactly 256 KiB is read and gives its
+review-set. This scenario is tested by `ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead`.
 
 **ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid**: A file one byte over 256 KiB is refused with the rule,
 and the message gives the limit. This scenario is tested by `ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid`.

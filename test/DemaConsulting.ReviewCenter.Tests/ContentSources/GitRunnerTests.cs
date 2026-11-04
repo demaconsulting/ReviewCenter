@@ -113,6 +113,60 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that a variable of the server process that git does not need is not passed on to git, while a listed
+    ///     variable such as <c>PATH</c> is.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit()
+    {
+        // Arrange: a runner, anonymous access and a variable in the server process that git does not need
+        const string unlisted = "RC_TEST_UNLISTED_VARIABLE";
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", null, null);
+        var path = Environment.GetEnvironmentVariable("PATH");
+        Environment.SetEnvironmentVariable(unlisted, "value");
+
+        try
+        {
+            // Act: build the process description
+            var info = runner.BuildStartInfo(["status"], access);
+
+            // Assert: the unlisted variable is dropped and the listed PATH is kept
+            Assert.False(info.Environment.ContainsKey(unlisted));
+            if (!string.IsNullOrEmpty(path))
+            {
+                Assert.Equal(path, info.Environment["PATH"]);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(unlisted, null);
+        }
+    }
+
+    /// <summary>
+    ///     Test that git is told to run no hooks: the hooks folder is set to the null device.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_Anonymous_DisablesHooks()
+    {
+        // Arrange: a runner and anonymous access
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", null, null);
+        var expected = "core.hooksPath=" + (OperatingSystem.IsWindows() ? "NUL" : "/dev/null");
+
+        // Act: build the process description
+        var info = runner.BuildStartInfo(["ls-remote", "origin"], access);
+
+        // Assert: the setting follows a -c option
+        var index = info.ArgumentList.IndexOf(expected);
+        Assert.True(index > 0, "The hooks setting is missing.");
+        Assert.Equal("-c", info.ArgumentList[index - 1]);
+    }
+
+    /// <summary>
     ///     Test that a secret is removed from text in every form git might print it: the token, the user and
     ///     token, the base64 header value and the user information of a URL.
     /// </summary>

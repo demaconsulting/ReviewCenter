@@ -8,9 +8,9 @@ through the `configure` hook (created by the test before the command runs, becau
 with a real `Context` created from the `audit verify` arguments. The trail is written
 through the real stores, and for the broken cases a row is edited or deleted over a second database connection. Everything
 the command writes is read back from the log file of the context, and the exit code from the context. The dispatch
-from `Program` to the command and the run of the verb in a separate process are **not** covered by a test: `Program`
-is verified only for the help text, and no system-level test starts `reviewcenter audit verify`. The flag handling of
-the verb is verified by the `Context` unit.
+from `Program` to the command and the run of the verb in a separate process are not covered by this unit: the system-level
+test `ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne` of `ReviewCenter`
+starts `reviewcenter audit verify` and covers them. The flag handling of the verb is verified by the `Context` unit.
 
 #### Test Environment
 
@@ -21,6 +21,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - All unit tests pass with zero failures.
 - An intact trail is reported as "Audit chain intact: N entries" with exit code 0, an empty trail as intact with zero
   entries.
+- Verifying an intact trail leaves the database file unchanged and creates no key file.
 - An edited entry is reported by its sequence and a deleted entry as a broken chain, each with exit code 1.
 - A database file that does not exist, also one named by a `file:` URI that asks for creation, is reported as an error
   with exit code 1 and nothing is created; a database that
@@ -32,6 +33,14 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 **AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero**: A trail with several entries is verified; the output
 says how many entries are intact and the exit code is 0. This scenario is tested by
 `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`.
+
+**AuditCommand_Run_IntactTrail_LeavesDatabaseFileUnchanged**: A trail with two entries is verified; the exit code is
+0, the output says "Audit chain intact: 2 entries", and the hash and the length of the database file are the same
+before and after the run. This scenario is tested by `AuditCommand_Run_IntactTrail_LeavesDatabaseFileUnchanged`.
+
+**AuditCommand_Run_IntactTrail_CreatesNoKeyFile**: A trail is verified with a key folder that does not exist; the
+exit code is 0 and neither a key file nor the key folder was created. This scenario is tested by
+`AuditCommand_Run_IntactTrail_CreatesNoKeyFile`.
 
 **AuditCommand_Run_EmptyTrail_ReportsIntactWithZeroEntries**: An existing database with the schema and no audit entries
 is verified; the output says zero entries and the exit code is 0. This scenario is tested by

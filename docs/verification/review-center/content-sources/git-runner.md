@@ -45,6 +45,14 @@ numbered configuration variables as an authorization header for the location. Th
 set; the environment cannot read the system or user configuration, cannot prompt, and runs no askpass program. This
 scenario is tested by `GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment`.
 
+**GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit**: A variable of the server process that git does not
+need is not in the environment of the start information, while the listed `PATH` is. This scenario is tested by
+`GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit`.
+
+**GitRunner_BuildStartInfo_Anonymous_DisablesHooks**: The start information sets the hooks folder to the null device
+with a `-c` option, so that git runs no hooks. This scenario is tested by
+`GitRunner_BuildStartInfo_Anonymous_DisablesHooks`.
+
 **GitRunner_Redact_RemovesEverySecretForm**: The token, the user name and token, the base64 header value, and the user
 information of an address are removed from text. This scenario is tested by `GitRunner_Redact_RemovesEverySecretForm`.
 

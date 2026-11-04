@@ -30,21 +30,24 @@ N/A - standard test environment.
   the per-name limit is reported with an error that names the `Identity:Throttle` setting; the defaults and a valid
   custom set are accepted.
 - A git timeout (`Git:TimeoutSeconds`) outside 1 to 3600 seconds is reported with an error that names the setting;
-  1 and 3600 are accepted.
+  1 and 3600 are accepted; without the setting the default of 120 seconds applies.
+- An anonymous visitor is served the home page and the login page, and a protected page redirects to the login page
+  with the return address.
 - Invalid settings of sign-in with an OpenID Connect provider (a missing or insecure authority, a bad client
   identifier, scopes without `openid`, a long display name, a bad user name claim, an age outside 10 to 900 seconds, or
   a control character in the secret) stop the start with an error that names the `Identity:Oidc` setting and never
   contains the value or the secret; with the provider off nothing is checked, and valid settings (https, or http on a
-  loopback host) build the application. With the provider off the endpoints and the callback are not mapped.
+  loopback host) build the application.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
-  the database", and `RunAsync` returns exit code 1 for each.
+  the database", and `RunAsync` returns exit code 1 for each; the text of the error reaches the context.
 - The repository store, the git source, and the token protector are registered as shared instances; the git cache and
   the Data Protection key ring are placed beside the database unless configured; the key ring is persisted, so a token
   encrypted before a restart is readable after it.
-- The project access rules (`IProjectAccess`) are registered as one shared instance. No unit test resolves the
-  registration alone; it is shown by the real pipeline serving the domain services
-  (`ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices`) and by the API refusing a
-  non-member (`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`).
+- The project access rules (`IProjectAccess`) are registered as one shared instance, shown by resolving the
+  registration twice (`ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton`).
+- The audit store, the audit appender, and the audit service are each registered as one shared instance, and an audit
+  trail that cannot be written logs a warning and reports failure instead of throwing.
+- Registering only the services (as the command-line verbs do) creates no key folder and no key file.
 - A key ring folder that cannot be written stops the start of the server with an error that names the
   `DataProtection:KeysPath` setting and the folder.
 - A certificate key ring is read again after a restart; invalid key ring settings, a certificate that cannot be loaded
@@ -57,8 +60,7 @@ N/A - standard test environment.
   installation (no secrets, empty ring), start without complaint; when the ring has keys but some secrets cannot be
   decrypted, the server logs an error with the counts and starts. A database that cannot be read stops the start when
   the ring has no key file (naming the folder and `Database:ConnectionString`, no exception text or database location,
-  no key created, with or without the setting), and only logs a warning when the ring has keys. `user add` and
-  `audit verify` create no key file.
+  no key created, with or without the setting), and only logs a warning when the ring has keys.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
   served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
   answered with a JSON problem document instead of a page.
@@ -69,7 +71,8 @@ N/A - standard test environment.
 - Invalid settings of the two-factor sign-in (a value of `Identity:Totp:Enabled` that is not a boolean, and an
   `Identity:Totp:Issuer` that is empty or holds a colon) stop the start with an error that says the two-factor
   settings are invalid and names the setting; valid settings provide the settings object to the services, with the
-  feature on and the issuer `ReviewCenter` by default, and a switched-off feature with a trimmed issuer when set.
+  feature on and the issuer `ReviewCenter` by default, and a switched-off feature with a trimmed issuer when set; the
+  endpoint of the second step of the sign-in is mapped only while the feature is on.
 - Invalid notification settings (a sender address that is not an address, an empty base address, an empty SMTP host, a
   port out of range, an hour out of range, and an unknown time zone) stop the start while notifications are on with an
   error that says the notification settings are invalid and names the setting, and that does not contain the SMTP
@@ -169,11 +172,6 @@ names the setting is thrown, and its message never holds the secret. This scenar
 **ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: The pipeline is built with the provider off and a
 garbage authority (not read), with an https authority, and with an http loopback authority and the largest age of 900
 seconds; all three are built. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
-
-**OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown**: With the provider off, the endpoints of the sign-in
-and the callback address `/signin-oidc` are answered like an unknown address, and the login page shows no button. This
-scenario is tested by `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown`, defined in
-`OidcSignInTests.cs` and described with the `OidcSignIn` unit.
 
 **ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
 with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting
@@ -292,18 +290,16 @@ per kind and the remedy. This scenario is tested by `ServerHost_CreateApplicatio
 **KeyRingSettings_AllowNewKeyRing_DefaultsToFalse**: The setting that accepts a new ring is off unless it is set. This
 scenario is tested by `KeyRingSettings_AllowNewKeyRing_DefaultsToFalse`.
 
-**Command-line verbs and keys**: `user add` and `audit verify` run against a database and a key folder; no key file is
-created, so neither verb scans nor uses the ring. This scenario is tested by `UserCommand_Run_ValidUser_CreatesNoKeyFile`
-and `AuditCommand_Run_IntactTrail_CreatesNoKeyFile`.
+The registration scenario of the command-line verbs is `ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile`, above:
+only `AddServices` runs, so neither a scan nor the use of the ring takes place and no key file is created.
 
 **ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError** and
 **ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles**: On Linux and macOS only (skipped on
 Windows), explicit DPAPI is refused with a message that names `DataProtection:Protection`, and the key folder gets mode
 0700 and the key files mode 0600. These scenarios are tested by the tests of the same names.
 
-**SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection**: The settings of the isolated hosts of the
-self-validation choose `PermissionsOnly`, so that they never use the key store of the operating system. This scenario
-is tested by `SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection`.
+The choice of `PermissionsOnly` by the settings of the isolated hosts of the self-validation is verified with the
+validation checks unit and is not a scenario of this unit.
 
 **ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys**: The pipeline
 is started twice on the same database folder with no attestation setting. The key file exists in the
@@ -314,10 +310,9 @@ This scenario is tested by
 **ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile**: The server is started once, which creates
 the protected attestation key, then the key ring folder is deleted and the server is started again. The start fails with
 a message that names `attestation-selfsigned.pfx.protected` and says to delete the file, and the file is still there.
-This scenario is tested by `ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile`. That `user add`
-and `audit verify` create no attestation key is shown by `UserCommand_Run_ValidUser_CreatesNoKeyFile` and
-`AuditCommand_Run_IntactTrail_CreatesNoKeyFile`: the default attestation folder is inside the key folder, which stays
-absent.
+This scenario is tested by `ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile`. That the
+services alone create no attestation key is shown by `ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile`: the
+default attestation folder is inside the key folder, which stays absent.
 
 **ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile**: The server is
 started once with secrets in the database, then the key ring folder is deleted and the server is started again with
@@ -393,6 +388,46 @@ holds one unrelated table, so that the server does not create the model, is used
 notifications off the application is built. This scenario is tested by
 `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`.
 
-**Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
-`AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real
-pipeline; there is no separate test of the registration.
+**ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton**: The real pipeline is started on an in-memory
+server and `IProjectAccess` is taken from the application services twice; both calls return the same instance. This
+scenario is tested by `ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton`.
+
+**ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons**: The real pipeline is started on an in-memory
+server; the `AuditAppender`, the `IAuditStore`, and the `AuditService` are each taken from the application services
+twice, and each pair is the same instance. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons`.
+
+**ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse**: The audit store is replaced by one whose
+append always fails, and `TryRecordAsync` of the audit service is called; it returns false and a warning that says "An
+audit entry could not be recorded" is logged by the `ServerHost` category. This scenario is tested by
+`ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse`.
+
+**ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile**: Only `AddServices` is called, as the command-line verbs do,
+with a key folder that does not exist; the `UserService` and the `AuditService` are resolved and used. Neither the key
+folder nor a key file exists afterwards. This scenario is tested by
+`ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile`.
+
+**ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin**: The real pipeline is started and
+`/projects` is requested without signing in; the answer is a redirect whose location is the login page with the return
+address `/projects`. This scenario is tested by
+`ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
+
+**ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed**: The real pipeline is started and `/` and
+`/login` are requested without signing in; both are answered 200. This scenario is tested by
+`ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed`.
+
+**ServerHost_CreateApplication_NoGitSettings_UsesDefaultTimeout**: The pipeline is built without a `Git:TimeoutSeconds`
+setting; the git options hold the default timeout of 120 seconds. This scenario is tested by
+`ServerHost_CreateApplication_NoGitSettings_UsesDefaultTimeout`.
+
+**ServerHost_RunAsync_UnsupportedProvider_ReportsTheError**: `RunAsync` is called with an unsupported database provider
+and a context that writes a log file; after the context is disposed, the log holds "Failed to prepare the database" and
+the provider name. This scenario is tested by `ServerHost_RunAsync_UnsupportedProvider_ReportsTheError`.
+
+**ServerHost_CreateApplication_TotpOn_CodeEndpointIsMapped**: The pipeline is built with the second factor on; the
+endpoint of the second step of the sign-in is among the routes of the application. This scenario is tested by
+`ServerHost_CreateApplication_TotpOn_CodeEndpointIsMapped`.
+
+**ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped**: The pipeline is built with `Identity:Totp:Enabled`
+false; the endpoint of the second step of the sign-in is not among the routes. This scenario is tested by
+`ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped`.

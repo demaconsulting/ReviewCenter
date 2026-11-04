@@ -147,6 +147,45 @@ public class ReviewMarkConfigParserTests
     }
 
     /// <summary>
+    ///     Test that a file that starts with a UTF-8 byte order mark is read as if the mark was not there.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped()
+    {
+        // Arrange: the bytes of a small file that start with the byte order mark
+        var bytes = Encoding.UTF8.GetPreamble()
+            .Concat(Encoding.UTF8.GetBytes("reviews:\n  - id: a\n    title: A\n"))
+            .ToArray();
+
+        // Act: parse it
+        var sets = new ReviewMarkConfigParser().Parse(bytes);
+
+        // Assert: the one set is read
+        var set = Assert.Single(sets);
+        Assert.Equal("a", set.Id);
+        Assert.Equal("A", set.Title);
+    }
+
+    /// <summary>
+    ///     Test that a file that uses Windows line endings is read like one with Unix line endings.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_WindowsLineEnds_AreUnderstood()
+    {
+        // Arrange: a small file with carriage return and line feed at the end of every line
+        const string text = "reviews:\r\n  - id: a\r\n    title: A\r\n    paths:\r\n      - x.txt\r\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: the set and its path are read without a carriage return
+        var set = Assert.Single(sets);
+        Assert.Equal("a", set.Id);
+        Assert.Equal("A", set.Title);
+        Assert.Equal(["x.txt"], set.Paths);
+    }
+
+    /// <summary>
     ///     Test that files that are empty, have no review-sets or are broken are refused with a plain message.
     /// </summary>
     /// <param name="text">The text of the file.</param>
@@ -217,6 +256,61 @@ public class ReviewMarkConfigParserTests
         {
             Assert.Equal(DomainRule.ReviewSetConfigInvalid, Assert.Throws<DomainRuleException>(() => Parse(text)).Rule);
         }
+    }
+
+    /// <summary>
+    ///     Test that a file one past a count or length limit is refused with the rule and a message that names the
+    ///     limit.
+    /// </summary>
+    /// <param name="kind">The limit that is exceeded.</param>
+    /// <param name="expected">A part of the expected message.</param>
+    [Theory]
+    [InlineData("set-count", "more than 500 review-sets")]
+    [InlineData("id-length", "The id of review-set 1 is longer than 100")]
+    [InlineData("title-length", "The title of review-set 1 is longer than 200")]
+    [InlineData("path-count", "has more than 100 paths")]
+    [InlineData("path-length", "A path of review-set 1")]
+    public void ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit(string kind, string expected)
+    {
+        // Arrange: a file that is one past the limit of the given kind
+        var text = kind switch
+        {
+            "set-count" => "reviews:\n"
+                + string.Concat(Enumerable.Range(0, ReviewLimits.MaxReviewSets + 1).Select(i => $"  - {{id: s{i}, title: T}}\n")),
+            "id-length" => $"reviews:\n  - id: {new string('i', ReviewLimits.MaxReviewSetIdLength + 1)}\n    title: T\n",
+            "title-length" => $"reviews:\n  - id: a\n    title: {new string('t', ReviewLimits.MaxReviewSetTitleLength + 1)}\n",
+            "path-count" => "reviews:\n  - id: a\n    title: T\n    paths: ["
+                + string.Join(", ", Enumerable.Repeat("a", SelectionMatcher.MaxPatterns + 1)) + "]\n",
+            "path-length" => $"reviews:\n  - id: a\n    title: T\n    paths: [{new string('p', SelectionMatcher.MaxPatternLength + 1)}]\n",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown limit.")
+        };
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
+
+        // Assert: the rule and the message that names the limit
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a file whose size is exactly the size limit is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead()
+    {
+        // Arrange: a valid file followed by comment characters, exactly as large as the limit allows
+        var bytes = new byte[ReviewLimits.MaxReviewSetFileBytes];
+        Array.Fill(bytes, (byte)'#');
+        var text = Encoding.ASCII.GetBytes("reviews:\n  - id: a\n    title: A\n");
+        text.CopyTo(bytes, 0);
+
+        // Act: parse it
+        var sets = new ReviewMarkConfigParser().Parse(bytes);
+
+        // Assert: the file is the size of the limit and the set is read
+        Assert.Equal(ReviewLimits.MaxReviewSetFileBytes, bytes.Length);
+        Assert.Equal("a", Assert.Single(sets).Id);
     }
 
     /// <summary>

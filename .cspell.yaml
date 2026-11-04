@@ -23,6 +23,7 @@ words:
   - selftest
   - unpooled
   - unsubmitted
+  - unwritable
   - onclick
   - onsubmit
   - pyhanko

@@ -307,6 +307,11 @@ folder and the private temporary folder are empty. This scenario is tested by
 check refuses two addresses, a non-loopback address, a host name, port 0 and an empty list, and accepts exactly one
 loopback address (IPv4 or IPv6) with a real port. These scenarios are tested by the tests of the same names.
 
+**SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection**: The settings of the isolated hosts of the
+checks are created for a temporary folder; `DataProtection:Protection` is `PermissionsOnly`, so no check uses the key
+store of the operating system. This scenario is tested by
+`SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection`.
+
 **ValidationChecks_FastCommit_SelfTestServices_RelaxesTheEmbeddedDatabase**: The services of the self-test are built
 and the database is opened through EF Core; `synchronous` is `0` and `journal_mode` is `memory`. This scenario is
 tested by `ValidationChecks_FastCommit_SelfTestServices_RelaxesTheEmbeddedDatabase`.

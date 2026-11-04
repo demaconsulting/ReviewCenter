@@ -19,14 +19,16 @@ N/A - standard test environment. The tests run on every platform.
 - The scan counts the repository tokens and the second-factor secrets of the database, and counts none as unreadable
   when the ring that protected them is the ring that is scanned.
 - With the ring of another installation, every secret is unreadable and the ids of the repositories and users are
-  reported, ascending; with a mix of secrets only the foreign ones are unreadable.
-- A key folder with no key file counts every secret as unreadable and no key file is created.
+  reported; with a mix of secrets only the foreign ones are unreadable.
+- A key folder with no key file, or that does not exist, counts every secret as unreadable, is reported as an empty
+  ring, and no key file or key folder is created.
 - A key folder whose only key file is malformed also counts every secret as unreadable, creates no key file, and leaves
   the malformed file as it was.
 - Key files are counted by their content: plaintext (`<masterKey`) and in total.
 - A database that does not exist is not created and holds no secrets; a database without the tables, or with the
   tables and no rows, holds no secrets and is no error.
-- The database and the key folder are unchanged by the scan (content and write time of every file, no new key file).
+- The database and the key folder are unchanged by the scan (content and write time of every file, no new key file),
+  and the scan never protects a value.
 - The result, as text, holds no secret, no ciphertext, and no path.
 - Many ids are shortened in a message, and a null argument is refused.
 
@@ -64,6 +66,15 @@ times recorded; scans with the ring of the installation and with an empty ring c
 file. The snapshot leaves out `-wal` and `-shm` side files, which SQLite may leave empty after a read-only connection
 to a database in write-ahead log mode; the database file itself is what must not change. This scenario is tested by
 the test of the same name.
+
+**SecretScan_ScanAsync_MissingKeyFolder_ReportsEmptyRingAndCreatesNoFolder**: A database with one secret is scanned with
+a key folder that does not exist; the scan reports a ring with no key files that is empty, counts the secret as
+unreadable, and does not create the folder. This scenario is tested by the test of the same name.
+
+**SecretScan_ScanAsync_Secrets_NeverCallsProtect**: The protectors of an installation are wrapped by two counting
+protectors after the secrets were seeded. The scan decrypts the token and the second-factor secret, counts none as
+unreadable, and calls neither `Protect` method, which would create a key. This scenario is tested by the test of the
+same name.
 
 **SecretScan_ScanAsync_Result_HoldsNoSecretCiphertextOrPath**: The text of the result holds neither the token, its
 ciphertext, nor the key folder. This scenario is tested by the test of the same name.

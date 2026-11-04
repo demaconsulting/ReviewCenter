@@ -130,6 +130,7 @@ sections:
           - ReviewCenter-ValidationChecks-Hermetic
           - ReviewCenter-ValidationChecks-Hermetic-InMemoryConfiguration
           - ReviewCenter-ValidationChecks-Hermetic-EphemeralLoopbackPort
+          - ReviewCenter-ValidationChecks-Hermetic-PermissionsOnlyKeys
           - ReviewCenter-ValidationChecks-FastCommit
           - ReviewCenter-ValidationChecks-FastCommit-ProductionDefault
           - ReviewCenter-ValidationChecks-FastCommit-OnlyInsideFolder
@@ -137,6 +138,10 @@ sections:
           - ReviewCenter-ValidationChecks-FastCommit-InMemoryUntouched
           - ReviewCenter-ValidationChecks-FastCommit-RequiresAllowedFolder
           - ReviewCenter-ServerHost-IsolatedSettings
+          - ReviewCenter-ServerHost-IsolatedSettings-Environment
+          - ReviewCenter-ServerHost-IsolatedSettings-AmbientData
+          - ReviewCenter-ServerHost-IsolatedSettings-Routes
+          - ReviewCenter-ServerHost-IsolatedSettings-DefaultHostAmbient
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
 
