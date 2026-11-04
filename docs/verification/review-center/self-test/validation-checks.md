@@ -276,8 +276,9 @@ nor a warning. The host does not exist, so the check passes only because it open
 tested by the test of the same name.
 
 **ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection**: A complete SMTP configuration names a
-loopback listener as the mail server. The check passes and its report names that server, and the listener has no
-pending connection, so the check opened none. This scenario is tested by
+loopback listener as the mail server, and the listener accepts and records any connection. The check passes and its
+report names that server, and after a short bounded wait the listener has accepted no connection, so the check opened
+none. This scenario is tested by
 `ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection`.
 
 **ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt**: The same configuration with an

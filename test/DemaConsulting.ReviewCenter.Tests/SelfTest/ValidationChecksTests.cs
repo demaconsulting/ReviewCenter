@@ -434,9 +434,12 @@ public partial class ValidationChecksTests
     [Fact]
     public async Task ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection()
     {
-        // Arrange: an SMTP configuration that points at a loopback listener, which would see any connection
+        // Arrange: an SMTP configuration that points at a loopback listener, which accepts and records any connection
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
+        using var acceptTimeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        acceptTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+        Task<System.Net.Sockets.TcpClient>? accepting = null;
         try
         {
             var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
@@ -444,17 +447,33 @@ public partial class ValidationChecksTests
                 new("Notifications__Smtp__Host", "127.0.0.1"),
                 new("Notifications__Smtp__Port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 new("Notifications__Smtp__Password", "unused-secret-value")));
+            accepting = listener.AcceptTcpClientAsync(acceptTimeout.Token).AsTask();
 
-            // Act: run the check
+            // Act: run the check, then give a late or background connection attempt a short bounded time to arrive
             var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+            var finished = await Task.WhenAny(accepting, Task.Delay(TimeSpan.FromMilliseconds(500),
+                TestContext.Current.CancellationToken));
 
-            // Assert: the check examined the settings and no connection reached the listener
+            // Assert: the check examined the settings and no connection was accepted by the listener
             Assert.Contains("server 127.0.0.1", detail);
-            Assert.False(listener.Pending(), "The check must not connect to the mail server");
+            Assert.NotSame(accepting, finished);
         }
         finally
         {
+            await acceptTimeout.CancelAsync();
             listener.Stop();
+            if (accepting is not null)
+            {
+                try
+                {
+                    (await accepting).Dispose();
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
+                                               or System.Net.Sockets.SocketException)
+                {
+                    // Expected: the pending accept ends when no connection arrived
+                }
+            }
         }
     }
 
