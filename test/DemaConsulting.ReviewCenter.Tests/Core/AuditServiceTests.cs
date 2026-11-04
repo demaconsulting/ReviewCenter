@@ -500,6 +500,34 @@ public class AuditServiceTests
     }
 
     /// <summary>
+    ///     Test that a filter with an actor identity lists only the entries of the user with that identity, also when
+    ///     another user shares the actor text.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries()
+    {
+        // Arrange: ann is user 7, bob is user 9, and one entry has no known user
+        var (service, store) = Create();
+        store.UserIds["ann"] = 7;
+        store.UserIds["bob"] = 9;
+        var token = TestContext.Current.CancellationToken;
+        await service.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", "a"), token);
+        await service.RecordAsync(AuditDraft.By(TestActors.Bob, "review.signed", "b"), token);
+        await service.RecordAsync(AuditDraft.By(TestActors.Ann, "auth.sign-in", "c"), token);
+        await service.RecordAsync(AuditDraft.By(Actor.CommandLine, "project.created", "d"), token);
+
+        // Act
+        var ann = await service.ListAsync(new AuditFilter(ActorUserId: 7), null, null, 50, token);
+        var bob = await service.ListAsync(new AuditFilter(ActorUserId: 9), null, null, 50, token);
+        var nobody = await service.ListAsync(new AuditFilter(ActorUserId: 8), null, null, 50, token);
+
+        // Assert
+        Assert.Equal([3L, 1L], ann.Entries.Select(e => e.Sequence));
+        Assert.Equal([2L], bob.Entries.Select(e => e.Sequence));
+        Assert.Empty(nobody.Entries);
+    }
+
+    /// <summary>
     ///     Test that an invalid filter is refused with the invalid-filter rule before the store is read, and that a
     ///     missing filter is refused as a programming error.
     /// </summary>
@@ -605,6 +633,26 @@ public class AuditServiceTests
         Assert.False(result.IsIntact);
         Assert.Equal(650, result.FirstBadSequence);
         Assert.Equal(649, result.Count);
+    }
+
+    /// <summary>
+    ///     Test that the first event of a key in a window is stored and reported as stored.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue()
+    {
+        // Arrange
+        var (service, store) = Create(clock: new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero)));
+        var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "unknown user, name 'x'");
+
+        // Act
+        var stored = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(stored);
+        var entry = Assert.Single(store.Entries);
+        Assert.Equal("auth.sign-in-failed", entry.Action);
+        Assert.Equal("unknown user, name 'x'", entry.Detail);
     }
 
     /// <summary>

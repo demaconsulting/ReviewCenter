@@ -89,13 +89,21 @@ rule for an invalid address and no mail is sent. This scenario is tested by
 raises the rule for too soon and sends no second mail. This scenario is tested by
 `NotificationPreferenceService_RequestConfirmation_WithinCooldown_ThrowsTooSoon`.
 
+**NotificationPreferenceService_RequestConfirmation_AfterCooldown_MailsNewCode**: After the pause a second request mails
+a second code to the same address, and the address is still pending. This scenario is tested by
+`NotificationPreferenceService_RequestConfirmation_AfterCooldown_MailsNewCode`.
+
 **NotificationPreferenceService_RequestConfirmation_AfterCooldown_OldCodeStopsWorking**: After the pause a new code is
 mailed, the old code is refused, and the new code works. This scenario is tested by
 `NotificationPreferenceService_RequestConfirmation_AfterCooldown_OldCodeStopsWorking`.
 
 **NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached**: A fourth request of one user
-within a day raises the rule for a reached limit, and a request after a day works again. This scenario is tested by
+within a day raises the rule for a reached limit, and only three mails were sent. This scenario is tested by
 `NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached`.
+
+**NotificationPreferenceService_RequestConfirmation_AfterDayPassed_MailsAgain**: After the limit was reached and a day
+passed, a request mails the new address again and that address is pending. This scenario is tested by
+`NotificationPreferenceService_RequestConfirmation_AfterDayPassed_MailsAgain`.
 
 **NotificationPreferenceService_RequestConfirmation_AddressDailyLimit_ThrowsLimitReached**: A fourth request for one
 address, made by another user, raises the rule for a reached limit. This scenario is tested by
@@ -137,23 +145,26 @@ This scenario is tested by `NotificationPreferenceService_RequestConfirmation_St
 refused with the rule for not available. This scenario is tested by
 `NotificationPreferenceService_Actions_ApiTokenActor_AreRefused`.
 
-**NotificationPreferenceService_Actions_FeatureOff_AreRefusedAndTouchNoStore**: With notifications switched off, every
-action is refused and the store is not used. This scenario is tested by
+**NotificationPreferenceService_Actions_FeatureOff_AreRefusedAndTouchNoStore**: With notifications switched off, each of
+the four actions (request, confirm, remove, status) is refused with the rule for not available, no mail is sent, and the
+store is not used. This scenario is tested by
 `NotificationPreferenceService_Actions_FeatureOff_AreRefusedAndTouchNoStore`.
 
 **NotificationPreferenceService_IsAvailable_SenderNotConfigured_IsFalse**: With a sender that is not configured the
-service reports that it is not available. This scenario is tested by
-`NotificationPreferenceService_IsAvailable_SenderNotConfigured_IsFalse`.
+service reports that it is not available, and each of the four actions is refused with the rule for not available. This
+scenario is tested by `NotificationPreferenceService_IsAvailable_SenderNotConfigured_IsFalse`.
 
-**NotificationPreferenceService_Actions_DisabledOrUnknownUser_AreRefused**: A disabled user and an unknown user are
-refused with the rule for an actor that is not allowed. This scenario is tested by
+**NotificationPreferenceService_Actions_DisabledOrUnknownUser_AreRefused**: Each of the four actions of a disabled user
+and of an unknown user is refused with the rule for an actor that is not allowed. This scenario is tested by
 `NotificationPreferenceService_Actions_DisabledOrUnknownUser_AreRefused`.
 
-**NotificationPreferenceService_Actions_TemporaryPassword_AreRefused**: A user who must change a temporary password
-is refused. This scenario is tested by `NotificationPreferenceService_Actions_TemporaryPassword_AreRefused`.
+**NotificationPreferenceService_Actions_TemporaryPassword_AreRefused**: Each of the four actions of a user who must
+change a temporary password is refused with the rule for not available. This scenario is tested by
+`NotificationPreferenceService_Actions_TemporaryPassword_AreRefused`.
 
-**NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull**: A missing actor raises `ArgumentNullException`.
-This scenario is tested by `NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull`.
+**NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull**: A missing actor raises `ArgumentNullException`
+in each of the four actions. This scenario is tested by
+`NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull`.
 
 **Mode scenarios**: The tests of the mode are in `NotificationPreferenceServiceModeTests.cs`; they use the same
 stand-ins.

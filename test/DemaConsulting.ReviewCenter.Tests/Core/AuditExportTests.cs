@@ -151,6 +151,9 @@ public class AuditExportTests
         // Assert
         Assert.Equal(1200, export.SnapshotSequence);
         Assert.Equal(1200, rows);
+
+        // The entry that was appended while the second batch was read really exists, and is not in the export
+        Assert.Contains(store.Entries, e => e.Detail == "late");
         var bytes = target.ToArray();
         var sequences = Sequences(new UTF8Encoding(false).GetString(bytes, 3, bytes.Length - 3));
         Assert.Equal(Enumerable.Range(1, 1200).Select(i => (long)i), sequences);
@@ -194,6 +197,34 @@ public class AuditExportTests
         // Assert
         Assert.Equal(1000, Sequences(text).Count);
         Assert.Equal(3, store.MatchingReads);
+    }
+
+    /// <summary>
+    ///     Test that each batch of an export is in the target before the next batch is read, so the batches are never
+    ///     held together.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext()
+    {
+        // Arrange: 500 + 500 + 201 entries; the hook looks into the target right after each batch was read
+        var (service, store) = Create();
+        await Fill(service, 1201);
+        var export = await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+        using var target = new MemoryStream();
+        var rowsInTargetAtRead = new List<int>();
+        store.AfterMatchingRead = _ =>
+        {
+            var bytes = target.ToArray();
+            rowsInTargetAtRead.Add(Sequences(new UTF8Encoding(false).GetString(bytes, 3, bytes.Length - 3)).Count);
+        };
+
+        // Act
+        var rows = await service.ExportAsync(export, target, TestContext.Current.CancellationToken);
+
+        // Assert: when the second batch was read the first was already written, and so on
+        Assert.Equal(1201, rows);
+        Assert.Equal([0, 500, 1000], rowsInTargetAtRead);
     }
 
     /// <summary>
@@ -274,7 +305,13 @@ public class AuditExportTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => service.ExportAsync(export, target, cancellation.Token));
 
-        // Assert: the first batch was written, the second was read but not passed on; the entry was appended although the token is cancelled
+        // Assert: the first batch was written, the second was read but not passed on, and no third batch was read;
+        // the entry was appended although the token is cancelled
+        Assert.Equal(2, store.MatchingReads);
+        var written = target.ToArray();
+        Assert.Equal(
+            Enumerable.Range(1, 500).Select(i => (long)i),
+            Sequences(new UTF8Encoding(false).GetString(written, 3, written.Length - 3)));
         var last = store.Entries[^1];
         Assert.Equal(1201, last.Sequence);
         Assert.Equal(AuditService.ExportedAction, last.Action);
@@ -345,6 +382,58 @@ public class AuditExportTests
         Assert.Contains("chain-intact.csv", export.FileName, StringComparison.Ordinal);
         Assert.Equal(5, export.SnapshotSequence);
         Assert.Equal(0, store.MatchingReads);
+    }
+
+    /// <summary>
+    ///     Test that the chain is read for one verification pass only while an export is prepared: the preparation
+    ///     asks the store for as many batches as one verification of the same chain does.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass()
+    {
+        // Arrange: 1,200 entries are read in four batches of at most 500, the last one empty
+        var (service, store) = Create();
+        await Fill(service, 1200);
+        await service.VerifyAsync(TestContext.Current.CancellationToken);
+        var readsOfOnePass = store.ReadAfterCalls;
+
+        // Act
+        await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(4, readsOfOnePass);
+        Assert.Equal(2 * readsOfOnePass, store.ReadAfterCalls);
+    }
+
+    /// <summary>
+    ///     Test that the newest sequence of an export is captured before the chain is verified: an entry that is
+    ///     appended while the chain is verified is covered by the verification but is not part of the snapshot.
+    /// </summary>
+    [Fact]
+    public async Task AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot()
+    {
+        // Arrange: the trail grows after the first verification batch was read
+        var (service, store) = Create();
+        await Fill(service, 5);
+        store.AfterReadAfter = call =>
+        {
+            if (call == 1)
+            {
+                service.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "during"), CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+        };
+
+        // Act
+        var export = await service.PrepareExportAsync(
+            AuditFilter.None, AuditExportFormat.Csv, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the snapshot was fixed first, the verification then saw all six entries
+        Assert.Equal(5, export.SnapshotSequence);
+        Assert.Equal(6, store.Entries.Count);
+        Assert.Equal(6, export.Chain.Count);
+        Assert.Equal("intact", export.ChainStatus);
     }
 
     /// <summary>

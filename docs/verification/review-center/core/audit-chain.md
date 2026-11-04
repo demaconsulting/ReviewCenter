@@ -28,6 +28,7 @@ N/A - standard test environment.
   a deleted entry is reported at the missing sequence; reordering, insertion, duplication, a wrong previous hash, and a
   first entry with another sequence are all reported; with two bad entries the first is reported; after a failure the
   verifier stays failed and keeps the last good head.
+- The verifier enumerates a sequence once, one entry at a time.
 - Text is trimmed, control characters and line breaks become spaces, lone surrogates are replaced, a long text is cut
   with an ellipsis within the limit without splitting a pair, and a limit below four is refused.
 - The short hash is the prefix of the SHA-256 of the trimmed text.
@@ -63,6 +64,10 @@ This scenario is tested by `AuditChain_ComputeHash_UnicodeText_IsHashed`; the ge
 last entry; an empty chain is intact with the genesis hash. This scenario is tested by
 `AuditChain_Verify_ValidChain_IsIntactWithLastHashAsHead` and `AuditChain_Verify_EmptyChain_IsIntactWithGenesisHead`.
 
+**AuditChain_Verify_ValidChain_ReportsLastEntryHashAsHead**: A valid chain of three entries is verified; the head is
+the hash of the last entry, not the hash of the first entry and not the genesis hash. This scenario is tested by
+`AuditChain_Verify_ValidChain_ReportsLastEntryHashAsHead`.
+
 **AuditChain_Verify_EditedEntry_ReportsThatEntry**: The detail of an entry is changed; verification reports that entry.
 This scenario is tested by `AuditChain_Verify_EditedEntry_ReportsThatEntry`.
 
@@ -84,6 +89,11 @@ scenario is tested by `AuditChain_Verify_InsertedEntry_IsDetected` and `AuditCha
 predecessor; it is reported, and so is a first entry whose sequence is not one. This scenario is tested by
 `AuditChain_Verify_WrongPreviousHash_ReportsThatEntry` and
 `AuditChain_Verify_FirstEntryWithOtherSequence_ReportsSequenceOne`.
+
+**AuditChain_Verify_Sequence_IsEnumeratedOnceOneEntryAtATime**: A valid chain of four entries is given as a lazy
+sequence that counts how often it is enumerated and how many entries it hands out; verification enumerates it once,
+takes each of the four entries once, and finds the chain intact. This scenario is tested by
+`AuditChain_Verify_Sequence_IsEnumeratedOnceOneEntryAtATime`.
 
 **AuditChain_Verify_TwoBadEntries_ReportsTheFirst**: Two entries are damaged; the first is reported and the verifier
 stops at it. This scenario is tested by `AuditChain_Verify_TwoBadEntries_ReportsTheFirst`,

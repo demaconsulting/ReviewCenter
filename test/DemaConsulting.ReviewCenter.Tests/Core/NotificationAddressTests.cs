@@ -245,4 +245,40 @@ public class NotificationAddressTests
         Assert.False(accepted);
         Assert.True(NotificationAddress.IsValid($"{new string('a', 64)}@example.com"));
     }
+
+    /// <summary>
+    ///     Test that a local part of exactly 64 characters is accepted and returned unchanged.
+    /// </summary>
+    [Fact]
+    public void NotificationAddress_TryNormalize_LocalPartOf64_Succeeds()
+    {
+        // Arrange: 64 characters before the at sign
+        var text = $"{new string('a', 64)}@example.com";
+
+        // Act
+        var accepted = NotificationAddress.TryNormalize(text, out var address);
+
+        // Assert: accepted as given
+        Assert.True(accepted);
+        Assert.Equal(text, address);
+    }
+
+    /// <summary>
+    ///     Test that an address of exactly 254 characters is accepted and returned unchanged.
+    /// </summary>
+    [Fact]
+    public void NotificationAddress_TryNormalize_AddressOf254_Succeeds()
+    {
+        // Arrange: an address of exactly 254 characters made of valid labels (the local part stays short)
+        var label = new string('a', 63);
+        var text = $"x@{label}.{label}.{label}.{new string('d', 254 - 2 - (3 * 64))}";
+        Assert.Equal(254, text.Length);
+
+        // Act
+        var accepted = NotificationAddress.TryNormalize(text, out var address);
+
+        // Assert: accepted as given
+        Assert.True(accepted);
+        Assert.Equal(text, address);
+    }
 }

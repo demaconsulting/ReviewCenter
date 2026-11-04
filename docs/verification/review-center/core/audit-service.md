@@ -62,6 +62,10 @@ N/A - standard test environment.
 tested by `AuditService_RecordAsync_Draft_StoresEntryThatVerifies`; the constructor and the failure of the strict
 operation by `AuditService_Constructor_NullStore_Throws` and `AuditService_RecordAsync_NullDraftOrStoreFailure_Throws`.
 
+**AuditService_RecordAsync_ParallelRecords_FormOneIntactChain**: Many drafts are recorded in parallel; the entries get
+consecutive sequences without a gap or a repeat, and `VerifyAsync` reports an intact chain. This scenario is tested by
+`AuditService_RecordAsync_ParallelRecords_FormOneIntactChain`.
+
 **AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue**: The best-effort operation stores the entry and returns
 `true`. This scenario is tested by `AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue`.
 
@@ -73,6 +77,10 @@ exception reaches the caller, and the hook receives the failure. This scenario i
 **AuditService_TryRecordAsync_Cancellation_Propagates**: A cancelled call is not swallowed, and a null draft is
 refused. This scenario is tested by `AuditService_TryRecordAsync_Cancellation_Propagates` and
 `AuditService_TryRecordAsync_NullDraft_Throws`.
+
+**AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue**: One event of a key is recorded; the
+call returns `true` and one entry with the action and the detail of the draft is stored. This scenario is tested by
+`AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue`.
 
 **AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst**: The same key is recorded three times
 within one minute; the first call returns `true`, the others `false`, and one entry is stored. This scenario is tested
@@ -156,6 +164,12 @@ without one. This scenario is tested by `AuditService_ListAsync_Filter_NarrowsBy
 the links follow the matching entries only. This scenario is tested by
 `AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries`.
 
+**AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries**: The fake store resolves two users from
+their user names (ann is 7, bob is 9) and records four entries, the last one by the command line, which has no user
+identity. A filter with identity 7 lists the two entries of ann, newest first; identity 9 lists the one entry of bob; an
+identity that nobody has lists nothing. This scenario is tested by
+`AuditService_ListAsync_ActorIdentityFilter_ReturnsOnlyThatUsersEntries`.
+
 **AuditService_ListAsync_InvalidFilter_IsRefused**: A filter with a From date after the To date, and one with a text
 that is too long, are refused with `AuditFilterInvalid`. This scenario is tested by
 `AuditService_ListAsync_InvalidFilter_IsRefused`.
@@ -210,6 +224,20 @@ larger than 500, and 1,000 entries end after an empty read. This scenario is tes
 `AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500` and
 `AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead`.
 
+**AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext**: 1,201 entries are exported while the
+hook of the fake store counts the rows that are already in the target right after each batch was read. It sees 0, 500,
+and 1,000 rows, so each batch is written before the next is read and the batches are never held together. This
+scenario is tested by `AuditExport_ExportAsync_MoreThanOneBatch_WritesEachBatchBeforeReadingTheNext`.
+
+**AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass**: A trail of 1,200 entries is verified once, which
+takes four reads (three batches and an empty one); preparing an export then adds exactly four reads more, one pass. This
+scenario is tested by `AuditExport_PrepareExportAsync_IntactChain_VerifiesInOnePass`.
+
+**AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot**: The hook of the fake store
+appends a sixth entry after the first verification batch of a five-entry trail was read. The snapshot of the export is
+5, the verification covered all 6 entries and is intact, so the newest sequence was captured before the verification.
+This scenario is tested by `AuditExport_PrepareExportAsync_EntryAppendedDuringVerification_IsOutsideTheSnapshot`.
+
 **AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence**: A stored entry is altered; the
 prepared export is broken at its sequence, an untouched trail is intact, the file name says so, and a project export
 carries no count of the other projects. This scenario is tested by
@@ -260,3 +288,7 @@ arguments are refused. This scenario is tested by `AuditExportWriter_Json_Envelo
 `AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts`,
 `AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime`, `AuditExportWriter_NullArguments_Throw`, and
 `AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable` (the writer can be disposed twice and refuses writes after).
+
+**AuditExportWriter_Json_FormulaCharacters_AreNotChanged**: Texts that start with `=`, `+`, `-`, or `@` are written to
+the JSON document and read back exactly as they were, because JSON is not opened in a spreadsheet. This scenario is
+tested by `AuditExportWriter_Json_FormulaCharacters_AreNotChanged`.

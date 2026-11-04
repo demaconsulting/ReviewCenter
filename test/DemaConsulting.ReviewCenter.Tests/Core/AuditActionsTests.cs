@@ -47,7 +47,11 @@ public static partial class AuditActionsTests
 
         // Act / Assert
         Assert.Equal(all.Order(StringComparer.Ordinal), all);
-        Assert.Equal(all.Count, all.Distinct(StringComparer.Ordinal).Count());
+        for (var i = 1; i < all.Count; i++)
+        {
+            Assert.True(string.CompareOrdinal(all[i - 1], all[i]) < 0, $"'{all[i]}' is not after '{all[i - 1]}'.");
+        }
+
         Assert.All(all, action => Assert.Matches(@"^[a-z]+\.[a-z]+(-[a-z]+)*$", action));
         Assert.All(all, action => Assert.True(action.Length <= AuditText.MaxActionLength));
     }

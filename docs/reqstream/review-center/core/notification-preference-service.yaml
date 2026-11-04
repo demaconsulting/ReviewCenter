@@ -151,11 +151,12 @@ sections:
 
       - id: ReviewCenter-NotificationPreferenceService-ResendAfterCooldown
         title: >-
-          The NotificationPreferenceService class shall mail a new code 60 seconds after the previous confirmation mail.
+          The NotificationPreferenceService class shall mail a new code once 60 seconds have passed since the previous
+          confirmation mail.
         justification: |
           A user who did not get the mail must be able to ask again.
         tests:
-          - NotificationPreferenceService_RequestConfirmation_AfterCooldown_OldCodeStopsWorking
+          - NotificationPreferenceService_RequestConfirmation_AfterCooldown_MailsNewCode
 
       - id: ReviewCenter-NotificationPreferenceService-NewCodeReplacesOld
         title: >-
@@ -199,7 +200,7 @@ sections:
         justification: |
           A limit that never ends would lock a user out for good.
         tests:
-          - NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached
+          - NotificationPreferenceService_RequestConfirmation_AfterDayPassed_MailsAgain
 
       - id: ReviewCenter-NotificationPreferenceService-SendFailureReported
         title: >-
@@ -336,7 +337,7 @@ sections:
         title: >-
           The NotificationPreferenceService class shall put no link in the plain text part of the confirmation mail.
         justification: |
-          A link in a mail trains people to click links and is the form that phishing mails take.
+          A link in the plain text part trains people to click links and is the form that phishing mails take.
         tests:
           - NotificationPreferenceService_RequestConfirmation_Mail_HasNameValidityAndNoLink
 
@@ -344,7 +345,7 @@ sections:
         title: >-
           The NotificationPreferenceService class shall put no link in the HTML part of the confirmation mail.
         justification: |
-          A link in a mail trains people to click links and is the form that phishing mails take.
+          A link in the HTML part can show other text than it opens, and it is the form that phishing mails take.
         tests:
           - NotificationPreferenceService_RequestConfirmation_Mail_HasNameValidityAndNoLink
 
@@ -518,7 +519,7 @@ sections:
           The NotificationPreferenceService class shall refuse a change of the mode for a user who must still change a
           temporary password.
         justification: |
-          A user with a temporary password has not finished signing in and must not be able to cause mail.
+          The mode decides which mail a user gets, and a user who has not finished signing in must not set it.
         tests:
           - NotificationPreferenceService_SetMode_MustChangePassword_Throws
 

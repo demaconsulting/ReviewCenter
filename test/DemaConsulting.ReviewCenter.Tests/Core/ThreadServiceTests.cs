@@ -126,10 +126,38 @@ public class ThreadServiceTests
 
         // Assert: refused naming slot 1 and storing nothing, then stored with the signature out of date
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
-        Assert.Equal("Rita", Assert.Single(ex.AffectedSlots).SignerDisplayName);
+        var affected = Assert.Single(ex.AffectedSlots);
+        Assert.Equal(1, affected.SlotNumber);
+        Assert.Equal("Rita", affected.SignerDisplayName);
         Assert.Equal(0, storedByRefusal);
         Assert.Single(world.Store.Threads);
         Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that the refusal of a thread included in the report names the slot number and the signer of every slot
+    ///     that holds a signature of the current record, and no other slot.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot()
+    {
+        // Arrange: slots 1 and 2 signed, slot 3 not
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+
+        // Act: start an included thread without the acknowledgement
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("a.txt"), TestActors.Bob, "A remark", cancellationToken,
+            includeInReport: true));
+
+        // Assert: both signed slots are named with their numbers and signers
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        Assert.Equal(2, ex.AffectedSlots.Count);
+        Assert.Equal([1, 2], ex.AffectedSlots.Select(slot => slot.SlotNumber).Order());
+        Assert.Equal(["Rita", "Sam"], ex.AffectedSlots.OrderBy(slot => slot.SlotNumber).Select(slot => slot.SignerDisplayName));
+        Assert.Empty(world.Store.Threads);
     }
 
     /// <summary>
@@ -178,7 +206,9 @@ public class ThreadServiceTests
 
         // Assert: refused naming slot 1 with nothing stored, a missing thread is not found, and the acknowledged reply is stored
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
-        Assert.Equal(1, Assert.Single(ex.AffectedSlots).SlotNumber);
+        var replyAffected = Assert.Single(ex.AffectedSlots);
+        Assert.Equal(1, replyAffected.SlotNumber);
+        Assert.Equal("Rita", replyAffected.SignerDisplayName);
         Assert.Equal(DomainRule.ThreadNotFound, missing.Rule);
         Assert.Equal(1, commentsAfterRefusal);
         Assert.Equal(2, world.Store.Threads.Single().Comments.Count);
@@ -812,6 +842,32 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that a reply of one character more than the limit is refused with nothing stored, and that a reply of
+    ///     exactly the limit is stored.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReplyAsync_TextLength_RejectsOneOverAndAcceptsTheLongest()
+    {
+        // Arrange: a thread with its first comment
+        var (store, service, projectId) = await CreateAsync();
+        var thread = await service.StartThreadAsync(
+            projectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+
+        // Act: reply with a text one character too long, and then with the longest allowed text
+        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => service.ReplyAsync(
+            projectId, "rev-1", thread.Id, TestActors.Bob, new string('t', ReviewLimits.MaxCommentLength + 1), TestContext.Current.CancellationToken));
+        var afterRefusal = Assert.Single(store.Threads).Comments.Count;
+        var longest = await service.ReplyAsync(
+            projectId, "rev-1", thread.Id, TestActors.Bob, new string('t', ReviewLimits.MaxCommentLength), TestContext.Current.CancellationToken);
+
+        // Assert: the first reply is refused and stored nothing, the second is stored in full
+        Assert.Equal(DomainRule.CommentTextInvalid, tooLong.Rule);
+        Assert.Equal(1, afterRefusal);
+        Assert.Equal(ReviewLimits.MaxCommentLength, longest.Text.Length);
+        Assert.Equal(2, Assert.Single(store.Threads).Comments.Count);
+    }
+
+    /// <summary>
     ///     Test that a reply, resolve or reopen of a thread that is not in the review is refused.
     /// </summary>
     [Fact]
@@ -883,25 +939,56 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that resolving or reopening a thread through another review is refused and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ResolveAsync_ReopenAsync_ThreadOfOtherReview_ThrowsThreadNotFound()
+    {
+        // Arrange: a resolved thread in review rev-1, an open thread in rev-1, and a second review
+        var (store, service, projectId) = await CreateAsync();
+        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+            projectId, "rev-2", "Second", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        var resolved = await service.StartThreadAsync(
+            projectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        await service.ResolveAsync(projectId, "rev-1", resolved.Id, TestContext.Current.CancellationToken);
+        var open = await service.StartThreadAsync(
+            projectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Second", TestContext.Current.CancellationToken);
+
+        // Act: reopen the resolved thread and resolve the open one through the other review
+        var reopen = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ReopenAsync(projectId, "rev-2", resolved.Id, TestContext.Current.CancellationToken));
+        var resolve = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ResolveAsync(projectId, "rev-2", open.Id, TestContext.Current.CancellationToken));
+
+        // Assert: both refused and the states are as they were
+        Assert.Equal(DomainRule.ThreadNotFound, reopen.Rule);
+        Assert.Equal(DomainRule.ThreadNotFound, resolve.Rule);
+        Assert.Equal(
+            [ReviewThreadState.Resolved, ReviewThreadState.Open],
+            store.Threads.OrderBy(t => t.Id).Select(t => t.State));
+    }
+
+    /// <summary>
     ///     Test that all threads of a review are listed in creation order with their comments.
     /// </summary>
     [Fact]
     public async Task ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments()
     {
-        // Arrange: threads on two files, one with a reply
+        // Arrange: threads on two files, started in an order that differs from the order of the file names and of
+        // the texts, the first one with a reply whose text sorts before the first comment
         var (_, service, projectId) = await CreateAsync();
         var first = await service.StartThreadAsync(
-            projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "One", TestContext.Current.CancellationToken);
+            projectId, "rev-1", new ThreadAnchor("bin.dat"), TestActors.Ann, "One", TestContext.Current.CancellationToken);
         await service.StartThreadAsync(
-            projectId, "rev-1", new ThreadAnchor("bin.dat"), TestActors.Bob, "Two", TestContext.Current.CancellationToken);
-        await service.ReplyAsync(projectId, "rev-1", first.Id, TestActors.Cy, "Reply", TestContext.Current.CancellationToken);
+            projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Two", TestContext.Current.CancellationToken);
+        await service.ReplyAsync(projectId, "rev-1", first.Id, TestActors.Cy, "Another", TestContext.Current.CancellationToken);
 
         // Act: list the threads
         var threads = await service.ListAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
-        // Assert: both threads in creation order, the first with both comments
-        Assert.Equal(["a.txt", "bin.dat"], threads.Select(t => t.FilePath));
-        Assert.Equal(["One", "Reply"], threads[0].Comments.Select(c => c.Text));
+        // Assert: both threads in creation order, the first with both comments in posting order
+        Assert.Equal(["bin.dat", "a.txt"], threads.Select(t => t.FilePath));
+        Assert.Equal(["One", "Another"], threads[0].Comments.Select(c => c.Text));
         Assert.Equal(["Two"], threads[1].Comments.Select(c => c.Text));
     }
 
@@ -981,6 +1068,12 @@ public class ThreadServiceTests
         Assert.Equal([1, 4, 2], open.Select(t => t.Id));
         Assert.Equal([3], resolvedOnly.Select(t => t.Id));
         Assert.Empty(ThreadService.BuildIndex([], null));
+
+        // Assert: the threads that were given are still in their order and unchanged
+        Assert.Equal([1, 2, 3, 4], threads.Select(t => t.Id));
+        Assert.Equal(
+            [ReviewThreadState.Open, ReviewThreadState.Open, ReviewThreadState.Resolved, ReviewThreadState.Open],
+            threads.Select(t => t.State));
     }
 
     /// <summary>
@@ -1118,6 +1211,28 @@ public class ThreadServiceTests
 
         // Assert
         Assert.Equal(expected, sentence);
+    }
+
+    /// <summary>
+    ///     Test that the next step names the parts in a fixed order: unanswered checks, disputed checks, checks answered
+    ///     Fail, open threads and, last, the conclusion.
+    /// </summary>
+    [Fact]
+    public void ThreadService_NextStep_AllParts_AreNamedInFixedOrder()
+    {
+        // Arrange: two open threads and a checklist with every kind of check that is named
+        var threads = Enumerable.Range(0, 2).Select(i => MakeThread(i, ReviewThreadState.Open, 0)).ToList();
+        var progress = new ChecklistProgress(58 - 5, 58);
+
+        // Act: word the next step with every part present
+        var sentence = ThreadService.NextStep(
+            threads, progress, failedChecks: 3, disputedChecks: 2, conclusionRequired: true, unanswered: 4);
+
+        // Assert: unanswered, disputed, Fail, open threads, conclusion
+        Assert.Equal(
+            "4 checklist checks unanswered, 2 checks disputed between the ballots, 3 checks answered Fail, "
+            + "2 open questions to resolve, a conclusion stating the reasons is needed.",
+            sentence);
     }
 
     /// <summary>

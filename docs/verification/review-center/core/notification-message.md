@@ -38,16 +38,35 @@ message does not contain the value. This scenario is tested by
 
 **NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue**: A subject with a line
 break and a second header, a bare line break, a carriage return, a tab, or a NUL raises an exception for `subject`
-whose message does not contain the injected header. This scenario is tested by
+whose message does not contain the injected header or any other part of the subject. This scenario is tested by
 `NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue`.
 
 **NotificationMessage_Constructor_SubjectLength_RefusesEmptyAndTooLong**: A blank subject and a subject that is one
 character too long are refused; a subject of the maximum length is accepted. This scenario is tested by
 `NotificationMessage_Constructor_SubjectLength_RefusesEmptyAndTooLong`.
 
-**NotificationMessage_Constructor_InvalidBody_Throws**: An empty plain text body, an HTML body with a NUL, and a plain
-text body that is one character too long raise an exception for the matching body parameter. This scenario is tested
-by `NotificationMessage_Constructor_InvalidBody_Throws`.
+**NotificationMessage_Constructor_InvalidBody_Throws**: A blank plain text body, an HTML body with a NUL, a blank HTML
+body, and a plain text body or an HTML body that is one character too long raise an exception for the matching body
+parameter. This scenario is tested by `NotificationMessage_Constructor_InvalidBody_Throws`.
+
+**NotificationMessage_Constructor_EmptyOrBlankSubject_Throws**: An empty subject and a subject of one space each raise
+an exception for `subject`. This scenario is tested by `NotificationMessage_Constructor_EmptyOrBlankSubject_Throws`.
+
+**NotificationMessage_Constructor_BlankSubject_Throws**: A subject of one space and a subject of three spaces each
+raise an exception for `subject`, while the same white space between two letters is kept in an accepted subject. This
+scenario is tested by `NotificationMessage_Constructor_BlankSubject_Throws`.
+
+**NotificationMessage_Constructor_BlankBody_Throws**: A plain text body of white space and an HTML body of white space
+each raise an exception for the matching body parameter. This scenario is tested by
+`NotificationMessage_Constructor_BlankBody_Throws`.
+
+**NotificationMessage_Constructor_TooLongBody_Throws**: A plain text body and an HTML body that are one character over
+the maximum length each raise an exception for the matching body parameter, and a body of exactly the maximum length is
+accepted. This scenario is tested by `NotificationMessage_Constructor_TooLongBody_Throws`.
+
+**NotificationMessage_Constructor_NulInBody_Throws**: A NUL character in the plain text body, and one in the HTML body,
+each raise an exception for the matching body parameter. This scenario is tested by
+`NotificationMessage_Constructor_NulInBody_Throws`.
 
 **NotificationMessage_Constructor_EmptyBody_Throws**: An empty plain text body and an empty HTML body each raise an
 exception for the matching body parameter. This scenario is tested by `NotificationMessage_Constructor_EmptyBody_Throws`.

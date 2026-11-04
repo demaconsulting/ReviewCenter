@@ -296,7 +296,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall send no mail when no item is new at the end of the batch window.
         justification: |
-          A mail without news must never be sent.
+          A user in the mode Every must not get an empty mail when nothing new happened in the window.
         tests:
           - NotificationDispatcher_RunPass_Every_AllHandled_NoMailWindowCleared
 
@@ -353,7 +353,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall send no daily summary when no item is new.
         justification: |
-          A mail without news must never be sent.
+          A daily summary without any news is noise, so the user in the mode Daily must not get one.
         tests:
           - NotificationDispatcher_RunPass_Daily_NothingNew_NoMailSlotConsumed
 
@@ -684,7 +684,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall wait 15 minutes after the second failed send.
         justification: |
-          The waits grow so that a dead mail server is not hammered.
+          The second failure suggests more than a blip, so the wait grows to 15 minutes.
         tests:
           - NotificationDispatcher_RunPass_Failure2_Waits15Min
 
@@ -692,7 +692,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall wait 1 hour after the third failed send.
         justification: |
-          The waits grow so that a dead mail server is not hammered.
+          Three failures in a row point to a real outage, so the wait grows to 1 hour.
         tests:
           - NotificationDispatcher_RunPass_Failure3_Waits1Hour
 
@@ -700,7 +700,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall wait 4 hours after the fourth failed send.
         justification: |
-          The waits grow so that a dead mail server is not hammered.
+          The longest wait stops a dead mail server from being hammered.
         tests:
           - NotificationDispatcher_RunPass_Failure4_Waits4Hours
 
@@ -879,7 +879,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall write a send-log row of the kind "update" for a mail of the mode Every.
         justification: |
-          The limits on mails count the rows of the send log.
+          The limits on mails count the rows of the send log, so a mode Every mail must appear as an update row.
         tests:
           - NotificationDispatcher_RunPass_EverySent_LogKindUpdate
 
@@ -887,7 +887,7 @@ sections:
         title: >-
           The NotificationDispatcher class shall write a send-log row of the kind "digest" for a mail of the mode Daily.
         justification: |
-          The limits on mails count the rows of the send log.
+          A daily summary is told apart from an update mail by the kind of its send-log row.
         tests:
           - NotificationDispatcher_RunPass_DailySent_LogKindDigest
 
