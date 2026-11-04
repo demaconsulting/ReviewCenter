@@ -98,6 +98,88 @@ public class ChecklistPageSideBySideTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that a plain member who holds no slot has the answer controls disabled.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_MemberWithoutSlot_AnswerControlsAreDisabled()
+    {
+        // Arrange: a review with two slots, viewed by dee, who is a plain member without a slot
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AddMemberAsync(projectId, "dee");
+        SignInAs("dee", "Dee", false);
+
+        // Act
+        var cut = RenderPage(projectId);
+        await OpenFirstSectionAsync(cut);
+
+        // Assert: the three answer buttons of the first check cannot be used
+        foreach (var testId in new[] { $"check-pass-{FirstItemTestId}", $"check-fail-{FirstItemTestId}", $"check-na-{FirstItemTestId}" })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a plain member who holds no slot sees the standing of a review with a single slot, where the
+    ///     answers are open to everyone.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_MemberWithoutSlot_SingleSlotReview_ShowsTheStanding()
+    {
+        // Arrange: bob, the only reviewer, answered every check; dee is a plain member without a slot
+        var projectId = await CreateReviewAsync("bob");
+        await AnswerAsync(projectId, "bob");
+        await AddMemberAsync(projectId, "dee");
+        SignInAs("dee", "Dee", false);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: the notice is there, and so is the standing
+        Assert.NotNull(cut.Find("[data-testid='no-slot-notice']"));
+        Assert.Equal("Checklist complete.", cut.Find("[data-testid='checklist-status']").TextContent);
+        Assert.Equal("58 of 58 checks answered", cut.Find("[data-testid='checklist-progress']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a plain member who holds no slot sees the standing of a concluded review, where the answers are
+    ///     open to everyone.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_MemberWithoutSlot_ConcludedReview_ShowsTheStanding()
+    {
+        // Arrange: ann and bob handed in Pass everywhere and both signed, so the review is concluded; dee is a plain
+        // member without a slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob");
+        var approval = await Signing.GetApprovalAsync(projectId, ReviewKey, cancellationToken);
+        foreach (var slot in approval!.Slots)
+        {
+            await Signing.SignAsync(
+                new Actor(slot.Primary.Username, slot.Primary.DisplayName),
+                projectId,
+                ReviewKey,
+                slot.SlotId,
+                approval.Digest,
+                "correct horse battery",
+                cancellationToken);
+        }
+
+        await AddMemberAsync(projectId, "dee");
+        SignInAs("dee", "Dee", false);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: the review is locked, and the standing is shown
+        Assert.NotNull(cut.Find("[data-testid='checklist-locked']"));
+        Assert.Equal("Checklist complete.", cut.Find("[data-testid='checklist-status']").TextContent);
+        Assert.Equal("58 of 58 checks answered", cut.Find("[data-testid='checklist-progress']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that a reviewer who handed in sees the checks the ballots answer differently, side by side, with the
     ///     names, and no hidden notice.
     /// </summary>
@@ -122,6 +204,29 @@ public class ChecklistPageSideBySideTests : BallotPageTestBase
             cut.Find($"[data-testid='ballot-others-text-{FirstItemTestId}']").TextContent);
         Assert.Contains("Different answers", cut.Find($"[data-testid='ballot-others-{FirstItemTestId}']").TextContent, StringComparison.Ordinal);
         Assert.Single(cut.FindAll("[data-testid^='ballot-others-text-']"));
+    }
+
+    /// <summary>
+    ///     Test that the answers are shown side by side in the order of the reviewer slots, not in the alphabetical
+    ///     order of the names.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_SubmittedBallot_ShowsAnswersInTheOrderOfTheSlots()
+    {
+        // Arrange: zed holds the first slot and abe the second; zed says Pass and abe says Fail on the first check
+        var projectId = await CreateReviewAsync("zed", "abe");
+        await AnswerAsync(projectId, "zed");
+        await AnswerAsync(projectId, "abe", ChecklistOutcome.Fail);
+        SignInAs("abe", "Abe", false);
+
+        // Act
+        var cut = RenderPage(projectId);
+        await OpenFirstSectionAsync(cut);
+
+        // Assert
+        Assert.Equal(
+            "Zed: Pass / Abe: Fail",
+            cut.Find($"[data-testid='ballot-others-text-{FirstItemTestId}']").TextContent);
     }
 
     /// <summary>
@@ -422,6 +527,30 @@ public class ChecklistPageSideBySideTests : BallotPageTestBase
         Assert.Equal("Why did you fail this one?", thread.Comments.Single().Text);
         Assert.NotNull(cut.Find($"[data-testid='discuss-started-{FirstItemTestId}']"));
         Assert.Empty(cut.FindAll($"[data-testid='discuss-form-{FirstItemTestId}']"));
+    }
+
+    /// <summary>
+    ///     Test that the notice of a started discussion links to the review page, where the thread is.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_DiscussStarted_LinksToTheReviewPage()
+    {
+        // Arrange: a differing check, and bob has the Discuss form open
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail);
+        SignInAs("bob", "Bob", false);
+        var cut = RenderPage(projectId);
+        await OpenFirstSectionAsync(cut);
+        await cut.Find($"[data-testid='discuss-{FirstItemTestId}']").ClickAsync();
+        await cut.Find($"[data-testid='discuss-text-{FirstItemTestId}']").InputAsync("Why did you fail this one?");
+
+        // Act: start the discussion
+        await cut.Find($"[data-testid='discuss-start-{FirstItemTestId}']").ClickAsync();
+
+        // Assert: the anchor of the notice (it has no test identifier of its own) points to the review page
+        var link = cut.Find($"[data-testid='discuss-started-{FirstItemTestId}'] a");
+        Assert.Equal($"/projects/{projectId}/reviews/{ReviewKey}", link.GetAttribute("href"));
     }
 
     /// <summary>

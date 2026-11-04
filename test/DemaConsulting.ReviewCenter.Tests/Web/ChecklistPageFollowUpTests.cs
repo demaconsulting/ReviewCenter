@@ -191,6 +191,36 @@ public class ChecklistPageFollowUpTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that in a review with a single slot the complete draft ballot, which only the answers carried from the
+    ///     followed review make complete, offers the submit button: no answer of the reviewer hands it in.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_SubmitButton_ShownForSingleSlotDraftCompletedByCarriedAnswers()
+    {
+        // Arrange: bob passed every check of REV-1, and REV-2 follows it with bob as the only reviewer
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        await SeatAsync(project.Id, "REV-1", "bob");
+        await AuditTestExtensions.AnswerAllAsync(Checklists, project.Id, "REV-1", TestActors.Bob, cancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-2", "Follow-up", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken, null, "REV-1");
+        await SeatAsync(project.Id, "REV-2", "bob");
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var cut = RenderPage(project.Id, "REV-2");
+
+        // Assert: every answer is carried (the finished checklist shows no open section, so one is opened first),
+        // the ballot is a draft, and the button hands it in
+        await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='check-carried-req-01']"));
+        Assert.Contains("draft", cut.Find("[data-testid='ballot-status']").TextContent, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find("[data-testid='submit-ballot']"));
+    }
+
+    /// <summary>
     ///     Builds a checklist definition with one section of two checks.
     /// </summary>
     /// <param name="version">The version label.</param>

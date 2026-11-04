@@ -129,6 +129,48 @@ public class ChecklistPageBallotTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a reviewer who holds a slot and has answered nothing is told so in the ballot status line.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_BallotStatus_NotAnsweredYet_ShowsYouHaveNotAnswered()
+    {
+        // Arrange: two slots, ann has answered nothing
+        var projectId = await CreateReviewAsync("ann", "bob");
+        SignInAs("ann", "Ann");
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.Equal("You have not answered yet.", cut.Find("[data-testid='ballot-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a complete draft ballot offers no submit button while the controls of the checklist are disabled,
+    ///     here because the author of the review may not answer.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_SubmitButton_HiddenWhenAuthorIsBlocked()
+    {
+        // Arrange: two slots; the author answered everything while the rule was off, then the rule is on
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync("author", "bob");
+        await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonAuthorChecklistAnswers, cancellationToken);
+        await AuditTestExtensions.AnswerAllAsync(Checklists, projectId, "REV-1", new Actor("author", "Author"), cancellationToken);
+        await Projects.SetReviewRuleAsync(TestActors.Ann, projectId, ReviewRule.NonAuthorChecklistAnswers, false, true, cancellationToken);
+        SignInAs("author", "Author");
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: the ballot is a complete draft, the controls are blocked, and nothing offers the hand-in
+        Assert.NotNull(cut.Find("[data-testid='author-answer-blocked']"));
+        Assert.Contains("draft", cut.Find("[data-testid='ballot-status']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='submit-ballot']"));
+        Assert.Empty(cut.FindAll("[data-testid='submit-and-sign']"));
+    }
+
+    /// <summary>
     ///     Test that somebody who holds no slot is told so, and gets no submit button.
     /// </summary>
     [Fact]
@@ -143,6 +185,7 @@ public class ChecklistPageBallotTests : PageTestBase
 
         // Assert
         Assert.NotNull(cut.Find("[data-testid='no-slot-notice']"));
+        Assert.Contains("not a reviewer", cut.Find("[data-testid='no-slot-notice']").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='submit-ballot']"));
         Assert.Empty(cut.FindAll("[data-testid='ballot-status']"));
     }
