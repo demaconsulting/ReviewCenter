@@ -38,15 +38,16 @@ N/A - standard test environment.
   submitted ballots; a review with a single slot counts its one ballot before the hand-in); a review with open threads,
   unanswered checks, disputed checks, a missing conclusion text, or without a checklist, that is not concluded, is
   blocked, a concluded review is not.
-- `WaitingOn` names the primary and a different alternate of every slot that is not signed, each person once, leaves out
-  signed slots, shows a disabled person with the suffix, and is empty for a concluded review.
+- `WaitingOn` names the primary and a different alternate of every slot that is not signed or is out of date, each
+  person once, leaves out signed slots, shows a disabled person with the suffix, and is empty for a concluded review.
 - A review is overdue from the day after its due date and not on it, never without a date, and never when concluded.
 - The last activity is the time of the newest audit entry of the review, the creation time when there is none, and
   entries of another review, of another project, and without a review do not count.
 - Members, read-only members, project administrators, and system administrators may read the progress; a user outside the
-  project and no actor at all get `ProjectNotFound`.
-- The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose time
-  bound of ten seconds (a guard against one query per review, not a benchmark).
+  project, a user whose account is disabled, and no actor at all get `ProjectNotFound`.
+- The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose
+  time bound of ten seconds (a guard against one query per review, not a benchmark); the approvals of all reviews are
+  read with one batch read and no single read.
 - The overload that is given the review list returns the same progress as the one that lists the reviews, makes no
   further read of the review list (also for a masked viewer, whose creator check uses the given list), uses exactly the
   given list (a subset, in the given order; an empty list gives an
@@ -134,6 +135,16 @@ and then the primary of the second; after the first reviewer signs, only the sec
 second is disabled, the name carries the suffix. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots`.
 
+**ReviewProgressService_GetProgressAsync_WaitingOn_OutOfDateSlot_IsNamed**: A review has two slots and the first is
+signed, so only the second reviewer is named; a thread that is included in the report is then started with the signature
+acknowledged, which changes the record and puts the first signature out of date, and both reviewers are named, in slot
+order. This scenario is tested by `ReviewProgressService_GetProgressAsync_WaitingOn_OutOfDateSlot_IsNamed`.
+
+**ReviewProgressService_GetProgressAsync_WaitingOn_SamePersonTwice_IsNamedOnce**: Two slots are stored directly (the
+slot rules of the signing service do not allow one person in two slots): the first has reviewer1 as primary and
+reviewer2 as alternate, the second has reviewer2 as primary. The person reviewer2 is named once, after reviewer1. This
+scenario is tested by `ReviewProgressService_GetProgressAsync_WaitingOn_SamePersonTwice_IsNamedOnce`.
+
 **ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter**: Reviews due today, due tomorrow and then moved
 to yesterday, without a date, and approved with a date of yesterday. Only the one that was moved to yesterday is overdue;
 the dates are carried. This scenario is tested by
@@ -151,10 +162,19 @@ project administrator, a system administrator, a user outside the project, and n
 single row, the last two get `ProjectNotFound`. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound`.
 
+**ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound**: A member of the project whose account is disabled
+asks for the progress and gets `ProjectNotFound`, like a user outside the project. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound`.
+
 **ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast**: 300 reviews, a third with a slot, over
 an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, the audit trail was
 read once, and the call finished within ten seconds. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
+
+**ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch**: 30 reviews, a third with a slot, over a
+`FakeReviewStore` that counts the snapshot reads. All 30 are returned, the approvals were read with one batch read, and
+no single snapshot read was made. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch`.
 
 **ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList**: Three reviews (one with a due date, one
 with a primary and an alternate, one signed) are read with the overload that lists them and then with the one that is

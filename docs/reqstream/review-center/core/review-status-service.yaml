@@ -6,116 +6,835 @@
 # the one thing the viewer should do next (ReviewNextAction), and, for a signature that no longer matches the report,
 # what changed since the reviewer signed. It is computed on demand from what the other services give the same viewer,
 # so it never shows more than they do.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ReviewStatusService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # NextAction: the one thing a viewer should do next
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewStatusService-NextAction
         title: >-
-          The ReviewNextAction type shall decide exactly one next action for a viewer from the facts about the viewer
-          and the review: a concluded review is done, a viewer who cannot take part has nothing to do, a reviewer
-          answers the checklist and hands in the ballot first (in one step with the signature when that is offered),
-          then discusses the checks answered differently, resolves open findings, answers open questions, writes the
-          conclusion when one is needed, and signs, a person without a slot adds the reviewers or themselves or helps
-          with the discussions, and everybody else waits, in plain words and with the place where it is done; the
-          person who asked every open question waits for the answer with a sentence instead of a button, a reviewer who
-          signed is told whom the review waits for, and a reviewer whose signature no longer counts is told so.
+          The ReviewNextAction class shall give every viewer of a review exactly one next action.
         justification: |
           A person who opens a review wants to know what to do, not to read a status table. One pure rule that gives a
-          single answer cannot contradict itself or the rest of the page, and the order makes the reviewer's own
-          judgment come before anything that depends on the others.
+          single answer cannot contradict itself or the rest of the page.
+        tests:
+          - ReviewNextAction_OneActionPerViewer
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Words
+        title: >-
+          The ReviewNextAction class shall word the next action in plain words, without the term "out of date".
+        justification: |
+          Reviewers read what to do, not the jargon of the signature check.
+        tests:
+          - ReviewNextAction_OneActionPerViewer
+          - ReviewNextAction_ReadyToSign_Sign
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Place
+        title: >-
+          The ReviewNextAction class shall give a place to go to if and only if the next action is one that the viewer
+          can take.
+        justification: |
+          The page shows a button only for an action that has a place, and a place without an action would mislead.
+        tests:
+          - ReviewNextAction_OneActionPerViewer
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Concluded
+        title: >-
+          The ReviewNextAction class shall tell every viewer of a concluded review that the review is done.
+        justification: |
+          A finished review must not suggest more work, even to a reviewer who never handed in a ballot.
+        tests:
+          - ReviewNextAction_Concluded_Done
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-ReadOnly
+        title: >-
+          The ReviewNextAction class shall give a viewer who cannot take part in the review no action.
+        justification: |
+          An auditor or other reader only looks at the review, so a button would offer what the viewer may not do.
+        tests:
+          - ReviewNextAction_Concluded_Done
+          - ReviewStatus_Auditor_SeesDisputesButCannotDiscuss
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-AddReviewers
+        title: >-
+          The ReviewNextAction class shall ask the lead of a review that has no reviewer slot to add the reviewers.
+        justification: |
+          Without a slot nothing else can happen in the review.
         tests:
           - ReviewNextAction_NoSlot_AssignMe
+          - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-AddSelf
+        title: >-
+          The ReviewNextAction class shall ask a project member who could take a slot of a review without slots to add
+          themselves as a reviewer.
+        justification: |
+          A member who may review can start the review by taking the first slot.
+        tests:
+          - ReviewNextAction_NoSlot_AssignMe
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-AnswerChecks
+        title: >-
+          The ReviewNextAction class shall ask a reviewer whose checks are not all answered to answer the checklist.
+        justification: |
+          The own ballot is the first duty of a reviewer: nothing else can be judged before the own answers are in.
+        tests:
           - ReviewNextAction_DraftBallot_Submit
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-SubmitBallot
+        title: >-
+          The ReviewNextAction class shall ask a reviewer whose checks are all answered, and whose ballot is not handed
+          in, to hand in the ballot.
+        justification: |
+          A ballot counts only when it is handed in.
+        tests:
+          - ReviewNextAction_DraftBallot_Submit
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-SubmitAndSign
+        title: >-
+          The ReviewNextAction class shall ask a reviewer whose ballot is complete, and who can hand it in and sign in
+          one step, to do both in that step.
+        justification: |
+          One step is shorter than two for a reviewer who has nothing left to discuss.
+        tests:
+          - ReviewNextAction_DraftBallot_Submit
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Discuss
+        title: >-
+          The ReviewNextAction class shall ask a reviewer who handed in a ballot with disputed checks to discuss them
+          before any open question or the conclusion.
+        justification: |
+          The order keeps disputes visible before the sign-off, so that the reviewers settle them first.
+        tests:
           - ReviewNextAction_SubmittedWithDispute_Discuss
+          - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-ResolveFindings
+        title: >-
+          The ReviewNextAction class shall ask a reviewer to resolve the open findings before answering open questions.
+        justification: |
+          A finding stops the signing, so it comes before the questions.
+        tests:
           - ReviewNextAction_OpenFindings_Resolve
-          - ReviewNextAction_ReadyToSign_Sign
-          - ReviewNextAction_SignedWaiting_WaitForOthers
-          - ReviewNextAction_Concluded_Done
-          - ReviewNextAction_OneActionPerViewer
           - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-AnswerQuestions
+        title: >-
+          The ReviewNextAction class shall ask a reviewer to answer the open questions that wait for that reviewer.
+        justification: |
+          An open question stops the signing until it is answered.
+        tests:
+          - ReviewNextAction_OpenFindings_Resolve
+          - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+          - ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Conclusion
+        title: >-
+          The ReviewNextAction class shall ask a reviewer to write the conclusion when the review needs one before it
+          can be signed.
+        justification: |
+          A rejected review has to say why before the reviewers sign it.
+        tests:
+          - ReviewNextAction_ReadyToSign_Sign
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Sign
+        title: >-
+          The ReviewNextAction class shall ask a reviewer who may sign, and has nothing else to do, to sign the review.
+        justification: |
+          Signing is the final duty of a reviewer.
+        tests:
+          - ReviewNextAction_ReadyToSign_Sign
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-SignAgain
+        title: >-
+          The ReviewNextAction class shall label the action of a reviewer whose signature went out of date "Look at the
+          changes and sign again".
+        justification: |
+          The reviewer must look at what changed before signing again, and the label says so without jargon.
+        tests:
+          - ReviewNextAction_ReadyToSign_Sign
+          - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-SignatureBlocked
+        title: >-
+          The ReviewNextAction class shall tell a reviewer whose signature went out of date, and who cannot sign yet,
+          that signing again has to wait, in a sentence without a button.
+        justification: |
+          A reviewer who lost the signature should learn that it is lost and that nothing can be done yet.
+        tests:
           - ReviewNextAction_AfterSigning_NamesWhoIsMissing
 
+      - id: ReviewCenter-ReviewStatusService-NextAction-SignedWaits
+        title: >-
+          The ReviewNextAction class shall tell a reviewer who has signed to wait for the other reviewers, in a sentence
+          without a button.
+        justification: |
+          A reviewer who has signed has done their part.
+        tests:
+          - ReviewNextAction_SignedWaiting_WaitForOthers
+          - ReviewNextAction_AfterSigning_NamesWhoIsMissing
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-SignedNames
+        title: >-
+          The ReviewNextAction class shall name the reviewers who still have to sign in the sentence of a reviewer who
+          has signed.
+        justification: |
+          A reviewer who has signed wants to know whom the review waits for.
+        tests:
+          - ReviewNextAction_AfterSigning_NamesWhoIsMissing
+          - ReviewStatus_AfterSigning_NamesWhoSignsNext
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Waits
+        title: >-
+          The ReviewNextAction class shall tell a reviewer who can do nothing yet to wait for the other reviewers.
+        justification: |
+          A reviewer who is blocked by the others must be told that nothing is missing on their side.
+        tests:
+          - ReviewNextAction_SignedWaiting_WaitForOthers
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OwnQuestion
+        title: >-
+          The ReviewNextAction class shall tell a reviewer who asked every open question to wait for the answer, in a
+          sentence without a button.
+        justification: |
+          A person who asked a question does not answer it themselves.
+        tests:
+          - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+          - ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OwnQuestionNames
+        title: >-
+          The ReviewNextAction class shall name the other reviewers in the sentence of a reviewer who waits for an
+          answer when there are at most two.
+        justification: |
+          A question has no addressee, so the names are given only when they are few and clear.
+        tests:
+          - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+          - ReviewNextAction_OwnQuestion_TwoOtherReviewers_AreNamedTogether
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OwnQuestionUnnamed
+        title: >-
+          The ReviewNextAction class shall not name the other reviewers in the sentence of a reviewer who waits for an
+          answer when there are more than two.
+        justification: |
+          A long list of names in one sentence would say less than the sentence without names.
+        tests:
+          - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OthersDiscuss
+        title: >-
+          The ReviewNextAction class shall ask a viewer who has no reviewer slot, and may take part, to discuss the
+          disputed checks.
+        justification: |
+          A lead or a member without a slot still moves the review along.
+        tests:
+          - ReviewNextAction_NoSlotViewer_Disputes_Discuss
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OthersFindings
+        title: >-
+          The ReviewNextAction class shall ask a viewer who has no reviewer slot, and may take part, to resolve the
+          open findings.
+        justification: |
+          A lead or a member without a slot still moves the review along.
+        tests:
+          - ReviewNextAction_NoSlotViewer_OpenFindings_Resolve
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OthersQuestions
+        title: >-
+          The ReviewNextAction class shall ask a viewer who has no reviewer slot, and may take part, to answer the open
+          questions.
+        justification: |
+          A lead or a member without a slot still moves the review along.
+        tests:
+          - ReviewNextAction_NoSlotViewer_OpenQuestions_Answer
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-OthersConclusion
+        title: >-
+          The ReviewNextAction class shall ask a viewer who has no reviewer slot, and may take part, to write the
+          conclusion when one is needed.
+        justification: |
+          A lead or a member without a slot still moves the review along.
+        tests:
+          - ReviewNextAction_NoSlotViewer_ConclusionNeeded_WriteConclusion
+
+      - id: ReviewCenter-ReviewStatusService-NextAction-Arguments
+        title: >-
+          The ReviewNextAction class shall refuse to decide the next action without the facts.
+        justification: |
+          A missing input is a programming error that must not turn into a wrong answer.
+        tests:
+          - ReviewNextAction_Decide_NullFacts_Throws
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Status: where the review stands for one viewer
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewStatusService-Status
         title: >-
-          The ReviewStatusService class shall give a viewer who may see the project the status of a review that lists,
-          in the order of the slots, the reviewer of each slot with the state of the ballot (not started, draft, or
-          handed in) and of the signature (signed, not signed, or signed and then the review changed) and never the
-          content of a ballot, the checks that the submitted ballots answer differently with whether the viewer may
-          start a discussion about each of them, the number of open questions and of open findings, and the next
-          action, shall give a review with one slot, or with none, a sensible status, shall return nothing for a
-          review that does not exist, and shall refuse a viewer who may not see the project.
+          The ReviewStatusService class shall give a viewer who may see the project the status of a review for that
+          viewer.
         justification: |
           The reviewers need one place that says where the review stands. Building it from the services that the pages
-          already use keeps it consistent with them, and leaving out the content of the ballots keeps it a status and
-          never a second way to read them.
+          already use keeps it consistent with them.
         tests:
           - ReviewStatus_Reviewers_ShowBallotAndSignatureState
+
+      - id: ReviewCenter-ReviewStatusService-Status-Reviewers
+        title: >-
+          The ReviewStatusService class shall list the reviewers of the review in the order of the slots.
+        justification: |
+          The reviewers know the slots by their numbers on the review page.
+        tests:
+          - ReviewStatus_Reviewers_ShowBallotAndSignatureState
+
+      - id: ReviewCenter-ReviewStatusService-Status-BallotState
+        title: >-
+          The ReviewStatusService class shall show for every reviewer whether the ballot is not started, a draft, or
+          handed in.
+        justification: |
+          Who has handed in is progress, not a verdict, so everyone who may see the review may see it.
+        tests:
+          - ReviewStatus_Reviewers_ShowBallotAndSignatureState
+
+      - id: ReviewCenter-ReviewStatusService-Status-SignatureState
+        title: >-
+          The ReviewStatusService class shall show for every reviewer whether the signature is missing, current, or out
+          of date.
+        justification: |
+          A reviewer whose signature went out of date has to sign again, and the others have to know it.
+        tests:
+          - ReviewStatus_Reviewers_ShowBallotAndSignatureState
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+          - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
+          - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
+
+      - id: ReviewCenter-ReviewStatusService-Status-NoBallotContent
+        title: >-
+          The ReviewStatusService class shall not put the content of any ballot in the list of reviewers.
+        justification: |
+          The status is a status and never a second way to read the ballots.
+        tests:
+          - ReviewStatus_Reviewers_ListNoBallotContent
+
+      - id: ReviewCenter-ReviewStatusService-Status-DisputedChecks
+        title: >-
+          The ReviewStatusService class shall list the checks that the submitted ballots answer differently.
+        justification: |
+          The reviewers have to settle a check that they answered differently before they sign.
+        tests:
           - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
           - ReviewStatus_Auditor_SeesDisputesButCannotDiscuss
-          - ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull
-          - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
-          - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+
+      - id: ReviewCenter-ReviewStatusService-Status-DisputeDiscuss
+        title: >-
+          The ReviewStatusService class shall offer a viewer who may take part in the review to start a discussion about
+          a disputed check.
+        justification: |
+          The discussion is how the reviewers settle a dispute.
+        tests:
+          - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
           - ReviewStatus_PassedInValues_AreUsedInsteadOfReread
+
+      - id: ReviewCenter-ReviewStatusService-Status-DisputeReadOnly
+        title: >-
+          The ReviewStatusService class shall not offer a viewer who may not take part in the review to start a
+          discussion about a disputed check.
+        justification: |
+          An auditor reads the review and does not take part in it.
+        tests:
+          - ReviewStatus_Auditor_SeesDisputesButCannotDiscuss
+
+      - id: ReviewCenter-ReviewStatusService-Status-DisputeThread
+        title: >-
+          The ReviewStatusService class shall not offer to start a discussion about a disputed check once a discussion
+          about it is open.
+        justification: |
+          Two discussions about one check would split the answers.
+        tests:
+          - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
+
+      - id: ReviewCenter-ReviewStatusService-Status-OpenQuestions
+        title: >-
+          The ReviewStatusService class shall count the open questions of the review.
+        justification: |
+          An open question stops the signing, so the reviewers see how many are left.
+        tests:
+          - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
+          - ReviewStatus_MaskedViewer_NoDisputedChecks
+
+      - id: ReviewCenter-ReviewStatusService-Status-OpenFindings
+        title: >-
+          The ReviewStatusService class shall count the open findings of the review apart from the open questions.
+        justification: |
+          A finding stops the signing like a question does, but it is a different kind of work.
+        tests:
+          - ReviewStatus_OpenFindings_CountedApartFromQuestions
+
+      - id: ReviewCenter-ReviewStatusService-Status-NextAction
+        title: >-
+          The ReviewStatusService class shall carry the next action of the viewer in the status.
+        justification: |
+          The page and the status must name the same next step.
+        tests:
+          - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+          - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
+
+      - id: ReviewCenter-ReviewStatusService-Status-SingleSlot
+        title: >-
+          The ReviewStatusService class shall not mask the status of a review that has one reviewer slot.
+        justification: |
+          One reviewer has no other ballot to be influenced by, so there is nothing to hide.
+        tests:
+          - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+
+      - id: ReviewCenter-ReviewStatusService-Status-SingleSlotDisputes
+        title: >-
+          The ReviewStatusService class shall list no disputed check for a review that has one reviewer slot.
+        justification: |
+          One reviewer cannot disagree with another.
+        tests:
+          - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+
+      - id: ReviewCenter-ReviewStatusService-Status-NoSlots
+        title: >-
+          The ReviewStatusService class shall give an empty list of reviewers for a review without reviewer slots.
+        justification: |
+          A review that has not named anybody is simply not reviewed yet.
+        tests:
+          - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
+
+      - id: ReviewCenter-ReviewStatusService-Status-Missing
+        title: >-
+          The ReviewStatusService class shall give no status for a review that does not exist.
+        justification: |
+          A review that is not there has no standing to report.
+        tests:
+          - ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull
           - ReviewStatus_PassedInValues_OutsiderIsStillRefused
+
+      - id: ReviewCenter-ReviewStatusService-Status-Refused
+        title: >-
+          The ReviewStatusService class shall refuse a viewer who may not see the project with the ProjectNotFound rule.
+        justification: |
+          A person outside the project must not learn that the project or its reviews exist.
+        tests:
+          - ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull
+          - ReviewStatus_PassedInValues_OutsiderIsStillRefused
+
+      - id: ReviewCenter-ReviewStatusService-Status-PassedIn
+        title: >-
+          The ReviewStatusService class shall give for values that the caller passes in the same status as it gives
+          when it reads the values itself.
+        justification: |
+          A page that has just loaded the values must see the same status without reading them a second time.
+        tests:
+          - ReviewStatus_PassedInValues_AreUsedInsteadOfReread
+
+      - id: ReviewCenter-ReviewStatusService-Status-PassedInUsed
+        title: >-
+          The ReviewStatusService class shall use the review values that the caller passes in and not read them again.
+        justification: |
+          Reading them again would defeat the purpose of passing them in.
+        tests:
+          - ReviewStatus_PassedInValues_AreUsedInsteadOfReread
+
+      - id: ReviewCenter-ReviewStatusService-Status-PassedInRefused
+        title: >-
+          The ReviewStatusService class shall refuse a viewer who may not see the project also when the values are
+          passed in.
+        justification: |
+          Passing the values in must not become a way around the access rules.
+        tests:
+          - ReviewStatus_PassedInValues_OutsiderIsStillRefused
+
+      - id: ReviewCenter-ReviewStatusService-Status-PassedInMissing
+        title: >-
+          The ReviewStatusService class shall give no status for passed-in values of a review that does not exist.
+        justification: |
+          Values for a review that is not there describe nothing.
+        tests:
+          - ReviewStatus_PassedInValues_OutsiderIsStillRefused
+
+      - id: ReviewCenter-ReviewStatusService-Status-ReopenerWaits
+        title: >-
+          The ReviewStatusService class shall tell the reviewer who reopened a review to wait when the project requires
+          another reviewer to sign.
+        justification: |
+          The person who reopened a review must not approve it again alone.
+        tests:
           - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
           - ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule
 
+      - id: ReviewCenter-ReviewStatusService-Status-ReopenerSigns
+        title: >-
+          The ReviewStatusService class shall ask the reviewer who reopened a review to sign when the project does not
+          require another reviewer to sign.
+        justification: |
+          Without the rule the reopener is a reviewer like any other.
+        tests:
+          - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
+          - ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule
+
+      - id: ReviewCenter-ReviewStatusService-Status-NonReopenerSigns
+        title: >-
+          The ReviewStatusService class shall ask a reviewer who did not reopen the review to sign again when the
+          signature went out of date.
+        justification: |
+          The rule about the reopener holds only for the person who reopened the review.
+        tests:
+          - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
+
+      - id: ReviewCenter-ReviewStatusService-Status-Arguments
+        title: >-
+          The ReviewStatusService class shall refuse to be created without one of the services and stores that it
+          reads.
+        justification: |
+          A missing collaborator is a programming error that is better found at the start than in the middle of a page.
+        tests:
+          - ReviewStatus_Constructor_NullCollaborator_Throws
+
+      - id: ReviewCenter-ReviewStatusService-Status-PassedInArguments
+        title: >-
+          The ReviewStatusService class shall refuse a status from passed-in values when the approval or the threads
+          are missing.
+        justification: |
+          Missing values would silently give a status that shows nothing.
+        tests:
+          - ReviewStatus_GetStatusAsync_NullPassedInValues_Throws
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # MaskedViewer: what a viewer who may not see the ballots of the others yet does not get
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewStatusService-MaskedViewer
         title: >-
-          The ReviewStatusService class shall, for a viewer who may not see the answers of the other reviewers yet,
-          list no disputed check, count no discussion about a check, give no outcome and no conclusion text, name no
-          answer in the changes since a signature, and shall decide the next action from what that viewer may see, so
-          that the status reveals nothing that the hidden ballots keep back.
+          The ReviewStatusService class shall list no disputed check for a viewer who may not see the answers of the
+          other reviewers yet.
         justification: |
-          The status summarizes the standing, which is where a leak would come through. It asks the same rule as every
-          other reader of the ballots, and a viewer without a ballot is told in the page that the rest stays hidden
-          until the own ballot is handed in.
+          Ballots stay private until every reviewer has decided on their own, so the status must not reveal them.
         tests:
           - ReviewStatus_MaskedViewer_NoDisputedChecks
           - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
-          - ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer
 
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Counts
+        title: >-
+          The ReviewStatusService class shall count no discussion about a check for a viewer who may not see the answers
+          of the other reviewers yet.
+        justification: |
+          The number of discussions about checks would tell that the reviewers answered differently.
+        tests:
+          - ReviewStatus_MaskedViewer_NoDisputedChecks
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Outcome
+        title: >-
+          The ReviewStatusService class shall give no outcome note to a viewer who may not see the answers of the other
+          reviewers yet.
+        justification: |
+          A note that the review will be rejected would reveal what the other reviewers answered.
+        tests:
+          - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
+          - ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Caution
+        title: >-
+          The ReviewStatusService class shall give no caution to a viewer who may not see the answers of the other
+          reviewers yet.
+        justification: |
+          The caution depends on the state of the other ballots, which a viewer without a ballot of their own does not
+          need to see.
+        tests:
+          - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Details
+        title: >-
+          The ReviewStatusService class shall name no answer, no check text, and no check identifier in the status of a
+          viewer who may not see the answers of the other reviewers yet.
+        justification: |
+          Any of them would tell what the hidden ballots say.
+        tests:
+          - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Action
+        title: >-
+          The ReviewStatusService class shall not ask a viewer who may not see the answers of the other reviewers yet to
+          discuss a disputed check.
+        justification: |
+          The request would tell that the reviewers answered a check differently.
+        tests:
+          - ReviewStatus_MaskedViewer_NoDisputedChecks
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer-Waiting
+        title: >-
+          The ReviewStatusService class shall not tell a viewer who may not see the answers of the other reviewers yet
+          that the review waits for somebody.
+        justification: |
+          Waiting for a named person would tell that a discussion about a check is open.
+        tests:
+          - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Guidance: what the status says to a viewer who may see the answers
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewStatusService-Guidance
         title: >-
-          The ReviewStatusService class shall, for a viewer who may see the answers of the other reviewers, give each
-          disputed check the answer of every submitted ballot with the justification written, name in a caution the
-          reviewers who have not handed in a ballot when the viewer is about to sign, state plainly that the review
-          will be Rejected and which check the reviewers failed, and tell the person who asked every open question to
-          wait for the answer while the other reviewer is still asked to answer, and shall give none of this to a
-          viewer who may not see the answers or to a person outside the project, and no caution to a single reviewer.
+          The ReviewStatusService class shall list for every disputed check the answer and the justification of every
+          submitted ballot in the order of the slots.
         justification: |
-          The reviewers of a disputed check need to see what the other said and why, a reviewer who signs early needs to
-          know that the signature may be lost again, and a review that is going to be Rejected should say so before the
-          last signature. All of it is content of the ballots, so it is given only where the ballots may be read.
+          The reviewers of a disputed check need to see what the others said and why.
         tests:
           - ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-Outcome
+        title: >-
+          The ReviewStatusService class shall give a viewer who may see the answers an outcome note that names the
+          failed check and says that the review will be Rejected when every reviewer failed it.
+        justification: |
+          A review that is going to be rejected should say so before the last signature.
+        tests:
           - ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-Caution
+        title: >-
+          The ReviewStatusService class shall give a reviewer who is about to sign a caution that names the reviewers
+          who have not handed in a ballot.
+        justification: |
+          A reviewer who signs early needs to know that the signature may be lost again.
+        tests:
           - ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-CautionNone
+        title: >-
+          The ReviewStatusService class shall give a reviewer who is about to sign no caution when every other ballot is
+          handed in.
+        justification: |
+          A caution that has nothing to say would only be noise.
+        tests:
+          - ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-CautionNotSigning
+        title: >-
+          The ReviewStatusService class shall give no caution to a reviewer who is not about to sign.
+        justification: |
+          The caution warns about signing, so it is shown only where signing is the next step.
+        tests:
+          - ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-SingleReviewer
+        title: >-
+          The ReviewStatusService class shall give no caution for a review that has one reviewer slot.
+        justification: |
+          A single reviewer has no other ballot to wait for.
+        tests:
           - ReviewStatus_SingleSlot_NoCaution
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-AskerWaits
+        title: >-
+          The ReviewStatusService class shall tell the reviewer who asked a question that the review waits for the
+          answer.
+        justification: |
+          A person who asked a question has nothing to do until it is answered.
+        tests:
           - ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-OtherAnswers
+        title: >-
+          The ReviewStatusService class shall ask the other reviewer to answer the question of a reviewer.
+        justification: |
+          The answer is what the person who asked is waiting for.
+        tests:
+          - ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewStatusService-Guidance-SignedNames
+        title: >-
+          The ReviewStatusService class shall name in the status of a reviewer who signed the reviewers who sign next.
+        justification: |
+          A reviewer who has signed wants to know whom the review waits for, in the same words as the approval.
+        tests:
           - ReviewStatus_AfterSigning_NamesWhoSignsNext
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # ChangesSinceSigning: what changed after a reviewer signed
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning
         title: >-
-          The ReviewStatusService class shall list, for each slot whose signature no longer matches the report, the
-          audit entries after the signature that can change the report (a ballot handed in, reopened or reassigned,
-          the conclusion text, a thread in the report that was started, answered, made a Finding or a Question,
-          added to the report or taken out, and a Finding resolved with a note, also a Finding that was carried over
-          from the followed review), each with the time, the person and a reason in plain words, shall leave out every
-          other entry, shall read the whole audit trail of the review, however long, shall list nothing for a signature
-          that still matches, and shall give the details of an entry only as the audit masking allows the viewer.
+          The ReviewStatusService class shall list for a reviewer whose signature is out of date the changes since the
+          signature, each with the time, the person, and a reason in plain words.
         justification: |
-          A signed reviewer who is told to look again wants to know what happened. The list is derived from the audit
-          trail by a fixed set of actions; it explains and does not prove: the signature check itself compares the
-          digest, and an entry in the list may not have changed the report in the end, for example a reply that was
-          not part of it. Rendering the entries through the audit masking keeps hidden answers hidden.
+          A signed reviewer who is told to look again wants to know what happened. The list explains and does not prove:
+          the signature check itself compares the digest.
         tests:
           - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
-          - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-AfterSignature
+        title: >-
+          The ReviewStatusService class shall list only the changes that were made after the reviewer signed.
+        justification: |
+          What happened before the signature is part of what the reviewer signed.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
           - ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-Ballots
+        title: >-
+          The ReviewStatusService class shall list a ballot that was handed in.
+        justification: |
+          A ballot that is handed in counts in the consolidated answers, so the signed report changes.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-BallotReopened
+        title: >-
+          The ReviewStatusService class shall list a ballot that was taken back for changes.
+        justification: |
+          A ballot that is taken back stops counting, so the signed report changes.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-Reassigned
+        title: >-
+          The ReviewStatusService class shall list a ballot that was given to another reviewer with the reason "Gave a
+          ballot to another reviewer".
+        justification: |
+          A ballot that changes hands changes who answered, so the signed report changes.
+        tests:
+          - ReviewStatus_ChangeRules_BallotReassigned_IsListed
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-Conclusion
+        title: >-
+          The ReviewStatusService class shall list a change of the review conclusion.
+        justification: |
+          The conclusion text is part of the signed report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
           - ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries
+          - ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadStarted
+        title: >-
+          The ReviewStatusService class shall list a thread that was started and goes in the report.
+        justification: |
+          A thread in the report is part of the signed report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadReply
+        title: >-
+          The ReviewStatusService class shall list a reply that goes in the report.
+        justification: |
+          A reply in the report is part of the signed report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKind
+        title: >-
+          The ReviewStatusService class shall list a thread that was turned from a question into a finding.
+        justification: |
+          A finding goes in the report and a question does not, so the kind of a thread changes the report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKindBack
+        title: >-
+          The ReviewStatusService class shall list a thread that was turned from a finding into a question.
+        justification: |
+          A finding goes in the report and a question does not, so the kind of a thread changes the report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReport
+        title: >-
+          The ReviewStatusService class shall list a comment that was put in the report.
+        justification: |
+          A comment that joins the report changes the signed report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReportOut
+        title: >-
+          The ReviewStatusService class shall list a comment that was taken out of the report.
+        justification: |
+          A comment that leaves the report changes the signed report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-FindingNote
+        title: >-
+          The ReviewStatusService class shall list the resolution of a finding together with its note.
+        justification: |
+          The note of a resolved finding goes in the report.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+          - ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFinding
+        title: >-
+          The ReviewStatusService class shall list the resolution with a note of a finding that was carried into the
+          review from an earlier one.
+        justification: |
+          A carried finding has no start entry in this review, but its note goes in the report like any other.
+        tests:
           - ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed
-          - ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange
-          - ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed
           - ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFindingKind
+        title: >-
+          The ReviewStatusService class shall list the resolution note of a carried finding that was turned into a
+          question later, when the note was made before that change.
+        justification: |
+          The kind that the thread had when the note was made decides whether the note is in the report.
+        tests:
+          - ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-QuestionNote
+        title: >-
+          The ReviewStatusService class shall leave out the resolution of a question, also when it has a note.
+        justification: |
+          A note counts in the report only for a finding.
+        tests:
+          - ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed
+          - ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-NotInReport
+        title: >-
+          The ReviewStatusService class shall leave out a thread and a reply that stay out of the report.
+        justification: |
+          What is not in the report cannot change it.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-OtherEntries
+        title: >-
+          The ReviewStatusService class shall leave out every other entry that does not change what the reviewer signed.
+        justification: |
+          A list that mixes in unrelated entries would hide the changes that matter.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-StillMatches
+        title: >-
+          The ReviewStatusService class shall list no change when the signature still matches the review.
+        justification: |
+          A reviewer whose signature is current has nothing to look at.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-WholeTrail
+        title: >-
+          The ReviewStatusService class shall read the whole audit trail of the review, also when it has more than
+          twenty thousand entries.
+        justification: |
+          A limit on the number of entries would drop the newest change, which is the one that matters most.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning-Masking
+        title: >-
+          The ReviewStatusService class shall word a change whose details are hidden from the viewer as one neutral
+          sentence without those details.
+        justification: |
+          Masked viewers must not learn answers from the list of changes.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer

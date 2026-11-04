@@ -161,4 +161,17 @@ public class FingerprintTests
         // Assert: same as computing from the bytes
         Assert.Equal(TestContent.FingerprintABC, fingerprint);
     }
+
+    /// <summary>
+    ///     Test that a missing set of hashes or contents is refused.
+    /// </summary>
+    [Fact]
+    public void Fingerprint_Compute_NullSet_Throws()
+    {
+        // Arrange: nothing beyond the missing sets
+
+        // Act and Assert: both overloads refuse a null set
+        Assert.Throws<ArgumentNullException>(() => Fingerprint.Compute((IEnumerable<string>)null!));
+        Assert.Throws<ArgumentNullException>(() => Fingerprint.Compute((IEnumerable<byte[]>)null!));
+    }
 }

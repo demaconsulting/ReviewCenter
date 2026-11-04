@@ -3,44 +3,235 @@
 #
 # The SelectionMatcher class parses the file selection patterns an author gives when a review is created from a
 # repository and decides which paths they select.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: SelectionMatcher Unit Requirements
     requirements:
       - id: ReviewCenter-SelectionMatcher-Match
         title: >-
-          The SelectionMatcher class shall select a path when the last pattern that matches it is an inclusion, with
-          a star matching any characters inside one path segment but never a separator, a question mark matching one
-          character, a segment of two stars matching any number of segments (at least one when it ends the pattern),
-          a leading exclamation mark making the pattern an exclusion, and matching that is case-sensitive.
+          The SelectionMatcher class shall select a path if and only if the last pattern that matches it is an
+          inclusion.
         justification: |
-          Authors choose the files of a review with a short, predictable syntax. The result must not depend on the
-          platform, and a later exclusion must be able to take back what an earlier pattern selected.
+          Authors choose the files of a review with a short, predictable syntax in which a later pattern can change
+          what an earlier pattern decided.
         tests:
           - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
-          - SelectionMatcher_IsMatch_TrailingDoubleStar_NeedsAtLeastOneSegment
+
+      - id: ReviewCenter-SelectionMatcher-Match-Exclusion
+        title: >-
+          The SelectionMatcher class shall treat a pattern with a leading exclamation mark as an exclusion that takes
+          back what an earlier pattern selected.
+        justification: |
+          Authors need to select a folder and then leave out a part of it without listing every file.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Match-Star
+        title: >-
+          The SelectionMatcher class shall match any characters inside one path segment with a star and shall never
+          match a path separator with it.
+        justification: |
+          A star that crossed folders would select files that the author did not name.
+        tests:
           - SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Match-Question
+        title: >-
+          The SelectionMatcher class shall match exactly one character with a question mark.
+        justification: |
+          Authors use the question mark for names that differ in one character.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Match-DoubleStar
+        title: >-
+          The SelectionMatcher class shall match any number of path segments with a segment of two stars.
+        justification: |
+          Authors select whole trees of folders without knowing how deep the files lie.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Match-TrailingDoubleStar
+        title: >-
+          The SelectionMatcher class shall require at least one segment for a segment of two stars that ends the
+          pattern.
+        justification: |
+          A folder pattern selects the files below the folder and not the folder name itself, which could be a file.
+        tests:
+          - SelectionMatcher_IsMatch_TrailingDoubleStar_NeedsAtLeastOneSegment
+
+      - id: ReviewCenter-SelectionMatcher-Match-CaseSensitive
+        title: >-
+          The SelectionMatcher class shall match paths case-sensitively.
+        justification: |
+          The result must not depend on the platform, and repository paths differ by case on most hosts.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
 
       - id: ReviewCenter-SelectionMatcher-Parse
         title: >-
-          The SelectionMatcher class shall read a selection as lines that are trimmed and normalized with blank lines
-          skipped, and shall refuse a selection that is empty or has too many patterns, a pattern that is too long,
-          or a pattern that uses a backslash, a dot or double dot segment, an empty segment, or a control character,
-          while accepting a selection at exactly the limits, and shall write parsed patterns back as the normalized
-          selection text, so that the text a review stores and the text compared with it are produced by one writer.
+          The SelectionMatcher class shall trim the lines of a selection when it reads them as patterns.
         justification: |
-          A pattern must never be able to reach outside the repository or to hide text, and the size of a selection
-          must be bounded. The user is told which rule a selection broke.
+          Authors type selections in text boxes and files, where white space around a line is not meant.
         tests:
           - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Parse-BlankLines
+        title: >-
+          The SelectionMatcher class shall skip the blank lines of a selection.
+        justification: |
+          A blank line is not a pattern and must neither select a file nor be refused as an empty pattern.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Prefix
+        title: >-
+          The SelectionMatcher class shall drop a leading dot-slash or slash of a pattern.
+        justification: |
+          Paths of a repository are relative to its root, so the same file can be written with or without the prefix.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Parse-ExclusionSpace
+        title: >-
+          The SelectionMatcher class shall allow white space between the exclamation mark of an exclusion and its
+          pattern.
+        justification: |
+          Authors write an exclusion with or without a space after the mark and mean the same thing.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Folder
+        title: >-
+          The SelectionMatcher class shall read a pattern that ends with a slash as everything below that folder.
+        justification: |
+          Authors name a folder to select all of it.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Normalize
+        title: >-
+          The SelectionMatcher class shall write parsed patterns back as the normalized selection text, one pattern
+          per line with exclusions marked by an exclamation mark.
+        justification: |
+          A review stores its selection as text, and the same selection must always give the same text.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+
+      - id: ReviewCenter-SelectionMatcher-Parse-RoundTrip
+        title: >-
+          The SelectionMatcher class shall give from the normalized selection text patterns that write back as the same
+          text.
+        justification: |
+          The stored text and a newly entered text can be compared only when normalizing does not change the text again.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Invalid
+        title: >-
+          The SelectionMatcher class shall refuse a selection that breaks a rule of parsing with a rule violation that
+          names the selection rule.
+        justification: |
+          A pattern must never be able to reach outside the repository or to hide text. The user is told which rule a
+          selection broke.
+        tests:
           - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
           - SelectionMatcher_Parse_Limits_AreInclusive
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Empty
+        title: >-
+          The SelectionMatcher class shall refuse a selection that has no pattern.
+        justification: |
+          A review without a selection would select nothing, which the author did not intend.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-EmptyPattern
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that names no file or folder.
+        justification: |
+          An exclamation mark or a slash alone would select nothing or everything, and the author did not say which.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-TooMany
+        title: >-
+          The SelectionMatcher class shall refuse a selection that has more patterns than the limit.
+        justification: |
+          The size of a selection must be bounded, because every pattern is matched against every file.
+        tests:
+          - SelectionMatcher_Parse_Limits_AreInclusive
+
+      - id: ReviewCenter-SelectionMatcher-Parse-TooLong
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that is longer than the limit.
+        justification: |
+          The size of a pattern must be bounded, because patterns are typed by users.
+        tests:
+          - SelectionMatcher_Parse_Limits_AreInclusive
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Limits
+        title: >-
+          The SelectionMatcher class shall accept a selection that has exactly the limit of patterns and a pattern that
+          has exactly the limit of characters.
+        justification: |
+          The limits are maximums that can be used.
+        tests:
+          - SelectionMatcher_Parse_Limits_AreInclusive
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Backslash
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that uses a backslash.
+        justification: |
+          A backslash is a separator on some platforms, so the pattern would not mean the same everywhere.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-DotSegment
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that has a dot or double dot segment.
+        justification: |
+          A double dot segment could reach outside the repository.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-EmptySegment
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that has an empty segment.
+        justification: |
+          An empty segment is a mistake in the path, and two spellings of the same path would not compare as equal.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Control
+        title: >-
+          The SelectionMatcher class shall refuse a pattern that contains a control character.
+        justification: |
+          A control character could hide text in the stored selection.
+        tests:
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+
+      - id: ReviewCenter-SelectionMatcher-Parse-Arguments
+        title: >-
+          The SelectionMatcher class shall refuse a missing selection text, a missing path, and a missing list of
+          patterns.
+        justification: |
+          A missing input is a caller error and must fail loudly.
+        tests:
           - SelectionMatcher_NullArguments_ThrowArgumentNull
 
       - id: ReviewCenter-SelectionMatcher-Bounded
         title: >-
-          The SelectionMatcher class shall decide a path in a time that stays small even for a pattern with many
-          double-star segments.
+          The SelectionMatcher class shall decide a path of 60 segments against a pattern of 40 double-star segments in
+          at most five seconds.
         justification: |
           Patterns are typed by users. A pattern that makes matching take exponential time would let one request
           stop the server.
@@ -49,8 +240,8 @@ sections:
 
       - id: ReviewCenter-SelectionMatcher-Compatibility
         title: >-
-          The SelectionMatcher class shall select the same paths as the glob matching used by ReviewMark for the
-          syntax that both support.
+          The SelectionMatcher class shall select the same paths as the glob matching used by ReviewMark for literal,
+          star, and double-star patterns with exclusions.
         justification: |
           Authors already write the selection of files for ReviewMark. The same text must select the same files in a
           review of ReviewCenter, so that the two tools agree about what is reviewed.
