@@ -480,6 +480,29 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the threads of the selected file are listed in the order in which they were created, not in the
+    ///     order of their lines.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder()
+    {
+        // Arrange: three threads on one file, started by three people, the later ones on earlier lines
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "1\n2\n3\n"u8.ToArray()));
+        var first = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 3, 3), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var second = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Second", TestContext.Current.CancellationToken);
+        var third = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Cy, "Third", TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the list follows the order of creation
+        Assert.Equal(
+            [$"thread-{first.Id}", $"thread-{second.Id}", $"thread-{third.Id}"],
+            cut.FindAll("[data-testid='threads-list'] > li").Select(item => item.GetAttribute("data-testid")));
+    }
+
+    /// <summary>
     ///     Test that a file without threads says so.
     /// </summary>
     [Fact]

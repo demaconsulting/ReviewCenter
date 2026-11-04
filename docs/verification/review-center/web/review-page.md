@@ -199,6 +199,11 @@ reviewers answered and started a discussion about a check; no discussion, no cou
 and the note says it stays hidden. This scenario is tested by
 `ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads`.
 
+**ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly**: A reviewer who holds a slot has answered one check
+and not handed in a ballot, while two other reviewers handed in ballots that differ; the checklist cell shows "1 of N
+checks answered" and no count of failed checks. This scenario is tested by
+`ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly`.
+
 **ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden**: A member without a slot sees "Hidden until you answer" in
 place of the checklist standing. This scenario is tested by `ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden`.
 
@@ -482,6 +487,10 @@ threads on two files; the summary, the per-file counts, the anchor labels, the a
 comments with author, time, and text are shown for the selected file. This scenario is tested by
 `ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments`.
 
+**ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder**: Three threads on one file are created in an order
+that differs from the order of their lines; the list of the file shows them in the order of creation. This scenario is
+tested by `ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder`.
+
 **ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage**: A file without threads shows an empty-state message.
 This scenario is tested by `ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage`.
 
@@ -538,6 +547,19 @@ label "Check discussion" in place of a file path, the card of check discussions 
 and a review without such a thread has no card. This scenario is tested by
 `ReviewPage_CheckThread_ListedInIndexWithCheckLabel`.
 
+**ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList**: A review has a thread on a file and a thread
+about a check; after the file is selected, the list of the file holds only the thread of the file and the thread about
+the check stays in the card of check discussions. This scenario is tested by
+`ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList`.
+
+**ReviewPage_CheckThread_CommentText_IsShownAsPlainText**: A comment of a thread about a check that holds markup is
+shown as the literal text and creates no element. This scenario is tested by
+`ReviewPage_CheckThread_CommentText_IsShownAsPlainText`.
+
+**ReviewPage_CheckThread_Card_OffersNoFormToStartThread**: With a file selected, so that the page has a form to start a
+thread, the card of check discussions holds no form, no text field, no start button and no kind choice. This scenario
+is tested by `ReviewPage_CheckThread_Card_OffersNoFormToStartThread`.
+
 **ReviewPage_CheckThread_ReplyAndResolve_Work**: With no file chosen, a reply in the card is stored, and resolving the
 thread moves it to the resolved count and collapses it. This scenario is tested by
 `ReviewPage_CheckThread_ReplyAndResolve_Work`.
@@ -545,6 +567,9 @@ thread moves it to the resolved count and collapses it. This scenario is tested 
 **ReviewPage_CheckThreadDeepLink_ShowsCheckCard**: The address of a thread about a check focuses the thread in its card
 and shows no message, although the thread has no file. This scenario is tested by
 `ReviewPage_CheckThreadDeepLink_ShowsCheckCard`.
+
+**ReviewPage_CheckThreadDeepLink_SelectsNoFile**: The address of a thread about a check selects no file: no file is
+marked as selected and no code is shown. This scenario is tested by `ReviewPage_CheckThreadDeepLink_SelectsNoFile`.
 
 **ReviewPage_CheckThread_DoesNotSelectFile**: Choosing a thread about a check in the index shows the thread without
 choosing a file and keeps a file that was chosen before. This scenario is tested by
@@ -1075,7 +1100,8 @@ render the component and the page with bUnit, and in two Puppet scenarios that r
 
 **ReviewStatusPanel_ShowsReviewerBallotAndSignedStates**, **ReviewStatusPanel_ShowsQuestionAndFindingCounts**,
 **ReviewStatusPanel_ShowsExactlyOneNextActionButton**, and **ReviewStatusPanel_DisputedCheck_DiscussStartsThread**: The
-panel lists each reviewer with the words for the ballot and the signature, shows the open questions and findings as
+panel, headed "Where are we?", lists each reviewer with the words for the ballot and the signature, shows the open
+questions and findings as
 icon and text, renders exactly one `next-action` element, and a Discuss button on a disputed check starts the check
 thread. These scenarios are tested by the tests of the same names.
 
@@ -1125,9 +1151,12 @@ with "Hand in your ballot" and does not repeat that the answers stay hidden; the
 tested by `ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce`.
 
 **ReviewPage_SignedThenChanged_ExplainsWhatChanged**: After a slot signed and a Finding then went into the report, the
-slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time, with
-the note that the list explains and does not prove. This scenario is tested by
-`ReviewPage_SignedThenChanged_ExplainsWhatChanged`.
+slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time. This
+scenario is tested by `ReviewPage_SignedThenChanged_ExplainsWhatChanged`.
+
+**ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain**: For the same slot the note above the list reads
+when the slot signed and that the reviewer needs to look again and sign again. This scenario is tested by
+`ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain`.
 
 **ReviewPage_NoJargonOutOfDateText** and **SignatureWarning_UsesPlainLanguage**: No text of the page and no warning
 contains "out of date"; the warning says that signed reviewers will need to look again and sign again, because the
