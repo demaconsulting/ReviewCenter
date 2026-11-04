@@ -36,10 +36,16 @@ sections:
           isolation, and an unidentified visitor must never be shown a project.
         children:
           - ReviewCenter-Web-Projects
+          - ReviewCenter-Web-Projects-Empty
           - ReviewCenter-Web-Projects-NewButton
+          - ReviewCenter-Web-Projects-NewButtonHidden
           - ReviewCenter-Web-Projects-NewPage
+          - ReviewCenter-Web-Projects-NewPageCreate
+          - ReviewCenter-Web-Projects-NewPageError
+          - ReviewCenter-Web-Projects-NewPageNothingCreated
           - ReviewCenter-Web-Projects-Project
           - ReviewCenter-Web-Projects-HeaderLink
+          - ReviewCenter-Web-Projects-HeaderLinkSignedOut
           - ReviewCenter-Core-Projects
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
@@ -59,11 +65,21 @@ sections:
           configuration of the repository names. Upload limits keep the service responsive.
         children:
           - ReviewCenter-Web-Reviews
+          - ReviewCenter-Web-Reviews-OtherProject
           - ReviewCenter-Web-Reviews-ProjectLink
           - ReviewCenter-Web-Reviews-UploadLimits
+          - ReviewCenter-Web-Reviews-ReservedId
+          - ReviewCenter-Web-Reviews-FormError
+          - ReviewCenter-Web-Reviews-FormNotFound
+          - ReviewCenter-Web-Reviews-NothingCreated
           - ReviewCenter-Web-Reviews-Page
+          - ReviewCenter-Web-Reviews-NotFound
+          - ReviewCenter-Web-Reviews-OtherReview
           - ReviewCenter-Web-Reviews-Summary
           - ReviewCenter-Web-Reviews-Files
+          - ReviewCenter-Web-Reviews-Content
+          - ReviewCenter-Web-Reviews-NoSelection
+          - ReviewCenter-Web-Reviews-Binary
           - ReviewCenter-Web-Reviews-Details
           - ReviewCenter-Core-Reviews
           - ReviewCenter-Core-Fingerprint
@@ -91,15 +107,25 @@ sections:
           - ReviewCenter-Storage-RepositoryReviews-NoContentInReview
           - ReviewCenter-Storage-RepositoryReviews-BaselineOnRequest
           - ReviewCenter-Web-RepositoryReviews
+          - ReviewCenter-Web-RepositoryReviews-SkippedEntries
           - ReviewCenter-Web-RepositoryReviews-EnabledOnly
+          - ReviewCenter-Web-RepositoryReviews-NoRepository
           - ReviewCenter-Web-RepositoryReviews-Reason
           - ReviewCenter-Web-RepositoryReviews-ChangeKind
+          - ReviewCenter-Web-RepositoryReviews-UploadNoKind
           - ReviewCenter-Web-RepositoryReviews-Source
+          - ReviewCenter-Web-RepositoryReviews-Source-Upload
           - ReviewCenter-Web-RepositoryReviews-DiffView
           - ReviewCenter-Web-RepositoryReviews-HeadVersion
           - ReviewCenter-Web-RepositoryReviews-BaselineVersion
+          - ReviewCenter-Web-RepositoryReviews-HeadOnly
+          - ReviewCenter-Web-RepositoryReviews-VersionSwitch
+          - ReviewCenter-Web-RepositoryReviews-DeletedFileComment
           - ReviewCenter-Core-Diff
           - ReviewCenter-Web-DiffReview
+          - ReviewCenter-Web-DiffReview-ScrollToChange
+          - ReviewCenter-Web-DiffReview-CommentForm
+          - ReviewCenter-Web-DiffReview-FileThreads
           - ReviewCenter-Web-DiffReview-Collapsed
           - ReviewCenter-Web-DiffReview-LineComment
           - ReviewCenter-Web-DiffReview-LineThreads
@@ -131,6 +157,23 @@ sections:
           - ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
           - ReviewCenter-Hosting-PlannerServices
           - ReviewCenter-Web-PlanReviews
+          - ReviewCenter-Web-PlanReviews-LinkUnavailable
+          - ReviewCenter-Web-PlanReviews-NoForm
+          - ReviewCenter-Web-PlanReviews-Incomplete
+          - ReviewCenter-Web-PlanReviews-Reset
+          - ReviewCenter-Web-PlanReviews-ProjectSwitch
+          - ReviewCenter-Web-PlanReviews-Busy
+          - ReviewCenter-Web-PlanReviews-Interactive
+          - ReviewCenter-Web-PlanReviews-HelpTopic
+          - ReviewCenter-Web-PlanReviews-RowDetails
+          - ReviewCenter-Web-PlanReviews-BulkSelection
+          - ReviewCenter-Web-PlanReviews-OtherSets
+          - ReviewCenter-Web-PlanReviews-RowFailed
+          - ReviewCenter-Web-PlanReviews-RowFailedKeeps
+          - ReviewCenter-Web-PlanReviews-Refused
+          - ReviewCenter-Web-PlanReviews-RefusedNothing
+          - ReviewCenter-Web-PlanReviews-NoLeak
+          - ReviewCenter-Web-PlanReviews-ReviewSetNone
           - ReviewCenter-Web-PlanReviews-Summary
           - ReviewCenter-Web-PlanReviews-Ordering
           - ReviewCenter-Web-PlanReviews-EmptySets
@@ -163,6 +206,10 @@ sections:
           - ReviewCenter-Storage-DueDate-Stale
           - ReviewCenter-Storage-DueDate-MissingReview
           - ReviewCenter-Web-DueDate
+          - ReviewCenter-Web-DueDate-PastRefused
+          - ReviewCenter-Web-DueDate-PlanRefused
+          - ReviewCenter-Web-DueDate-DateKept
+          - ReviewCenter-Web-DueDate-NoForm
           - ReviewCenter-Web-DueDate-Repository
           - ReviewCenter-Web-DueDate-PlanDefault
           - ReviewCenter-Web-DueDate-PlanRow
@@ -193,6 +240,15 @@ sections:
           - ReviewCenter-Core-Progress
           - ReviewCenter-Storage-Progress
           - ReviewCenter-Web-Progress
+          - ReviewCenter-Web-Progress-BlockersNoFail
+          - ReviewCenter-Web-Progress-DateFormat
+          - ReviewCenter-Web-Progress-FilterNoMatch
+          - ReviewCenter-Web-Progress-PageRange
+          - ReviewCenter-Web-Progress-QueryIgnored
+          - ReviewCenter-Web-Progress-QueryEncoded
+          - ReviewCenter-Web-Progress-AuditorRestrictions
+          - ReviewCenter-Web-Progress-AuditorNoRead
+          - ReviewCenter-Web-Progress-EmptyProject
           - ReviewCenter-Web-Progress-Signatures
           - ReviewCenter-Web-Progress-Blockers
           - ReviewCenter-Web-Progress-WaitingOn
@@ -230,14 +286,39 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
           - ReviewCenter-Web-ProjectAccess-CreateProjects
+          - ReviewCenter-Web-ProjectAccess-CreateProjectsNothing
           - ReviewCenter-Web-ProjectAccess-MemberAccess
+          - ReviewCenter-Web-ProjectAccess-MemberChange
+          - ReviewCenter-Web-ProjectAccess-MemberRemoval
+          - ReviewCenter-Web-ProjectAccess-MemberChangeLastAdmin
+          - ReviewCenter-Web-ProjectAccess-MembersHidden
           - ReviewCenter-Web-ProjectAccess-Roles
+          - ReviewCenter-Web-ProjectAccess-RolesAuditor
+          - ReviewCenter-Web-ProjectAccess-RolesCombination
+          - ReviewCenter-Web-ProjectAccess-RolesOpenWork
+          - ReviewCenter-Web-ProjectAccess-RolesLastAdmin
+          - ReviewCenter-Web-ProjectAccess-RolesOwnRole
           - ReviewCenter-Web-ProjectAccess-AuditorReadOnly
+          - ReviewCenter-Web-ProjectAccess-AuditorNotice
+          - ReviewCenter-Web-ProjectAccess-AuditorRoleChange
+          - ReviewCenter-Web-ProjectAccess-AuditorNoRepositoryRead
           - ReviewCenter-Web-ProjectAccess-AddMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNoUserList
+          - ReviewCenter-Web-ProjectAccess-AddMemberUnusableName
+          - ReviewCenter-Web-ProjectAccess-AddMemberAlreadyMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNotFound
+          - ReviewCenter-Web-ProjectAccess-AddMemberOtherProject
           - ReviewCenter-Web-ProjectAccess-CreateAccount
+          - ReviewCenter-Web-ProjectAccess-CreateAccountPassword
+          - ReviewCenter-Web-ProjectAccess-CreateAccountCopyFailure
+          - ReviewCenter-Web-ProjectAccess-CreateAccountUnusableName
+          - ReviewCenter-Web-ProjectAccess-CreateAccountNotFound
+          - ReviewCenter-Web-ProjectAccess-CreateAccountOtherProject
           - ReviewCenter-Web-ProjectAccess-RepositoriesAccess
+          - ReviewCenter-Web-ProjectAccess-RepositoriesNotFound
           - ReviewCenter-Web-ProjectAccess-ReviewRepositories
           - ReviewCenter-Web-ProjectAccess-ViewRecheck
+          - ReviewCenter-Web-ProjectAccess-ViewRecheckNothingStored
           - ReviewCenter-Web-ProjectAccess-ViewLost
           - ReviewCenter-Web-ProjectAccess-AdministerRecheck
           - ReviewCenter-Web-ProjectAccess-AdministerLost
@@ -283,6 +364,13 @@ sections:
           - ReviewCenter-Api-FollowUp
           - ReviewCenter-Evidence-FollowUp
           - ReviewCenter-Web-FollowUp
+          - ReviewCenter-Web-FollowUp-NoChoice
+          - ReviewCenter-Web-FollowUp-PlainReview
+          - ReviewCenter-Web-FollowUp-Title
+          - ReviewCenter-Web-FollowUp-Tag
+          - ReviewCenter-Web-FollowUp-Refusal
+          - ReviewCenter-Web-FollowUp-EarlierFailHidden
+          - ReviewCenter-Web-FollowUp-Standalone
           - ReviewCenter-Web-FollowUp-Preview
           - ReviewCenter-Web-FollowUp-DropConfirmation
           - ReviewCenter-Web-FollowUp-CarriedMarks
@@ -330,6 +418,16 @@ sections:
           - ReviewCenter-Storage-Inbox-ReviewDeleted
           - ReviewCenter-Storage-Inbox-UserDeleted
           - ReviewCenter-Web-Inbox
+          - ReviewCenter-Web-Inbox-DueMark
+          - ReviewCenter-Web-Inbox-Empty
+          - ReviewCenter-Web-Inbox-Interactive
+          - ReviewCenter-Web-Inbox-HomeCountNone
+          - ReviewCenter-Web-Inbox-HeaderTabRefresh
+          - ReviewCenter-Web-Inbox-HeaderTabNoTab
+          - ReviewCenter-Web-Inbox-HeaderTabReadFailure
+          - ReviewCenter-Web-Inbox-MarkersSummary
+          - ReviewCenter-Web-Inbox-MarkersNone
+          - ReviewCenter-Web-Inbox-SeenNoAccess
           - ReviewCenter-Web-Inbox-Summary
           - ReviewCenter-Web-Inbox-Chip
           - ReviewCenter-Web-Inbox-NewBadge
@@ -365,22 +463,56 @@ sections:
           changes).
         children:
           - ReviewCenter-Web-Comments
+          - ReviewCenter-Web-Comments-StartError
+          - ReviewCenter-Web-Comments-Shortcut
+          - ReviewCenter-Web-Comments-BinaryWholeFile
+          - ReviewCenter-Web-Comments-BinaryRange
+          - ReviewCenter-Web-Comments-SessionEnded
+          - ReviewCenter-Web-Comments-KindChoice
+          - ReviewCenter-Web-Comments-ReplyReport
+          - ReviewCenter-Web-Comments-KindBadge
+          - ReviewCenter-Web-Comments-DiffMarkers
           - ReviewCenter-Web-Comments-Reply
+          - ReviewCenter-Web-Comments-ReplyError
+          - ReviewCenter-Web-Comments-KindButtons
+          - ReviewCenter-Web-Comments-Auditor
           - ReviewCenter-Web-Comments-Resolve
+          - ReviewCenter-Web-Comments-ResolveFinding
+          - ReviewCenter-Web-Comments-SignatureWarning
+          - ReviewCenter-Web-Comments-WarningCancelled
           - ReviewCenter-Web-Comments-Reopen
           - ReviewCenter-Web-Comments-NextStep
+          - ReviewCenter-Web-Comments-NextStepMasked
           - ReviewCenter-Web-Comments-Index
+          - ReviewCenter-Web-Comments-IndexDefaultFilter
+          - ReviewCenter-Web-Comments-IndexSelect
+          - ReviewCenter-Web-Comments-IndexNoDiff
+          - ReviewCenter-Web-Comments-KindFilter
           - ReviewCenter-Web-Comments-Threads
+          - ReviewCenter-Web-Comments-CheckThreads
+          - ReviewCenter-Web-Comments-CheckThreadOpen
+          - ReviewCenter-Web-Comments-ConclusionFindings
+          - ReviewCenter-Web-Comments-ConclusionMasked
           - ReviewCenter-Web-Comments-Collapsed
+          - ReviewCenter-Web-Comments-OpenExpanded
           - ReviewCenter-Web-Comments-Counts
           - ReviewCenter-Web-DiffReview
+          - ReviewCenter-Web-DiffReview-ScrollToChange
+          - ReviewCenter-Web-DiffReview-CommentForm
+          - ReviewCenter-Web-DiffReview-FileThreads
           - ReviewCenter-Web-DiffReview-Collapsed
           - ReviewCenter-Web-DiffReview-LineComment
           - ReviewCenter-Web-DiffReview-LineThreads
           - ReviewCenter-Web-DiffReview-Unavailable
           - ReviewCenter-Web-DiffReview-PhoneLayout
           - ReviewCenter-Web-DeepLinks
+          - ReviewCenter-Web-DeepLinks-ThreadLink
+          - ReviewCenter-Web-DeepLinks-CopyFailed
+          - ReviewCenter-Web-DeepLinks-NullArgument
+          - ReviewCenter-Web-DeepLinks-NotFound
+          - ReviewCenter-Web-DeepLinks-UnknownSide
           - ReviewCenter-Web-DeepLinks-AddressBar
+          - ReviewCenter-Web-DeepLinks-AddressBar-Opened
           - ReviewCenter-Web-DeepLinks-ReturnAfterSignIn
           - ReviewCenter-Web-DeepLinks-FirstResponse
           - ReviewCenter-Core-Threads
@@ -408,15 +540,39 @@ sections:
           stated reason so that skipped checks are explained and not silent.
         children:
           - ReviewCenter-Web-Checklist
+          - ReviewCenter-Web-Checklist-MaskedFailed
+          - ReviewCenter-Web-Checklist-None
           - ReviewCenter-Web-Checklist-Page
+          - ReviewCenter-Web-Checklist-OneSection
+          - ReviewCenter-Web-Checklist-NotFound
+          - ReviewCenter-Web-Checklist-NoChecklist
           - ReviewCenter-Web-Checklist-Remaining
           - ReviewCenter-Web-Checklist-Answer
+          - ReviewCenter-Web-Checklist-AnswerJustify
+          - ReviewCenter-Web-Checklist-AnswerBy
+          - ReviewCenter-Web-Checklist-AnswerViolation
           - ReviewCenter-Web-Checklist-Applicability
+          - ReviewCenter-Web-Checklist-ApplicabilityRefused
+          - ReviewCenter-Web-Checklist-ApplicabilityPending
           - ReviewCenter-Web-Checklist-SubmitBallot
+          - ReviewCenter-Web-Checklist-BallotStatus
+          - ReviewCenter-Web-Checklist-SubmitHidden
           - ReviewCenter-Web-Checklist-NextUnanswered
+          - ReviewCenter-Web-Checklist-NextUnansweredDone
           - ReviewCenter-Web-Checklist-JoinNotice
           - ReviewCenter-Web-Checklist-Standing
           - ReviewCenter-Web-ChecklistTemplate
+          - ReviewCenter-Web-ChecklistTemplate-StartLineHidden
+          - ReviewCenter-Web-ChecklistTemplate-ExportRightLost
+          - ReviewCenter-Web-ChecklistTemplate-ImportFileRefused
+          - ReviewCenter-Web-ChecklistTemplate-ValidationNothingChanged
+          - ReviewCenter-Web-ChecklistTemplate-ValidationSample
+          - ReviewCenter-Web-ChecklistTemplate-DifferencesNone
+          - ReviewCenter-Web-ChecklistTemplate-LabelWarning
+          - ReviewCenter-Web-ChecklistTemplate-PreviewNullArgument
+          - ReviewCenter-Web-ChecklistTemplate-ConfirmationCancelled
+          - ReviewCenter-Web-ChecklistTemplate-ReplaceRefused
+          - ReviewCenter-Web-ChecklistTemplate-OtherProject
           - ReviewCenter-Web-ChecklistTemplate-HiddenProject
           - ReviewCenter-Web-ChecklistTemplate-StartLine
           - ReviewCenter-Web-ChecklistTemplate-ExportCurrent
@@ -487,9 +643,29 @@ sections:
           section 11.70, signed records and signature linking).
         children:
           - ReviewCenter-Web-Signatures
+          - ReviewCenter-Web-Signatures-AddSlot
+          - ReviewCenter-Web-Signatures-ChangeSlot
+          - ReviewCenter-Web-Signatures-SlotRefusal
+          - ReviewCenter-Web-Signatures-SignedSlotFixed
+          - ReviewCenter-Web-Signatures-EditWarning
+          - ReviewCenter-Web-Signatures-NonMember
+          - ReviewCenter-Web-Signatures-MemberUnmarked
+          - ReviewCenter-Web-Signatures-SignatureWarning
+          - ReviewCenter-Web-Signatures-ChatRefusal
+          - ReviewCenter-Web-Signatures-ChecklistWarning
+          - ReviewCenter-Web-Signatures-ChecklistConfirm
+          - ReviewCenter-Web-Signatures-ChecklistMerged
+          - ReviewCenter-Web-Signatures-ChecklistCancel
+          - ReviewCenter-Web-Signatures-ChecklistNoWarning
           - ReviewCenter-Web-Signatures-Approve
+          - ReviewCenter-Web-Signatures-WrongPassword
+          - ReviewCenter-Web-Signatures-StaleRecord
+          - ReviewCenter-Web-Signatures-Blockers
+          - ReviewCenter-Web-Signatures-OthersNoForm
           - ReviewCenter-Web-Signatures-Reject
           - ReviewCenter-Web-Signatures-Conclusion
+          - ReviewCenter-Web-Signatures-ConclusionReadOnly
+          - ReviewCenter-Web-Signatures-ConclusionRefusal
           - ReviewCenter-Web-Signatures-Status
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
@@ -541,9 +717,29 @@ sections:
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
+          - ReviewCenter-Web-Signatures-AddSlot
+          - ReviewCenter-Web-Signatures-ChangeSlot
+          - ReviewCenter-Web-Signatures-SlotRefusal
+          - ReviewCenter-Web-Signatures-SignedSlotFixed
+          - ReviewCenter-Web-Signatures-EditWarning
+          - ReviewCenter-Web-Signatures-NonMember
+          - ReviewCenter-Web-Signatures-MemberUnmarked
+          - ReviewCenter-Web-Signatures-SignatureWarning
+          - ReviewCenter-Web-Signatures-ChatRefusal
+          - ReviewCenter-Web-Signatures-ChecklistWarning
+          - ReviewCenter-Web-Signatures-ChecklistConfirm
+          - ReviewCenter-Web-Signatures-ChecklistMerged
+          - ReviewCenter-Web-Signatures-ChecklistCancel
+          - ReviewCenter-Web-Signatures-ChecklistNoWarning
           - ReviewCenter-Web-Signatures-Approve
+          - ReviewCenter-Web-Signatures-WrongPassword
+          - ReviewCenter-Web-Signatures-StaleRecord
+          - ReviewCenter-Web-Signatures-Blockers
+          - ReviewCenter-Web-Signatures-OthersNoForm
           - ReviewCenter-Web-Signatures-Reject
           - ReviewCenter-Web-Signatures-Conclusion
+          - ReviewCenter-Web-Signatures-ConclusionReadOnly
+          - ReviewCenter-Web-Signatures-ConclusionRefusal
           - ReviewCenter-Web-Signatures-Status
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
@@ -568,9 +764,38 @@ sections:
           - ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
           - ReviewCenter-Storage-ReviewIntegrity-SettingAudit
           - ReviewCenter-Web-ReviewRules
+          - ReviewCenter-Web-ReviewRules-Audit
+          - ReviewCenter-Web-ReviewRules-Conflict
           - ReviewCenter-Web-ReviewRules-Hidden
+          - ReviewCenter-Web-ReviewLock-Independence
+          - ReviewCenter-Web-ReviewLock-IndependenceHintHidden
+          - ReviewCenter-Web-ReviewLock-IndependenceOff
+          - ReviewCenter-Web-ReviewRuleSwitches
+          - ReviewCenter-Web-ReviewRuleSwitches-Audit
+          - ReviewCenter-Web-ReviewRuleSwitches-Conflict
           - ReviewCenter-Core-BallotVisibility
           - ReviewCenter-Web-BallotExperience
+          - ReviewCenter-Web-BallotExperience-Counts
+          - ReviewCenter-Web-BallotExperience-MemberView
+          - ReviewCenter-Web-BallotExperience-Administrator
+          - ReviewCenter-Web-BallotExperience-SingleSlot
+          - ReviewCenter-Web-BallotExperience-ReviewPageAdministrator
+          - ReviewCenter-Web-BallotExperience-ProjectBallots
+          - ReviewCenter-Web-BallotExperience-MaskedNote
+          - ReviewCenter-Web-BallotExperience-NoteGone
+          - ReviewCenter-Web-BallotExperience-HistoryVisible
+          - ReviewCenter-Web-BallotExperience-SideBySideSummary
+          - ReviewCenter-Web-BallotExperience-DiscussThread
+          - ReviewCenter-Web-BallotExperience-DiscussNoThread
+          - ReviewCenter-Web-BallotExperience-Sign
+          - ReviewCenter-Web-BallotExperience-SubmitOnly
+          - ReviewCenter-Web-BallotExperience-Provider
+          - ReviewCenter-Web-BallotExperience-Revealed
+          - ReviewCenter-Web-BallotExperience-Refused
+          - ReviewCenter-Web-BallotExperience-NotOffered
+          - ReviewCenter-Web-BallotExperience-Confirm
+          - ReviewCenter-Web-BallotExperience-AssignMeSlot
+          - ReviewCenter-Web-BallotExperience-AssignMeNotOffered
           - ReviewCenter-Web-BallotExperience-ReviewPage
           - ReviewCenter-Web-BallotExperience-ProjectOverview
           - ReviewCenter-Web-BallotExperience-History
@@ -607,9 +832,16 @@ sections:
           - ReviewCenter-Web-WhereAreWe
           - ReviewCenter-Web-WhereAreWe-Ballots
           - ReviewCenter-Web-WhereAreWe-Differences
+          - ReviewCenter-Web-WhereAreWe-DiscussWarning
+          - ReviewCenter-Web-WhereAreWe-DiscussCancel
           - ReviewCenter-Web-WhereAreWe-OpenQuestions
           - ReviewCenter-Web-WhereAreWe-ChangesSince
+          - ReviewCenter-Web-WhereAreWe-ChangesSinceWarning
           - ReviewCenter-Web-WhereAreWe-SignAgain
+          - ReviewCenter-Web-WhereAreWe-Answers
+          - ReviewCenter-Web-WhereAreWe-SigningGuidance
+          - ReviewCenter-Web-WhereAreWe-Waiting
+          - ReviewCenter-Web-WhereAreWe-GuidanceMasked
           - ReviewCenter-Web-WhereAreWe-PlainWords
           - ReviewCenter-Web-WhereAreWe-Hidden
         tests:
@@ -642,12 +874,18 @@ sections:
           - ReviewCenter-Storage-ReviewRuleSwitches-Audit
           - ReviewCenter-Storage-ReviewRuleSwitches-OtherRulesKept
           - ReviewCenter-Web-ReviewRuleSwitches
+          - ReviewCenter-Web-ReviewRuleSwitches-Audit
+          - ReviewCenter-Web-ReviewRuleSwitches-Conflict
           - ReviewCenter-Web-ReviewRuleSwitches-ReopenerSigning
           - ReviewCenter-Web-ReviewRuleSwitches-DefaultNotice
           - ReviewCenter-Web-ReviewRuleSwitches-Hidden
           - ReviewCenter-Web-ReviewRuleNotices
+          - ReviewCenter-Web-ReviewRuleNotices-Hidden
+          - ReviewCenter-Web-ReviewRuleNotices-AuthorRefusal
           - ReviewCenter-Web-ReviewRuleNotices-AuthorControls
+          - ReviewCenter-Web-ReviewRuleNotices-OtherControls
           - ReviewCenter-Web-ReviewRuleNotices-ReopenerNotice
+          - ReviewCenter-Web-ReviewRuleNotices-ReopenerNoticeHidden
           - ReviewCenter-Web-ReviewRuleNotices-ReopenRefused
         tests:
           - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
@@ -674,17 +912,51 @@ sections:
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
+          - ReviewCenter-Web-Signatures-AddSlot
+          - ReviewCenter-Web-Signatures-ChangeSlot
+          - ReviewCenter-Web-Signatures-SlotRefusal
+          - ReviewCenter-Web-Signatures-SignedSlotFixed
+          - ReviewCenter-Web-Signatures-EditWarning
+          - ReviewCenter-Web-Signatures-NonMember
+          - ReviewCenter-Web-Signatures-MemberUnmarked
+          - ReviewCenter-Web-Signatures-SignatureWarning
+          - ReviewCenter-Web-Signatures-ChatRefusal
+          - ReviewCenter-Web-Signatures-ChecklistWarning
+          - ReviewCenter-Web-Signatures-ChecklistConfirm
+          - ReviewCenter-Web-Signatures-ChecklistMerged
+          - ReviewCenter-Web-Signatures-ChecklistCancel
+          - ReviewCenter-Web-Signatures-ChecklistNoWarning
           - ReviewCenter-Web-Signatures-Approve
+          - ReviewCenter-Web-Signatures-WrongPassword
+          - ReviewCenter-Web-Signatures-StaleRecord
+          - ReviewCenter-Web-Signatures-Blockers
+          - ReviewCenter-Web-Signatures-OthersNoForm
           - ReviewCenter-Web-Signatures-Reject
           - ReviewCenter-Web-Signatures-Conclusion
+          - ReviewCenter-Web-Signatures-ConclusionReadOnly
+          - ReviewCenter-Web-Signatures-ConclusionRefusal
           - ReviewCenter-Web-Signatures-Status
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
           - ReviewCenter-Identity-OidcSignIn
           - ReviewCenter-Core-TotpSecondFactor
           - ReviewCenter-Web-TotpSecondFactor
+          - ReviewCenter-Web-TotpSecondFactor-WrongCode
+          - ReviewCenter-Web-TotpSecondFactor-Recovery
+          - ReviewCenter-Web-TotpSecondFactor-FieldsEmptied
+          - ReviewCenter-Web-TotpSecondFactor-NoCard
+          - ReviewCenter-Web-TotpSecondFactor-External
+          - ReviewCenter-Web-TotpSecondFactor-ExpiredNotice
+          - ReviewCenter-Web-TotpSecondFactor-WrongPasswordNoNotice
+          - ReviewCenter-Web-TotpSecondFactor-SignatureCodeNoField
+          - ReviewCenter-Web-TotpSecondFactor-SignatureCodeRefused
+          - ReviewCenter-Web-TotpSecondFactor-VisibilityExternal
+          - ReviewCenter-Web-TotpSecondFactor-ResetCancelled
+          - ReviewCenter-Web-TotpSecondFactor-ResetRefused
           - ReviewCenter-Web-TotpSecondFactor-TurnOff
           - ReviewCenter-Web-TotpSecondFactor-CodePage
+          - ReviewCenter-Web-TotpSecondFactor-CodePage-Refused
+          - ReviewCenter-Web-TotpSecondFactor-CodePage-NoPending
           - ReviewCenter-Web-TotpSecondFactor-CodePage-Antiforgery
           - ReviewCenter-Web-TotpSecondFactor-SignatureCode
           - ReviewCenter-Web-TotpSecondFactor-Visibility
@@ -725,9 +997,29 @@ sections:
           - ReviewCenter-Storage-Signatures-ConclusionText
           - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Web-Signatures
+          - ReviewCenter-Web-Signatures-AddSlot
+          - ReviewCenter-Web-Signatures-ChangeSlot
+          - ReviewCenter-Web-Signatures-SlotRefusal
+          - ReviewCenter-Web-Signatures-SignedSlotFixed
+          - ReviewCenter-Web-Signatures-EditWarning
+          - ReviewCenter-Web-Signatures-NonMember
+          - ReviewCenter-Web-Signatures-MemberUnmarked
+          - ReviewCenter-Web-Signatures-SignatureWarning
+          - ReviewCenter-Web-Signatures-ChatRefusal
+          - ReviewCenter-Web-Signatures-ChecklistWarning
+          - ReviewCenter-Web-Signatures-ChecklistConfirm
+          - ReviewCenter-Web-Signatures-ChecklistMerged
+          - ReviewCenter-Web-Signatures-ChecklistCancel
+          - ReviewCenter-Web-Signatures-ChecklistNoWarning
           - ReviewCenter-Web-Signatures-Approve
+          - ReviewCenter-Web-Signatures-WrongPassword
+          - ReviewCenter-Web-Signatures-StaleRecord
+          - ReviewCenter-Web-Signatures-Blockers
+          - ReviewCenter-Web-Signatures-OthersNoForm
           - ReviewCenter-Web-Signatures-Reject
           - ReviewCenter-Web-Signatures-Conclusion
+          - ReviewCenter-Web-Signatures-ConclusionReadOnly
+          - ReviewCenter-Web-Signatures-ConclusionRefusal
           - ReviewCenter-Web-Signatures-Status
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
@@ -824,9 +1116,14 @@ sections:
           - ReviewCenter-Web-ReviewLock
           - ReviewCenter-Web-ReviewLock-ChecklistLocked
           - ReviewCenter-Web-ReviewLock-Controls
+          - ReviewCenter-Web-ReviewLock-Reading
           - ReviewCenter-Web-ReviewLock-Reopen
+          - ReviewCenter-Web-ReviewLock-ReopenHidden
+          - ReviewCenter-Web-ReviewLock-ReopenRefused
           - ReviewCenter-Web-ReviewLock-ReopenHistory
           - ReviewCenter-Web-ReviewLock-Independence
+          - ReviewCenter-Web-ReviewLock-IndependenceHintHidden
+          - ReviewCenter-Web-ReviewLock-IndependenceOff
           - ReviewCenter-Api-LockedReview
         tests:
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
@@ -906,16 +1203,28 @@ sections:
           - ReviewCenter-Cli-AuditVerify-Misuse
           - ReviewCenter-Hosting-AuditVerify
           - ReviewCenter-Web-AuditPage
+          - ReviewCenter-Web-AuditPage-Paging
+          - ReviewCenter-Web-AuditPage-ShortHash
+          - ReviewCenter-Web-AuditPage-Refused
+          - ReviewCenter-Web-AuditPage-VerifyRefused
           - ReviewCenter-Web-AuditPage-HeaderLink
           - ReviewCenter-Web-AuditPage-Verify
           - ReviewCenter-Web-AuditPage-Intact
           - ReviewCenter-Web-AuditPage-Broken
           - ReviewCenter-Web-AuditPage-Filter
+          - ReviewCenter-Web-AuditPage-FilterAddress
+          - ReviewCenter-Web-AuditPage-FilterReversed
           - ReviewCenter-Web-AuditPage-ExportCsv
+          - ReviewCenter-Web-AuditPage-ExportLinks
+          - ReviewCenter-Web-AuditPage-ExportNote
           - ReviewCenter-Web-AuditPage-ExportJson
           - ReviewCenter-Web-AuditPage-ProjectTrail
+          - ReviewCenter-Web-AuditPage-ProjectTrailAuditor
           - ReviewCenter-Web-AuditPage-ProjectTrailOnly
+          - ReviewCenter-Web-AuditPage-ProjectTrailLost
           - ReviewCenter-Web-AuditHistory
+          - ReviewCenter-Web-AuditHistory-NotFound
+          - ReviewCenter-Web-AuditHistory-Access
           - ReviewCenter-Web-AuditHistory-Newest
           - ReviewCenter-Web-AuditHistory-Paging
           - ReviewCenter-Web-AuditHistory-Link
@@ -959,6 +1268,9 @@ sections:
           - ReviewCenter-Storage-EvidenceSettings-Stale
           - ReviewCenter-Storage-EvidenceSettings-MissingProject
           - ReviewCenter-Web-EvidenceSettings
+          - ReviewCenter-Web-EvidenceSettings-NoWarnings
+          - ReviewCenter-Web-EvidenceSettings-SaveUnchanged
+          - ReviewCenter-Web-EvidenceSettings-OtherProject
           - ReviewCenter-Web-EvidenceSettings-HiddenProject
           - ReviewCenter-Web-EvidenceSettings-Switches
           - ReviewCenter-Web-EvidenceSettings-RegulatoryWarnings
@@ -972,6 +1284,9 @@ sections:
           - ReviewCenter-Hosting-AttestationServices
           - ReviewCenter-Hosting-AttestationKeyFailure
           - ReviewCenter-Web-Attestation
+          - ReviewCenter-Web-Attestation-NotConcluded
+          - ReviewCenter-Web-Attestation-KeyWarning
+          - ReviewCenter-Web-Attestation-NoKeyWarning
           - ReviewCenter-Web-Attestation-KeyNote
           - ReviewCenter-Web-Attestation-HelpLink
           - ReviewCenter-Web-Attestation-HelpTopic
@@ -1047,26 +1362,53 @@ sections:
           - ReviewCenter-Web-SignIn-Logout
           - ReviewCenter-Web-SignIn-SignInLink
           - ReviewCenter-Web-SignIn-LoginPage
+          - ReviewCenter-Web-SignIn-RouteAuthorization
+          - ReviewCenter-Web-SignIn-AccessDenied
+          - ReviewCenter-Web-SignIn-RouteLoginLink
           - ReviewCenter-Web-SignIn-LoginPage-Antiforgery
           - ReviewCenter-Web-SignIn-LoginFailure
+          - ReviewCenter-Web-SignIn-LoginThrottled
+          - ReviewCenter-Web-SignIn-LoginReturnAddress
+          - ReviewCenter-Web-SignIn-LoginForeignAddress
           - ReviewCenter-Web-SignIn-AccountPage
           - ReviewCenter-Web-SignIn-ChangePassword
+          - ReviewCenter-Web-SignIn-ChangePasswordRefused
+          - ReviewCenter-Web-SignIn-ChangePasswordCodeField
+          - ReviewCenter-Web-SignIn-ChangePasswordNoCodeField
+          - ReviewCenter-Web-SignIn-ChangePasswordCode
+          - ReviewCenter-Web-SignIn-ChangePasswordCodeRefused
           - ReviewCenter-Web-SignIn-Appearance
+          - ReviewCenter-Web-SignIn-AppearanceFirstPaint
           - ReviewCenter-Web-SignIn-TemporaryPassword
+          - ReviewCenter-Web-SignIn-TemporaryPasswordNone
           - ReviewCenter-Web-SignIn-TemporaryHeader
           - ReviewCenter-Web-SignIn-TemporaryPages
+          - ReviewCenter-Web-SignIn-TemporaryOpenPages
           - ReviewCenter-Web-SignIn-PasswordChanged
           - ReviewCenter-Web-SignIn-UsersPage
+          - ReviewCenter-Web-SignIn-UsersFilter
+          - ReviewCenter-Web-SignIn-UsersStatus
+          - ReviewCenter-Web-SignIn-UsersUnlock
+          - ReviewCenter-Web-SignIn-UsersLink
           - ReviewCenter-Web-SignIn-Enable
           - ReviewCenter-Web-SignIn-Disable
+          - ReviewCenter-Web-SignIn-DisableCancel
+          - ReviewCenter-Web-SignIn-DisableLoadError
           - ReviewCenter-Web-SignIn-MakeAdmin
           - ReviewCenter-Web-SignIn-TakeAdmin
+          - ReviewCenter-Web-SignIn-LastAdmin
           - ReviewCenter-Web-SignIn-SetPassword
+          - ReviewCenter-Web-SignIn-SetPasswordOwn
+          - ReviewCenter-Web-SignIn-SetPasswordCancel
           - ReviewCenter-Web-SignIn-NewUser
+          - ReviewCenter-Web-SignIn-NewUserRefused
+          - ReviewCenter-Web-SignIn-NewUserCancel
           - ReviewCenter-Web-SessionEnd
+          - ReviewCenter-Web-SessionEnd-Active
           - ReviewCenter-Web-SessionEnd-ChangeRefused
           - ReviewCenter-Web-SessionEnd-NothingChanged
           - ReviewCenter-Web-SessionEnd-UserAdminRefused
+          - ReviewCenter-Web-SessionEnd-UserAdminNothingChanged
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
           - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
@@ -1093,6 +1435,9 @@ sections:
           - ReviewCenter-Storage-ExternalIdentity-UniquePair
           - ReviewCenter-Hosting-OidcSignIn
           - ReviewCenter-Web-OidcSignIn
+          - ReviewCenter-Web-OidcSignIn-Error
+          - ReviewCenter-Web-OidcSignIn-Off
+          - ReviewCenter-Web-OidcSignIn-SignatureFailed
           - ReviewCenter-Web-OidcSignIn-UserList
           - ReviewCenter-Web-OidcSignIn-NoPassword
           - ReviewCenter-Web-OidcSignIn-OwnPage
@@ -1130,8 +1475,22 @@ sections:
           - ReviewCenter-Storage-TotpSecondFactor-UserDeleted
           - ReviewCenter-Hosting-TotpSecondFactor
           - ReviewCenter-Web-TotpSecondFactor
+          - ReviewCenter-Web-TotpSecondFactor-WrongCode
+          - ReviewCenter-Web-TotpSecondFactor-Recovery
+          - ReviewCenter-Web-TotpSecondFactor-FieldsEmptied
+          - ReviewCenter-Web-TotpSecondFactor-NoCard
+          - ReviewCenter-Web-TotpSecondFactor-External
+          - ReviewCenter-Web-TotpSecondFactor-ExpiredNotice
+          - ReviewCenter-Web-TotpSecondFactor-WrongPasswordNoNotice
+          - ReviewCenter-Web-TotpSecondFactor-SignatureCodeNoField
+          - ReviewCenter-Web-TotpSecondFactor-SignatureCodeRefused
+          - ReviewCenter-Web-TotpSecondFactor-VisibilityExternal
+          - ReviewCenter-Web-TotpSecondFactor-ResetCancelled
+          - ReviewCenter-Web-TotpSecondFactor-ResetRefused
           - ReviewCenter-Web-TotpSecondFactor-TurnOff
           - ReviewCenter-Web-TotpSecondFactor-CodePage
+          - ReviewCenter-Web-TotpSecondFactor-CodePage-Refused
+          - ReviewCenter-Web-TotpSecondFactor-CodePage-NoPending
           - ReviewCenter-Web-TotpSecondFactor-CodePage-Antiforgery
           - ReviewCenter-Web-TotpSecondFactor-SignatureCode
           - ReviewCenter-Web-TotpSecondFactor-Visibility
@@ -1159,6 +1518,16 @@ sections:
           - ReviewCenter-Hosting-NotificationTables
           - ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
           - ReviewCenter-Web-NotificationCard
+          - ReviewCenter-Web-NotificationUnavailable
+          - ReviewCenter-Web-NotificationCodeSent
+          - ReviewCenter-Web-NotificationInvalidAddress
+          - ReviewCenter-Web-NotificationRightCode
+          - ReviewCenter-Web-NotificationWrongCode
+          - ReviewCenter-Web-NotificationResend
+          - ReviewCenter-Web-NotificationResendCooldown
+          - ReviewCenter-Web-NotificationRemove
+          - ReviewCenter-Web-NotificationTemporaryPassword
+          - ReviewCenter-Web-NotificationExternalUser
           - ReviewCenter-Web-NotificationModeHiddenNotAvailable
         tests:
           - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
@@ -1209,6 +1578,16 @@ sections:
         children:
           - ReviewCenter-Core-NotificationAccess
           - ReviewCenter-Web-NotificationCard
+          - ReviewCenter-Web-NotificationUnavailable
+          - ReviewCenter-Web-NotificationCodeSent
+          - ReviewCenter-Web-NotificationInvalidAddress
+          - ReviewCenter-Web-NotificationRightCode
+          - ReviewCenter-Web-NotificationWrongCode
+          - ReviewCenter-Web-NotificationResend
+          - ReviewCenter-Web-NotificationResendCooldown
+          - ReviewCenter-Web-NotificationRemove
+          - ReviewCenter-Web-NotificationTemporaryPassword
+          - ReviewCenter-Web-NotificationExternalUser
         tests:
           - NotificationPreferenceService_Actions_ApiTokenActor_AreRefused
           - AccountPage_Render_TemporaryPassword_HidesNotificationsCard
@@ -1448,6 +1827,9 @@ sections:
           is made where the address is managed.
         children:
           - ReviewCenter-Web-NotificationMode
+          - ReviewCenter-Web-NotificationModeNeedsAddress
+          - ReviewCenter-Web-NotificationModeSave
+          - ReviewCenter-Web-NotificationModeRefused
         tests:
           - AccountPage_Render_ModeSelector_OffersThreeModes
           - WebSubsystem_AccountPage_ChoosesNotificationMode
@@ -2174,14 +2556,39 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
           - ReviewCenter-Web-ProjectAccess-CreateProjects
+          - ReviewCenter-Web-ProjectAccess-CreateProjectsNothing
           - ReviewCenter-Web-ProjectAccess-MemberAccess
+          - ReviewCenter-Web-ProjectAccess-MemberChange
+          - ReviewCenter-Web-ProjectAccess-MemberRemoval
+          - ReviewCenter-Web-ProjectAccess-MemberChangeLastAdmin
+          - ReviewCenter-Web-ProjectAccess-MembersHidden
           - ReviewCenter-Web-ProjectAccess-Roles
+          - ReviewCenter-Web-ProjectAccess-RolesAuditor
+          - ReviewCenter-Web-ProjectAccess-RolesCombination
+          - ReviewCenter-Web-ProjectAccess-RolesOpenWork
+          - ReviewCenter-Web-ProjectAccess-RolesLastAdmin
+          - ReviewCenter-Web-ProjectAccess-RolesOwnRole
           - ReviewCenter-Web-ProjectAccess-AuditorReadOnly
+          - ReviewCenter-Web-ProjectAccess-AuditorNotice
+          - ReviewCenter-Web-ProjectAccess-AuditorRoleChange
+          - ReviewCenter-Web-ProjectAccess-AuditorNoRepositoryRead
           - ReviewCenter-Web-ProjectAccess-AddMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNoUserList
+          - ReviewCenter-Web-ProjectAccess-AddMemberUnusableName
+          - ReviewCenter-Web-ProjectAccess-AddMemberAlreadyMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNotFound
+          - ReviewCenter-Web-ProjectAccess-AddMemberOtherProject
           - ReviewCenter-Web-ProjectAccess-CreateAccount
+          - ReviewCenter-Web-ProjectAccess-CreateAccountPassword
+          - ReviewCenter-Web-ProjectAccess-CreateAccountCopyFailure
+          - ReviewCenter-Web-ProjectAccess-CreateAccountUnusableName
+          - ReviewCenter-Web-ProjectAccess-CreateAccountNotFound
+          - ReviewCenter-Web-ProjectAccess-CreateAccountOtherProject
           - ReviewCenter-Web-ProjectAccess-RepositoriesAccess
+          - ReviewCenter-Web-ProjectAccess-RepositoriesNotFound
           - ReviewCenter-Web-ProjectAccess-ReviewRepositories
           - ReviewCenter-Web-ProjectAccess-ViewRecheck
+          - ReviewCenter-Web-ProjectAccess-ViewRecheckNothingStored
           - ReviewCenter-Web-ProjectAccess-ViewLost
           - ReviewCenter-Web-ProjectAccess-AdministerRecheck
           - ReviewCenter-Web-ProjectAccess-AdministerLost
@@ -2238,14 +2645,39 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
           - ReviewCenter-Web-ProjectAccess-CreateProjects
+          - ReviewCenter-Web-ProjectAccess-CreateProjectsNothing
           - ReviewCenter-Web-ProjectAccess-MemberAccess
+          - ReviewCenter-Web-ProjectAccess-MemberChange
+          - ReviewCenter-Web-ProjectAccess-MemberRemoval
+          - ReviewCenter-Web-ProjectAccess-MemberChangeLastAdmin
+          - ReviewCenter-Web-ProjectAccess-MembersHidden
           - ReviewCenter-Web-ProjectAccess-Roles
+          - ReviewCenter-Web-ProjectAccess-RolesAuditor
+          - ReviewCenter-Web-ProjectAccess-RolesCombination
+          - ReviewCenter-Web-ProjectAccess-RolesOpenWork
+          - ReviewCenter-Web-ProjectAccess-RolesLastAdmin
+          - ReviewCenter-Web-ProjectAccess-RolesOwnRole
           - ReviewCenter-Web-ProjectAccess-AuditorReadOnly
+          - ReviewCenter-Web-ProjectAccess-AuditorNotice
+          - ReviewCenter-Web-ProjectAccess-AuditorRoleChange
+          - ReviewCenter-Web-ProjectAccess-AuditorNoRepositoryRead
           - ReviewCenter-Web-ProjectAccess-AddMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNoUserList
+          - ReviewCenter-Web-ProjectAccess-AddMemberUnusableName
+          - ReviewCenter-Web-ProjectAccess-AddMemberAlreadyMember
+          - ReviewCenter-Web-ProjectAccess-AddMemberNotFound
+          - ReviewCenter-Web-ProjectAccess-AddMemberOtherProject
           - ReviewCenter-Web-ProjectAccess-CreateAccount
+          - ReviewCenter-Web-ProjectAccess-CreateAccountPassword
+          - ReviewCenter-Web-ProjectAccess-CreateAccountCopyFailure
+          - ReviewCenter-Web-ProjectAccess-CreateAccountUnusableName
+          - ReviewCenter-Web-ProjectAccess-CreateAccountNotFound
+          - ReviewCenter-Web-ProjectAccess-CreateAccountOtherProject
           - ReviewCenter-Web-ProjectAccess-RepositoriesAccess
+          - ReviewCenter-Web-ProjectAccess-RepositoriesNotFound
           - ReviewCenter-Web-ProjectAccess-ReviewRepositories
           - ReviewCenter-Web-ProjectAccess-ViewRecheck
+          - ReviewCenter-Web-ProjectAccess-ViewRecheckNothingStored
           - ReviewCenter-Web-ProjectAccess-ViewLost
           - ReviewCenter-Web-ProjectAccess-AdministerRecheck
           - ReviewCenter-Web-ProjectAccess-AdministerLost
@@ -2294,22 +2726,47 @@ sections:
           - ReviewCenter-Web-SignIn-Logout
           - ReviewCenter-Web-SignIn-SignInLink
           - ReviewCenter-Web-SignIn-LoginPage
+          - ReviewCenter-Web-SignIn-RouteAuthorization
+          - ReviewCenter-Web-SignIn-AccessDenied
+          - ReviewCenter-Web-SignIn-RouteLoginLink
           - ReviewCenter-Web-SignIn-LoginPage-Antiforgery
           - ReviewCenter-Web-SignIn-LoginFailure
+          - ReviewCenter-Web-SignIn-LoginThrottled
+          - ReviewCenter-Web-SignIn-LoginReturnAddress
+          - ReviewCenter-Web-SignIn-LoginForeignAddress
           - ReviewCenter-Web-SignIn-AccountPage
           - ReviewCenter-Web-SignIn-ChangePassword
+          - ReviewCenter-Web-SignIn-ChangePasswordRefused
+          - ReviewCenter-Web-SignIn-ChangePasswordCodeField
+          - ReviewCenter-Web-SignIn-ChangePasswordNoCodeField
+          - ReviewCenter-Web-SignIn-ChangePasswordCode
+          - ReviewCenter-Web-SignIn-ChangePasswordCodeRefused
           - ReviewCenter-Web-SignIn-Appearance
+          - ReviewCenter-Web-SignIn-AppearanceFirstPaint
           - ReviewCenter-Web-SignIn-TemporaryPassword
+          - ReviewCenter-Web-SignIn-TemporaryPasswordNone
           - ReviewCenter-Web-SignIn-TemporaryHeader
           - ReviewCenter-Web-SignIn-TemporaryPages
+          - ReviewCenter-Web-SignIn-TemporaryOpenPages
           - ReviewCenter-Web-SignIn-PasswordChanged
           - ReviewCenter-Web-SignIn-UsersPage
+          - ReviewCenter-Web-SignIn-UsersFilter
+          - ReviewCenter-Web-SignIn-UsersStatus
+          - ReviewCenter-Web-SignIn-UsersUnlock
+          - ReviewCenter-Web-SignIn-UsersLink
           - ReviewCenter-Web-SignIn-Enable
           - ReviewCenter-Web-SignIn-Disable
+          - ReviewCenter-Web-SignIn-DisableCancel
+          - ReviewCenter-Web-SignIn-DisableLoadError
           - ReviewCenter-Web-SignIn-MakeAdmin
           - ReviewCenter-Web-SignIn-TakeAdmin
+          - ReviewCenter-Web-SignIn-LastAdmin
           - ReviewCenter-Web-SignIn-SetPassword
+          - ReviewCenter-Web-SignIn-SetPasswordOwn
+          - ReviewCenter-Web-SignIn-SetPasswordCancel
           - ReviewCenter-Web-SignIn-NewUser
+          - ReviewCenter-Web-SignIn-NewUserRefused
+          - ReviewCenter-Web-SignIn-NewUserCancel
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
           - StorageSubsystem_Users_PersistAcrossReopen
@@ -2366,7 +2823,10 @@ sections:
           - ReviewCenter-Storage-Repositories-ProjectOnlyList
           - ReviewCenter-Storage-Repositories-UniqueName
           - ReviewCenter-Web-Repositories
+          - ReviewCenter-Web-Repositories-LinkHidden
           - ReviewCenter-Web-Repositories-Register
+          - ReviewCenter-Web-Repositories-RegisterRefused
+          - ReviewCenter-Web-Repositories-AddPage
           - ReviewCenter-Web-Repositories-Change
           - ReviewCenter-Web-Repositories-Disable
           - ReviewCenter-Web-Repositories-Enable
@@ -2556,6 +3016,11 @@ sections:
           - ReviewCenter-Storage-AccessTokens-Touch
           - ReviewCenter-Storage-AccessTokens-Audit
           - ReviewCenter-Web-AccessTokens
+          - ReviewCenter-Web-AccessTokens-ValueOnce
+          - ReviewCenter-Web-AccessTokens-Refused
+          - ReviewCenter-Web-AccessTokens-RefusedNothing
+          - ReviewCenter-Web-AccessTokens-CopyRefused
+          - ReviewCenter-Web-AccessTokens-RevokeNotOffered
           - ReviewCenter-Web-AccessTokens-Copy
           - ReviewCenter-Web-AccessTokens-List
           - ReviewCenter-Web-AccessTokens-Revoke
@@ -2744,14 +3209,27 @@ sections:
           administrator handing out documents (EU GMP Annex 11 clause 2, personnel who are trained to use it).
         children:
           - ReviewCenter-Web-HomePage
+          - ReviewCenter-Web-HomePage-NotFound
+          - ReviewCenter-Web-HomePage-NotFoundOther
+          - ReviewCenter-Web-HomePage-GetStarted
+          - ReviewCenter-Web-HomePage-AdminLinks
+          - ReviewCenter-Web-HomePage-AdminLinksHidden
+          - ReviewCenter-Web-HomePage-HeaderLink
+          - ReviewCenter-Web-HomePage-Footer
           - ReviewCenter-Web-HomePage-Document
+          - ReviewCenter-Web-HomePage-ClientScript
           - ReviewCenter-Web-HomePage-Tagline
+          - ReviewCenter-Web-HomePage-NoLinks
           - ReviewCenter-Web-Interactive
           - ReviewCenter-Web-Interactive-Live
           - ReviewCenter-Web-Help
+          - ReviewCenter-Web-Help-HeaderLink
           - ReviewCenter-Web-Help-About
           - ReviewCenter-Web-Help-TopicPages
+          - ReviewCenter-Web-Help-SigningTopic
+          - ReviewCenter-Web-Help-ReadingReviewTopic
           - ReviewCenter-Web-Help-Navigation
+          - ReviewCenter-Web-Help-NavigationEnds
           - ReviewCenter-Web-Help-MembersTopic
           - ReviewCenter-Web-Help-UnknownTopic
         tests:

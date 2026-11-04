@@ -457,8 +457,9 @@ while notifications are set up, which is tested by `AccountPage_Render_Notificat
 **Inbox**: A signed-in user who requests the inbox route is served the inbox page, which waits for its live
 connection and carries the interactive marker, which is tested by
 `WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is the evidence of the requirement
-`ReviewCenter-Web-Inbox`. A visitor who is not signed in is sent to the login page by the inbox route and sees nothing
-of the inbox, which is tested by `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`, the evidence of the requirement
+`ReviewCenter-Web-Inbox-Interactive`. A visitor who is not signed in is sent to the login page by the inbox
+route and sees nothing of the inbox, which is tested by
+`WebSubsystem_InboxPage_Unauthenticated_IsChallenged`, the evidence of the requirement
 `ReviewCenter-Web-Inbox-SignedInOnly`. The groups, the markers, and Mark all as read
 are tested in the unit tests of `InboxPage`, the unread markers of the review in those of `ReviewPage`, the card in
 those of `HomePage`, and the topic in those of `HelpPage`.
