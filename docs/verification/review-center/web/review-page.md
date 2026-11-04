@@ -122,7 +122,7 @@ N/A - standard test environment.
 - The file, line and thread addresses open the review page at that place with the highlight and the scroll request;
   an address that names nothing gives a message with a link back to the file list; choosing a file or a thread asks
   the browser to replace its address by the matching link without navigating; every thread has a plain,
-  unobtrusive link (not styled as a button); links
+  unobtrusive link (in plain link style); links
   from `ReviewLinks` return the same file path through the router, whatever its characters.
 - An approved review offers "Download attestation (PDF)", whose address is the attestation address of `ReviewLinks`
   and whose file name follows the project and the review, with a note that a self-signed key is not an organization key
@@ -290,6 +290,15 @@ share one row, left and right; an unchanged line shows on both sides with its ow
 a muted, hidden-from-assistive-technology empty placeholder on the left. This scenario is tested by
 `ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders`.
 
+**ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles**: The modified file is opened; the removed row has
+the minus sign and the removed class only, the added row has the plus sign and the added class only, and the unchanged
+row has no sign and the context class only. This scenario is tested by
+`ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles`.
+
+**ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText**: A modified file whose removed, added and unchanged lines
+contain markup is opened; every cell shows the characters of its line and none of the markup became an element of the
+diff. This scenario is tested by `ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText`.
+
 **ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange**: Opening a modified file whose first change follows
 collapsed lines asks the browser to scroll that row to the middle of the window (the bUnit stand-in records the
 call). This scenario is tested by `ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange`.
@@ -384,13 +393,17 @@ line, the files, and the thread index come before the Details section, which has
 identifier, state, fingerprint, and file hashes, while the file list holds no hash. This scenario is tested by
 `ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata`.
 
+**ReviewPage_Render_UploadedReview_DetailsShowNoSource**: An uploaded review is rendered next to a repository review;
+the Details section of the uploaded review is there, and none of the repository name, commit identifier and selection
+rows is. This scenario is tested by `ReviewPage_Render_UploadedReview_DetailsShowNoSource`.
+
 **ReviewPage_Render_NextStep_FollowsThreadState**: With no threads the line names the 58 unanswered checks; after a
 thread is started it names the checks and "1 open question to resolve" in one sentence; after the thread is resolved
 only the checks are named again. This scenario is tested by `ReviewPage_Render_NextStep_FollowsThreadState`.
 
 **ReviewPage_Render_NextStep_IncludesChecklistProgress**: A check is answered and a section is marked not
 applicable; the line counts the remaining unanswered checks (52). When everything that applies is answered and the
-thread is resolved, no reviewer slot exists and the line is "Add a reviewer slot.". This scenario is tested by
+thread is resolved, the line is one sentence that says the review is ready for signatures. This scenario is tested by
 `ReviewPage_Render_NextStep_IncludesChecklistProgress`.
 
 **ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink**: A review with two answered checks is rendered; the
@@ -405,6 +418,14 @@ is tested by `ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard`.
 slots or threads is rendered; the summary strip contains the checklist progress and a link to the checklist page of
 the review, the text "No reviewer slots yet", and the thread counts "0 open" and "0 resolved". This scenario is
 tested by `ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads`.
+
+**ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles**: A review of one file is rendered; the
+next-step line comes first, then the summary strip, then the file list. This scenario is tested by
+`ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles`.
+
+**ReviewPage_Render_SignedSlot_SummaryShowsSignedCount**: A review has one slot that ann has signed; the reviewers
+cell of the summary strip counts the signed slot. This scenario is tested by
+`ReviewPage_Render_SignedSlot_SummaryShowsSignedCount`.
 
 **ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc**: A review without a due date says "No due date" and
 shows no Overdue badge. A system administrator types a date in the future and saves it; the header shows "Due
@@ -447,12 +468,24 @@ and collapses when resolved. This scenario is tested by `ReviewPage_ResolvedThre
 the owning project is labeled with the project name and only the selected file's row is highlighted. This scenario
 is tested by `ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow`.
 
+**ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject**: A review of the project named "Apollo" is rendered
+without a selected file; the breadcrumb link goes to the project and is labeled with its name. This scenario is tested
+by `ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject`.
+
 **ReviewPage_Render_NoFileSelected_ShowsNoContent**: Before a file is selected neither content nor the binary
 notice is shown. This scenario is tested by `ReviewPage_Render_NoFileSelected_ShowsNoContent`.
 
 **ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText**: A text file is selected; its lines are shown
 with numbers and their exact text, with the selected path, and no binary notice. This scenario is tested by
 `ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText`.
+
+**ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept**: A file whose last line ends in a lone carriage return,
+not in a line terminator, is selected; the carriage return is dropped only as part of a CRLF terminator, so it is kept
+at the very end of the file. This scenario is tested by `ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept`.
+
+**ReviewPage_Render_FileSelected_ShowsContentBeforeDetails**: A review of one file is rendered and the file is
+selected; the numbered lines of the file come before the Details section in the page. This scenario is tested by
+`ReviewPage_Render_FileSelected_ShowsContentBeforeDetails`.
 
 **ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent**: A binary file is selected; the binary notice
 is shown and no content. This scenario is tested by `ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent`.
@@ -786,6 +819,11 @@ starts the handler finds no signed-in user, so the not-found message replaces th
 no thread exists. This scenario is tested by
 `ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing`.
 
+**ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing**: A member has a file selected and has typed
+the text of a new thread, and the membership is removed in the store; the new thread is submitted. Only the not-found
+message is shown, and the review still has only its original thread. This scenario is tested by
+`ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing`.
+
 **ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: An open thread and a
 resolved thread are shown, and the sign-in state ends without the page being told; resolving the open thread is
 attempted. The not-found message replaces the page, no thread control remains, and both threads keep their stored
@@ -802,6 +840,16 @@ file names, file content, comment, reviewer name or checklist progress is in the
 `readonly-notice`, the comments and the status, and none of the slot, sign, comment, reply, and resolve controls and no
 reopen form. This scenario is tested by `ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls`.
 
+**ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls**: A review has a file with a thread. An
+Auditor and a user who may work both select the file. The Auditor reads the comment of the thread and has no new
+comment form, no reply box and no resolve toggle; the user who may work has all three, so the absence is not an
+artifact of the arrangement. This scenario is tested by
+`ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls`.
+
+**ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm**: Bob is the alternate of a slot and sees the sign form;
+he becomes an Auditor of the project and the page is drawn again. Bob still holds the slot, sees the read-only notice
+and gets no sign form. This scenario is tested by `ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm`.
+
 **ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked**: An Auditor opens a file of an open review; the diff
 hint says that the access is read-only and does not say that the review is locked. This scenario is tested by
 `ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked`.
@@ -813,6 +861,10 @@ new-comment line selection; the page still renders no `new-thread-form`. This sc
 **ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member has a comment draft open, the
 role changes to Auditor, and the page reloads; the composer and the draft are gone. This scenario is tested by
 `ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft`.
+
+**ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton**: An Auditor opens the modified file and
+switches to the Head version; the numbered head lines have a comment button each, and every one is disabled. This
+scenario is tested by `ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton`.
 
 **ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the review open, and the membership is
 removed in the store; choosing a file shows the not-found message, and nothing that the page had loaded (names, file

@@ -141,6 +141,27 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the summary strip sits below the next-step line and above the file list.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles()
+    {
+        // Arrange: a review of one file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the next-step line comes first, then the strip, then the file list
+        var markup = cut.Markup;
+        var nextStep = markup.IndexOf("data-testid=\"next-step\"", StringComparison.Ordinal);
+        var summary = markup.IndexOf("data-testid=\"review-summary\"", StringComparison.Ordinal);
+        var files = markup.IndexOf("data-testid=\"files-list\"", StringComparison.Ordinal);
+        Assert.InRange(nextStep, 0, summary - 1);
+        Assert.InRange(summary, nextStep, files - 1);
+    }
+
+    /// <summary>
     ///     Test that the review's id, title and fingerprint are shown, and that the always-"Draft" state is not.
     /// </summary>
     [Fact]
@@ -203,6 +224,25 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal("Apollo", cut.Find("[data-testid='project-link']").TextContent);
         Assert.DoesNotContain("selected", cut.Find("[data-testid='file-row-0']").ClassList);
         Assert.Contains("selected", cut.Find("[data-testid='file-row-1']").ClassList);
+    }
+
+    /// <summary>
+    ///     Test that the breadcrumb of a review without a selected file links back to the owning project and is
+    ///     labeled with the project name.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject()
+    {
+        // Arrange: a review in the project named "Apollo"
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page without selecting a file
+        var cut = RenderPage(projectId);
+
+        // Assert: the link goes to the project and is labeled with its name
+        var link = cut.Find("[data-testid='project-link']");
+        Assert.Equal($"/projects/{projectId}", link.GetAttribute("href"));
+        Assert.Equal("Apollo", link.TextContent);
     }
 
     /// <summary>
@@ -853,6 +893,26 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal(TestContent.HashA, detailsElement.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
         Assert.Equal("c.bin", detailsElement.QuerySelector("[data-testid='file-hash-path-2']")?.TextContent);
         Assert.Empty(cut.Find("[data-testid='files-list']").QuerySelectorAll("[data-testid^='file-hash']"));
+    }
+
+    /// <summary>
+    ///     Test that the content of the selected file comes before the review details.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_FileSelected_ShowsContentBeforeDetails()
+    {
+        // Arrange: a review of one file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the numbered lines of the file come before the details in the page
+        var markup = cut.Markup;
+        var content = markup.IndexOf("data-testid=\"file-content\"", StringComparison.Ordinal);
+        var details = markup.IndexOf("data-testid=\"review-details\"", StringComparison.Ordinal);
+        Assert.InRange(content, 0, details - 1);
     }
 
     /// <summary>
@@ -1563,6 +1623,28 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a user who occupies a slot but has the role of an auditor sees the read-only notice and no
+    ///     sign form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm()
+    {
+        // Arrange: a signable review in which bob is the alternate of the slot; bob sees the sign form
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        SignInAs("bob", "Bob", false);
+        Assert.NotEmpty(RenderPage(projectId).FindAll($"[data-testid='sign-form-{slotId}']"));
+
+        // Act: bob becomes an auditor of the project and the page is drawn again
+        await ChangeMemberRoleAsync(projectId, "bob", ProjectRole.Auditor);
+        var cut = RenderPage(projectId);
+
+        // Assert: bob still holds the slot, sees the read-only notice and gets no sign form
+        Assert.NotEmpty(cut.FindAll("[data-testid='readonly-notice']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-button-{slotId}']"));
+    }
+
+    /// <summary>
     ///     Test that a wrong password is refused with the generic message, signs nothing, and neither the typed
     ///     password nor any value is left in the page.
     /// </summary>
@@ -1614,6 +1696,24 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
         var signature = Assert.Single(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         Assert.Equal((ids["ann"], SlotRole.Primary), (signature.UserId, signature.Role));
+    }
+
+    /// <summary>
+    ///     Test that the summary strip shows how many of the reviewer slots are signed.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignedSlot_SummaryShowsSignedCount()
+    {
+        // Arrange: a review with one slot that ann has signed
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await SignSlotAsync(projectId, slotId);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the reviewers cell of the strip counts the signed slot
+        var cell = cut.Find("[data-testid='summary-reviewers']");
+        Assert.Equal("1 of 1 signed", cell.QuerySelector(".summary-value")!.TextContent);
     }
 
     /// <summary>
@@ -2546,6 +2646,31 @@ public partial class ReviewPageTests : PageTestBase
         Assert.DoesNotContain("late reply", cut.Markup, StringComparison.Ordinal);
         var stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         Assert.Single(stored.Comments);
+    }
+
+    /// <summary>
+    ///     Test that a new thread submitted after the membership was removed is refused, stores nothing and leaves
+    ///     only the not-found page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing()
+    {
+        // Arrange: the member has the file selected and has typed the text of a new thread
+        var (projectId, _) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-1']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("late new thread");
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: submit the new thread
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: nothing is shown, and the review still has only its original thread
+        AssertNothingOfTheReviewIsShown(cut);
+        Assert.DoesNotContain("late new thread", cut.Markup, StringComparison.Ordinal);
+        var stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal("confidential-thread-comment", Assert.Single(stored.Comments).Text);
     }
 
     /// <summary>

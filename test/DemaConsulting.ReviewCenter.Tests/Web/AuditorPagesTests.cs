@@ -146,6 +146,47 @@ public class AuditorPagesTests : PageTestBase
 
         Assert.Empty(asUser.FindAll("[data-testid='readonly-notice']"));
         Assert.NotEmpty(asUser.FindAll("[data-testid='slot-add-form']"));
+        Assert.NotEmpty(asUser.FindAll("[data-testid^='slot-save-']"));
+    }
+
+    /// <summary>
+    ///     Test that the review page shows an auditor the threads of a selected file without the new comment form,
+    ///     the reply box and the resolve toggle, which a user who may work does get.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls()
+    {
+        // Arrange: a review whose file has a thread
+        var projectId = await ArrangeAsync();
+
+        // Act: the auditor and a user who may work both select the file
+        SignInAs("aud", "Aud", false);
+        var asAuditor = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, "REV-1"));
+        await asAuditor.Find("[data-testid='file-select-0']").ClickAsync();
+        SignInAs("ann", "Ann", false);
+        var asUser = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, "REV-1"));
+        await asUser.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the auditor reads the comment of the thread and has no control that writes
+        Assert.Contains("first", asAuditor.Find("[data-testid='threads-list']").TextContent, StringComparison.Ordinal);
+        foreach (var selector in new[]
+                 {
+                     "[data-testid='new-thread-form']", "[data-testid^='reply-text-']", "[data-testid^='reply-button-']",
+                     "[data-testid^='thread-toggle-']"
+                 })
+        {
+            Assert.Empty(asAuditor.FindAll(selector));
+        }
+
+        // Assert: the user who may work has them all, so the absence above is not an artifact of the arrangement
+        Assert.NotEmpty(asUser.FindAll("[data-testid='new-thread-form']"));
+        Assert.NotEmpty(asUser.FindAll("[data-testid^='reply-text-']"));
+        Assert.NotEmpty(asUser.FindAll("[data-testid^='reply-button-']"));
+        Assert.NotEmpty(asUser.FindAll("[data-testid^='thread-toggle-']"));
     }
 
     /// <summary>
