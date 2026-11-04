@@ -828,3 +828,160 @@ sections:
           the second factor is managed.
         tests:
           - AccountPage_Render_ExternalUser_ShowsNoteAndNoControls
+
+      - id: ReviewCenter-AccountPage-NotificationModeSelector
+        title: >-
+          The AccountPage unit shall show a selector for the notification mode in the notification card of a user who
+          has a confirmed address.
+        justification: |
+          The mode decides whether and when mail is sent, and the person must be able to choose it where the address is
+          managed.
+        tests:
+          - AccountPage_Render_ConfirmedAddress_ShowsModeSelector
+
+      - id: ReviewCenter-AccountPage-NotificationModeThreeChoices
+        title: >-
+          The AccountPage unit shall offer exactly the modes None, Daily, and Every in the selector, in that order.
+        justification: |
+          The three modes are the whole set of behaviors, and the safe choice comes first.
+        tests:
+          - AccountPage_Render_ModeSelector_OffersThreeModes
+
+      - id: ReviewCenter-AccountPage-NotificationModeStoredShown
+        title: >-
+          The AccountPage unit shall preselect the stored mode of the user in the selector.
+        justification: |
+          The page must show what is in effect, so that a person is not surprised by mail.
+        tests:
+          - AccountPage_Render_StoredEvery_EverySelected
+
+      - id: ReviewCenter-AccountPage-NotificationModeDefaultNone
+        title: >-
+          The AccountPage unit shall preselect the mode None for a user who has not chosen a mode.
+        justification: |
+          Notifications are off by default.
+        tests:
+          - AccountPage_Render_NoMode_NoneSelected
+
+      - id: ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled
+        title: >-
+          The AccountPage unit shall show the selector as disabled while the user has no confirmed address.
+        justification: |
+          A mode needs an address that is proven to be the person's own.
+        tests:
+          - AccountPage_Render_NoConfirmedAddress_SelectorDisabled
+
+      - id: ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled-NoSaveButton
+        title: >-
+          The AccountPage unit shall show no save button for the mode while the user has no confirmed address.
+        justification: |
+          A button that can not act would only confuse.
+        tests:
+          - AccountPage_Render_NoConfirmedAddress_NoSaveButton
+
+      - id: ReviewCenter-AccountPage-NotificationModeNeedsAddressExplained
+        title: >-
+          The AccountPage unit shall explain next to the disabled selector that a confirmed address is needed.
+        justification: |
+          A disabled control without a reason leaves the person guessing.
+        tests:
+          - AccountPage_Render_NoConfirmedAddress_ExplainsNeed
+
+      - id: ReviewCenter-AccountPage-NotificationModeHiddenNotAvailable
+        title: >-
+          The AccountPage unit shall show no mode selector while notifications are not available.
+        justification: |
+          A feature that is off must show no controls for itself.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_NoModeSelector
+
+      - id: ReviewCenter-AccountPage-NotificationModeSaveCalls
+        title: >-
+          When the user saves the selected mode, the AccountPage unit shall set that mode through the notification
+          preference service.
+        justification: |
+          The service holds the rules for who may choose a mode and writes the audit entry.
+        tests:
+          - AccountPage_SaveMode_Daily_CallsService
+
+      - id: ReviewCenter-AccountPage-NotificationModeSavedNotice
+        title: >-
+          When a mode was saved, the AccountPage unit shall show a notice that the choice was saved.
+        justification: |
+          The person needs to know that the choice took effect.
+        tests:
+          - AccountPage_SaveMode_Success_ShowsSavedMessage
+
+      - id: ReviewCenter-AccountPage-NotificationModeSavedNotice-NoError
+        title: >-
+          When a mode was saved, the AccountPage unit shall show no error.
+        justification: |
+          A success must not look like a failure.
+        tests:
+          - AccountPage_SaveMode_Success_ShowsNoError
+
+      - id: ReviewCenter-AccountPage-NotificationModeRefusedMessage
+        title: >-
+          When the service refuses a mode, the AccountPage unit shall show the message of the refusal.
+        justification: |
+          The person must learn why the choice was not accepted.
+        tests:
+          - AccountPage_SaveMode_Refused_ShowsMessage
+
+      - id: ReviewCenter-AccountPage-NotificationModeRefusedMessage-NoSavedNotice
+        title: >-
+          When the service refuses a mode, the AccountPage unit shall show no notice that the choice was saved.
+        justification: |
+          A refused choice must not look like a success.
+        tests:
+          - AccountPage_SaveMode_Refused_ShowsNoSavedMessage
+
+      - id: ReviewCenter-AccountPage-NotificationModeRemoveAddressNone
+        title: >-
+          When the user removes the address, the AccountPage unit shall show the mode None in the disabled selector.
+        justification: |
+          Without an address no mail is sent, and the page must show that.
+        tests:
+          - AccountPage_RemoveAddress_AfterMode_ShowsNone
+
+      - id: ReviewCenter-AccountPage-NotificationExplainsContent
+        title: >-
+          The AccountPage unit shall explain in the notification card that an e-mail names the kind of news.
+        justification: |
+          A person decides whether to turn mail on only when they know what it contains.
+        tests:
+          - AccountPage_Render_Card_ExplainsWhatIsMailed
+
+      - id: ReviewCenter-AccountPage-NotificationExplainsContent-ProjectAndReview
+        title: >-
+          The AccountPage unit shall explain in the notification card that an e-mail names the project and the review.
+        justification: |
+          A person decides whether to turn mail on only when they know what it contains.
+        tests:
+          - AccountPage_Render_Card_ExplainsProjectAndReview
+
+      - id: ReviewCenter-AccountPage-NotificationExplainsContent-Link
+        title: >-
+          The AccountPage unit shall explain in the notification card that an e-mail links to the review.
+        justification: |
+          A person decides whether to turn mail on only when they know what it contains.
+        tests:
+          - AccountPage_Render_Card_ExplainsLinkToReview
+
+      - id: ReviewCenter-AccountPage-NotificationExplainsNotMailed
+        title: >-
+          The AccountPage unit shall explain in the notification card that an e-mail never contains the text of
+          comments, answers, verdicts, or outcomes.
+        justification: |
+          Reviews of regulated projects can be confidential, so the person must be told what stays in the system. The
+          four named kinds are the review content that the mails leave out.
+        tests:
+          - AccountPage_Render_Card_ExplainsWhatIsNotMailed
+
+      - id: ReviewCenter-AccountPage-NotificationExplainsModes
+        title: >-
+          The AccountPage unit shall explain in the notification card what each of the three modes does.
+        justification: |
+          A person chooses a mode only when the effect of each is clear.
+        tests:
+          - AccountPage_Render_Card_ExplainsModes

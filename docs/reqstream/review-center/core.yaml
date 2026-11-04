@@ -7,7 +7,8 @@
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
 #   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService,
 #   UserImpactService, BallotConsolidation, BallotVisibility, ReviewStatusService, NotificationAddress,
-#   NotificationMessage, and NotificationPreferenceService
+#   NotificationMessage, NotificationPreferenceService, NotificationComposer, DigestSchedule, and
+#   NotificationDispatcher
 #   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
@@ -1308,3 +1309,790 @@ sections:
         tests:
           - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
           - NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-Core-NotificationCandidates
+        title: >-
+          The Core subsystem shall derive a notification candidate from each inbox row that calls for an action of the
+          user.
+        justification: |
+          A user is mailed only about the rows of the inbox that need the user. A notification candidate is the item of
+          the inbox of a user in the form that the rules of the mails use: the project, the review, the section of the
+          inbox, and a state without text.
+        children:
+          - ReviewCenter-NotificationComposer-ClassifyToAnswer
+          - ReviewCenter-NotificationComposer-ClassifyQuestion
+          - ReviewCenter-NotificationComposer-ClassifyDisputed
+          - ReviewCenter-NotificationComposer-ClassifyToSign
+          - ReviewCenter-NotificationComposer-ClassifySignAgain
+          - ReviewCenter-NotificationComposer-ClassifySignatureLost
+          - ReviewCenter-NotificationComposer-ClassifyReplies
+          - ReviewCenter-NotificationComposer-ClassifyApprovedConcluded
+          - ReviewCenter-NotificationComposer-ClassifyRejectedConcluded
+          - ReviewCenter-NotificationComposer-ClassifyReopened
+          - ReviewCenter-NotificationComposer-ClassifyRefuseFailedChecks
+          - ReviewCenter-NotificationComposer-ClassifyRefuseWaitingForOthers
+        tests:
+          - CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce
+          - NotificationComposer_Classify_NotStartedAndDraft_SameState
+
+      - id: ReviewCenter-Core-NotificationNewness
+        title: >-
+          The Core subsystem shall tell whether a notification candidate is new for a user from the state that the user
+          was told about.
+        justification: |
+          The same news must not be mailed twice, and a change that the user can not act on is no news.
+        children:
+          - ReviewCenter-NotificationComposer-NewWhenNothingStored
+          - ReviewCenter-NotificationComposer-NewWhenStateDiffers
+          - ReviewCenter-NotificationComposer-NotNewWhenStateSame
+          - ReviewCenter-NotificationComposer-NewWhenRepliesRise
+          - ReviewCenter-NotificationComposer-NotNewWhenRepliesFall
+          - ReviewCenter-NotificationComposer-LoweredWhenRepliesFall
+        tests:
+          - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
+
+      - id: ReviewCenter-Core-NotificationComposition
+        title: >-
+          The Core subsystem shall keep the detail text of an inbox row out of a notification mail.
+        justification: |
+          A mail leaves the server and may be read by others, so it says that there is news and not what the news is.
+        children:
+          - ReviewCenter-NotificationComposer-SubjectNoItemText
+          - ReviewCenter-NotificationComposer-NeverUseDetail
+          - ReviewCenter-NotificationDispatcher-NoDetailInMail
+          - ReviewCenter-NotificationDispatcher-ExcludeFailedChecks
+          - ReviewCenter-NotificationDispatcher-ExcludeWaitingForOthers
+        tests:
+          - NotificationComposer_Compose_DetailSentinel_NotInTextOrHtml
+          - NotificationDispatcher_RunPass_DetailText_NotInMail
+
+      - id: ReviewCenter-Core-NotificationComposition-NoOutcome
+        title: >-
+          The Core subsystem shall keep the outcome of a review out of a notification mail.
+        justification: |
+          A mail leaves the server and may be read by others, so a conclusion is told without its outcome.
+        children:
+          - ReviewCenter-NotificationComposer-NeverShowOutcome
+          - ReviewCenter-NotificationComposer-ConcludedWording
+          - ReviewCenter-NotificationComposer-ReopenedWording
+          - ReviewCenter-NotificationComposer-DisputedNoCount
+          - ReviewCenter-NotificationDispatcher-NoOutcomeInMail
+          - ReviewCenter-NotificationDispatcher-NoOutcomeInMailRejected
+        tests:
+          - NotificationComposer_Compose_Updates_NoOutcomeWord
+          - NotificationDispatcher_RunPass_Concluded_MailHasNoOutcome
+          - NotificationDispatcher_RunPass_Rejected_MailHasNoOutcomeOrConclusionText
+
+      - id: ReviewCenter-Core-NotificationMailContent
+        title: >-
+          The Core subsystem shall name in a notification mail the project and the review of each new item.
+        justification: |
+          The reader must see where the news is, and the operator decides whether titles are part of it.
+        children:
+          - ReviewCenter-NotificationComposer-SubjectEveryFixed
+          - ReviewCenter-NotificationComposer-SubjectDailyFixed
+          - ReviewCenter-NotificationComposer-RepliesShowCount
+          - ReviewCenter-NotificationComposer-ShowProjectName
+          - ReviewCenter-NotificationComposer-ShowTitle
+          - ReviewCenter-NotificationComposer-OmitTitle
+          - ReviewCenter-NotificationComposer-ShowReviewId
+        tests:
+          - NotificationComposer_Compose_IncludeTitlesTrue_ShowsTitle
+          - NotificationComposer_Compose_IncludeTitlesFalse_OmitsTitle
+
+      - id: ReviewCenter-Core-NotificationMailLinks
+        title: >-
+          The Core subsystem shall link each new item of a notification mail to the page of its review.
+        justification: |
+          The reader must reach the news in one step, and a link must open nothing without the sign-in of the reader.
+        children:
+          - ReviewCenter-NotificationComposer-LinkPath
+          - ReviewCenter-NotificationComposer-LinkBaseUrl
+          - ReviewCenter-NotificationComposer-LinkTrailingSlash
+          - ReviewCenter-NotificationComposer-LinkEscapeReviewId
+          - ReviewCenter-NotificationComposer-LinkNoToken
+        tests:
+          - NotificationComposer_Compose_Item_LinkMatchesReviewLinks
+          - NotificationComposer_Compose_Item_LinkHasNoQuery
+
+      - id: ReviewCenter-Core-NotificationMailLayout
+        title: >-
+          The Core subsystem shall list at most 50 items in a notification mail.
+        justification: |
+          A mail that is long would not be read, and the size of a mail is limited.
+        children:
+          - ReviewCenter-NotificationComposer-ItemLimit
+          - ReviewCenter-NotificationComposer-ItemLimit-More
+          - ReviewCenter-NotificationComposer-BodyWithinMessageLimits
+        tests:
+          - NotificationComposer_Compose_60Items_50ListedAndMore
+
+      - id: ReviewCenter-Core-NotificationMailLayout-Order
+        title: >-
+          The Core subsystem shall list the items of a notification mail in the order of the sections of the inbox.
+        justification: |
+          The reader sees the most urgent kind of news first, as on the page of the inbox.
+        children:
+          - ReviewCenter-NotificationComposer-GroupBySection
+        tests:
+          - NotificationComposer_Compose_MixedSections_GroupedInOrder
+
+      - id: ReviewCenter-Core-NotificationMailLayout-Daily
+        title: >-
+          The Core subsystem shall put the new items before the count of the outstanding items in a daily summary.
+        justification: |
+          The news is the reason for the mail, so it comes first, and the outstanding items need no second listing.
+        children:
+          - ReviewCenter-NotificationComposer-DigestNewFirst
+          - ReviewCenter-NotificationComposer-DigestOutstandingCountOnly
+        tests:
+          - NotificationComposer_Compose_Daily_NewItemsThenOutstanding
+
+      - id: ReviewCenter-Core-NotificationMailLayout-Every
+        title: >-
+          The Core subsystem shall leave the line about outstanding items out of a mail about new items.
+        justification: |
+          Only the daily summary reports on what still waits.
+        children:
+          - ReviewCenter-NotificationComposer-EveryNoOutstanding
+        tests:
+          - NotificationComposer_Compose_Every_NoOutstandingLine
+
+      - id: ReviewCenter-Core-NotificationMailLayout-StopLink
+        title: >-
+          The Core subsystem shall lay out a notification mail so that it says how to stop the mails.
+        justification: |
+          A mail that is hard to stop would be marked as spam.
+        children:
+          - ReviewCenter-NotificationComposer-FooterAccountLink
+          - ReviewCenter-NotificationComposer-FooterAccountLink-Reason
+        tests:
+          - NotificationComposer_Compose_Footer_LinksToAccount
+
+      - id: ReviewCenter-Core-NotificationMailSafety
+        title: >-
+          The Core subsystem shall keep the text of a user from changing the structure of a notification mail.
+        justification: |
+          A title or a name that holds a line break or markup could otherwise forge header lines, lines of the text, or
+          elements of the page of the mail.
+        children:
+          - ReviewCenter-NotificationComposer-SubjectInstanceNameSingleLine
+          - ReviewCenter-NotificationComposer-TextSingleLineValues
+          - ReviewCenter-NotificationComposer-HtmlEncodeText
+          - ReviewCenter-NotificationComposer-HtmlEncodeLink
+          - ReviewCenter-NotificationDispatcher-HeaderInjectionSafe
+          - ReviewCenter-NotificationDispatcher-HeaderInjectionSafe-ProjectName
+          - ReviewCenter-NotificationDispatcher-HeaderInjectionSafe-DisplayName
+        tests:
+          - NotificationComposer_Compose_TitleWithMarkup_HtmlEncoded
+          - NotificationDispatcher_RunPass_TitleWithCrLfBcc_SubjectFixedAndAddressUnchanged
+          - NotificationDispatcher_RunPass_ProjectNameWithCrLfBcc_SubjectFixedAndAddressUnchanged
+          - NotificationDispatcher_RunPass_DisplayNameWithCrLfBcc_SubjectFixedAndAddressUnchanged
+
+      - id: ReviewCenter-Core-NotificationComposerInput
+        title: >-
+          When the notification composer is asked to compose a mail without an item, the Core subsystem shall refuse
+          it with an argument error.
+        justification: |
+          A mail without an item is a mistake of the caller that must show at once.
+        children:
+          - ReviewCenter-NotificationComposer-RefuseNoItems
+        tests:
+          - NotificationComposer_Compose_NoItems_ThrowsArgument
+
+      - id: ReviewCenter-Core-NotificationComposerInput-NullRow
+        title: >-
+          When the notification composer is asked to classify a missing inbox row, the Core subsystem shall refuse it
+          with an argument error.
+        justification: |
+          A call without a row is a mistake of the caller that must show at once.
+        children:
+          - ReviewCenter-NotificationComposer-ClassifyRefuseNullRow
+        tests:
+          - NotificationComposer_Classify_NullRow_ThrowsArgumentNull
+
+      - id: ReviewCenter-Core-NotificationComposerInput-EmptyBaseUrl
+        title: >-
+          When the notification composer is given an empty base address, the Core subsystem shall refuse it with an
+          argument error.
+        justification: |
+          Without a base address no link of a mail can be absolute.
+        children:
+          - ReviewCenter-NotificationComposer-RefuseEmptyBaseUrl
+        tests:
+          - NotificationComposer_Constructor_EmptyBaseUrl_Throws
+
+      - id: ReviewCenter-Core-NotificationScheduling
+        title: >-
+          The Core subsystem shall make the daily summary due from the digest hour of the configured time zone on.
+        justification: |
+          The reader of a daily summary expects it at a known hour, also on the days on which the clock changes and
+          after a downtime of the server.
+        children:
+          - ReviewCenter-DigestSchedule-NotDueBeforeHour
+          - ReviewCenter-DigestSchedule-DueAtHour
+          - ReviewCenter-DigestSchedule-DueAfterHour
+          - ReviewCenter-DigestSchedule-CatchUp
+          - ReviewCenter-DigestSchedule-HourZero
+          - ReviewCenter-DigestSchedule-HourZero-DueAfterMidnight
+          - ReviewCenter-DigestSchedule-SpringForwardGap
+        tests:
+          - DigestSchedule_IsDue_AtHour_True
+
+      - id: ReviewCenter-Core-NotificationScheduling-OncePerDate
+        title: >-
+          The Core subsystem shall make the daily summary due once for each local date.
+        justification: |
+          The reader of a daily summary expects one mail a day, also on the day on which the clock repeats an hour.
+        children:
+          - ReviewCenter-DigestSchedule-NotDueWhenHandledToday
+          - ReviewCenter-DigestSchedule-DueWhenHandledYesterday
+          - ReviewCenter-DigestSchedule-DueWhenNeverHandled
+          - ReviewCenter-DigestSchedule-UseLocalDate
+          - ReviewCenter-DigestSchedule-FallBackRepeatedHour
+          - ReviewCenter-DigestSchedule-LocalDate
+        tests:
+          - CoreSubsystem_DailyDigest_OnePerLocalDate
+
+      - id: ReviewCenter-Core-NotificationSchedulingInput
+        title: >-
+          When the digest schedule is given a digest hour outside the range 0 to 23, the Core subsystem shall refuse it
+          with an argument error.
+        justification: |
+          A schedule that can never be due would silently stop all daily summaries.
+        children:
+          - ReviewCenter-DigestSchedule-RefuseInvalidHour
+        tests:
+          - DigestSchedule_Constructor_Hour24_Throws
+
+      - id: ReviewCenter-Core-NotificationSchedulingInput-NullZone
+        title: >-
+          When the digest schedule is given no time zone, the Core subsystem shall refuse it with an argument error.
+        justification: |
+          A schedule without a zone can not tell the local date.
+        children:
+          - ReviewCenter-DigestSchedule-RefuseNullZone
+        tests:
+          - DigestSchedule_Constructor_NullZone_Throws
+
+      - id: ReviewCenter-Core-NotificationDispatch
+        title: >-
+          The Core subsystem shall mail the new items of the inbox of a user to the confirmed address of that user,
+          once, when the user chose a notification mode.
+        justification: |
+          This is the purpose of the notifications: the user learns about the work that waits, without a look at the
+          pages of the server.
+        children:
+          - ReviewCenter-NotificationDispatcher-SkipModeNone
+          - ReviewCenter-NotificationDispatcher-SkipNoAddress
+          - ReviewCenter-NotificationDispatcher-SkipDisabledUser
+          - ReviewCenter-NotificationDispatcher-SkipMustChangePassword
+          - ReviewCenter-NotificationDispatcher-MailToConfirmedAddress
+        tests:
+          - CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce
+
+      - id: ReviewCenter-Core-NotificationOwnInbox
+        title: >-
+          The Core subsystem shall base a notification mail on what the recipient may see in the own inbox.
+        justification: |
+          A mail must not tell more than the page of the inbox tells to the same person, so the answers of others stay
+          hidden until the own ballot is handed in.
+        children:
+          - ReviewCenter-NotificationDispatcher-OwnInboxOnly
+          - ReviewCenter-NotificationDispatcher-OwnIdentity
+          - ReviewCenter-NotificationDispatcher-NoApiTokenActor
+          - ReviewCenter-NotificationDispatcher-NoAuditEntries
+          - ReviewCenter-NotificationDispatcher-HiddenBallotMasked
+        tests:
+          - CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce
+          - NotificationDispatcher_RunPass_HiddenBallotRecipient_NoDisputedItem
+
+      - id: ReviewCenter-Core-NotificationBaseline
+        title: >-
+          When a user switches a notification mode on, the Core subsystem shall send no mail for the items that exist
+          at that time.
+        justification: |
+          A user who switches notifications on must not get a mail for the whole backlog.
+        children:
+          - ReviewCenter-NotificationDispatcher-BaselineNoSend
+          - ReviewCenter-NotificationDispatcher-BaselineNoSend-RecordsItems
+          - ReviewCenter-NotificationDispatcher-BaselineClearsPending
+          - ReviewCenter-NotificationDispatcher-BaselineNoLogRow
+          - ReviewCenter-NotificationDispatcher-BaselineStartsDigestDay
+          - ReviewCenter-NotificationDispatcher-BaselineThenNewMails
+          - ReviewCenter-NotificationDispatcher-BaselineBypassesIdleSkip
+          - ReviewCenter-NotificationDispatcher-BaselineKeptBetweenModes
+        tests:
+          - NotificationDispatcher_RunPass_BaselinePending_RecordsBacklogNoMail
+          - NotificationDispatcher_RunPass_AfterBaseline_NewItemMailed
+          - NotificationDispatcher_RunPass_ModeSwitchedBeforeBaseline_BacklogNotMailed
+
+      - id: ReviewCenter-Core-NotificationBatching
+        title: >-
+          While the mode of a user is Every, the Core subsystem shall tell the new items of a batch window in one mail
+          at the end of the window.
+        justification: |
+          One mail for the changes of a few minutes is easier to read than a mail for each change.
+        children:
+          - ReviewCenter-NotificationDispatcher-EveryStartsWindow
+          - ReviewCenter-NotificationDispatcher-EveryNoSendInWindow
+          - ReviewCenter-NotificationDispatcher-EverySendsAfterWindow
+          - ReviewCenter-NotificationDispatcher-EveryOneMessage
+          - ReviewCenter-NotificationDispatcher-EveryIncludesLateItem
+          - ReviewCenter-NotificationDispatcher-EveryDropsHandledItem
+          - ReviewCenter-NotificationDispatcher-EveryNothingNewNoMail
+          - ReviewCenter-NotificationDispatcher-EveryNothingNewClearsWindow
+          - ReviewCenter-NotificationDispatcher-EveryWindowSurvivesRestart
+          - ReviewCenter-NotificationDispatcher-EveryConfiguredWindow
+          - ReviewCenter-NotificationDispatcher-EverySuccessClearsWindow
+        tests:
+          - NotificationDispatcher_RunPass_Every_ThreeItems_OneMessage
+          - NotificationDispatcher_RunPass_Every_AfterWindow_Sends
+
+      - id: ReviewCenter-Core-NotificationDailySummary
+        title: >-
+          While the mode of a user is Daily, the Core subsystem shall send one summary of the new items for each local
+          date.
+        justification: |
+          A user who chose the daily summary expects the news of a day in a single mail at the digest hour.
+        children:
+          - ReviewCenter-NotificationDispatcher-DailyNoSendBeforeHour
+          - ReviewCenter-NotificationDispatcher-DailySendsAtHour
+          - ReviewCenter-NotificationDispatcher-DailyNothingNewNoMail
+          - ReviewCenter-NotificationDispatcher-DailyNothingNewConsumesSlot
+          - ReviewCenter-NotificationDispatcher-DailyOnePerDate
+          - ReviewCenter-NotificationDispatcher-DailyLateItemWaits
+          - ReviewCenter-NotificationDispatcher-DailyCatchUp
+          - ReviewCenter-NotificationDispatcher-DailyConfiguredZone
+          - ReviewCenter-NotificationDispatcher-DailyDst
+          - ReviewCenter-NotificationDispatcher-DailyOutstandingCounted
+          - ReviewCenter-NotificationDispatcher-DailyOutstandingCounted-GaveUp
+          - ReviewCenter-NotificationDispatcher-DailySwitchFromEvery
+          - ReviewCenter-NotificationDispatcher-DailyFirstAfterEnable
+        tests:
+          - CoreSubsystem_DailyDigest_OnePerLocalDate
+          - NotificationDispatcher_RunPass_Daily_AtHour_Sends
+
+      - id: ReviewCenter-Core-NotificationDedupe
+        title: >-
+          The Core subsystem shall send no second mail for an item that did not change in a way that the user can act
+          on.
+        justification: |
+          The same news must not be mailed twice, and the record of what was told must neither grow without bound nor
+          lose news.
+        children:
+          - ReviewCenter-NotificationDispatcher-DedupeSameState
+          - ReviewCenter-NotificationDispatcher-DedupeChangedState
+          - ReviewCenter-NotificationDispatcher-DedupeToAnswerDraft
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesRise
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-Stored
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ThenRise
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ToZero
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-NoRewrite
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-KeepsGaveUp
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-WithMail
+          - ReviewCenter-NotificationDispatcher-DedupeReappear
+          - ReviewCenter-NotificationDispatcher-DedupePruneStale
+          - ReviewCenter-NotificationDispatcher-DedupeConcludedThenReopened
+          - ReviewCenter-NotificationDispatcher-DedupeRecordAfterSend
+          - ReviewCenter-NotificationDispatcher-DedupeNotRecordedOnFailure
+          - ReviewCenter-NotificationDispatcher-DedupeUnseenOnly
+          - ReviewCenter-NotificationDispatcher-DedupeQuestionAfterToAnswer
+          - ReviewCenter-NotificationDispatcher-DedupeQuestionNotRepeated
+          - ReviewCenter-NotificationComposer-KindInKey
+          - ReviewCenter-NotificationComposer-KindOfStripsCount
+          - ReviewCenter-NotificationComposer-KindOfPlainState
+        tests:
+          - CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce
+          - NotificationDispatcher_RunPass_SameItemSameState_NotMailedTwice
+
+      - id: ReviewCenter-Core-NotificationCurrentAddress
+        title: >-
+          The Core subsystem shall mail a user only at the confirmed address that the user has at the time of the
+          send.
+        justification: |
+          A user who replaced the address must not see the news go to the old address, and the result of a mail that
+          went nowhere must not hide the news.
+        children:
+          - ReviewCenter-NotificationDispatcher-StaleAddressNoSend
+          - ReviewCenter-NotificationDispatcher-StaleAddressNextPass
+          - ReviewCenter-NotificationDispatcher-StaleAddressNothingRecorded
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NothingSent
+          - NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded
+
+      - id: ReviewCenter-Core-NotificationCurrentMode
+        title: >-
+          The Core subsystem shall discard a notification that was prepared before the user changed the notification
+          mode.
+        justification: |
+          A user who switched the mail off, or off and on again, chose a new start, and the result of a send that began
+          before it must not decide what is news. Discarding means that nothing is sent when the mail is off before
+          the send, and that no item is recorded when the mode flipped during the send.
+        children:
+          - ReviewCenter-NotificationDispatcher-StaleModeOffNoSend
+          - ReviewCenter-NotificationDispatcher-StaleModeFlipNothingRecorded
+        tests:
+          - NotificationDispatcher_RunPass_ModeSwitchedOffBeforeSend_NothingSent
+          - NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded
+
+      - id: ReviewCenter-Core-NotificationRetry
+        title: >-
+          When the send of a notification mail fails, the Core subsystem shall try again after 5 minutes, 15 minutes,
+          1 hour, 4 hours, and 12 hours following the first to the fifth failed send.
+        justification: |
+          A short outage of the mail server must not lose mail, and the waits grow so that a dead mail server is not
+          hammered.
+        children:
+          - ReviewCenter-NotificationDispatcher-RetryStoresFailure
+          - ReviewCenter-NotificationDispatcher-RetryStoresFailure-NextAttempt
+          - ReviewCenter-NotificationDispatcher-RetryFirstFiveMinutes
+          - ReviewCenter-NotificationDispatcher-RetrySecondFifteenMinutes
+          - ReviewCenter-NotificationDispatcher-RetryThirdOneHour
+          - ReviewCenter-NotificationDispatcher-RetryFourthFourHours
+          - ReviewCenter-NotificationDispatcher-RetryFifthTwelveHours
+          - ReviewCenter-NotificationDispatcher-RetryNoSendBeforeDue
+          - ReviewCenter-NotificationDispatcher-IdleRetryWaitKept
+          - ReviewCenter-NotificationDispatcher-RetryRecomputes
+          - ReviewCenter-NotificationDispatcher-RetrySuccessResets
+          - ReviewCenter-NotificationDispatcher-RetryFailureKeepsOthers
+        tests:
+          - NotificationDispatcher_RunPass_Failure1_Waits5Min
+          - NotificationDispatcher_RunPass_Failure2_Waits15Min
+          - NotificationDispatcher_RunPass_Failure3_Waits1Hour
+          - NotificationDispatcher_RunPass_Failure4_Waits4Hours
+          - NotificationDispatcher_RunPass_Failure5_Waits12Hours
+
+      - id: ReviewCenter-Core-NotificationRetry-GiveUp
+        title: >-
+          When the send of a notification mail failed six times, the Core subsystem shall give up.
+        justification: |
+          A dead address must not be tried for ever.
+        children:
+          - ReviewCenter-NotificationDispatcher-RetryGiveUp
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpRecordsItems
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpSameStateNotMailed
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateMailed
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateDelivered
+        tests:
+          - NotificationDispatcher_RunPass_Failure6_GivesUp
+
+      - id: ReviewCenter-Core-NotificationMailLimits
+        title: >-
+          The Core subsystem shall defer a notification mail that would exceed a limit on the number of mails.
+        justification: |
+          The server must not become a source of bulk mail, and a single mailbox must not be flooded. A deferral delays
+          the news and does not lose it.
+        children:
+          - ReviewCenter-NotificationDispatcher-CapGlobal
+          - ReviewCenter-NotificationDispatcher-CapGlobalCountsAllKinds
+          - ReviewCenter-NotificationDispatcher-CapUser
+          - ReviewCenter-NotificationDispatcher-CapKeepsItemsNew
+          - ReviewCenter-NotificationDispatcher-CapDeferNoFailure
+        tests:
+          - NotificationDispatcher_RunPass_GlobalCapReached_Deferred
+          - NotificationDispatcher_RunPass_UserCapReached_Deferred
+
+      - id: ReviewCenter-Core-NotificationMailLimits-Reservation
+        title: >-
+          The Core subsystem shall reserve a notification mail under the limits on the number of mails before it sends
+          the mail.
+        justification: |
+          The limits are counted in the shared database, so a reservation that exists during the send keeps concurrent
+          senders inside the one host, such as the dispatcher and a confirmation request, from passing the same count.
+          A mail that was sent stays counted,
+          and a mail that was not sent is released.
+        children:
+          - ReviewCenter-NotificationDispatcher-CapReserveBeforeSend
+          - ReviewCenter-NotificationDispatcher-CapReservationRefusedNoSend
+          - ReviewCenter-NotificationDispatcher-CapReleaseOnFailure
+          - ReviewCenter-NotificationDispatcher-CapReleaseOnCancellation
+          - ReviewCenter-NotificationDispatcher-CapKeepsRowWhenStale
+        tests:
+          - NotificationDispatcher_RunPass_SendInProgress_ReservationExists
+          - NotificationDispatcher_RunPass_ReservationRefused_NothingChanges
+
+      - id: ReviewCenter-Core-NotificationSendLog
+        title: >-
+          When a notification mail is sent, the Core subsystem shall record the kind of the mail in the send log.
+        justification: |
+          The limits on mails count the rows of the send log, so every mail that is sent must have a row.
+        children:
+          - ReviewCenter-NotificationDispatcher-LogUpdateKind
+          - ReviewCenter-NotificationDispatcher-LogDigestKind
+        tests:
+          - NotificationDispatcher_RunPass_EverySent_LogKindUpdate
+          - NotificationDispatcher_RunPass_DailySent_LogKindDigest
+
+      - id: ReviewCenter-Core-NotificationIdleCost
+        title: >-
+          When a notification pass finds the audit trail unchanged since the previous pass and no sweep is due, the Core
+          subsystem shall read no inbox.
+        justification: |
+          Most passes find nothing to do, so they must cost one cheap query and not a reading of the inbox of every
+          user.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleNoRecipientsNoRead
+          - ReviewCenter-NotificationDispatcher-IdleSkipUnchanged
+        tests:
+          - NotificationDispatcher_RunPass_SequenceUnchanged_NoInboxRead
+
+      - id: ReviewCenter-Core-NotificationIdleCost-FirstPass
+        title: >-
+          In its first pass, the Core subsystem shall read the inbox of each recipient.
+        justification: |
+          Without a remembered audit position the pass can not tell what changed.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleFirstPassFull
+        tests:
+          - NotificationDispatcher_RunPass_First_ReadsInbox
+
+      - id: ReviewCenter-Core-NotificationIdleCost-OnChange
+        title: >-
+          When the audit trail has a new entry, the Core subsystem shall read the inbox of each recipient.
+        justification: |
+          A new entry can be the news that a user waits for, and a pass that failed must not hide news.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleReadOnChange
+          - ReviewCenter-NotificationDispatcher-IdleSequenceKeptOnError
+        tests:
+          - NotificationDispatcher_RunPass_SequenceChanged_ReadsInbox
+          - NotificationDispatcher_RunPass_PassFails_NextPassReads
+
+      - id: ReviewCenter-Core-NotificationIdleCost-AfterFailure
+        title: >-
+          When a notification pass failed for a user, the Core subsystem shall read the inbox of each recipient in the
+          next pass although no sweep is due.
+        justification: |
+          A failed pass must not mark the sweep as done, or the user would wait for the next sweep to get the news.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleSweepKeptOnError
+        tests:
+          - NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain
+          - NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain
+
+      - id: ReviewCenter-Core-NotificationIdleCost-Resume
+        title: >-
+          When a notification pass is clean, the Core subsystem shall read no inbox in the next idle pass.
+        justification: |
+          Reading everything after a failure must not keep the dispatcher from becoming cheap again.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleResumesAfterCleanPass
+        tests:
+          - NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle
+
+      - id: ReviewCenter-Core-NotificationIdleCost-Sweep
+        title: >-
+          When 15 minutes have passed since the last full reading, the Core subsystem shall read the inbox of each
+          recipient.
+        justification: |
+          News that comes with no entry in the audit trail must still be found.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleSweep
+        tests:
+          - NotificationDispatcher_RunPass_15MinutesNoChange_ReadsInbox
+
+      - id: ReviewCenter-Core-NotificationIdleCost-TimeDriven
+        title: >-
+          When a batch window has elapsed, the Core subsystem shall serve it although the audit trail has no new entry.
+        justification: |
+          A mail that is due by the clock must not wait for an unrelated change.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleTimeDriven
+        tests:
+          - NotificationDispatcher_RunPass_WindowElapsedSequenceUnchanged_Sends
+
+      - id: ReviewCenter-Core-NotificationResilience
+        title: >-
+          When the notifications of one user fail, the Core subsystem shall go on with the notifications of the other
+          users.
+        justification: |
+          The failure of one mailbox or one inbox must not keep other users from their mail.
+        children:
+          - ReviewCenter-NotificationDispatcher-ErrorIsolation
+          - ReviewCenter-NotificationDispatcher-ErrorCallback
+        tests:
+          - NotificationDispatcher_RunPass_InboxFails_OtherUserMailed
+          - NotificationDispatcher_RunPass_InboxFails_CallbackInvoked
+
+      - id: ReviewCenter-Core-NotificationPassResult
+        title: >-
+          When a notification pass ends, the Core subsystem shall report the numbers of sent, failed, and deferred
+          mails.
+        justification: |
+          The host logs the result of a pass.
+        children:
+          - ReviewCenter-NotificationDispatcher-ResultCounts
+        tests:
+          - NotificationDispatcher_RunPass_Mixed_ResultCounts
+
+      - id: ReviewCenter-Core-NotificationPassResult-NoAddress
+        title: >-
+          The Core subsystem shall keep the address of a recipient out of the result of a notification pass.
+        justification: |
+          The host logs the result of a pass, which must hold no personal data.
+        children:
+          - ReviewCenter-NotificationDispatcher-ResultCounts-NoAddress
+        tests:
+          - NotificationDispatcher_RunPass_Sent_ResultHoldsNoAddress
+
+      - id: ReviewCenter-Core-NotificationPassResult-Cancellation
+        title: >-
+          When a notification pass is canceled, the Core subsystem shall report a cancellation.
+        justification: |
+          A server that stops must not wait for a pass.
+        children:
+          - ReviewCenter-NotificationDispatcher-Cancellation
+        tests:
+          - NotificationDispatcher_RunPass_Cancelled_Throws
+
+      - id: ReviewCenter-Core-NotificationMode
+        title: >-
+          The Core subsystem shall let a user with a confirmed address choose the notification mode.
+        justification: |
+          Notification mail is off by default, so the user must opt in. Two ways to be told serve the two ways in which
+          people work: soon after each change, or once a day.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeStatusShown
+          - ReviewCenter-NotificationPreferenceService-ModeSet
+          - ReviewCenter-NotificationPreferenceService-ModeSetEvery
+          - ReviewCenter-NotificationPreferenceService-ModeSetNone
+        tests:
+          - CoreSubsystem_NotificationMode_ConfirmedUserChoosesAndIsAudited
+
+      - id: ReviewCenter-Core-NotificationMode-DefaultNone
+        title: >-
+          The Core subsystem shall use the mode None for a user who has not chosen a mode.
+        justification: |
+          Notification mail is off by default, so the user must opt in.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeDefaultNone
+        tests:
+          - NotificationPreferenceService_GetStatus_NoRow_ModeNone
+
+      - id: ReviewCenter-Core-NotificationMode-RemoveResets
+        title: >-
+          When a user removes the address, the Core subsystem shall return the notification mode to None.
+        justification: |
+          Mail must not go to an address that is gone.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRemoveResets
+        tests:
+          - NotificationPreferenceService_RemoveAddress_AfterMode_ModeNone
+
+      - id: ReviewCenter-Core-NotificationModeRefusals
+        title: >-
+          The Core subsystem shall refuse a change of the notification mode for a user without a confirmed address.
+        justification: |
+          Mail may go only to an address that its owner has proven.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeNeedsConfirmedAddress
+        tests:
+          - NotificationPreferenceService_SetMode_NoConfirmedAddress_Throws
+
+      - id: ReviewCenter-Core-NotificationModeRefusals-ApiToken
+        title: >-
+          The Core subsystem shall refuse a change of the notification mode by an actor of an API token.
+        justification: |
+          Only the person may decide when mail goes.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseApiToken
+        tests:
+          - NotificationPreferenceService_SetMode_ApiTokenActor_Throws
+
+      - id: ReviewCenter-Core-NotificationModeRefusals-NotAvailable
+        title: >-
+          The Core subsystem shall refuse a change of the notification mode while notifications are not available.
+        justification: |
+          A feature that is off must not cause mail.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseNotAvailable
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseNotAvailable-StoreUntouched
+        tests:
+          - NotificationPreferenceService_SetMode_NotAvailable_Throws
+
+      - id: ReviewCenter-Core-NotificationModeRefusals-DisabledUser
+        title: >-
+          The Core subsystem shall refuse a change of the notification mode for a disabled user.
+        justification: |
+          A disabled account must not cause mail.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseDisabledUser
+        tests:
+          - NotificationPreferenceService_SetMode_DisabledUser_Throws
+
+      - id: ReviewCenter-Core-NotificationModeRefusals-TemporaryPassword
+        title: >-
+          The Core subsystem shall refuse a change of the notification mode for a user with a temporary password.
+        justification: |
+          An account that is not yet taken over by its person must not cause mail.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseTemporaryPassword
+        tests:
+          - NotificationPreferenceService_SetMode_MustChangePassword_Throws
+
+      - id: ReviewCenter-Core-NotificationModeRefusals-UnknownValue
+        title: >-
+          The Core subsystem shall refuse a notification mode that is not one of the defined modes.
+        justification: |
+          A value that no code path knows must not be stored.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeRefuseUnknownValue
+        tests:
+          - NotificationPreferenceService_SetMode_UndefinedValue_Throws
+
+      - id: ReviewCenter-Core-NotificationModeAudit
+        title: >-
+          The Core subsystem shall record a change of the notification mode as an audit entry.
+        justification: |
+          A change of when mail goes belongs in the audit trail.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeAudited
+        tests:
+          - CoreSubsystem_NotificationMode_ConfirmedUserChoosesAndIsAudited
+          - NotificationPreferenceService_SetMode_Changed_AuditEntryWritten
+
+      - id: ReviewCenter-Core-NotificationModeAudit-NoAddress
+        title: >-
+          The Core subsystem shall keep the address out of the audit entry of a change of the notification mode.
+        justification: |
+          The audit trail is kept long and read by many, so it holds no personal data.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeAuditNoAddress
+        tests:
+          - NotificationPreferenceService_SetMode_Changed_AuditHasNoAddress
+
+      - id: ReviewCenter-Core-NotificationModeAudit-Unchanged
+        title: >-
+          When the notification mode does not change, the Core subsystem shall record no audit entry.
+        justification: |
+          An unchanged choice is no change.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit
+          - ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit-NoChange
+          - ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit-NoneWithoutRow
+        tests:
+          - NotificationPreferenceService_SetMode_Same_NoAuditNoChange
+
+      - id: ReviewCenter-Core-NotificationModeBaseline
+        title: >-
+          When a user switches a notification mode on from None, the Core subsystem shall mark the items of the inbox as
+          known before any mail is sent for them.
+        justification: |
+          A user who opts in must not get a mail for the whole backlog.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeEnableMarksBaseline
+        tests:
+          - NotificationPreferenceService_SetMode_NoneToEvery_BaselinePending
+
+      - id: ReviewCenter-Core-NotificationModeBaseline-KeepsItems
+        title: >-
+          When a user switches between the modes Daily and Every, the Core subsystem shall keep the known items.
+        justification: |
+          A switch between Daily and Every must neither repeat nor swallow news.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ModeSwitchKeepsItems
+          - ReviewCenter-NotificationPreferenceService-ModeSwitchKeepsItems-NoBaseline
+        tests:
+          - NotificationPreferenceService_SetMode_DailyToEvery_ItemsKept

@@ -143,6 +143,10 @@ internal static class ServerHost
         // configuration is final (it is read for the Enabled switch)
         builder.Services.AddOidcSignIn(builder.Configuration);
 
+        // The background worker of the e-mail notifications belongs to the web host only (a command-line run never
+        // mails) and is registered only when notifications are enabled with a transport; same reason as above
+        builder.Services.AddNotificationWorker(builder.Configuration);
+
         // Outside the Development environment ASP.NET Core does not load the static web asset
         // manifest on its own, which would leave the Blazor client script empty when the server is
         // started with 'dotnet <dll>'. Load it explicitly (a no-op when the manifest is absent)
@@ -295,7 +299,8 @@ internal static class ServerHost
         services.AddSingleton<TotpService>();
 
         // The optional e-mail notifications: the settings (read at start-up), the sender they choose, the store and
-        // the service for the notification address. They are off by default; no background work is registered here
+        // the service for the notification address. They are off by default; the worker that mails them is not
+        // registered here but by the web host (see CreateApplication), so a command-line run never mails
         services.AddNotifications(configuration);
         services.AddSingleton<INotificationStore, NotificationStore>();
         services.AddSingleton<NotificationPreferenceService>();

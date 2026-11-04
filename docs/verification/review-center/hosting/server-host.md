@@ -79,6 +79,10 @@ N/A - standard test environment.
   password; with notifications off the same garbage is not checked; valid settings build the application and log one
   warning for an inline password that holds no password; a database without the notification tables stops the start
   while notifications are on and does not while they are off.
+- The notification worker is part of the web host only: with notifications enabled and the file or the SMTP transport the
+  application has the worker; with notifications off, with the transport `None` (which stops the start before any
+  worker exists), with the self-test settings, and in the shared service registration of the commands it has none; the
+  worker runs while the host runs and has stopped when the host has stopped.
 
 #### Test Scenarios
 
@@ -431,3 +435,19 @@ endpoint of the second step of the sign-in is among the routes of the applicatio
 **ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped**: The pipeline is built with `Identity:Totp:Enabled`
 false; the endpoint of the second step of the sign-in is not among the routes. This scenario is tested by
 `ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped`.
+
+**Notification worker scenarios**: The tests of the worker registration of the composition root are in
+`ServerHostNotificationWorkerTests.cs`. They build the real application with an in-memory server and look at the hosted
+services in its container. The application has the worker when notifications are enabled with the file sender or with
+SMTP, which is tested by `ServerHost_CreateApplication_NotificationsFile_HasWorker` and
+`ServerHost_CreateApplication_NotificationsSmtp_HasWorker`; it has none while notifications are off, which is tested by
+`ServerHost_CreateApplication_NotificationsOff_NoWorker`; enabled notifications without a transport are refused at
+start-up, so no worker exists, which is tested by `ServerHost_CreateApplication_EnabledSenderNone_RefusedBeforeAnyWorker`.
+The shared service registration of the commands adds no hosted service even when notifications are enabled, which is
+tested by `ServerHost_AddServices_NotificationsEnabled_NoHostedService`, and the host of the self-test start check has no
+worker, which is tested by `ServerHost_CreateApplication_SelfTestSettings_NoWorker`. The worker runs while the host runs
+and has stopped when the host has stopped, which is tested by `ServerHost_RunAsync_Stop_WorkerStopped`.
+
+**Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
+`AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real
+pipeline; there is no separate test of the registration.

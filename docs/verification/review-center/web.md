@@ -427,6 +427,11 @@ and the right code shows the confirmed address, which is tested by
 `AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. The other states of the card are tested in the unit tests of
 `AccountPage`.
 
+**Notification mode**: The account page of a user with a confirmed address offers the choice of the mode, shows the
+chosen mode, and explains what is and is not mailed, which is tested by
+`WebSubsystem_AccountPage_ChoosesNotificationMode`. The disabled selector, the refusals, and the case that the feature is
+not set up are tested in the unit tests of `AccountPage` in `AccountNotificationModeTests.cs`.
+
 **Inbox**: A signed-in user who requests the inbox route is served the inbox page, which waits for its live
 connection and carries the interactive marker, which is tested by
 `WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is the evidence of the requirement

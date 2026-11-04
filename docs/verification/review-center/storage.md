@@ -109,6 +109,11 @@ persistence across a restart, and the unit tests verify the detailed rules on th
 - Inbox (`ReviewCenter-Storage-Inbox` and its aspects): what a user has seen of a review is still present, and still
   honored, after the database is closed and opened again; the candidate reviews and the race rules are verified in
   the unit tests of `InboxStore`.
+- The notification mode, the items already mailed, and the dispatch state of a user are stored with the audit entry of
+  a mode change or not at all, are still there, identical, after the database is closed and opened again, and the mode
+  `None` forgets the items; the commit of a mail (items and state) is one transaction; the send log row of a mail is
+  reserved under the limits in one transaction before the send; this is verified in
+  the unit tests of `NotificationStore` and by `StorageSubsystem_NotificationState_PersistsModeItemsAndState`.
 
 ### Test Scenarios
 
@@ -293,6 +298,12 @@ one of several parallel requests is tested by `NotificationStore_ReserveConfirma
 and the limit of the attempts at a code under parallel requests by
 `NotificationStore_TryCountAttemptAsync_Concurrent_NeverExceedsTheLimit`; all are defined in
 `NotificationStoreTests.cs` and run on a real SQLite file.
+
+**Notification mode and dispatch state**: The mode, the notified items, and the dispatch state of a user (the baseline
+flag, the batch window, the retry state, and the daily slot) are still there, identical, after the database is closed
+and opened again, and the mode `None` forgets the items, which is tested by
+`StorageSubsystem_NotificationState_PersistsModeItemsAndState`. The commit of a mail as one transaction, the recipients,
+and the counts of the sent mails are tested by the unit tests of `NotificationStore` in `NotificationStoreModeTests.cs`.
 
 **Inbox**: The candidate reviews of a user and the read state that never moves backwards, also when many writers race,
 are verified in the unit tests of `InboxStore`. The read state of a user is still present, and still honored, after the

@@ -102,10 +102,14 @@ includes:
   - docs/reqstream/review-center/core/notification-address.yaml
   - docs/reqstream/review-center/core/notification-message.yaml
   - docs/reqstream/review-center/core/notification-preference-service.yaml
+  - docs/reqstream/review-center/core/notification-composer.yaml
+  - docs/reqstream/review-center/core/digest-schedule.yaml
+  - docs/reqstream/review-center/core/notification-dispatcher.yaml
   - docs/reqstream/review-center/messaging.yaml
   - docs/reqstream/review-center/messaging/notification-options.yaml
   - docs/reqstream/review-center/messaging/smtp-notification-sender.yaml
   - docs/reqstream/review-center/messaging/file-notification-sender.yaml
+  - docs/reqstream/review-center/messaging/notification-worker.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml

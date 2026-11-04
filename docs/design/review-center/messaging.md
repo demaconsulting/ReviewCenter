@@ -7,16 +7,19 @@
 The `Messaging` subsystem delivers the e-mail of the optional e-mail notifications. It owns the `Notifications`
 configuration section, the check of that section at start-up, and the two transports that deliver a message: an SMTP
 server and a folder of files. It implements the Core interface `INotificationSender`, so that the domain services know
-only the interface and a service can be tested with a recording fake. The subsystem contains three units:
+only the interface and a service can be tested with a recording fake. The subsystem contains four units:
 `NotificationOptions`, the settings, their check, the warnings, the resolution of the SMTP password, and the
-registration of the settings and of the sender (`NotificationRegistration`); `SmtpNotificationSender`, which delivers a
-message through an SMTP server with the MailKit library; and `FileNotificationSender`, which writes a message as a file
-for demonstrations, development and tests. The types of the subsystem are internal to the application.
+registration of the settings, of the sender, and of the worker (`NotificationRegistration`); `SmtpNotificationSender`,
+which delivers a message through an SMTP server with the MailKit library; `FileNotificationSender`, which writes a
+message as a file for demonstrations, development and tests; and `NotificationWorker`, the background service that runs
+a notification pass at the polling interval. The types of the subsystem are internal to the application.
 
 E-mail notifications are off unless `Notifications:Enabled` is set. While they are off nothing else of the section is
 read, checked or registered, and the sender that the rest of the system receives is the Core `NoNotificationSender`,
 which reports that it is not configured and refuses to send. The subsystem does not decide when a mail is sent, to
-whom, or with which text; that is the work of the `Core` subsystem (`NotificationPreferenceService`).
+whom, or with which text; that is the work of the `Core` subsystem (`NotificationPreferenceService` for the
+confirmation mail, `NotificationDispatcher` for the notification mails). The worker only runs the passes of the
+dispatcher, survives a failed pass, and logs no personal data.
 
 ### Interfaces
 
@@ -101,3 +104,12 @@ server, or a path, because exception messages can repeat them. Cancellation is p
 
 **Libraries**: MailKit (with MimeKit) is the only OTS item of the subsystem (see the design of MailKit). The senders are
 the only units that reference it; the rest of the product uses the Core interface.
+
+**The worker**: `NotificationRegistration.AddNotificationWorker` registers `NotificationWorker` as a hosted service
+only when notifications are enabled and the sender is Smtp or File, and only the web host calls it, so a command-line run
+never starts a background loop. The registration builds the Core `NotificationComposer`, `DigestSchedule`, and
+`NotificationDispatcher` from the settings and gives the worker the method of the dispatcher that runs one pass. The
+worker runs a pass at once, then at each polling interval (`PollSeconds`) on the clock of the host. A failed pass is
+logged by the type of its exception only, and the loop goes on. A pass that sent or failed nothing is not logged. See
+the `NotificationWorker` unit. Exactly one host may run the worker for a database: the server is a single instance by
+design and the worker is not coordinated between hosts, so two hosts on one database could send the same mail twice.

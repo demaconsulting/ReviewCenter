@@ -438,3 +438,96 @@ sections:
           Settings of a feature that is not enabled do not matter and must not cause noise.
         tests:
           - NotificationOptions_GetWarnings_GoodOrDisabled_IsEmpty
+
+      - id: ReviewCenter-NotificationOptions-WorkerRegisteredSmtp
+        title: >-
+          While e-mail notifications are enabled with the sender Smtp, the NotificationOptions class shall register
+          exactly one notification worker as a hosted service.
+        justification: |
+          The worker is what sends the mail, and two workers would send each mail twice.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_EnabledSmtp_Registers
+
+      - id: ReviewCenter-NotificationOptions-WorkerRegisteredFile
+        title: >-
+          While e-mail notifications are enabled with the sender File, the NotificationOptions class shall register
+          exactly one notification worker as a hosted service.
+        justification: |
+          The file sender is for tests and trials, and it needs the worker like the SMTP sender does.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_EnabledFile_Registers
+
+      - id: ReviewCenter-NotificationOptions-WorkerNotRegisteredOff
+        title: >-
+          While e-mail notifications are not enabled, the NotificationOptions class shall register no hosted service.
+        justification: |
+          A feature that is off must cost nothing and must not run any background work.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_Off_NotRegistered
+
+      - id: ReviewCenter-NotificationOptions-WorkerNotRegisteredNoSection
+        title: >-
+          While the configuration has no Notifications section, the NotificationOptions class shall register no hosted
+          service.
+        justification: |
+          A server that was set up before the feature existed must not change its behavior.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_NoSection_NotRegistered
+
+      - id: ReviewCenter-NotificationOptions-WorkerNotRegisteredSenderNone
+        title: >-
+          While the sender is None, the NotificationOptions class shall register no hosted service.
+        justification: |
+          With no sender there is nothing that could send a mail, and a worker would only fail on every pass.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_EnabledSenderNone_NotRegistered
+
+      - id: ReviewCenter-NotificationOptions-WorkerUsesPollInterval
+        title: >-
+          The NotificationOptions class shall configure the worker to run a pass every PollSeconds seconds.
+        justification: |
+          The administrator trades the delay of a mail against the load of the check.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_PollSeconds_Honored
+
+      - id: ReviewCenter-NotificationOptions-WorkerUsesBatchWindow
+        title: >-
+          The NotificationOptions class shall configure the dispatcher with the batch window of BatchWindowSeconds
+          seconds.
+        justification: |
+          The administrator decides how long changes are collected into one mail.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_BatchWindow_Honored
+
+      - id: ReviewCenter-NotificationOptions-WorkerUsesDigestSchedule
+        title: >-
+          The NotificationOptions class shall configure the dispatcher with the digest schedule of the settings.
+        justification: |
+          The administrator decides at which local time the daily summary goes out.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_ZoneAndHour_Honored
+
+      - id: ReviewCenter-NotificationOptions-WorkerUsesIncludeTitles
+        title: >-
+          The NotificationOptions class shall configure the composer with the setting IncludeTitles, so that no title is
+          mailed when it is false.
+        justification: |
+          Titles can be confidential, and the administrator decides whether they may leave the system.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_IncludeTitles_Honored
+
+      - id: ReviewCenter-NotificationOptions-WorkerTitlesShownByDefault
+        title: >-
+          While IncludeTitles is not set, the NotificationOptions class shall configure the composer to mention titles.
+        justification: |
+          The default of the setting is true, and the registration must keep to it.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_IncludeTitlesDefault_TitleShown
+
+      - id: ReviewCenter-NotificationOptions-WorkerRegistrationNullArgument
+        title: >-
+          The NotificationOptions class shall refuse a null argument when it registers the worker.
+        justification: |
+          A missing argument is a programming error that must show at once.
+        tests:
+          - NotificationRegistration_AddNotificationWorker_NullArgument_Throws

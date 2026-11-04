@@ -136,7 +136,9 @@ and the settings), `TotpSignIn` and `TotpOptions` (the second step of a sign-in,
   a password written inline, and it checks that the database has the notification tables.
 - *Constraints*: An invalid setting stops the start-up with an error that names it and never shows a secret. A database
   that was created before the feature has no notification tables and stops the start while the feature is on; it must
-  be deleted and created again, because the database has no migrations. No background work is registered.
+  be deleted and created again, because the database has no migrations; the same holds for a database of the first
+  version of the feature, which lacks the table of notified items and the mode and dispatch columns. The background
+  worker of the notifications is registered for the web host only, and only while the feature is on with a transport.
 
 **Identity:Oidc settings**: The `Identity:Oidc` configuration section, described in the `Identity` design.
 
@@ -292,7 +294,11 @@ inline, an unencrypted connection to another machine) without a value, and asks 
 database has its tables; a database that was created before the feature stops the start with a message that says to
 delete it and let the server create it again, or to turn the feature off. `AddServices` registers the settings and the
 sender (`AddNotifications`), the `NotificationStore`, and the `NotificationPreferenceService`; no background work is
-registered. The git setting `Git:TimeoutSeconds`
+registered there, because the commands and the self-test share that method. `CreateApplication` then registers the
+notification worker (`AddNotificationWorker`) after the sign-in registrations: it adds one hosted service only while
+`Notifications:Enabled` is true and the transport is `Smtp` or `File`; with the feature off, or without a section, no
+timer runs and no mail is composed. A transport `None` while the feature is on is refused by the check above. The worker
+stops with the host. The git setting `Git:TimeoutSeconds`
 is checked the same
 way and must be from 1 to 3600:
 any other number stops the start-up with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600

@@ -390,7 +390,13 @@ public enum DomainRule
     ///     Too many wrong codes were typed for the waiting address, so it can no longer be confirmed; a new code must be
     ///     requested.
     /// </summary>
-    NotificationTooManyAttempts
+    NotificationTooManyAttempts,
+
+    /// <summary>
+    ///     A notification mode other than none was chosen while the user has no confirmed address; nothing is
+    ///     stored.
+    /// </summary>
+    NotificationAddressNotConfirmed
 }
 
 /// <summary>

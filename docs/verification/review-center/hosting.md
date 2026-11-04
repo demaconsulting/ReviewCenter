@@ -38,6 +38,9 @@ N/A - standard test environment.
   stops the start-up with an error that names the problem and never shows the SMTP password, an inline password is
   logged as a warning, and valid settings build the application; while they are off nothing is checked; the behavior is
   verified in the unit tests of `ServerHost`.
+- Notification worker: the web host runs the notification worker only while notifications are enabled with a transport;
+  with notifications off, in a command-line run, and in the self-test there is none; the behavior is verified in the
+  unit tests of `ServerHost` and in `HostingSubsystem_NotificationWorker_OnlyEnabledWebHost`.
 
 ### Test Scenarios
 
@@ -137,3 +140,8 @@ by `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInli
 a table but no notification tables stops the start while notifications are on and does not while they are off, which is
 tested by `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`; all three
 are unit tests of `ServerHost`.
+
+**Notification worker**: The running web host with notifications enabled has the worker and the worker is running, and
+the same host with notifications off has none, which is tested by `HostingSubsystem_NotificationWorker_OnlyEnabledWebHost`.
+That a command and the self-test get no worker, that an enabled transport `None` is refused, and that the worker stops
+with the host are tested by the unit tests of `ServerHost` in `ServerHostNotificationWorkerTests.cs`.

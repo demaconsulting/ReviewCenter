@@ -56,6 +56,25 @@ internal sealed partial class FakeNotificationSender : INotificationSender
     /// </summary>
     public Exception? FailWith { get; set; }
 
+    /// <summary>
+    ///     Gets or sets an action that runs inside every send before the message is kept, so a test can look at the
+    ///     state of the system while the mail is being sent, or <c>null</c> for none.
+    /// </summary>
+    public Action<NotificationMessage>? OnSend { get; set; }
+
+    /// <summary>
+    ///     Gets or sets an action that runs at the very start of every send, before any failure is thrown, so a test
+    ///     can look at the state of the system while a mail that will fail is being sent, or cancel the pass at that
+    ///     moment; <c>null</c> for none.
+    /// </summary>
+    public Action<NotificationMessage>? BeforeSend { get; set; }
+
+    /// <summary>
+    ///     Gets or sets an address whose sends fail with a <see cref="NotificationSendException"/> while the other
+    ///     addresses are sent to normally, or <c>null</c> for none.
+    /// </summary>
+    public string? FailForAddress { get; set; }
+
     /// <inheritdoc />
     public bool IsConfigured => Configured;
 
@@ -76,18 +95,21 @@ internal sealed partial class FakeNotificationSender : INotificationSender
     /// <inheritdoc />
     public Task SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
+        BeforeSend?.Invoke(message);
+        cancellationToken.ThrowIfCancellationRequested();
         if (FailWith is not null)
         {
             throw FailWith;
         }
 
-        if (Fail)
+        if (Fail || (FailForAddress is not null && message.ToAddress == FailForAddress))
         {
             throw new NotificationSendException("The fake sender was told to fail.");
         }
 
         lock (_lock)
         {
+            OnSend?.Invoke(message);
             _sent.Add(message);
         }
 
