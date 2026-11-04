@@ -200,6 +200,26 @@ public class SignInAuditTests
     }
 
     /// <summary>
+    ///     Test that a refusal by the throttle records the typed name cleaned, on one line.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_Throttled_RecordsCleanedTypedName()
+    {
+        // Arrange: a limit of one attempt per name
+        await using var app = await StartAsync(perName: 1);
+        using var browser = new TestBrowser(app);
+        const string TypedName = "mallory\r\nforged line";
+
+        // Act: one attempt that passes, then one that the throttle refuses
+        await browser.LoginAsync(TypedName, "typed-secret-password-5");
+        await browser.LoginAsync(TypedName, "typed-secret-password-5");
+
+        // Assert: the one throttled entry holds the name on one line, with each control character as a space
+        var entry = Assert.Single(await EntriesAsync(app, "auth.sign-in-throttled"));
+        Assert.Equal("too many attempts, name 'mallory  forged line'", entry.Detail);
+    }
+
+    /// <summary>
     ///     Test that the trail of the whole flow is a verifiable chain.
     /// </summary>
     [Fact]

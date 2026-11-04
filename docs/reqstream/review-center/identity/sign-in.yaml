@@ -50,6 +50,7 @@ sections:
           A user who mistyped the password must still end up where they were going once the next attempt works.
         tests:
           - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
+          - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
 
       - id: ReviewCenter-SignIn-Throttle
         title: >-
@@ -60,6 +61,7 @@ sections:
           do not exist.
         tests:
           - SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames
+          - SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage
 
       - id: ReviewCenter-SignIn-Throttle-RefusesRightPassword
         title: >-
@@ -105,9 +107,25 @@ sections:
       - id: ReviewCenter-SignIn-Throttle-Audit
         title: >-
           The SignIn unit shall record a refusal by the throttle in the audit trail, at most once per minute and typed
-          name, with the typed name cleaned and without the password.
+          name.
         justification: |
           Recording the refusals once per minute shows an attack without letting it flood the trail.
+        tests:
+          - SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow
+
+      - id: ReviewCenter-SignIn-Throttle-Audit-NameCleaned
+        title: >-
+          The SignIn unit shall clean the typed name in the audit entry of a refusal by the throttle.
+        justification: |
+          A typed name with a line break must not forge a second line in the audit trail.
+        tests:
+          - SignIn_Login_Throttled_RecordsCleanedTypedName
+
+      - id: ReviewCenter-SignIn-Throttle-Audit-NoPassword
+        title: >-
+          The SignIn unit shall not record the password in the audit entry of a refusal by the throttle.
+        justification: |
+          The audit trail is read by many people, so a typed password must never end up in it.
         tests:
           - SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow
 

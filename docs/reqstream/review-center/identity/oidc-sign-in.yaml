@@ -790,6 +790,16 @@ sections:
         tests:
           - OidcSignIn_AccountDisabledWhileSessionIsOpen_EndsTheSession
 
+      - id: ReviewCenter-OidcSignIn-LocalSession-OpenPageChecked
+        title: >-
+          The OidcSignIn unit shall end the sign-in state of an open page of a user of a provider when the account is
+          disabled.
+        justification: |
+          A page that stays open makes no request, so an open page of a disabled user of a provider must not keep
+          acting; the user is held to the same check as a local user.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse
+
       - id: ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
         title: >-
           The OidcSignIn unit shall keep the session of the user as it was when a confirmation of identity succeeds.

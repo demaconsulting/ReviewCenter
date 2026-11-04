@@ -66,6 +66,8 @@ sections:
           - ReviewCenter-SignIn-Throttle-ReturnUrl
           - ReviewCenter-SignIn-Throttle-NoLockoutCount
           - ReviewCenter-SignIn-Throttle-Audit
+          - ReviewCenter-SignIn-Throttle-Audit-NameCleaned
+          - ReviewCenter-SignIn-Throttle-Audit-NoPassword
           - ReviewCenter-SignIn-Throttle-SuccessReset
           - ReviewCenter-Identity-ThrottleSettings
           - ReviewCenter-Identity-ThrottleSettings-NotPositive
@@ -379,6 +381,7 @@ sections:
           - ReviewCenter-OidcSignIn-LocalSession
           - ReviewCenter-OidcSignIn-LocalSession-LogoutLocalOnly
           - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
+          - ReviewCenter-OidcSignIn-LocalSession-OpenPageChecked
           - ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
           - ReviewCenter-OidcSignIn-NoPassword
           - ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused

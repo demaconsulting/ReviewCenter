@@ -86,9 +86,12 @@ wrong one. This scenario is tested by
 `ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword`.
 
 **ValidationChecks_Totp_Run_PassesWithRfcVectors**: The two-factor check is run; it is named `ReviewCenter_Totp`,
-it passes, and its detail mentions "RFC 6238", which means the production algorithm gave the published codes for the
-vector times, accepted the window, and handled the Base32 text and the `otpauth` address. This scenario is tested by
-`ValidationChecks_Totp_Run_PassesWithRfcVectors`.
+it passes, and its detail mentions "RFC 6238". The check throws unless the production algorithm gave the published
+codes for the vector times, accepted the right code and its neighbors in the window, refused a code at two steps
+distance, refused a wrong code (`000000`) and a malformed code (`08180`), and handled the Base32 text and the `otpauth`
+address, so the passed run shows both the acceptance of the right code and the refusal of the wrong and malformed
+codes. The scenario cannot show that the check fails for a code that differs from its vector, because the vectors and
+the algorithm are fixed in the check. This scenario is tested by `ValidationChecks_Totp_Run_PassesWithRfcVectors`.
 
 **ValidationChecks_AuditChain_Run_DetectsTamperedEntry**: The log of the real run is read; the audit chain check shows
 a passed line that reports that the change of an entry was detected by the verifier. This scenario is tested by
@@ -122,6 +125,24 @@ it in review with one reopen. The check passes and its detail contains `author a
 `author signature refused`, and `approved review locked and reopened by an administrator`, followed by the evidence
 index fingerprint and the record digest. This scenario is tested by
 `ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails`.
+
+**ReviewWorkflowCheck_RunAsync_RealRun_ReportsApprovedReviewLocked**: The log of the real run is read; the passed line
+of the review workflow check names `author signature refused; approved review locked`. The check throws unless the
+approved review refuses a change with `ReviewLocked`, so a passed line shows that the lock held. The check reports the
+lock and the reopen in one joined detail, so the scenario can only read the text. This scenario is tested by
+`ReviewWorkflowCheck_RunAsync_RealRun_ReportsApprovedReviewLocked`.
+
+**ReviewWorkflowCheck_RunAsync_RealRun_ReportsAdministratorReopen**: The log of the real run is read; the passed line
+of the review workflow check names `locked and reopened by an administrator; evidence index`. The check throws unless
+the reopen by an administrator leaves the review in review with one reopen, so a passed line shows that the
+reopening removed the approval. This scenario is tested by
+`ReviewWorkflowCheck_RunAsync_RealRun_ReportsAdministratorReopen`.
+
+**ValidationChecks_GitAvailable_GitNotOnPath_FailsWithGitUnavailableMessage**: After the shared real runs have
+finished, the search path of the process names only an empty folder, so that git cannot be started, and the git check is
+run. It fails with the message that the server cannot run git and that git is to be installed; the message names no
+folder. The search path is restored afterwards. This scenario is tested by
+`ValidationChecks_GitAvailable_GitNotOnPath_FailsWithGitUnavailableMessage`.
 
 **ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped**: No connection string is
 configured and no database exists at the default location; the check reports that it is skipped
@@ -216,6 +237,13 @@ check passes and reports the subject and the thumbprint of the key and the expir
 folder of the file nor the password, and the files of the installation are unchanged. This scenario is tested by the
 test of the same name.
 
+**ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses**: The File provider is
+configured with a protected PFX whose validity ended yesterday and its password in `Attestation__CertificatePassword`.
+The check passes, because an expired certificate fails it only when a trusted key is required, and reports the key as
+expired with a warning that the certificate expired on a date, not that it expires; the output holds neither the folder
+of the file nor the password, and the files of the installation are unchanged. This scenario is tested by
+`ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses`.
+
 **ValidationChecks_ConfiguredKeys_FileProviderWithoutPassword_FailsNamingTheFileAndSettings**: The PFX is protected and
 no password is set. The check fails with "The certificate file 'attest.pfx' needs a password", naming
 `Attestation:CertificatePassword` and `Attestation:CertificatePasswordFile` and not the folder. This scenario is tested
@@ -298,7 +326,6 @@ scenario is tested by `ValidationChecks_FastCommit_Interceptor_LeavesInMemoryDat
 empty or white-space folder throws. This scenario is tested by
 `ValidationChecks_FastCommit_Interceptor_RequiresAllowedFolder`.
 
-**GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync** and
-**GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable**: With a counting stand-in for git, the version check
-returns the version text and the next command does not check again (two git invocations in total); an old git is
-refused. These scenarios are tested by the tests of the same names, which are in `GitRunnerTests.cs`.
+**GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync**: With a counting stand-in for git,
+the version check returns the version text and the next command does not check again (two git invocations in total).
+This scenario is tested by the test of the same name, which is in `GitRunnerTests.cs`.

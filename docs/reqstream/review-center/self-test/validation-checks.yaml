@@ -20,6 +20,16 @@ sections:
         tests:
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
 
+      - id: ReviewCenter-ValidationChecks-GitAvailable-NotInstalled
+        title: >-
+          The GitAvailable check shall fail with the message that the server cannot run git when git cannot be
+          started.
+        justification: |
+          A machine without git cannot read any content source, so the qualification run has to fail and tell the
+          administrator what to install, not report a pass.
+        tests:
+          - ValidationChecks_GitAvailable_GitNotOnPath_FailsWithGitUnavailableMessage
+
       - id: ReviewCenter-ValidationChecks-GitRoundTrip
         title: >-
           The GitRoundTrip check shall pass when the history, the changes between two commits and a file at a revision
@@ -70,6 +80,7 @@ sections:
           The lock keeps the approved content as it was signed, so the qualification run shows that it holds.
         tests:
           - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+          - ReviewWorkflowCheck_RunAsync_RealRun_ReportsApprovedReviewLocked
 
       - id: ReviewCenter-ValidationChecks-ReviewWorkflow-AdministratorReopen
         title: >-
@@ -80,6 +91,7 @@ sections:
           removes the approval.
         tests:
           - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+          - ReviewWorkflowCheck_RunAsync_RealRun_ReportsAdministratorReopen
 
       - id: ReviewCenter-ValidationChecks-ReviewWorkflow-EvidenceIndex
         title: >-
@@ -123,7 +135,7 @@ sections:
       - id: ReviewCenter-ValidationChecks-Totp
         title: >-
           The Totp check shall compute the codes of the published test vectors of RFC 6238 with the production
-          algorithm and fail when a code does not match its vector.
+          algorithm and compare each with its published code.
         justification: |
           The second factor of a person depends on the computation of the code to be the same as that of every
           authenticator app. The published vectors are the proof that the library and its use work on this platform.
@@ -132,9 +144,17 @@ sections:
 
       - id: ReviewCenter-ValidationChecks-Totp-CodeAcceptance
         title: >-
-          The Totp check shall show that the production algorithm accepts the right code and refuses a wrong code.
+          The Totp check shall show that the production algorithm accepts the right code.
         justification: |
-          An algorithm that accepted a wrong code, or refused the right one, would lock people out or let others in.
+          An algorithm that refused the right code would lock people out.
+        tests:
+          - ValidationChecks_Totp_Run_PassesWithRfcVectors
+
+      - id: ReviewCenter-ValidationChecks-Totp-WrongCodeRefused
+        title: >-
+          The Totp check shall show that the production algorithm refuses a wrong code and a malformed code.
+        justification: |
+          An algorithm that accepted a wrong code would let others in.
         tests:
           - ValidationChecks_Totp_Run_PassesWithRfcVectors
 
@@ -515,12 +535,21 @@ sections:
 
       - id: ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning
         title: >-
-          The ConfiguredKeys check shall add a warning to its report when the attestation certificate ends soon or
-          has ended.
+          The ConfiguredKeys check shall add a warning to its report when the attestation certificate ends soon.
         justification: |
-          A certificate that has ended cannot sign a valid attestation, so the operator should hear about it in time.
+          A certificate that ends soon will stop signing valid attestations, so the operator should hear about it in
+          time.
         tests:
           - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning-Ended
+        title: >-
+          The ConfiguredKeys check shall add a warning to its report when the attestation certificate has ended.
+        justification: |
+          A certificate that has ended cannot sign a valid attestation, so the operator should hear about it, and the
+          report names it as ended and not as ending soon.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses
 
       - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPassword
         title: >-

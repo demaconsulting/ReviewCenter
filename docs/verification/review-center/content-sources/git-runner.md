@@ -90,6 +90,10 @@ scenario is tested by `GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable`.
 **GitRunner_RunAsync_OldGit_ThrowsGitUnavailable**: A git that reports a version older than the minimum is refused as
 unavailable. This scenario is tested by `GitRunner_RunAsync_OldGit_ThrowsGitUnavailable`.
 
+**GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable**: With a stand-in for git that reports a version older than
+the minimum, the version check itself fails with the rule that names git as unavailable. This scenario is tested by
+`GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable`.
+
 **GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable**: When the cache path cannot be created (it lies below
 a regular file), a call fails with `GitUnavailable`; the message names `Git:CachePath` but not the path, and no inner
 exception is chained. This scenario is tested by `GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable`.

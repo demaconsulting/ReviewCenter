@@ -1701,6 +1701,7 @@ sections:
           - ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedAttestationProvider
           - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderReport
           - ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning-Ended
           - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPassword
           - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderMissingFile
           - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPath

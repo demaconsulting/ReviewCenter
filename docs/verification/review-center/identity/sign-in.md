@@ -184,7 +184,8 @@ user without the password, which is tested by `SignIn_Login_WrongPassword_Record
 Repeated failures record the lockout once, which is tested by `SignIn_Login_RepeatedFailures_RecordsLockoutOnce`;
 an attempt on a locked account records `auth.sign-in-locked` once per minute, which is tested by
 `SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry`; refused attempts record `auth.sign-in-throttled` once per
-minute, which is tested by `SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow`; and a complete flow forms an
+minute, which is tested by `SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow`; the typed name in that entry is
+cleaned to one line, which is tested by `SignIn_Login_Throttled_RecordsCleanedTypedName`; and a complete flow forms an
 intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`. A failing audit trail does not
 stop a sign-in, which is tested by `SignIn_Login_FailingAuditTrail_StillSignsTheUserIn`, and the typed name of an
 unknown user that is longer than a user name is cut before it is recorded, which is tested by

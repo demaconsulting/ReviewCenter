@@ -196,6 +196,62 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the review workflow check, which throws when the ReviewLocked rule is not hit, reports in the real
+    ///     run that the author's signature is refused and that the approved review is locked.
+    /// </summary>
+    [Fact]
+    public void ReviewWorkflowCheck_RunAsync_RealRun_ReportsApprovedReviewLocked()
+    {
+        // Arrange: the shared real run, in which the check passed only because the locked review refused a change
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the passed check names the refused signature and the locked approved review
+        Assert.Contains("author signature refused; approved review locked", log);
+    }
+
+    /// <summary>
+    ///     Test that the review workflow check, which throws when the administrator's reopen does not return the review
+    ///     to not approved, reports in the real run that an administrator reopened it and read the evidence index.
+    /// </summary>
+    [Fact]
+    public void ReviewWorkflowCheck_RunAsync_RealRun_ReportsAdministratorReopen()
+    {
+        // Arrange: the shared real run, in which the check passed only because the reopen unlocked the review
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the passed check names the reopening by an administrator and the evidence index that follows
+        Assert.Contains("locked and reopened by an administrator; evidence index", log);
+    }
+
+    /// <summary>
+    ///     Test that the git check fails with the message that the server cannot run git when git cannot be started,
+    ///     without naming a folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_GitAvailable_GitNotOnPath_FailsWithGitUnavailableMessage()
+    {
+        // Arrange: wait for the shared real runs, which start git in the background, then let the search path name
+        // only an empty folder, so that git cannot be started
+        _ = RealValidationRun.Result;
+        _ = RealValidationRun.Process;
+        using var emptyFolder = new TemporaryDirectory();
+        using var configuration = new ConfiguredKeysEnvironment(new KeyValuePair<string, string?>("PATH", emptyFolder.DirectoryPath));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => GitAvailableCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the message says that the server cannot run git and what to install, and names no folder
+        Assert.Contains("The server cannot run git", exception.Message);
+        Assert.Contains("install git", exception.Message);
+        Assert.DoesNotContain(emptyFolder.DirectoryPath, exception.Message);
+    }
+
+    /// <summary>
     ///     Test that the real validation passes in a hostile environment and uses nothing of it: the program copy has
     ///     a broken <c>appsettings.json</c> (and so does the working directory), and the environment names all-interface
     ///     listen addresses, the Development environment and a database, key ring, git cache and attestation key
@@ -758,6 +814,38 @@ public partial class ValidationChecksTests
         Assert.Contains(", thumbprint ", detail);
         Assert.Contains("warning: The signing certificate ", detail);
         Assert.Contains(" expires on ", detail);
+        Assert.DoesNotContain(certificates.DirectoryPath, detail);
+        Assert.DoesNotContain(KeysInstall.Password, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check warns that the certificate of the File provider has ended, still passes, names no
+    ///     folder and never the password, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses()
+    {
+        // Arrange: a protected PFX whose validity ended yesterday, with its password in the environment form
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WriteExpiredPfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx),
+            new("Attestation__CertificatePassword", KeysInstall.Password));
+        var before = install.Snapshot();
+
+        // Act: the check passes, because an expired certificate only fails it when a trusted key is required
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the key is marked expired, the warning says it ended, it does not say it ends soon, and nothing leaks
+        Assert.Contains("attestation key File: subject 'CN=attest'", detail);
+        Assert.Contains("(expired)", detail);
+        Assert.Contains("warning: The signing certificate ", detail);
+        Assert.Contains(" expired on ", detail);
+        Assert.DoesNotContain(" expires on ", detail);
         Assert.DoesNotContain(certificates.DirectoryPath, detail);
         Assert.DoesNotContain(KeysInstall.Password, detail);
         Assert.Equal(before, install.Snapshot());
