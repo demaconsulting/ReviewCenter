@@ -13,27 +13,47 @@ sections:
       - id: ReviewCenter-RecordDigest-Format
         title: >-
           The RecordDigest class shall calculate the digest of a review record as the SHA-256 hash, written as 64
-          lowercase hexadecimal characters, of a canonical text that is built in one documented way and starts with
-          the version header ReviewCenter record v2, so that the same record always gives the same digest.
+          lowercase hexadecimal characters, of its canonical text, so that the same record always gives the same
+          digest.
         justification: |
-          A signature is only evidence if the same record can be recognized later. Fixing the text that is hashed,
-          and checking it against a known answer, means a change of the format cannot go unnoticed and make every
-          earlier signature look out of date.
+          A signature is only evidence if the same record can be recognized later. A hash of one fixed text, checked
+          against a known answer, gives the same value every time.
         tests:
-          - RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat
           - RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText
           - RecordDigest_Compute_KnownRecord_MatchesKnownValue
-          - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
-          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
-          - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Format-Header
+        title: >-
+          The RecordDigest class shall start the canonical text with the version header ReviewCenter record v2.
+        justification: |
+          A fixed header names the layout version of what is hashed, so that a later layout cannot be mistaken for
+          this one.
+        tests:
           - RecordDigest_Canonicalize_Header_IsV2
-          - RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue
-          - RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-Format-Layout
+        title: >-
+          The RecordDigest class shall build the canonical text in one documented layout, line by line.
+        justification: |
+          Checking the text against the documented layout means a change of the format cannot go unnoticed and make
+          every earlier signature look out of date.
+        tests:
+          - RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
 
       - id: ReviewCenter-RecordDigest-NullRecord
         title: >-
-          The RecordDigest class shall reject a missing record with an ArgumentNullException, both when it builds
-          the canonical text and when it calculates the digest.
+          The RecordDigest class shall reject a missing record with an ArgumentNullException when it builds the
+          canonical text.
+        justification: |
+          A missing record has no canonical text. Failing loudly stops a caller from hashing nothing.
+        tests:
+          - RecordDigest_Compute_NullRecord_Throws
+
+      - id: ReviewCenter-RecordDigest-NullRecord-Compute
+        title: >-
+          The RecordDigest class shall reject a missing record with an ArgumentNullException when it calculates the
+          digest.
         justification: |
           A missing record has no digest. Failing loudly stops a signature from binding to a digest of nothing.
         tests:
@@ -41,136 +61,388 @@ sections:
 
       - id: ReviewCenter-RecordDigest-Coverage
         title: >-
-          The RecordDigest class shall give a different digest when the content fingerprint, the agreed outcome
-          (Pass, Fail, or NotApplicable) of a check, a check that is answered, a section that the submitted ballots
-          mark as not applicable, a thread that has an included comment or its file, side, start line, end line (a
-          whole-file thread being different from one with lines), or an included comment's kind, author display name,
-          author user name, text, time, or order, or a new included comment, changes, and shall give the same digest
-          when only chat, the state of a thread, or the creation time or identity of a thread changes. It shall also
-          give a different digest when the review conclusion text (the free text, not the approved or rejected
-          conclusion) is set, changed or cleared, by writing it as the line conclusion-text with its length and text
-          between the outcome line and the report, and no line when there is none, so that a record without a text
-          keeps its digest.
+          The RecordDigest class shall give a different digest when the content fingerprint of the record changes.
         justification: |
-          A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
-          signature could stay current after the content, the agreed answers, or the report it approved had changed.
-          Chat and whether a thread is open are not part of what is signed, so they must not invalidate a signature;
-          an open thread blocks signing by a rule of its own. The review conclusion text is what the reviewers
-          concluded in words, so it is signed like the report.
+          A signature approves what the reviewer saw. If the content fingerprint did not change the digest, a
+          signature could stay current for other content.
         tests:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
-          - RecordDigest_Compute_CommentOrder_ChangesDigest
-          - RecordDigest_Compute_ThreadSideChange_ChangesDigest
-          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Coverage-CheckAnswer
+        title: >-
+          The RecordDigest class shall give a different digest when the agreed outcome (Pass, Fail, or
+          NotApplicable) of a check changes, or when a check becomes answered or unanswered.
+        justification: |
+          The agreed answers are what the reviewers vouch for. A signature must not stay current after an answer that
+          it approved has changed.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-SectionNa
+        title: >-
+          The RecordDigest class shall give a different digest when a section that the submitted ballots mark as not
+          applicable is added or removed.
+        justification: |
+          Whether a section applies decides which checks count, so a signature must not stay current when that
+          changes.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-ThreadAdded
+        title: >-
+          The RecordDigest class shall give a different digest when a thread that has an included comment is added.
+        justification: |
+          The report is part of what is signed, so a new thread in the report must make earlier signatures out of
+          date.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-ThreadAnchor
+        title: >-
+          The RecordDigest class shall give a different digest when the file, the start line, or the end line of a
+          thread that has an included comment changes, a whole-file thread being different from one with lines.
+        justification: |
+          A comment says something about a place. A changed place is a changed record, so a signature must not stay
+          current for it.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-CommentFields
+        title: >-
+          The RecordDigest class shall give a different digest when the author display name, the author user name,
+          the text, or the time of an included comment changes.
+        justification: |
+          These fields are what the report says, so a signature must not stay current when one of them changes.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-Promotion
+        title: >-
+          The RecordDigest class shall give a different digest when an included Question is promoted to a Finding,
+          and the original digest again when it is demoted back.
+        justification: |
+          A Finding and a Question mean different things in a report, so a signature must not stay current when one
+          is turned into the other. Demoting must restore the earlier record exactly, which shows that nothing else
+          is changed by the promotion.
+        tests:
+          - RecordDigest_Compute_PromoteDemote_ChangesDigestAndRoundTrips
+
+      - id: ReviewCenter-RecordDigest-Coverage-NewComment
+        title: >-
+          The RecordDigest class shall give a different digest when a new included comment is added to a thread.
+        justification: |
+          A new comment in the report changes what was approved, so earlier signatures must become out of date.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-Chat
+        title: >-
+          The RecordDigest class shall give the same digest when only chat changes.
+        justification: |
+          Chat is not part of what is signed, so it must not make a signature out of date.
+        tests:
           - RecordDigest_Compute_ChatAddedToFinding_DigestUnchanged
+
+      - id: ReviewCenter-RecordDigest-Coverage-ThreadState
+        title: >-
+          The RecordDigest class shall give the same digest when only the state of a thread changes.
+        justification: |
+          Whether a thread is open is not part of what is signed; an open thread blocks signing by a rule of its own.
+        tests:
           - RecordDigest_Compute_ThreadState_NotCovered
+
+      - id: ReviewCenter-RecordDigest-Coverage-ThreadIdentity
+        title: >-
+          The RecordDigest class shall give the same digest when only the creation time or the identity of a thread
+          changes.
+        justification: |
+          Storage details do not change what was said, so they must not make a signature out of date.
+        tests:
           - RecordDigest_Compute_ThreadCreatedAndIds_NotCovered
+
+      - id: ReviewCenter-RecordDigest-Coverage-ConclusionText
+        title: >-
+          The RecordDigest class shall give a different digest when the review conclusion text (the free text, not
+          the approved or rejected conclusion) is set, changed, or cleared.
+        justification: |
+          The conclusion text is what the reviewers concluded in words, so it is signed like the report.
+        tests:
+          - RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-ConclusionLine
+        title: >-
+          The RecordDigest class shall write the review conclusion text as the line conclusion-text with its length
+          and text between the outcome line and the report.
+        justification: |
+          A fixed place and a length prefix keep the text unambiguous, also when it has several lines.
+        tests:
+          - RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue
+          - RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-Coverage-ConclusionNone
+        title: >-
+          The RecordDigest class shall write no conclusion-text line when there is no review conclusion text, so that
+          a record without a text keeps its digest.
+        justification: |
+          Leaving the line out keeps every existing signature valid.
+        tests:
           - RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Checklist
         title: >-
-          The RecordDigest class shall cover the checklist the review was created with in the canonical text: its
-          version and, sorted by identifier, the identifier and title of every section and the identifier and
-          question wording of every check (none for a review without a checklist), and shall give a different
-          digest when any of them changes, and the same digest whatever order the definition lists them in (assuming
-          the identifiers of its sections and checks are unique).
+          The RecordDigest class shall cover the checklist of the review in the canonical text: its version and,
+          sorted by identifier, the identifier and title of every section and the identifier and question wording of
+          every check.
         justification: |
-          A signed answer only has meaning together with the question it answers. If the wording were not covered,
-          a signature would not show which question the reviewer vouched for.
+          A signed answer only has meaning together with the question it answers. If the wording were not covered, a
+          signature would not show which question the reviewer vouched for.
         tests:
           - RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Checklist-Change
+        title: >-
+          The RecordDigest class shall give a different digest when the version of the checklist, the title of a
+          section, or the wording of a check changes, or when a check or the whole checklist is removed.
+        justification: |
+          A changed question is a different question, so a signature must not stay current for it.
+        tests:
           - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Checklist-Order
+        title: >-
+          The RecordDigest class shall give the same digest whatever order the checklist definition lists its
+          sections and checks in, assuming that the identifiers of its sections and checks are unique.
+        justification: |
+          The digest describes the checklist, not how it was written down, so listing it in another order must not
+          make a signature out of date.
+        tests:
           - RecordDigest_Compute_ChecklistDefinitionOrder_SameDigest
+
+      - id: ReviewCenter-RecordDigest-Checklist-None
+        title: >-
+          The RecordDigest class shall write a single checklist line with a dash for a review without a checklist.
+        justification: |
+          A review without a checklist has nothing to cover, and one fixed line keeps its canonical text defined.
+        tests:
+          - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
 
       - id: ReviewCenter-RecordDigest-ChecklistInvalid
         title: >-
           The RecordDigest class shall refuse a stored checklist definition that is invalid or incomplete with a
-          JSON error instead of hiding it, and shall still accept a minimal complete definition.
+          JSON error instead of hiding it.
         justification: |
-          Corrupted stored text must stop the digest instead of being read as a different definition, while a
-          valid definition must not be refused for being small.
+          Corrupted stored text must stop the digest instead of being read as a different definition.
         tests:
           - RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws
+
+      - id: ReviewCenter-RecordDigest-ChecklistInvalid-Minimal
+        title: >-
+          The RecordDigest class shall accept a minimal complete checklist definition.
+        justification: |
+          A valid definition must not be refused for being small.
+        tests:
           - RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes
 
       - id: ReviewCenter-RecordDigest-AnsweredBy
         title: >-
-          The RecordDigest class shall not cover who answered a check (display name or user name), the justification
-          of an answer, or the time of an answer, so that the digest is the same whoever answered the same outcome,
-          with whatever words, and whenever.
+          The RecordDigest class shall not cover who answered a check (display name or user name), so that the digest
+          is the same whoever answered the same outcome.
         justification: |
-          A signature binds to what the reviewers agree on, not to how they worded it or which of them said it. The
-          agreed outcome of a check is the claim of the record; leaving the rest out means that a reviewer who words an
-          answer again, or a second reviewer who agrees, does not make the signatures of the others out of date.
+          A signature binds to what the reviewers agree on, not to which of them said it. The agreed outcome of a
+          check is the claim of the record, so a second reviewer who agrees does not make the signatures of the others
+          out of date.
+        tests:
+          - RecordDigest_Compute_AnswererJustificationAndTime_NotCovered
+          - RecordDigest_Compute_JustificationAndAnswerer_NotCovered
+
+      - id: ReviewCenter-RecordDigest-AnsweredBy-Justification
+        title: >-
+          The RecordDigest class shall not cover the justification of an answer.
+        justification: |
+          Rewording a note must not make signatures out of date, because only the agreed outcome is the claim.
+        tests:
+          - RecordDigest_Compute_AnswererJustificationAndTime_NotCovered
+          - RecordDigest_Compute_JustificationAndAnswerer_NotCovered
+
+      - id: ReviewCenter-RecordDigest-AnsweredBy-Time
+        title: >-
+          The RecordDigest class shall not cover the time of an answer.
+        justification: |
+          When a reviewer answered is not what the reviewers agree on, so it must not make a signature out of date.
         tests:
           - RecordDigest_Compute_AnswererJustificationAndTime_NotCovered
 
       - id: ReviewCenter-RecordDigest-SectionSetter
         title: >-
-          The RecordDigest class shall not cover who marked a section as not applicable, the reason given, or when, so
-          that the digest is the same whatever person, reason, or time is stored with the section and depends only on
-          whether the submitted ballots agree that the section does not apply.
+          The RecordDigest class shall not cover who marked a section as not applicable, so that the digest depends
+          only on whether the submitted ballots agree that the section does not apply.
         justification: |
-          Whether the section applies is what the record says; the words of the reason and who recorded the exception
-          are not a claim a signature vouches for, in the same way as the justification of an answer.
+          Whether the section applies is what the record says; who recorded the exception is not a claim a signature
+          vouches for.
+        tests:
+          - RecordDigest_Compute_SectionSetterAndTime_NotCovered
+
+      - id: ReviewCenter-RecordDigest-SectionSetter-Reason
+        title: >-
+          The RecordDigest class shall not cover the reason given for marking a section as not applicable.
+        justification: |
+          The words of a reason are not a claim a signature vouches for, in the same way as the justification of an
+          answer.
+        tests:
+          - RecordDigest_Compute_SectionSetterAndTime_NotCovered
+
+      - id: ReviewCenter-RecordDigest-SectionSetter-Time
+        title: >-
+          The RecordDigest class shall not cover when a section was marked as not applicable.
+        justification: |
+          The time of the exception is not what the reviewers agree on, so it must not make a signature out of date.
         tests:
           - RecordDigest_Compute_SectionSetterAndTime_NotCovered
 
       - id: ReviewCenter-RecordDigest-Independence
         title: >-
           The RecordDigest class shall give the same digest for the same record whatever the order in which its
-          threads, ballots, answers, and sections are given and whatever identities the storage has given them (the
-          slots of the ballots included), and shall not change when a section that applies is recorded as applying.
+          threads, ballots, answers, and sections are given, assuming that the keys of each list are unique.
         justification: |
-          The digest describes the review, not how it is stored. Without this, reading the record in another order,
-          or recording the default of a section, would wrongly invalidate signatures. The order holds for lists whose
-          keys are unique, which is assumed of the input: the store keeps them unique.
+          The digest describes the review, not how it is stored. Reading the record in another order must not
+          invalidate signatures. The order holds for lists whose keys are unique, which is assumed of the input: the
+          store keeps them unique.
         tests:
           - RecordDigest_Compute_ReorderedAndRenumbered_SameDigest
-          - RecordDigest_Compute_ApplicableSection_NotCovered
+
+      - id: ReviewCenter-RecordDigest-Independence-Identities
+        title: >-
+          The RecordDigest class shall give the same digest for the same record whatever identities the storage has
+          given to its threads, comments, and answers.
+        justification: |
+          Database numbers say nothing about the review, so renumbering must not make a signature out of date.
+        tests:
+          - RecordDigest_Compute_ReorderedAndRenumbered_SameDigest
+
+      - id: ReviewCenter-RecordDigest-Independence-Slots
+        title: >-
+          The RecordDigest class shall give the same digest for the same agreed ballots whatever the order and the
+          identities of their slots.
+        justification: |
+          A slot that is replaced or renumbered must not make signatures out of date.
+        tests:
           - RecordDigest_Compute_SlotOrderAndIds_NotCovered
+
+      - id: ReviewCenter-RecordDigest-Independence-ApplicableSection
+        title: >-
+          The RecordDigest class shall give the same digest when a section that applies is recorded as applying.
+        justification: |
+          Recording the default of a section must not invalidate signatures.
+        tests:
+          - RecordDigest_Compute_ApplicableSection_NotCovered
 
       - id: ReviewCenter-RecordDigest-Unambiguous
         title: >-
-          The RecordDigest class shall give different digests for two records that differ only in where text
-          ends and the next value begins, so that no text of a comment, a name, a path, a checklist title, or any
-          other string can imitate the structure of the digest, and an absent value shall differ from every text.
+          The RecordDigest class shall give different digests for two records that differ only in where text ends and
+          the next value begins, so that no text of a comment, a name, a path, a checklist title, or any other string
+          can imitate the structure of the digest.
         justification: |
           Comment text is typed by users. If a text could contain what looks like the next field, two different
           records could share a digest, and a signature could be reused for a record it never covered.
         tests:
           - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide
+          - RecordDigest_Compute_DelimitersInReportText_DoNotCollide
+
+      - id: ReviewCenter-RecordDigest-Unambiguous-EmptyValues
+        title: >-
+          The RecordDigest class shall give different digests for records whose empty or space-bordered values would
+          run together without their length.
+        justification: |
+          Empty and padded values are the easiest way to build a collision, so they must not give the same digest.
+        tests:
           - RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide
+
+      - id: ReviewCenter-RecordDigest-Unambiguous-Absent
+        title: >-
+          The RecordDigest class shall give a different digest for an absent value than for any text, the text dash
+          included.
+        justification: |
+          An absent value and the text that stands for it must not look the same, or two different records could share
+          a digest.
+        tests:
+          - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide
 
       - id: ReviewCenter-RecordDigest-ThreadSide
         title: >-
           The RecordDigest class shall write the side of every thread of the report (Head or Baseline) into the
-          canonical text between the file path and the line range, and shall give a different digest
-          for two records that differ only in the side of a thread.
+          canonical text between the file path and the line range.
         justification: |
-          A comment on a baseline line is about different text than a comment on a head line of the same number.
-          A signature approves the report as it was, so the side must be part of what the signature binds to.
+          A comment on a baseline line is about different text than a comment on a head line of the same number, so the
+          side must be part of the text that is hashed.
         tests:
           - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
-          - RecordDigest_Compute_ThreadSideChange_ChangesDigest
           - RecordDigest_Compute_BaselineFinding_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-ThreadSide-Change
+        title: >-
+          The RecordDigest class shall give a different digest for two records that differ only in the side of a
+          thread.
+        justification: |
+          A signature approves the report as it was, so the side must be part of what the signature binds to.
+        tests:
+          - RecordDigest_Compute_ThreadSideChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Source
         title: >-
-          The RecordDigest class shall cover the source of a review in the canonical text: the word upload for an
-          uploaded review, and for a review from a repository the repository
-          identity, the baseline and head commit identifiers, the selection text, the identifier of the review-set
-          the review was planned from (distinguishing none from the empty text), and every change with its path,
-          change kind, baseline hash, and head hash, and shall give a different digest when any of them changes.
+          The RecordDigest class shall write the word upload as the source of an uploaded review.
         justification: |
-          A signature approves a review of specific commits and files. If the source were not covered, the same
-          signature could stay current for another selection, another commit, or a changed file. The review-set is
-          part of what the review claims to cover, so a signature must not stay current if it is changed.
+          The source of the files is part of what is reviewed, so it must be part of the text that is hashed.
+        tests:
+          - RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat
+          - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Source-Repository
+        title: >-
+          The RecordDigest class shall write the repository identity, the baseline commit identifier, the head commit
+          identifier, and the selection text of a review from a repository.
+        justification: |
+          A signature approves specific commits and a specific selection, so they must be part of the text that is
+          hashed.
         tests:
           - RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat
-          - RecordDigest_Compute_SourceChange_ChangesDigest
-          - RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Source-Changes
+        title: >-
+          The RecordDigest class shall write every change of a review from a repository with its path, change kind,
+          baseline hash, and head hash.
+        justification: |
+          A changed file must not leave a signature current, so every change must be part of the text that is hashed.
+        tests:
+          - RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat
+
+      - id: ReviewCenter-RecordDigest-Source-ReviewSet
+        title: >-
+          The RecordDigest class shall write the identifier of the review set that the review was planned from.
+        justification: |
+          The review set is part of what the review claims to cover, so a signature must not stay current if it is
+          changed.
+        tests:
+          - RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty
+
+      - id: ReviewCenter-RecordDigest-Source-ReviewSetEmpty
+        title: >-
+          The RecordDigest class shall write a review set identifier that is none differently from one that is the
+          empty text.
+        justification: |
+          None and empty are different claims, so they must not give the same digest.
+        tests:
+          - RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty
+
+      - id: ReviewCenter-RecordDigest-Source-Change
+        title: >-
+          The RecordDigest class shall give a different digest when any covered part of the source of a review
+          changes.
+        justification: |
+          A signature approves a review of specific commits and files. Otherwise it could stay current for another
+          selection, another commit, or a changed file.
+        tests:
+          - RecordDigest_Compute_SourceChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-SourceOrder
         title: >-
@@ -185,169 +457,500 @@ sections:
 
       - id: ReviewCenter-RecordDigest-ReopenCount
         title: >-
-          The RecordDigest class shall cover the number of times a review was reopened in the canonical text, as a
-          line that is written only when the number is greater than zero, shall give a different digest when the
-          number changes, and shall give for a review that was never reopened the same digest as before the reopening
-          existed, without a new format version.
+          The RecordDigest class shall write the number of times a review was reopened as a line that comes last in
+          the canonical text, only when the number is greater than zero.
         justification: |
           A reopened review must not accept its earlier signatures again, not even when the content is changed back to
-          what was signed. Counting the reopenings in the digest makes every earlier signature out of date for good,
-          while leaving the line out for a review that was never reopened keeps every existing signature and the
-          evidence index valid.
+          what was signed. Counting the reopenings in the text makes every earlier signature out of date for good.
+        tests:
+          - RecordDigest_Compute_ReopensChangeDigest
+          - RecordDigest_Compute_Reopens_MatchesKnownValueAfterReport
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-ReopenCount-Change
+        title: >-
+          The RecordDigest class shall give a different digest when the number of reopenings of a review changes.
+        justification: |
+          A reopened review must not accept its earlier signatures, so each reopening must change the digest.
+        tests:
+          - RecordDigest_Compute_ReopensChangeDigest
+
+      - id: ReviewCenter-RecordDigest-ReopenCount-Zero
+        title: >-
+          The RecordDigest class shall give a review that was never reopened the same digest as before the reopening
+          count existed, without a new format version.
+        justification: |
+          Leaving the line out for a review that was never reopened keeps every existing signature and the evidence
+          index valid.
         tests:
           - RecordDigest_Compute_ZeroReopens_EqualsDigestWithoutReopensLine
-          - RecordDigest_Compute_ReopensChangeDigest
-          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
-          - RecordDigest_Compute_Reopens_MatchesKnownValueAfterReport
 
       - id: ReviewCenter-RecordDigest-FollowUp
         title: >-
-          The RecordDigest class shall cover the review that a follow-up review follows, as a line that is written
-          only for a follow-up, and the review that a carried thread of the report came from, as a suffix that is
-          written only on a carried thread line (a carried thread that has no included comment is not written at
-          all), shall give a different digest when either changes, shall not cover the number that the carried thread
-          had in the earlier review nor the review that a carried answer or section came from, and shall give for a
-          review that is not a follow-up, and has no carried thread, the same digest as a review without them,
-          without a new format version.
+          The RecordDigest class shall write the review that a follow-up review follows as a line right after the
+          source, written only for a follow-up.
         justification: |
-          What a signature approves includes which review the follow-up follows and whether a Finding was raised in
-          this review or taken over from an earlier one, so a change of that is a change of the record. Leaving the
-          line and the suffix out when they do not apply keeps every existing signature and the evidence index valid.
-          The number of the thread in the earlier review is a database number that adds nothing a reader could check,
-          so it is not covered. A carried answer is only an answer that a reviewer has to agree with in a ballot, so
-          the digest sees its outcome and not where it came from.
+          What a signature approves includes which review the follow-up follows, so it must be part of the text that
+          is hashed, and only a follow-up has one.
+        tests:
+          - RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat
+
+      - id: ReviewCenter-RecordDigest-FollowUp-CarriedSuffix
+        title: >-
+          The RecordDigest class shall write the review that a carried thread came from as a suffix on the thread
+          line of a carried thread only.
+        justification: |
+          Whether a Finding was raised in this review or taken over from an earlier one is part of the record.
+        tests:
+          - RecordDigest_Compute_CarriedFinding_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-FollowUp-CarriedNoComment
+        title: >-
+          The RecordDigest class shall not write a carried thread that has no included comment.
+        justification: |
+          Only threads with included comments are part of the report, whether or not they were carried.
+        tests:
+          - RecordDigest_Compute_CarriedChatThread_WritesNothing
+
+      - id: ReviewCenter-RecordDigest-FollowUp-Change
+        title: >-
+          The RecordDigest class shall give a different digest when the review that a follow-up review follows
+          changes.
+        justification: |
+          A signature must not stay current for another followed review.
+        tests:
+          - RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-FollowUp-CarriedChange
+        title: >-
+          The RecordDigest class shall give a different digest for a carried thread than for the same thread when it
+          is not carried, and for another review that the thread came from.
+        justification: |
+          The origin of a Finding is part of the record, so a signature must not stay current when the origin
+          changes.
+        tests:
+          - RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-FollowUp-CarriedNumber
+        title: >-
+          The RecordDigest class shall not cover the number that a carried thread had in the earlier review.
+        justification: |
+          That number is a database number that adds nothing a reader could check, so it must not make a signature
+          out of date.
+        tests:
+          - RecordDigest_Compute_CarriedFromThreadId_NotCovered
+
+      - id: ReviewCenter-RecordDigest-FollowUp-None
+        title: >-
+          The RecordDigest class shall give a review that is not a follow-up and has no carried thread the same digest
+          as a review without them, without a new format version.
+        justification: |
+          Leaving the line and the suffix out when they do not apply keeps every existing signature and the evidence
+          index valid.
         tests:
           - RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest
-          - RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat
-          - RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest
-          - RecordDigest_Compute_CarriedFromThreadId_NotCovered
-          - RecordDigest_Compute_CarriedMarker_NotCovered
-          - ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange
-          - RecordDigest_Compute_CarriedFinding_MatchesKnownValue
 
       - id: ReviewCenter-RecordDigest-Report
         title: >-
           The RecordDigest class shall write the report of a review into the canonical text as the marker line
-          report followed by one block for every thread that has at least one included comment, shall write in a block
-          the file anchor of the thread and then, in the order they were posted, only the included comments as
-          claim (the starting comment of a Finding), comment (an included reply), or resolution (an included
-          resolution note) lines with the author display name, author user name, text, and time, shall sort the blocks
-          ordinally so that the order of the threads does not matter, shall not write chat or a thread without an
-          included comment, and shall keep the digest of a record without any included comment equal to that of the
-          empty report.
+          report.
         justification: |
-          The report is what the owner chooses to put into the signed record. A canonical layout that names the kind
-          of every line keeps a claim, a reply, and a resolution apart, and omitting everything else makes chat
-          free of consequences. The known values pin the layout so that a change of it cannot go unnoticed.
+          The report is what the owner chooses to put into the signed record, so it must have a place of its own in
+          the text that is hashed.
         tests:
           - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-Report-Block
+        title: >-
+          The RecordDigest class shall write after the report marker line one block for every thread that has at
+          least one included comment, starting with the file anchor of the thread.
+        justification: |
+          A block ties the comments of a thread to the place that they are about.
+        tests:
           - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
           - RecordDigest_Compute_OpenFinding_MatchesKnownValue
-          - RecordDigest_Compute_QuestionWithIncludedReply_MatchesKnownValue
-          - RecordDigest_Compute_BaselineFinding_MatchesKnownValue
-          - RecordDigest_Compute_CarriedFinding_MatchesKnownValue
           - RecordDigest_Compute_TwoIncludedThreads_SortedBlocksMatchKnownValue
-          - RecordDigest_Compute_ChatOnlyThreads_EqualsEmptyReport
-          - RecordDigest_Compute_PromoteDemote_ChangesDigestAndRoundTrips
+
+      - id: ReviewCenter-RecordDigest-Report-Claim
+        title: >-
+          The RecordDigest class shall write the starting comment of a Finding as a claim line, first in its block,
+          with the author display name, the author user name, the text, and the time.
+        justification: |
+          A claim and a reply are different things, so the starting comment of a Finding must be kept apart from the
+          replies to it.
+        tests:
+          - RecordDigest_Compute_OpenFinding_MatchesKnownValue
+          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-Report-Comment
+        title: >-
+          The RecordDigest class shall write an included reply as a comment line and shall not write an excluded
+          reply.
+        justification: |
+          The owner chooses which replies are part of the record, so an excluded reply must not be covered.
+        tests:
+          - RecordDigest_Compute_QuestionWithIncludedReply_MatchesKnownValue
           - RecordDigest_Compute_ReplyInclusionToggle_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Report-Resolution
+        title: >-
+          The RecordDigest class shall write an included resolution note as a resolution line and shall not write an
+          excluded one.
+        justification: |
+          A resolution note is covered only when the owner includes it in the report.
+        tests:
+          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
           - RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded
-          - RecordDigest_Compute_ThreadOrder_SameDigest
+
+      - id: ReviewCenter-RecordDigest-Report-Fields
+        title: >-
+          The RecordDigest class shall write on every comment line the author display name, the author user name, the
+          text, and the time.
+        justification: |
+          These fields say who said what and when, and they are written together on one line.
+        tests:
+          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
+          - RecordDigest_Compute_QuestionWithIncludedReply_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-Report-CommentOrder
+        title: >-
+          The RecordDigest class shall write the included comments of a thread in the order they were posted, so that
+          another order gives another digest.
+        justification: |
+          The order of a discussion is part of what was said.
+        tests:
           - RecordDigest_Compute_ReportCommentOrder_ChangesDigest
-          - RecordDigest_Compute_DelimitersInReportText_DoNotCollide
+          - RecordDigest_Compute_CommentOrder_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Report-Sorted
+        title: >-
+          The RecordDigest class shall sort the blocks of the report ordinally, so that the order of the threads does
+          not matter.
+        justification: |
+          The digest must not depend on the order in which the store reads the threads.
+        tests:
+          - RecordDigest_Compute_TwoIncludedThreads_SortedBlocksMatchKnownValue
+          - RecordDigest_Compute_ThreadOrder_SameDigest
+
+      - id: ReviewCenter-RecordDigest-Report-Chat
+        title: >-
+          The RecordDigest class shall write no chat and no thread without an included comment, so that a record
+          with only such threads has the same digest as the record with an empty report.
+        justification: |
+          Chat is free of consequences, so a record with only chat must keep the digest of the plain record.
+        tests:
+          - RecordDigest_Compute_ChatOnlyThreads_EqualsEmptyReport
 
       - id: ReviewCenter-RecordDigest-CheckThread
         title: >-
           The RecordDigest class shall write the block of a thread about a check, in place of the file anchor, as the
-          line thread check followed by the length-prefixed identifier of the check and nothing else (no side, no
-          lines and no carried marker), shall write the included comments of the thread and leave out chat in the
-          same way as for a thread on a file, shall sort the blocks of both kinds together ordinally, and shall
-          leave the canonical text, and so the digest, of a record whose threads are all about files unchanged.
+          line thread check followed by the length-prefixed identifier of the check, without a side or a line range.
         justification: |
-          A comment that the owner includes in the report belongs to the signed record wherever it was made, and the
-          check it is about is part of what it says. A check has no file, lines or side, so the anchor line names the
-          check alone. A signature on a record with file threads only must stay valid, so the layout of those blocks
-          cannot move.
+          A check has no file, lines or side, so the anchor line names the check alone.
         tests:
           - RecordDigest_Compute_IncludedCheckThreadComment_UsesCheckAnchorLine
+
+      - id: ReviewCenter-RecordDigest-CheckThread-Comments
+        title: >-
+          The RecordDigest class shall write the included comments of a thread about a check in the same way as for
+          a thread on a file.
+        justification: |
+          A comment that the owner includes in the report belongs to the signed record wherever it was made.
+        tests:
+          - RecordDigest_Compute_IncludedCheckThreadComment_UsesCheckAnchorLine
+
+      - id: ReviewCenter-RecordDigest-CheckThread-Chat
+        title: >-
+          The RecordDigest class shall leave out chat of a thread about a check.
+        justification: |
+          Chat is not signed anywhere, so chat on a check must not change the digest.
+        tests:
           - RecordDigest_Compute_ChatCheckThread_DoesNotChangeDigest
-          - RecordDigest_Compute_FileThreadsOnly_DigestUnchangedByCheckThreadSupport
+
+      - id: ReviewCenter-RecordDigest-CheckThread-Sorted
+        title: >-
+          The RecordDigest class shall sort the blocks of threads about checks and of threads about files together
+          ordinally.
+        justification: |
+          One ordering keeps the text independent of the order in which the store reads the threads.
+        tests:
           - RecordDigest_Compute_CheckAndFileBlocks_AreSortedOrdinally
+
+      - id: ReviewCenter-RecordDigest-CheckThread-FileUnchanged
+        title: >-
+          The RecordDigest class shall leave the canonical text, and so the digest, of a record whose threads are all
+          about files unchanged.
+        justification: |
+          A signature on a record with file threads only must stay valid, so the layout of those blocks cannot move.
+        tests:
+          - RecordDigest_Compute_FileThreadsOnly_DigestUnchangedByCheckThreadSupport
 
       - id: ReviewCenter-RecordDigest-ConsolidatedChecks
         title: >-
-          The RecordDigest class shall write the standing of the checks and sections from the consolidation of the
-          submitted ballots, as a checks marker line followed by one check line for every check of a section that
-          applies, sorted ordinally by check identifier, that says agreed with the outcome, disputed, or pending, and
-          as a sections marker line followed by one applicability line for every section that the submitted ballots
-          agree is not applicable (not-applicable) or dispute (disputed), sorted by section identifier, without a
-          check line for a check of such a section and without a line for an applicable section.
+          The RecordDigest class shall write a check line that says agreed with the outcome for every check of a
+          section that applies when the submitted ballots answer it with the same outcome.
         justification: |
-          What a signature attests is what the reviewers agree on. Writing the agreed, disputed, or pending state of
-          every check, and not the individual answers, binds a signature to that agreement and to nothing about how
-          it was reached. Sorting by identifier makes the text independent of the order of the checklist and of the
-          ballots.
+          What a signature attests is what the reviewers agree on, so an agreed check is written with its agreed
+          outcome and not with the individual answers.
         tests:
           - RecordDigest_Canonicalize_AgreedCheck_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-Disputed
+        title: >-
+          The RecordDigest class shall write a check line that says disputed for a check that the submitted ballots
+          answer with different outcomes.
+        justification: |
+          A dispute is part of the standing that a signature attests, so it must be part of the text that is hashed.
+        tests:
           - RecordDigest_Canonicalize_Disputed_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-Pending
+        title: >-
+          The RecordDigest class shall write a check line that says pending for a check that no submitted ballot
+          answers.
+        justification: |
+          An unanswered check is part of the standing that a signature attests, so it must be part of the text that
+          is hashed.
+        tests:
           - RecordDigest_Canonicalize_Pending_Line
-          - RecordDigest_Canonicalize_AgreedNaSection_Line
-          - RecordDigest_Canonicalize_DisputedSection_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-Sorted
+        title: >-
+          The RecordDigest class shall sort the check lines ordinally by check identifier.
+        justification: |
+          The text must not depend on the order of the checklist or of the ballots.
+        tests:
           - RecordDigest_Canonicalize_ChecksSortedOrdinal
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-NaSection
+        title: >-
+          The RecordDigest class shall write an applicability line that says not-applicable for a section that every
+          submitted ballot marks as not applicable.
+        justification: |
+          Agreement that a section does not apply is a verdict that a signature attests.
+        tests:
+          - RecordDigest_Canonicalize_AgreedNaSection_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-DisputedSection
+        title: >-
+          The RecordDigest class shall write an applicability line that says disputed for a section that only some of
+          the submitted ballots mark as not applicable.
+        justification: |
+          A disputed section is an open question that is part of the standing that a signature attests.
+        tests:
+          - RecordDigest_Canonicalize_DisputedSection_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-NaSectionChecks
+        title: >-
+          The RecordDigest class shall write no check line for a check of a section that the submitted ballots agree
+          does not apply.
+        justification: |
+          Such a check needs no answer, so it has no standing to write.
+        tests:
+          - RecordDigest_Canonicalize_AgreedNaSection_Line
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-DisputedSectionChecks
+        title: >-
+          The RecordDigest class shall write no check line for a check of a disputed section.
+        justification: |
+          The dispute is counted once, for the section, and not again for each of its checks.
+        tests:
+          - RecordDigest_Canonicalize_DisputedSection_ListsNoCheckOfTheSection
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-ApplicableSection
+        title: >-
+          The RecordDigest class shall write no applicability line for a section that applies, so that recording a
+          section as applying leaves the canonical text as it was.
+        justification: |
+          The default of a section is not part of the standing, so recording it must not change the text.
+        tests:
+          - RecordDigest_Compute_ApplicableSection_NotCovered
+
+      - id: ReviewCenter-RecordDigest-ConsolidatedChecks-SectionsSorted
+        title: >-
+          The RecordDigest class shall sort the applicability lines by section identifier.
+        justification: |
+          The text must not depend on the order in which the sections are given.
+        tests:
+          - RecordDigest_Canonicalize_SectionLines_SortedBySectionId
 
       - id: ReviewCenter-RecordDigest-DraftIgnored
         title: >-
-          The RecordDigest class shall let only submitted ballots change the digest, so that a draft ballot, or any
-          edit of a draft, never changes the digest, a second ballot that agrees with the first leaves it as it was,
-          and the first disagreement changes it.
+          The RecordDigest class shall let a draft ballot, and any edit of a draft, never change the digest.
         justification: |
-          A reviewer who is still working must not make the signatures of others out of date. The record changes for
-          the signers only when the agreed standing changes, which is when a ballot is submitted that disagrees with
-          the ballots already handed in.
+          A reviewer who is still working must not make the signatures of others out of date.
         tests:
           - RecordDigest_Compute_DraftBallot_DoesNotChangeDigest
+
+      - id: ReviewCenter-RecordDigest-DraftIgnored-Agreeing
+        title: >-
+          The RecordDigest class shall leave the digest as it was when a second submitted ballot agrees with the
+          first.
+        justification: |
+          An agreeing ballot does not change the agreed standing, so it must not make signatures out of date.
+        tests:
           - RecordDigest_Compute_AgreeingSecondSubmit_SameDigest
+
+      - id: ReviewCenter-RecordDigest-DraftIgnored-Disagreement
+        title: >-
+          The RecordDigest class shall change the digest when a second submitted ballot disagrees with the first.
+        justification: |
+          A disagreement changes the agreed standing, so signatures on the earlier standing must become out of date.
+        tests:
           - RecordDigest_Compute_FirstDisagreement_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-NoBallotContent
         title: >-
-          The RecordDigest class shall not cover the justification of an answer, who answered it, the order or the
-          identities of the slots of the ballots, or the review that an answer was carried from, so that records with
-          the same agreed standing of the submitted ballots have the same digest.
+          The RecordDigest class shall not cover the review that an answer of a ballot was carried from.
         justification: |
-          The digest binds to what the reviewers agree on and not to the wording, the author, the slot, or the origin of
-          an answer. If any of them were covered, a reviewer who rewords a note or a slot that is replaced would make
-          every signature out of date without any change of what was agreed.
+          A carried answer is only an answer that a reviewer has to agree with in a ballot, so the digest sees its
+          outcome and not where it came from.
         tests:
-          - RecordDigest_Compute_JustificationAndAnswerer_NotCovered
-          - RecordDigest_Compute_SlotOrderAndIds_NotCovered
           - RecordDigest_Compute_CarriedMarker_NotCovered
+
+      - id: ReviewCenter-RecordDigest-NoBallotContent-CarriedSection
+        title: >-
+          The RecordDigest class shall not cover the review that a section state of a ballot was carried from.
+        justification: |
+          A carried section state is only a state that a reviewer has to agree with in a ballot, so the digest sees
+          whether the section applies and not where the state came from.
+        tests:
+          - RecordDigest_Compute_CarriedSectionMarker_NotCovered
 
       - id: ReviewCenter-RecordDigest-Outcome
         title: >-
-          The RecordDigest class shall write the outcome of the consolidation as the line outcome with none, approved,
-          or rejected, so that a signature binds to the outcome that the agreed standing leads to.
+          The RecordDigest class shall write the outcome line as none while the consolidation has no outcome.
         justification: |
-          A signature attests an outcome, so the outcome is part of the record. Writing it as a line of its own keeps
-          the text easy to read and makes the three possible values different texts.
+          A signature binds to the outcome that the agreed standing leads to, and a standing that is not decided yet
+          has none.
+        tests:
+          - RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected
+
+      - id: ReviewCenter-RecordDigest-Outcome-Approved
+        title: >-
+          The RecordDigest class shall write the outcome line as approved when the consolidation is approved.
+        justification: |
+          Approved must be a different text from the other outcomes, so a signature on it binds to approval.
+        tests:
+          - RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected
+
+      - id: ReviewCenter-RecordDigest-Outcome-Rejected
+        title: >-
+          The RecordDigest class shall write the outcome line as rejected when the consolidation is rejected.
+        justification: |
+          Rejected must be a different text from the other outcomes, so a signature on it binds to rejection.
         tests:
           - RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected
 
       - id: ReviewCenter-RecordDigest-BallotFingerprint
         title: >-
-          The RecordDigest class shall compute the ballot fingerprint of a record, separate from the record digest, as
-          the SHA-256 of a canonical text in lowercase hexadecimal that begins with a version line and lists the final
-          submitted ballots by the ordinal of the slot, with every answer, its outcome, and its justification, and
-          every section state, in a sorted order, so that the same ballots always give the same fingerprint, and a
-          change of an answer changes it while a change of a display name does not.
+          The RecordDigest class shall compute the ballot fingerprint of a record, separate from the record digest,
+          as the SHA-256 of the canonical ballots text written as lowercase hexadecimal characters.
         justification: |
-          The ballots appendix of an attestation shows what each slot handed in, including the justification that the
-          record digest leaves out. The fingerprint ties the appendix to the record and lets two copies be compared,
-          without changing the digest that the signatures cover. Slot ordinals replace identities so that the
-          fingerprint does not depend on who held a slot.
+          The fingerprint ties the ballots appendix of an attestation to the record and lets two copies be compared,
+          without changing the digest that the signatures cover.
+        tests:
+          - RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Header
+        title: >-
+          The RecordDigest class shall begin the canonical ballots text with a version line and write nothing more
+          when no ballot is submitted.
+        justification: |
+          The header names the layout, and a record without a submitted ballot has nothing to list.
         tests:
           - RecordDigest_CanonicalizeBallots_NoSubmittedBallot_GivesOnlyTheHeader
-          - RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex
-          - RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-SubmittedOnly
+        title: >-
+          The RecordDigest class shall list only submitted ballots in the canonical ballots text.
+        justification: |
+          A draft is not handed in, so it must not be part of the appendix.
+        tests:
+          - RecordDigest_CanonicalizeBallots_NoSubmittedBallot_GivesOnlyTheHeader
           - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Ordinal
+        title: >-
+          The RecordDigest class shall number the ballots by the ordinal of the slot in slot order instead of the
+          identity of the slot.
+        justification: |
+          The fingerprint must not depend on who held a slot.
+        tests:
+          - RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Answers
+        title: >-
+          The RecordDigest class shall write for every ballot every answer with its check identifier, its outcome, and
+          its justification.
+        justification: |
+          The appendix shows what each slot handed in, including the justification that the record digest leaves out.
+        tests:
           - RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted
+          - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-AnswerOrder
+        title: >-
+          The RecordDigest class shall sort the answer lines of a ballot by check identifier.
+        justification: |
+          The order of storage must not change the fingerprint.
+        tests:
+          - RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-LastRow
+        title: >-
+          The RecordDigest class shall write a check that was answered twice in one ballot once, with the last row.
+        justification: |
+          The last answer is the standing one, so an earlier one must not appear in the appendix.
+        tests:
+          - RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Sections
+        title: >-
+          The RecordDigest class shall write for every ballot every section state.
+        justification: |
+          A section that a slot marked as not applicable is part of what that slot handed in.
+        tests:
+          - RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-SectionOrder
+        title: >-
+          The RecordDigest class shall sort the section lines of a ballot by section identifier.
+        justification: |
+          The order of storage must not change the fingerprint.
+        tests:
+          - RecordDigest_CanonicalizeBallots_SectionStates_AreSortedBySectionId
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Change
+        title: >-
+          The RecordDigest class shall give a different fingerprint when an answer of a submitted ballot changes.
+        justification: |
+          A changed answer is a changed appendix, so the fingerprint must show it.
+        tests:
+          - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-DisplayName
+        title: >-
+          The RecordDigest class shall give the same fingerprint when only the display name of an answerer changes.
+        justification: |
+          Who held the slot is not what was handed in, so it must not change the fingerprint.
+        tests:
+          - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-Justification
+        title: >-
+          The RecordDigest class shall give a different fingerprint when only the justification of an answer changes.
+        justification: |
+          The fingerprint covers the justification that the record digest leaves out, so that the appendix and the
+          fingerprint cannot differ.
+        tests:
+          - RecordDigest_ComputeBallotFingerprint_ChangedJustification_ChangesFingerprint
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint-NullRecord
+        title: >-
+          The RecordDigest class shall reject a missing record with an ArgumentNullException, both when it builds the
+          canonical ballots text and when it computes the fingerprint.
+        justification: |
+          A missing record has no ballots, so failing loudly stops a fingerprint of nothing from being used.
+        tests:
           - RecordDigest_CanonicalizeBallots_NullRecord_Throws

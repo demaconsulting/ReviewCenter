@@ -213,6 +213,23 @@ public class RecordDigestBallotTests
     }
 
     /// <summary>
+    ///     Test that a disputed section has an applicability line and that its checks have no check line.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Canonicalize_DisputedSection_ListsNoCheckOfTheSection()
+    {
+        // Arrange: one ballot marks section b as not applicable and the other answers its check
+        var first = BallotOf(1, BallotStatus.Submitted, Full(1).Answers.Where(a => a.ItemId != "b-01").ToArray(), [NotApplicable(1, "b")]);
+
+        // Act
+        var text = RecordDigest.Canonicalize(Record(first, Full(2)));
+
+        // Assert
+        Assert.Contains("applicability 1:b disputed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("check 4:b-01", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test the three outcome lines: none without a decision, approved, and rejected.
     /// </summary>
     [Fact]
@@ -315,6 +332,33 @@ public class RecordDigestBallotTests
     }
 
     /// <summary>
+    ///     Test that the applicability lines are sorted by section id whatever the order of the checklist and of the
+    ///     section states.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Canonicalize_SectionLines_SortedBySectionId()
+    {
+        // Arrange: a checklist that lists section b before section a, and a ballot that marks both not applicable
+        var definition = new ChecklistDefinition(
+            "v",
+            [
+                new ChecklistSection("b", "Beta", string.Empty, [new ChecklistItem("b-01", "Third")]),
+                new ChecklistSection("a", "Alpha", string.Empty, [new ChecklistItem("a-01", "First")])
+            ]);
+        var checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "r", Version = "v", Definition = definition.ToJson() };
+        var ballot = BallotOf(1, BallotStatus.Submitted, [], [NotApplicable(1, "b"), NotApplicable(1, "a")]);
+        var record = new ReviewRecord("fp", checklist, [ballot], [], ReviewSource.Upload);
+
+        // Act
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert
+        Assert.Contains("applicability 1:a not-applicable", text, StringComparison.Ordinal);
+        Assert.Contains("applicability 1:b not-applicable", text, StringComparison.Ordinal);
+        Assert.True(text.IndexOf("applicability 1:a", StringComparison.Ordinal) < text.IndexOf("applicability 1:b", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that a carried marker on an answer is not covered, so a carried and a fresh answer give one digest.
     /// </summary>
     [Fact]
@@ -338,6 +382,36 @@ public class RecordDigestBallotTests
                 CarriedFromReviewId = "old"
             }).ToArray()
         };
+
+        // Act and assert
+        Assert.Equal(RecordDigest.Compute(Record(fresh)), RecordDigest.Compute(Record(carried)));
+    }
+
+    /// <summary>
+    ///     Test that a carried marker on a section state is not covered, so a carried and a fresh section state give one
+    ///     digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_CarriedSectionMarker_NotCovered()
+    {
+        // Arrange: the same submitted ballot with section b not applicable, once fresh and once marked as carried
+        var answers = Full(1).Answers.Where(a => a.ItemId != "b-01").ToArray();
+        var fresh = BallotOf(1, BallotStatus.Submitted, answers, [NotApplicable(1, "b")]);
+        var state = NotApplicable(1, "b");
+        var carriedState = new ChecklistSectionState
+        {
+            ProjectId = state.ProjectId,
+            ReviewId = state.ReviewId,
+            SlotId = state.SlotId,
+            SectionId = state.SectionId,
+            Applicable = state.Applicable,
+            Reason = state.Reason,
+            SetBy = state.SetBy,
+            SetByUsername = state.SetByUsername,
+            SetAt = state.SetAt,
+            CarriedFromReviewId = "old"
+        };
+        var carried = BallotOf(1, BallotStatus.Submitted, answers, [carriedState]);
 
         // Act and assert
         Assert.Equal(RecordDigest.Compute(Record(fresh)), RecordDigest.Compute(Record(carried)));

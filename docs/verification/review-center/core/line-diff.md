@@ -148,6 +148,10 @@ pinned unchanged row) are paired; the collapsed gaps stay out, the pinned row is
 two pairs the first and leaves an empty left cell for the second, and every shown row appears exactly once. This
 scenario is tested by `LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins`.
 
+**LineDiff_Pair_RandomPatterns_ShowEveryRowExactlyOnceInOrder**: For many seeded random patterns of unchanged, removed,
+and added rows, every row appears in exactly one side-by-side row and the rows keep their order on each side. This
+scenario is tested by `LineDiff_Pair_RandomPatterns_ShowEveryRowExactlyOnceInOrder`.
+
 **FileText_TryReadLines_Text_SplitsLikeSplitLines**: Texts with Unix and Windows line endings, no final line ending,
 blank lines, a lone carriage return, and an empty text give the same lines as `FileText.SplitLines`. This scenario is
 tested by `FileText_TryReadLines_Text_SplitsLikeSplitLines`.
