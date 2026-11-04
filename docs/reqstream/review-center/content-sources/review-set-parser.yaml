@@ -195,7 +195,8 @@ sections:
         title: >-
           The ReviewSetParser class shall accept a file whose size is exactly at the limit of 256 KiB.
         justification: |
-          The limit must not refuse a file that is allowed.
+          A review-set file that is exactly as large as the size limit allows must still be read, so the size limit
+          may not be off by one.
         tests:
           - ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead
 
@@ -203,7 +204,8 @@ sections:
         title: >-
           The ReviewSetParser class shall accept a file with exactly 500 review-sets.
         justification: |
-          The limit must not refuse a file that is allowed.
+          A repository that uses the full number of review-sets the limit allows must still be readable, so the
+          limit may not be off by one.
         tests:
           - ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead
           - ReviewMarkConfigParser_Parse_Limits_AreEnforced

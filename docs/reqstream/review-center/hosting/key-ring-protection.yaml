@@ -366,7 +366,8 @@ sections:
           The KeyRingProtection class shall, on Windows, restrict the key folder to access rules that admit only the
           account of the server and the system.
         justification: |
-          Only the account of the server may read keys that decrypt the stored tokens.
+          Windows has no owner-only mode, so access rules limited to the server account and the system are what
+          keep other accounts from reading keys that decrypt the stored tokens.
         tests:
           - windows@KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem
 
