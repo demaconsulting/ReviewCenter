@@ -448,15 +448,17 @@ public class ProjectServiceTests
     public async Task ProjectService_CreateAsync_Rejected_StoresNothing(string? name, string? description)
     {
         // Arrange: a service over an empty store
-        var service = CreateService(new FakeReviewStore());
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
 
         // Act: attempt an invalid create, then list
         await Assert.ThrowsAsync<DomainRuleException>(
             () => service.CreateAsync(name, description, TestContext.Current.CancellationToken));
         var projects = await service.ListAsync(TestContext.Current.CancellationToken);
 
-        // Assert: nothing was stored
+        // Assert: neither a project nor an audit entry was stored
         Assert.Empty(projects);
+        Assert.Empty(store.Audits);
     }
 
     /// <summary>

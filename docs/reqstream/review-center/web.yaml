@@ -477,6 +477,65 @@ sections:
         children:
           - ReviewCenter-UsersPage-AdminCheck-StopRendering
 
+      - id: ReviewCenter-Web-ProjectAccess-ContributeRecheck
+        title: >-
+          The Web subsystem shall let a page check again, at the start of an action, that the user may still work in
+          the project.
+        justification: |
+          A page that stays open does not load again, so a user whose right to work was removed would otherwise keep
+          working through it.
+        tests:
+          - ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback
+
+      - id: ReviewCenter-Web-ProjectAccess-ContributeReadOnly
+        title: >-
+          The Web subsystem shall refuse a user who can see the project but may only read it the right to work
+          without reporting the project as lost to the page.
+        justification: |
+          The page keeps what it loaded and can say that the access is read-only.
+        tests:
+          - ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback
+
+      - id: ReviewCenter-Web-ProjectAccess-ContributeLost
+        title: >-
+          The Web subsystem shall report the project as lost to a page once when the user can no longer see the
+          project.
+        justification: |
+          The user must learn nothing of a project after the membership ended.
+        tests:
+          - ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly
+
+      - id: ReviewCenter-Web-ProjectAccess-ContributeConsistent
+        title: >-
+          The Web subsystem shall give a page the answer of one lookup when the access of the user is removed while
+          the page checks the right to work.
+        justification: |
+          One check must give one decision; the next guard catches the removal.
+        tests:
+          - ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer
+
+      - id: ReviewCenter-Web-ProjectAccess-AuditRecheck
+        title: >-
+          The Web subsystem shall let the audit page check again, at the start of an action, that the user may still
+          read the audit trail of the project.
+        justification: |
+          A page that stays open does not load again, so a user whose right to read the audit trail was removed
+          would otherwise keep reading it through the page.
+        tests:
+          - ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback
+
+      - id: ReviewCenter-Web-ProjectAccess-AuditLost
+        title: >-
+          The Web subsystem shall report the project as lost to the audit page once when the user may not read the
+          audit trail.
+        justification: |
+          The user must not keep reading the trail after losing the right.
+        tests:
+          - ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+
       - id: ReviewCenter-Web-Reviews
         title: >-
           The Web subsystem shall let a user create a review of selected files on a page of its own.

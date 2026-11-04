@@ -34,55 +34,84 @@ public class UserServiceTotpTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     /// <summary>
-    ///     Test that the right password of an enrolled account asks for the second factor and does not reset the failure
-    ///     counter, while an account without one signs in as before.
+    ///     Test that the right password of an enrolled account asks for the second factor.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactorAndKeepsTheCounter()
-    {
-        // Arrange: ann is enrolled with three failures on record; bob has no second factor and one failure
-        var world = new TotpTestWorld();
-        await world.AddUserAsync("ann");
-        await world.AddUserAsync("bob");
-        await world.EnrollAsync("ann");
-        foreach (var name in new[] { "ann", "ann", "ann", "bob" })
-        {
-            await world.UserService.AuthenticatePasswordAsync(name, "wrong password", Token);
-        }
-
-        // Act: the right password for both
-        var ann = await world.UserService.AuthenticatePasswordAsync("ann", TotpTestWorld.Password, Token);
-        var bob = await world.UserService.AuthenticatePasswordAsync("bob", TotpTestWorld.Password, Token);
-
-        // Assert: ann must give a code and her counter stays; bob is in and his counter is reset
-        Assert.True(ann.SecondFactorRequired);
-        Assert.Equal("ann", ann.User!.Username);
-        Assert.Equal(3, (await world.Users.GetByUsernameAsync("ann", Token))!.FailedLoginCount);
-        Assert.False(bob.SecondFactorRequired);
-        Assert.Equal("bob", bob.User!.Username);
-        Assert.Equal(0, (await world.Users.GetByUsernameAsync("bob", Token))!.FailedLoginCount);
-    }
-
-    /// <summary>
-    ///     Test that the legacy password-only checks refuse an enrolled account (fail closed) and record why.
-    /// </summary>
-    [Fact]
-    public async Task UserService_AuthenticateAndReauthenticate_EnrolledUser_FailClosed()
+    public async Task UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactor()
     {
         // Arrange: ann is enrolled
         var world = new TotpTestWorld();
         await world.AddUserAsync("ann");
         await world.EnrollAsync("ann");
 
-        // Act: the legacy checks with the right password
+        // Act: the right password
+        var ann = await world.UserService.AuthenticatePasswordAsync("ann", TotpTestWorld.Password, Token);
+
+        // Assert: ann must give a code
+        Assert.True(ann.SecondFactorRequired);
+        Assert.Equal("ann", ann.User!.Username);
+    }
+
+    /// <summary>
+    ///     Test that the right password of an enrolled account leaves the count of failures as it is.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticatePasswordAsync_EnrolledUser_KeepsTheCountOfFailures()
+    {
+        // Arrange: ann is enrolled with two wrong passwords on record
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+        await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+
+        // Act: the right password
+        var step = await world.UserService.AuthenticatePasswordAsync("ann", TotpTestWorld.Password, Token);
+
+        // Assert: the code is asked for and the stored count of failures is still two
+        Assert.True(step.SecondFactorRequired);
+        Assert.Equal(2, (await world.Users.GetByUsernameAsync("ann", Token))!.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that the legacy password-only sign-in refuses an enrolled account (fail closed) and records why.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_EnrolledUser_FailsClosed()
+    {
+        // Arrange: ann is enrolled
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+
+        // Act: the legacy sign-in with the right password
         var signIn = await world.UserService.AuthenticateAsync("ann", TotpTestWorld.Password, Token);
+
+        // Assert: refused, and the audit trail says a second factor is required
+        Assert.Null(signIn);
+        var entry = Assert.Single(world.AuditStore.Entries, e => e.Action == "auth.sign-in-failed");
+        Assert.Contains("second factor required", entry.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the legacy password-only re-authentication refuses an enrolled account (fail closed) and records
+    ///     why.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ReauthenticateAsync_EnrolledUser_FailsClosed()
+    {
+        // Arrange: ann is enrolled
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+
+        // Act: the legacy re-authentication with the right password
         var reauth = await world.UserService.ReauthenticateAsync("ann", TotpTestWorld.Password, Token);
 
-        // Assert: both refuse, and the audit trail says a second factor is required
-        Assert.Null(signIn);
+        // Assert: refused, and the audit trail says a second factor is required
         Assert.Null(reauth);
-        Assert.Contains(world.AuditStore.Entries, e => e.Action == "auth.sign-in-failed" && e.Detail.Contains("second factor required", StringComparison.Ordinal));
-        Assert.Contains(world.AuditStore.Entries, e => e.Action == "signature.reauth-failed" && e.Detail.Contains("second factor required", StringComparison.Ordinal));
+        var entry = Assert.Single(world.AuditStore.Entries, e => e.Action == "signature.reauth-failed");
+        Assert.Contains("second factor required", entry.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -264,11 +293,30 @@ public class UserServiceTotpTests
     }
 
     /// <summary>
-    ///     Test that the legacy change still counts a wrong current password for an enrolled account, and still works
-    ///     for an enrolled account while the feature is switched off.
+    ///     Test that the legacy change counts a wrong current password for an enrolled account like any wrong password.
     /// </summary>
     [Fact]
-    public async Task UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges()
+    public async Task UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCounts()
+    {
+        // Arrange: ann is enrolled
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+
+        // Act: a wrong current password
+        var wrong = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.UserService.ChangeOwnPasswordAsync("ann", "wrong password", "another long passphrase", Token));
+
+        // Assert: the wrong password is a plain wrong password and is counted once
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, wrong.Rule);
+        Assert.Equal(1, (await world.Users.GetByUsernameAsync("ann", Token))!.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that the legacy change still works for an enrolled account while the second factor is switched off.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ChangeOwnPasswordAsync_EnrolledUserWithTheFeatureOff_ChangesThePassword()
     {
         // Arrange: ann is enrolled; a second user service shares the stores but has the feature off
         var world = new TotpTestWorld();
@@ -282,15 +330,113 @@ public class UserServiceTotpTests
             world.Store,
             new TotpSettings(false, TotpSettings.DefaultIssuer));
 
-        // Act: a wrong current password, then the right one with the feature off
-        var wrong = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.UserService.ChangeOwnPasswordAsync("ann", "wrong password", "another long passphrase", Token));
-        var counted = (await world.Users.GetByUsernameAsync("ann", Token))!.FailedLoginCount;
+        // Act: the right current password with the feature off
         await off.ChangeOwnPasswordAsync("ann", TotpTestWorld.Password, "another long passphrase", Token);
 
-        // Assert: the wrong password is a plain wrong password (counted), and the feature-off change went through
-        Assert.Equal(DomainRule.CurrentPasswordIncorrect, wrong.Rule);
-        Assert.Equal(1, counted);
-        Assert.NotNull(await off.ConfirmPasswordAsync("ann", "another long passphrase", Token));
+        // Assert: the stored hash is the new one and no failure is on record
+        var stored = (await world.Users.GetByUsernameAsync("ann", Token))!;
+        Assert.Equal("hash:another long passphrase", stored.PasswordHash);
+        Assert.Equal(0, stored.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that recording a complete sign-in stores its time and clears the count of failures.
+    /// </summary>
+    [Fact]
+    public async Task UserService_RecordSignInAsync_KnownUser_StoresTheTimeOfTheSignIn()
+    {
+        // Arrange: ann has two wrong passwords on record and an hour has passed
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        world.Clock.Advance(TimeSpan.FromHours(1));
+
+        // Act: record the sign-in under another spelling of the name
+        await world.UserService.RecordSignInAsync("ANN", Token);
+
+        // Assert: the stored time is the clock and the count of failures is cleared
+        var stored = (await world.Users.GetByUsernameAsync("ann", Token))!;
+        Assert.Equal(TotpTestWorld.Start.AddHours(1), stored.LastSignInUtc);
+        Assert.Equal(0, stored.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that the right password of an enrolled account, which only asks for the code, stores no sign-in time.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticatePasswordAsync_EnrolledUser_StoresNoSignInTime()
+    {
+        // Arrange: ann is enrolled
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+
+        // Act: the right password
+        var step = await world.UserService.AuthenticatePasswordAsync("ann", TotpTestWorld.Password, Token);
+
+        // Assert: the code is still required and no sign-in time is stored
+        Assert.True(step.SecondFactorRequired);
+        Assert.Null((await world.Users.GetByUsernameAsync("ann", Token))!.LastSignInUtc);
+    }
+
+    /// <summary>
+    ///     Test that wrong codes count with wrong passwords in one counter that locks the account on the fifth failure.
+    /// </summary>
+    [Fact]
+    public async Task UserService_RegisterSecondFactorFailureAsync_WrongCodesAndPasswords_ShareOneCounter()
+    {
+        // Arrange: three wrong passwords are on record
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        for (var i = 0; i < 3; i++)
+        {
+            await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        }
+
+        // Act: two wrong codes
+        var fourth = await world.UserService.RegisterSecondFactorFailureAsync(
+            "ann", "auth.totp-failed", "wrong code", Token);
+        var afterFourth = (await world.Users.GetByUsernameAsync("ann", Token))!;
+        var countAfterFourth = afterFourth.FailedLoginCount;
+        var lockoutAfterFourth = afterFourth.LockoutUntil;
+        var fifth = await world.UserService.RegisterSecondFactorFailureAsync(
+            "ann", "auth.totp-failed", "wrong code", Token);
+
+        // Assert: the fourth failure counts without a lockout; the fifth locks (the count restarts at zero)
+        Assert.False(fourth);
+        Assert.Equal(4, countAfterFourth);
+        Assert.Null(lockoutAfterFourth);
+        Assert.True(fifth);
+        var stored = (await world.Users.GetByUsernameAsync("ann", Token))!;
+        Assert.Equal(TotpTestWorld.Start.AddMinutes(5), stored.LockoutUntil);
+        Assert.Equal(0, stored.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that the check whether an account is locked out is true for a locked account and false for a free or
+    ///     unknown one.
+    /// </summary>
+    [Fact]
+    public async Task UserService_IsLockedOutAsync_LockedAndFreeAccounts_TellsWhetherLocked()
+    {
+        // Arrange: five wrong passwords lock ann; bob is free
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.AddUserAsync("bob");
+        for (var i = 0; i < 5; i++)
+        {
+            await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        }
+
+        // Act: ask for each
+        var ann = await world.UserService.IsLockedOutAsync("ann", Token);
+        var bob = await world.UserService.IsLockedOutAsync("bob", Token);
+        var nobody = await world.UserService.IsLockedOutAsync("nobody", Token);
+
+        // Assert: only the locked account is reported as locked
+        Assert.True(ann);
+        Assert.False(bob);
+        Assert.False(nobody);
     }
 }

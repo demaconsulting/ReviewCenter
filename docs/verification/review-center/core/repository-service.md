@@ -22,7 +22,8 @@ N/A - standard test environment.
 - A repository is registered enabled; the token is stored only encrypted and is never returned by a listing or shown by
   a text form.
 - Every allowed location form registers; a name, a location, or a credential that breaks a rule is refused with the
-  matching rule, and nothing is stored.
+  matching rule, and nothing is stored. A name, a location, a user name, and a token are accepted at their limits and
+  refused one character beyond them; a changed location is held to the same rules.
 - Only administrators of the project (project administrators of it, and system administrators) can use the registry of
   the project; a plain member is refused with `ActorNotAllowed`, and a user who cannot see the project, an unknown
   user, and a disabled user are refused like a missing project or repository.
@@ -54,12 +55,11 @@ scenario is tested by `RepositoryService_CreateAsync_AbsoluteLocalPath_Registers
 other than a letter or digit, or hold characters outside the allowed set are refused with `RepositoryNameInvalid`. This
 scenario is tested by `RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid`.
 
-**RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced**: A name of 40 characters is accepted and one of 41
-is
-refused; a name that differs only in case from an existing one in the same project is refused with
-`RepositoryNameTaken`. This scenario is
-tested by `RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced`. That the same name is accepted in a
-second project is part of `RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly`.
+**RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced**: A repository with a name of 40 characters is
+registered, and registering a name that differs only in letter case from it in the same project is refused with
+`RepositoryNameTaken`. This scenario is tested by `RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced`.
+That the same name is accepted in a second project is part of
+`RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly`.
 
 **RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid**: Locations that are empty, too long,
 start with `-`, hold control characters or white space, carry user information or a query string or fragment, lack a
@@ -190,6 +190,68 @@ updated one. This scenario is tested by `RepositoryService_GetAccessAsync_Concur
 **RepositoryService_TokenTypes_ToStringHidesToken**: The text forms of the token change and of the access data never
 show a
 token. This scenario is tested by `RepositoryService_TokenTypes_ToStringHidesToken`.
+
+**RepositoryService_CreateAsync_ValidName_Registers**: Registers a repository under each of a one-letter name, a
+one-digit name, a name with a dot, an underscore, and a dash, and a name of 40 characters, and checks that the name is
+stored as entered, in the default project, with one audit entry. This scenario is tested by
+`RepositoryService_CreateAsync_ValidName_Registers`.
+
+**RepositoryService_CreateAsync_LocationLength_HasInclusiveLimit**: Registers a repository with a location of 500
+characters and checks it is accepted as entered, then registers one with 501 characters and checks the
+`RepositoryLocationInvalid` rule and that nothing else was stored or audited. This scenario is tested by
+`RepositoryService_CreateAsync_LocationLength_HasInclusiveLimit`.
+
+**RepositoryService_UpdateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid**: A theory that changes the location of
+a registered repository to an ssh address, an option, an address with user information, an address with a query string,
+and an empty location; each throws `RepositoryLocationInvalid`, the location is as before, and only the creation was
+audited. This scenario is tested by `RepositoryService_UpdateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid`.
+
+**RepositoryService_CreateAsync_UserNameWithControlCharacter_ThrowsRepositoryCredentialInvalid**: A user name with a
+bell character is refused with `RepositoryCredentialInvalid` and nothing is stored or audited. This scenario is tested
+by `RepositoryService_CreateAsync_UserNameWithControlCharacter_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_CreateAsync_UserNameLength_HasInclusiveLimit**: A user name of 200 characters is accepted and
+stored whole, and one of 201 characters is refused with `RepositoryCredentialInvalid` with nothing else stored. This
+scenario is tested by `RepositoryService_CreateAsync_UserNameLength_HasInclusiveLimit`.
+
+**RepositoryService_CreateAsync_TokenWithControlCharacter_ThrowsRepositoryCredentialInvalid**: A token with a bell
+character is refused with `RepositoryCredentialInvalid` and nothing is stored or audited. This scenario is tested by
+`RepositoryService_CreateAsync_TokenWithControlCharacter_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_CreateAsync_TokenLength_HasInclusiveLimit**: A token of 1000 characters is accepted and stored
+whole, and one of 1001 characters is refused with `RepositoryCredentialInvalid`, without the token in the message and
+with nothing else stored. This scenario is tested by `RepositoryService_CreateAsync_TokenLength_HasInclusiveLimit`.
+
+**RepositoryService_UpdateAsync_ReplaceToken_StoresTheNewTokenEncrypted**: Replacing the token of a private repository
+stores another encrypted text that does not hold the plain new token, and the access data carries the new token. This
+scenario is tested by `RepositoryService_UpdateAsync_ReplaceToken_StoresTheNewTokenEncrypted`.
+
+**RepositoryService_UpdateAsync_ClearToken_RemovesTheStoredToken**: Clearing the token removes the stored token, the
+read model reports no token, and the access data carries none. This scenario is tested by
+`RepositoryService_UpdateAsync_ClearToken_RemovesTheStoredToken`.
+
+**RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories**: A project administrator registers,
+lists, changes, disables, and enables a repository of the own project; each step works, and each of the four audit
+entries names the project administrator. This scenario is tested by
+`RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories`.
+
+**RepositoryService_AdminOnly_RechecksTheActorOnEveryCall**: A system administrator registers a repository and is then
+disabled; with the same service, a create, an update, a disable, and a list are each refused (`ProjectNotFound` or
+`RepositoryNotFound`), only the creation was audited, and the repository is still enabled. This scenario is tested by
+`RepositoryService_AdminOnly_RechecksTheActorOnEveryCall`.
+
+**RepositoryService_ListEnabledAsync_UserWhoCannotSeeTheProject_IsRefused**: A member lists the enabled repositories
+and gets the identity and name of the enabled one; a user who is no member, an unknown user, and a disabled
+administrator are each refused with `ProjectNotFound`. This scenario is tested by
+`RepositoryService_ListEnabledAsync_UserWhoCannotSeeTheProject_IsRefused`.
+
+**RepositoryService_ListEnabledAsync_OtherProjectRepository_IsNotOffered**: A repository exists in each of two
+projects; the enabled list of each project holds only the repository of that project. This scenario is tested by
+`RepositoryService_ListEnabledAsync_OtherProjectRepository_IsNotOffered`.
+
+**RepositoryService_Changes_AreAuditedWithTheProject**: One repository is registered in the default project, and one is
+registered, renamed, disabled, and enabled in a second project; the first audit entry names the default project and the
+other four name the second. This scenario is tested by `RepositoryService_Changes_AreAuditedWithTheProject`.
 
 **RepositoryService_NullArguments_ThrowArgumentNull**: Null arguments raise `ArgumentNullException`. This scenario is
 tested by `RepositoryService_NullArguments_ThrowArgumentNull`.

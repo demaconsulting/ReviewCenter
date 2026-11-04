@@ -4,59 +4,432 @@
 # The RepositoryService class keeps the registry of git repositories that reviews can be created from, and the access
 # tokens of those repositories. Every repository belongs to exactly one project and is administered by the project
 # administrators of that project and by system administrators.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: RepositoryService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Name
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Name
         title: >-
           The RepositoryService class shall register a repository under a name of 1 to 40 letters, digits, dots,
-          underscores, and dashes that starts with a letter or digit, refuse any other name, and refuse a second
-          repository in the same project whose name differs from an existing one only in letter case, while the same
-          name may be used in two different projects.
+          underscores, and dashes that starts with a letter or digit.
         justification: |
-          The name is what users see and choose, so it must be short, plain, and unambiguous. Projects are
-          separate bodies of work and must not have to agree on names with each other.
+          The name is what users see and choose, so it must be short, plain, and unambiguous.
+        tests:
+          - RepositoryService_CreateAsync_ValidName_Registers
+
+      - id: ReviewCenter-RepositoryService-Name-Empty
+        title: >-
+          The RepositoryService class shall refuse an empty or blank repository name with the repository name invalid
+          rule.
+        justification: |
+          A repository without a name cannot be chosen.
         tests:
           - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
+
+      - id: ReviewCenter-RepositoryService-Name-TooLong
+        title: >-
+          The RepositoryService class shall refuse a repository name longer than 40 characters with the repository
+          name invalid rule.
+        justification: |
+          Short names keep lists and messages readable.
+        tests:
+          - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
+
+      - id: ReviewCenter-RepositoryService-Name-FirstCharacter
+        title: >-
+          The RepositoryService class shall refuse a repository name that starts with a character other than a letter
+          or digit with the repository name invalid rule.
+        justification: |
+          A leading dash or dot could be read as an option or a hidden entry.
+        tests:
+          - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
+
+      - id: ReviewCenter-RepositoryService-Name-Characters
+        title: >-
+          The RepositoryService class shall refuse a repository name that contains a character other than letters,
+          digits, dots, underscores, and dashes with the repository name invalid rule.
+        justification: |
+          Plain characters keep the name safe in messages and audit entries.
+        tests:
+          - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
+
+      - id: ReviewCenter-RepositoryService-Name-Duplicate
+        title: >-
+          The RepositoryService class shall refuse a second repository in the same project whose name differs from an
+          existing one only in letter case with the repository name taken rule.
+        justification: |
+          Two names that look alike would be confused.
+        tests:
           - RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced
+
+      - id: ReviewCenter-RepositoryService-Name-OtherProject
+        title: >-
+          The RepositoryService class shall allow the same repository name in two different projects.
+        justification: |
+          Projects are separate bodies of work and must not have to agree on names with each other.
+        tests:
           - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Location
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Location
         title: >-
-          The RepositoryService class shall accept as the location of a repository an https URL, an http URL whose
-          host is exactly localhost, 127.0.0.1, or [::1], a file URL, or an absolute local path, and shall refuse,
-          when a repository is registered and when it is changed, an http URL with any other host (including a
-          host that only starts or ends like a loopback host), an empty or too long location, a location that git
-          could read as an option or a helper, any other form (including ssh and git addresses), and a location that
-          carries credentials of its own, in the user information, the query string, or a fragment.
+          The RepositoryService class shall accept an https URL as the location of a repository.
         justification: |
-          The location is handed to git and fetched by the server. Only the forms that the server can use safely are
-          allowed, and credentials belong in the token, where they are protected, not in the location, where they
-          would be shown. Plain http to a remote host can be tampered with on the way, so it is allowed only for the
-          local machine, where tests and local git servers use it.
+          https is the normal, protected way to reach a repository.
         tests:
           - RepositoryService_CreateAsync_AllowedLocation_Registers
-          - RepositoryService_CreateAsync_AbsoluteLocalPath_Registers
-          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-LoopbackHttp
+        title: >-
+          The RepositoryService class shall accept an http URL as the location of a repository when its host is
+          exactly localhost, 127.0.0.1, or [::1].
+        justification: |
+          Local test and git servers use plain http and cannot be tampered with on the way.
+        tests:
+          - RepositoryService_CreateAsync_AllowedLocation_Registers
           - RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted
+
+      - id: ReviewCenter-RepositoryService-Location-File
+        title: >-
+          The RepositoryService class shall accept a file URL as the location of a repository.
+        justification: |
+          A repository on the own disk of the server is reached through a file URL.
+        tests:
+          - RepositoryService_CreateAsync_AllowedLocation_Registers
+
+      - id: ReviewCenter-RepositoryService-Location-LocalPath
+        title: >-
+          The RepositoryService class shall accept an absolute local path as the location of a repository.
+        justification: |
+          A repository on the own disk of the server may be given as a path.
+        tests:
+          - RepositoryService_CreateAsync_AbsoluteLocalPath_Registers
+
+      - id: ReviewCenter-RepositoryService-Location-RemoteHttp
+        title: >-
+          The RepositoryService class shall refuse an http URL whose host is not localhost, 127.0.0.1, or [::1] with
+          the repository location invalid rule.
+        justification: |
+          Plain http to another machine can be tampered with on the way.
+        tests:
           - RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid
 
+      - id: ReviewCenter-RepositoryService-Location-LoopbackLookalike
+        title: >-
+          The RepositoryService class shall refuse an http URL whose host only starts or ends like a loopback host
+          with the repository location invalid rule.
+        justification: |
+          A host such as localhost.evil.com is a remote host.
+        tests:
+          - RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Change
+        title: >-
+          The RepositoryService class shall apply the same location rules when the location of an existing repository
+          is changed.
+        justification: |
+          A change must not be a way around the rules for a new registration.
+        tests:
+          - RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted
+          - RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid
+          - RepositoryService_UpdateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Empty
+        title: >-
+          The RepositoryService class shall refuse an empty or blank location with the repository location invalid
+          rule.
+        justification: |
+          There is nothing to fetch from.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-TooLong
+        title: >-
+          The RepositoryService class shall refuse a location longer than 500 characters with the repository location
+          invalid rule.
+        justification: |
+          A limit keeps stored data and messages bounded.
+        tests:
+          - RepositoryService_CreateAsync_LocationLength_HasInclusiveLimit
+
+      - id: ReviewCenter-RepositoryService-Location-Option
+        title: >-
+          The RepositoryService class shall refuse a location that starts with a dash with the repository location
+          invalid rule.
+        justification: |
+          Git could read such a location as an option.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Helper
+        title: >-
+          The RepositoryService class shall refuse a location that git could run as a remote helper with the
+          repository location invalid rule.
+        justification: |
+          A helper address such as ext:: runs a program.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-OtherForm
+        title: >-
+          The RepositoryService class shall refuse a location that is not an https, http, or file URL or an absolute
+          path, including ssh, scp-style, git, and relative addresses, with the repository location invalid rule.
+        justification: |
+          Only the forms that the server can use safely are allowed.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Malformed
+        title: >-
+          The RepositoryService class shall refuse an https URL that has no host, or that contains white space or a
+          control character, with the repository location invalid rule.
+        justification: |
+          An unusable address must be reported when it is entered.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-UserInfo
+        title: >-
+          The RepositoryService class shall refuse a location that carries user information with the repository
+          location invalid rule.
+        justification: |
+          Credentials belong in the token, where they are protected.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Query
+        title: >-
+          The RepositoryService class shall refuse a location that has a query string with the repository location
+          invalid rule.
+        justification: |
+          A query string can carry a credential that would then be shown.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Location-Fragment
+        title: >-
+          The RepositoryService class shall refuse a location that has a fragment with the repository location
+          invalid rule.
+        justification: |
+          A fragment can carry text that would then be shown.
+        tests:
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Credentials
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Credentials
         title: >-
-          The RepositoryService class shall accept a user name and a token only for an https location, refuse a token
-          without a user name, refuse a user name or token with characters or a length that is not allowed, and refuse a
-          token that is contained in (is a substring of, compared ordinally, with case) the repository name, the user
-          name, or the location (its percent-escaped form too, whatever the case of the hex digits), when it is
-          registered, when it replaces the stored token, and when the name, the user, or the location is changed while
-          the stored token is kept.
+          The RepositoryService class shall refuse, when a repository is registered, a user name or a token for a
+          location that is not an https URL with the repository credential invalid rule.
         justification: |
-          A credential that cannot work, or that could change the meaning of a header, must be reported when it is
-          entered, not when a review is created. The repository name, the user name, and the location are written to
-          audit entries and messages, so a token that is part of one of them would put the secret there.
+          A credential sent over another transport would be exposed or unusable.
         tests:
           - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
           - RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-LocationChange
+        title: >-
+          The RepositoryService class shall refuse a change of the location to one that is not an https URL while a
+          user name or token is kept, with the repository credential invalid rule.
+        justification: |
+          A change must not leave a credential on a transport that cannot protect it.
+        tests:
+          - RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenWithoutUser
+        title: >-
+          The RepositoryService class shall refuse a token without a user name with the repository credential invalid
+          rule.
+        justification: |
+          A token without a user name cannot be used to sign in.
+        tests:
+          - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-UserNameRemoved
+        title: >-
+          The RepositoryService class shall refuse a change that removes the user name while the token is kept with
+          the repository credential invalid rule.
+        justification: |
+          The kept token would be left without a user name.
+        tests:
+          - RepositoryService_UpdateAsync_InvalidRequests_ThrowRules
+
+      - id: ReviewCenter-RepositoryService-Credentials-UserNameColon
+        title: >-
+          The RepositoryService class shall refuse a user name that contains a colon with the repository credential
+          invalid rule.
+        justification: |
+          A colon would change the meaning of the sign-in header.
+        tests:
+          - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-UserNameControl
+        title: >-
+          The RepositoryService class shall refuse a user name that contains a control character with the repository
+          credential invalid rule.
+        justification: |
+          A control character could split a header.
+        tests:
+          - RepositoryService_CreateAsync_UserNameWithControlCharacter_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-UserNameLength
+        title: >-
+          The RepositoryService class shall refuse a user name longer than 200 characters with the repository
+          credential invalid rule.
+        justification: |
+          A limit keeps stored data bounded.
+        tests:
+          - RepositoryService_CreateAsync_UserNameLength_HasInclusiveLimit
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenSpace
+        title: >-
+          The RepositoryService class shall refuse a token that contains white space with the repository credential
+          invalid rule.
+        justification: |
+          White space could change the meaning of a header.
+        tests:
+          - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenControl
+        title: >-
+          The RepositoryService class shall refuse a token that contains a control character with the repository
+          credential invalid rule.
+        justification: |
+          A control character could split a header.
+        tests:
+          - RepositoryService_CreateAsync_TokenWithControlCharacter_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenLength
+        title: >-
+          The RepositoryService class shall refuse a token longer than 1000 characters with the repository credential
+          invalid rule.
+        justification: |
+          A limit keeps stored data bounded.
+        tests:
+          - RepositoryService_CreateAsync_TokenLength_HasInclusiveLimit
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenInName
+        title: >-
+          The RepositoryService class shall refuse, when a repository is registered or its token is replaced, a token
+          that is contained in the repository name with the repository credential invalid rule.
+        justification: |
+          Names are written to audit entries and messages, so the token would be shown.
+        tests:
+          - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenInUserName
+        title: >-
+          The RepositoryService class shall refuse, when a repository is registered or its token is replaced, a token
+          that is contained in the user name with the repository credential invalid rule.
+        justification: |
+          User names are written to audit entries and messages, so the token would be shown.
+        tests:
+          - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenInLocation
+        title: >-
+          The RepositoryService class shall refuse, when a repository is registered or its token is replaced, a token
+          that is contained in the location with the repository credential invalid rule.
+        justification: |
+          Locations are written to audit entries and messages, so the token would be shown.
+        tests:
+          - RepositoryService_CreateAsync_TokenEqualsLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenEqualsLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenInEscapedLocation
+        title: >-
+          The RepositoryService class shall refuse, when a repository is registered or its token is replaced, a token
+          whose percent-escaped form is contained in the location with the repository credential invalid rule.
+        justification: |
+          A location may show the token in its escaped form.
+        tests:
+          - RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenEscapedHexCase
+        title: >-
+          The RepositoryService class shall refuse a token whose percent-escaped form is contained in the location
+          whatever the case of the hexadecimal digits, with the repository credential invalid rule.
+        justification: |
+          The two spellings of an escape mean the same text.
+        tests:
+          - RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-KeptTokenInName
+        title: >-
+          The RepositoryService class shall refuse a change of the name to text that contains the kept token with the
+          repository credential invalid rule.
+        justification: |
+          The kept token would be shown in audit entries.
+        tests:
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-KeptTokenInUserName
+        title: >-
+          The RepositoryService class shall refuse a change of the user name to text that contains the kept token
+          with the repository credential invalid rule.
+        justification: |
+          The kept token would be shown in audit entries.
+        tests:
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-KeptTokenInLocation
+        title: >-
+          The RepositoryService class shall refuse a change of the location to text that contains the kept token with
+          the repository credential invalid rule.
+        justification: |
+          The kept token would be shown in audit entries.
+        tests:
+          - RepositoryService_UpdateAsync_KeepTokenEqualsNewLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-KeptTokenInEscapedLocation
+        title: >-
+          The RepositoryService class shall refuse a change of the location to one that contains the percent-escaped
+          form of the kept token with the repository credential invalid rule.
+        justification: |
+          The kept token would be shown in its escaped form.
+        tests:
+          - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-TokenCase
+        title: >-
+          The RepositoryService class shall not treat a token as contained in the name, the user name, or the location
+          when it differs only in letter case, except in the hexadecimal digits of its escaped form.
+        justification: |
+          Containment is checked exactly; refusing values that merely look similar would refuse valid credentials.
+        tests:
+          - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenEqualsLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-MessageHidesToken
+        title: >-
+          The RepositoryService class shall not show the token in the message of a refusal because the token is
+          contained in the name, the user name, or the location.
+        justification: |
+          The refusal must not repeat the secret.
+        tests:
           - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
           - RepositoryService_CreateAsync_TokenEqualsLocation_ThrowsRepositoryCredentialInvalid
@@ -67,83 +440,439 @@ sections:
           - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-RefusalChangesNothing
+        title: >-
+          The RepositoryService class shall leave the stored token, the registration, and the audit trail unchanged
+          when a change is refused because the token is contained in the name, the user name, or the location.
+        justification: |
+          A refused change must not be applied halfway.
+        tests:
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenEqualsLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenEqualsNewLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials-KeptUnreadable
+        title: >-
+          The RepositoryService class shall not compare a kept token that cannot be decrypted with the new name, user
+          name, or location.
+        justification: |
+          An unreadable token cannot be compared and is useless until it is replaced; the administrator must still be
+          able to rename the repository.
+        tests:
           - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare
 
+      - id: ReviewCenter-RepositoryService-Credentials-ClearedNotCompared
+        title: >-
+          The RepositoryService class shall not compare a cleared token with the new name, user name, or location.
+        justification: |
+          A token that no longer exists cannot leak.
+        tests:
+          - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Token
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Token
         title: >-
-          The RepositoryService class shall store a token only encrypted, let an update keep, replace, or clear it,
-          never give it back to a caller that shows or changes the registry, and never show it in the text form of
-          any value it hands out.
+          The RepositoryService class shall store the token of a repository only in encrypted form.
         justification: |
-          The token is write-only: an administrator can set it, but nobody, including an administrator, can read it
-          back through the registry, so it cannot leak through a page or a log.
+          A stolen database must not hand out working tokens.
         tests:
           - RepositoryService_CreateAsync_WithToken_StoresItEncryptedAndWriteOnly
-          - RepositoryService_NoOpChanges_AreNotAudited
-          - RepositoryService_UpdateAsync_InvalidRequests_ThrowRules
-          - RepositoryService_TokenTypes_ToStringHidesToken
 
+      - id: ReviewCenter-RepositoryService-Token-Keep
+        title: >-
+          The RepositoryService class shall leave the stored token unchanged when an update keeps it.
+        justification: |
+          An administrator can edit the other fields without entering the token again.
+        tests:
+          - RepositoryService_NoOpChanges_AreNotAudited
+
+      - id: ReviewCenter-RepositoryService-Token-Replace
+        title: >-
+          The RepositoryService class shall store the new token, encrypted, in place of the old one when an update
+          replaces it.
+        justification: |
+          A token that has expired must be possible to renew.
+        tests:
+          - RepositoryService_UpdateAsync_ReplaceToken_StoresTheNewTokenEncrypted
+
+      - id: ReviewCenter-RepositoryService-Token-ReplaceEmpty
+        title: >-
+          The RepositoryService class shall refuse an update that replaces the token with an empty token with the
+          repository credential invalid rule.
+        justification: |
+          Clearing the token is a separate, explicit choice.
+        tests:
+          - RepositoryService_UpdateAsync_InvalidRequests_ThrowRules
+
+      - id: ReviewCenter-RepositoryService-Token-Clear
+        title: >-
+          The RepositoryService class shall remove the stored token when an update clears it.
+        justification: |
+          A repository that no longer needs a token must not keep one.
+        tests:
+          - RepositoryService_UpdateAsync_ClearToken_RemovesTheStoredToken
+
+      - id: ReviewCenter-RepositoryService-Token-WriteOnly
+        title: >-
+          The RepositoryService class shall report, instead of the token, only whether a token is set to a caller that
+          lists or changes the registry.
+        justification: |
+          The token is write-only: nobody can read it back through the registry.
+        tests:
+          - RepositoryService_CreateAsync_WithToken_StoresItEncryptedAndWriteOnly
+
+      - id: ReviewCenter-RepositoryService-Token-TextForm
+        title: >-
+          The RepositoryService class shall not show the token in the text form of the token change or of the access
+          data that it hands out.
+        justification: |
+          The text form ends up in logs and pages.
+        tests:
+          - RepositoryService_TokenTypes_ToStringHidesToken
+          - RepositoryService_DisabledRepository_IsNotSelectable
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Administrators
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Admin
         title: >-
-          The RepositoryService class shall let only an administrator of the project, that is a project
-          administrator of it or an enabled system administrator, list the registry of the project, register,
-          change, enable, and disable its repositories, checking the acting user again on every call, shall refuse
-          a plain member of the project with the actor not allowed failure, and shall refuse a user who cannot see
-          the project, an unknown user, and a disabled user with the same project not found or repository not found
-          failure as for something that does not exist.
+          The RepositoryService class shall let an enabled system administrator list the registry of a project.
         justification: |
-          The registry holds the locations and tokens through which the server reads source code, so changing it
-          is a duty of the people who run the project. An open page keeps its state for a while after rights are
-          taken away, so the check is made again each time, and a refusal must not show that a repository exists.
+          The registry holds the access to source code, so the people who run the system manage it.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+
+      - id: ReviewCenter-RepositoryService-Admin-Register
+        title: >-
+          The RepositoryService class shall let an enabled system administrator register a repository in a project.
+        justification: |
+          The people who run the system manage the registry, and registering is the first step of that.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Admin-Change
+        title: >-
+          The RepositoryService class shall let an enabled system administrator change a repository of a project.
+        justification: |
+          A location or a name that is wrong must be corrected by the people who run the system.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Admin-SetEnabled
+        title: >-
+          The RepositoryService class shall let an enabled system administrator enable or disable a repository of a
+          project.
+        justification: |
+          The people who run the system decide which repositories may be used.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Admin-ProjectAdmin
+        title: >-
+          The RepositoryService class shall let a project administrator list the registry of the project.
+        justification: |
+          The project administrators run the project.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+          - RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories
+
+      - id: ReviewCenter-RepositoryService-Admin-ProjectAdmin-Register
+        title: >-
+          The RepositoryService class shall let a project administrator register a repository in the project.
+        justification: |
+          The project administrators run the project, so they add the repositories it needs.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+          - RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories
+
+      - id: ReviewCenter-RepositoryService-Admin-ProjectAdmin-Change
+        title: >-
+          The RepositoryService class shall let a project administrator change a repository of the project.
+        justification: |
+          The project administrators run the project, so they correct its repositories.
+        tests:
+          - RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories
+
+      - id: ReviewCenter-RepositoryService-Admin-ProjectAdmin-SetEnabled
+        title: >-
+          The RepositoryService class shall let a project administrator enable or disable a repository of the project.
+        justification: |
+          The project administrators run the project, so they decide which of its repositories are used.
+        tests:
+          - RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories
+
+      - id: ReviewCenter-RepositoryService-Admin-Member
+        title: >-
+          The RepositoryService class shall refuse a plain member of the project with the actor not allowed rule when
+          the member lists the registry.
+        justification: |
+          A member uses repositories but does not manage them.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-Member-Register
+        title: >-
+          The RepositoryService class shall refuse a plain member of the project with the actor not allowed rule when
+          the member registers a repository.
+        justification: |
+          A member uses repositories but does not add them.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-Member-Change
+        title: >-
+          The RepositoryService class shall refuse a plain member of the project with the actor not allowed rule when
+          the member changes a repository.
+        justification: |
+          A member uses repositories but does not change them.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-Member-SetEnabled
+        title: >-
+          The RepositoryService class shall refuse a plain member of the project with the actor not allowed rule when
+          the member enables or disables a repository.
+        justification: |
+          A member uses repositories but does not decide which of them are used.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-NotVisible
+        title: >-
+          The RepositoryService class shall refuse a user who cannot see the project with the project not found rule
+          or the repository not found rule, as for something that does not exist.
+        justification: |
+          A refusal must not show that a project or a repository exists.
         tests:
           - RepositoryService_AdminOnly_RefusesOtherActors
           - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
 
+      - id: ReviewCenter-RepositoryService-Admin-UnknownUser
+        title: >-
+          The RepositoryService class shall refuse an unknown user with the project not found rule or the repository
+          not found rule.
+        justification: |
+          An unknown user is no one.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-DisabledUser
+        title: >-
+          The RepositoryService class shall refuse a disabled administrator with the project not found rule or the
+          repository not found rule.
+        justification: |
+          A disabled account has no rights.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-RefusalChangesNothing
+        title: >-
+          The RepositoryService class shall leave the registry and the audit trail unchanged when it refuses an actor.
+        justification: |
+          A refused request must not change anything.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Admin-Recheck
+        title: >-
+          The RepositoryService class shall check the acting user again on every call, so that an administrator who is
+          disabled after a first call is refused on the next.
+        justification: |
+          An open page keeps its state after the rights of the user are taken away.
+        tests:
+          - RepositoryService_AdminOnly_RechecksTheActorOnEveryCall
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Ownership
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Ownership
         title: >-
-          The RepositoryService class shall register every repository in exactly one project, shall give the git
-          layer the access data of a repository only for the project that owns it and report any other project's
-          repository as not found, and shall offer the enabled repositories of a project only to a user who may
-          see that project.
+          The RepositoryService class shall register every repository in exactly one project.
         justification: |
-          A repository is registered with the credentials of one body of work. Another project must not be able to
-          open it, not even by guessing its identity.
+          A repository is registered with the credentials of one body of work.
         tests:
           - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
-          - RepositoryService_DisabledRepository_IsNotSelectable
 
+      - id: ReviewCenter-RepositoryService-Ownership-Access
+        title: >-
+          The RepositoryService class shall give the git layer the access data of a repository only for the project
+          that owns it and report the repository of any other project as not found.
+        justification: |
+          Another project must not open a repository, not even by guessing its identity.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+
+      - id: ReviewCenter-RepositoryService-Ownership-Listing
+        title: >-
+          The RepositoryService class shall offer the enabled repositories of a project only to a user who may see
+          that project, and refuse any other user with the project not found rule.
+        justification: |
+          The names of repositories belong to the people of the project.
+        tests:
+          - RepositoryService_DisabledRepository_IsNotSelectable
+          - RepositoryService_ListEnabledAsync_UserWhoCannotSeeTheProject_IsRefused
+
+      - id: ReviewCenter-RepositoryService-Ownership-ListingProject
+        title: >-
+          The RepositoryService class shall offer for a project only the enabled repositories of that project.
+        justification: |
+          A project must not be offered the repositories of another.
+        tests:
+          - RepositoryService_ListEnabledAsync_OtherProjectRepository_IsNotOffered
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Audit
         title: >-
-          The RepositoryService class shall record the creation, the change, the disabling, and the enabling of a
-          repository in the audit trail with the project, with the names of the fields that changed, never with a
-          token or other secret, and shall record nothing for a request that changes nothing.
+          The RepositoryService class shall record the creation of a repository in the audit trail with its name, its
+          location, and whether a user name and a token are set.
         justification: |
-          Who made source code reachable through the server, and who changed that, must be traceable, but the audit
-          trail must never become a place where secrets are kept.
+          Who made source code reachable through the server must be traceable.
         tests:
           - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-Update
+        title: >-
+          The RepositoryService class shall record the change of a repository in the audit trail with the names of the
+          fields that changed.
+        justification: |
+          What was changed must be traceable.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-TokenCleared
+        title: >-
+          The RepositoryService class shall record in the audit trail that the token of a repository was cleared.
+        justification: |
+          The removal of a credential is a change that must be traceable.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-Disabled
+        title: >-
+          The RepositoryService class shall record the disabling of a repository in the audit trail.
+        justification: |
+          Who stopped the use of a repository must be traceable.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-Enabled
+        title: >-
+          The RepositoryService class shall record the enabling of a repository in the audit trail.
+        justification: |
+          Who resumed the use of a repository must be traceable.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-Project
+        title: >-
+          The RepositoryService class shall record each repository audit entry with the project that owns the
+          repository.
+        justification: |
+          The trail of a project must show what happened to its repositories.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithTheProject
+
+      - id: ReviewCenter-RepositoryService-Audit-NoSecret
+        title: >-
+          The RepositoryService class shall never put a token or another secret into a repository audit entry.
+        justification: |
+          The audit trail is read by more people than the administrators.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Audit-NoChange
+        title: >-
+          The RepositoryService class shall record nothing in the audit trail for an update that changes nothing or
+          for the enabling of an enabled repository.
+        justification: |
+          A request without a change is not an event.
+        tests:
           - RepositoryService_NoOpChanges_AreNotAudited
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Disabling
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Disable
         title: >-
-          The RepositoryService class shall disable a repository instead of deleting it, offer the members of the
-          project only the name of its enabled repositories, and refuse access to a disabled repository.
+          The RepositoryService class shall keep a disabled repository in the registry of the administrators instead
+          of deleting it.
         justification: |
-          Reviews made from a repository keep their reference to it, so it is never deleted, and disabling it is how
-          a project administrator stops its use.
+          Reviews keep their reference to the repository.
+        tests:
+          - RepositoryService_DisabledRepository_IsNotSelectable
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+
+      - id: ReviewCenter-RepositoryService-Disable-Listed
+        title: >-
+          The RepositoryService class shall leave a disabled repository out of the list of enabled repositories that
+          it offers to members.
+        justification: |
+          Disabling is how an administrator stops the use of a repository.
         tests:
           - RepositoryService_DisabledRepository_IsNotSelectable
 
+      - id: ReviewCenter-RepositoryService-Disable-NameOnly
+        title: >-
+          The RepositoryService class shall offer the members of the project only the identity and the name of an
+          enabled repository.
+        justification: |
+          Members must not see locations or user names.
+        tests:
+          - RepositoryService_DisabledRepository_IsNotSelectable
+
+      - id: ReviewCenter-RepositoryService-Disable-Access
+        title: >-
+          The RepositoryService class shall refuse access to a disabled repository with the repository disabled rule.
+        justification: |
+          The git layer must not use a disabled repository.
+        tests:
+          - RepositoryService_DisabledRepository_IsNotSelectable
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Access
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-RepositoryService-Access
         title: >-
-          The RepositoryService class shall give the git layer the location, the user name, and the decrypted token
-          of an enabled repository, as one consistent registration even while an administrator changes it, and shall
-          report that the credentials cannot be read, without naming any secret,
-          when the stored token cannot be decrypted.
+          The RepositoryService class shall give the git layer the location, the user name, and the decrypted token of
+          an enabled repository.
         justification: |
-          The server must be able to use the token, and when the key ring was lost the administrator must be told to
-          enter the token again. A location paired with the token of another version would send a token to the wrong
-          host.
+          The server must be able to use the token.
+        tests:
+          - RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair
+          - RepositoryService_DisabledRepository_IsNotSelectable
+
+      - id: ReviewCenter-RepositoryService-Access-Consistent
+        title: >-
+          The RepositoryService class shall give the location, the user name, and the token of one version of a
+          repository together, even while an administrator changes it.
+        justification: |
+          A location paired with the token of another version would send a token to the wrong host.
+        tests:
+          - RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair
+
+      - id: ReviewCenter-RepositoryService-Access-Unreadable
+        title: >-
+          The RepositoryService class shall refuse access with the credentials unreadable rule when the stored token
+          cannot be decrypted.
+        justification: |
+          After a lost key ring the administrator must be told to enter the token again.
         tests:
           - RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable
-          - RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair
+
+      - id: ReviewCenter-RepositoryService-Access-UnreadableMessage
+        title: >-
+          The RepositoryService class shall name the repository and no secret in the message of the credentials
+          unreadable failure.
+        justification: |
+          The administrator must know which token to enter again, and the message must not leak.
+        tests:
+          - RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable

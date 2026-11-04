@@ -40,6 +40,29 @@ public class PersonalAccessTokenServiceTests
     private const string Password = "correct horse battery";
 
     /// <summary>
+    ///     Test that a token created for a known, enabled user is answered with its details and is listed for that user.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Create_ValidRequest_ReturnsTheTokenAndListsIt()
+    {
+        // Arrange: a service with a user
+        var (service, tokens, _, _, _) = await CreateAsync();
+
+        // Act: create a token for the user and list the tokens of the user
+        var created = await service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken);
+        var list = await service.ListAsync(TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the answer has the name, the creation time, no revocation, and no last use; the list holds only it
+        Assert.Equal("build server", created.Token.Name);
+        Assert.Equal(_now, created.Token.Created);
+        Assert.Null(created.Token.Revoked);
+        Assert.Null(created.Token.LastUsed);
+        Assert.NotEmpty(created.Value);
+        Assert.Equal(created.Token.Id, Assert.Single(list).Id);
+        Assert.Single(tokens.Rows);
+    }
+
+    /// <summary>
     ///     Test that a new token has the recognizable prefix, 256 bits of base64url secret and is different each time.
     /// </summary>
     [Fact]
@@ -127,69 +150,88 @@ public class PersonalAccessTokenServiceTests
     }
 
     /// <summary>
-    ///     Test that the three expiry choices set the expiry and anything else is refused.
+    ///     Test that each of the three expiry choices sets the expiry that many days after the creation.
     /// </summary>
     /// <param name="days">The requested lifetime in days.</param>
-    /// <param name="accepted">Whether the lifetime is one of the choices.</param>
     [Theory]
-    [InlineData(30, true)]
-    [InlineData(90, true)]
-    [InlineData(365, true)]
-    [InlineData(0, false)]
-    [InlineData(-1, false)]
-    [InlineData(7, false)]
-    [InlineData(366, false)]
-    public async Task PersonalAccessTokenService_Create_ExpiryChoices_SetsExpiryOrRejectsOthers(int days, bool accepted)
+    [InlineData(30)]
+    [InlineData(90)]
+    [InlineData(365)]
+    public async Task PersonalAccessTokenService_Create_ExpiryChoice_SetsTheExpiry(int days)
     {
         // Arrange: a service with a user
         var (service, tokens, _, _, _) = await CreateAsync();
 
         // Act: create a token with the lifetime
-        var attempt = () => service.CreateAsync(TestActors.Ann, "build server", days, TestContext.Current.CancellationToken);
+        var created = await service.CreateAsync(TestActors.Ann, "build server", days, TestContext.Current.CancellationToken);
 
-        // Assert: accepted lifetimes set the expiry from the clock; others are refused and store nothing
-        if (accepted)
-        {
-            var created = await attempt();
-            Assert.Equal(_now, created.Token.Created);
-            Assert.Equal(_now.AddDays(days), created.Token.Expires);
-        }
-        else
-        {
-            var exception = await Assert.ThrowsAsync<DomainRuleException>(attempt);
-            Assert.Equal(DomainRule.TokenExpiryInvalid, exception.Rule);
-            Assert.Empty(tokens.Rows);
-        }
+        // Assert: the expiry is set from the clock, in the answer and in the store
+        Assert.Equal(_now, created.Token.Created);
+        Assert.Equal(_now.AddDays(days), created.Token.Expires);
+        Assert.Equal(_now.AddDays(days), Assert.Single(tokens.Rows).Expires);
     }
 
     /// <summary>
-    ///     Test that invalid names are refused and the valid name is trimmed.
+    ///     Test that a lifetime other than the three choices is refused and nothing is stored.
     /// </summary>
-    /// <param name="name">The name.</param>
-    /// <param name="valid">Whether the name is acceptable.</param>
+    /// <param name="days">The requested lifetime in days.</param>
     [Theory]
-    [InlineData(null, false)]
-    [InlineData("", false)]
-    [InlineData("   ", false)]
-    [InlineData("bad\u0007name", false)]
-    [InlineData("  ci server  ", true)]
-    public async Task PersonalAccessTokenService_Create_Name_IsValidatedAndTrimmed(string? name, bool valid)
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(7)]
+    [InlineData(366)]
+    public async Task PersonalAccessTokenService_Create_InvalidExpiry_ThrowsTokenExpiryInvalid(int days)
     {
         // Arrange: a service with a user
-        var (service, _, _, _, _) = await CreateAsync();
+        var (service, tokens, _, _, _) = await CreateAsync();
+
+        // Act: create a token with the lifetime
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(TestActors.Ann, "build server", days, TestContext.Current.CancellationToken));
+
+        // Assert: refused with the rule and nothing is stored
+        Assert.Equal(DomainRule.TokenExpiryInvalid, exception.Rule);
+        Assert.Empty(tokens.Rows);
+    }
+
+    /// <summary>
+    ///     Test that a name with surrounding white space is stored without it.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Create_NameWithSurroundingSpaces_StoresItTrimmed()
+    {
+        // Arrange: a service with a user
+        var (service, tokens, _, _, _) = await CreateAsync();
+
+        // Act: create a token with a name that has spaces around it
+        var created = await service.CreateAsync(TestActors.Ann, "  ci server  ", 90, TestContext.Current.CancellationToken);
+
+        // Assert: the answer and the store hold the trimmed name
+        Assert.Equal("ci server", created.Token.Name);
+        Assert.Equal("ci server", Assert.Single(tokens.Rows).Name);
+    }
+
+    /// <summary>
+    ///     Test that an empty, blank, or control-character name is refused with the rule and nothing is stored.
+    /// </summary>
+    /// <param name="name">The name.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("bad\u0007name")]
+    public async Task PersonalAccessTokenService_Create_InvalidName_ThrowsTokenNameInvalid(string? name)
+    {
+        // Arrange: a service with a user
+        var (service, tokens, _, _, _) = await CreateAsync();
 
         // Act: create a token with the name
-        var attempt = () => service.CreateAsync(TestActors.Ann, name, 90, TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(TestActors.Ann, name, 90, TestContext.Current.CancellationToken));
 
-        // Assert: a valid name is stored trimmed; an invalid one names the rule
-        if (valid)
-        {
-            Assert.Equal("ci server", (await attempt()).Token.Name);
-        }
-        else
-        {
-            Assert.Equal(DomainRule.TokenNameInvalid, (await Assert.ThrowsAsync<DomainRuleException>(attempt)).Rule);
-        }
+        // Assert: refused with the rule and nothing is stored
+        Assert.Equal(DomainRule.TokenNameInvalid, exception.Rule);
+        Assert.Empty(tokens.Rows);
     }
 
     /// <summary>
@@ -256,34 +298,58 @@ public class PersonalAccessTokenServiceTests
     }
 
     /// <summary>
-    ///     Test that revoked and expired tokens do not count toward the limit of active tokens.
+    ///     Test that a revoked token does not count toward the limit of active tokens.
     /// </summary>
     [Fact]
-    public async Task PersonalAccessTokenService_Create_RevokedAndExpiredDoNotCount()
+    public async Task PersonalAccessTokenService_Create_RevokedTokens_DoNotCount()
     {
-        // Arrange: ten tokens that will expire, then ten active tokens
-        var (service, _, _, clock, _) = await CreateAsync();
+        // Arrange: twenty active tokens
+        var (service, tokens, _, clock, _) = await CreateAsync();
+        var created = new List<CreatedPersonalAccessToken>();
+        for (var i = 0; i < ReviewLimits.MaxActiveTokensPerUser; i++)
+        {
+            created.Add(await service.CreateAsync(TestActors.Ann, $"token {i}", 90, TestContext.Current.CancellationToken));
+        }
+
+        // Act: revoke the first token and create a replacement
+        await service.RevokeAsync(TestActors.Ann, created[0].Token.Id, TestContext.Current.CancellationToken);
+        var replacement = await service.CreateAsync(TestActors.Ann, "replacement", 90, TestContext.Current.CancellationToken);
+
+        // Assert: the replacement was accepted, twenty tokens are active, and one more is refused
+        var list = await service.ListAsync(TestActors.Ann, TestContext.Current.CancellationToken);
+        Assert.NotEmpty(replacement.Value);
+        Assert.Equal(ReviewLimits.MaxActiveTokensPerUser, list.Count(t => t.IsActive(clock.GetUtcNow())));
+        Assert.Equal(ReviewLimits.MaxActiveTokensPerUser + 1, tokens.Rows.Count);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(TestActors.Ann, "one too many", 90, TestContext.Current.CancellationToken));
+        Assert.Equal(DomainRule.TokenLimitReached, exception.Rule);
+        Assert.Equal(ReviewLimits.MaxActiveTokensPerUser + 1, tokens.Rows.Count);
+    }
+
+    /// <summary>
+    ///     Test that an expired token does not count toward the limit of active tokens.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Create_ExpiredTokens_DoNotCount()
+    {
+        // Arrange: ten tokens that have expired
+        var (service, tokens, _, clock, _) = await CreateAsync();
         for (var i = 0; i < 10; i++)
         {
             await service.CreateAsync(TestActors.Ann, $"short {i}", 30, TestContext.Current.CancellationToken);
         }
 
         clock.Advance(TimeSpan.FromDays(31));
-        var active = new List<CreatedPersonalAccessToken>();
-        for (var i = 0; i < 10; i++)
+
+        // Act: create twenty tokens that are active
+        for (var i = 0; i < ReviewLimits.MaxActiveTokensPerUser; i++)
         {
-            active.Add(await service.CreateAsync(TestActors.Ann, $"long {i}", 365, TestContext.Current.CancellationToken));
+            await service.CreateAsync(TestActors.Ann, $"long {i}", 90, TestContext.Current.CancellationToken);
         }
 
-        // Act: revoke one active token (9 are active now) and create eleven more
-        await service.RevokeAsync(TestActors.Ann, active[0].Token.Id, TestContext.Current.CancellationToken);
-        for (var i = 0; i < 11; i++)
-        {
-            await service.CreateAsync(TestActors.Ann, $"after {i}", 90, TestContext.Current.CancellationToken);
-        }
-
-        // Assert: all eleven were accepted, so exactly the active ones were counted: 20 are active and one more is refused
+        // Assert: all twenty were accepted, the expired ones are still stored, and one more is refused
         var list = await service.ListAsync(TestActors.Ann, TestContext.Current.CancellationToken);
+        Assert.Equal(ReviewLimits.MaxActiveTokensPerUser + 10, tokens.Rows.Count);
         Assert.Equal(ReviewLimits.MaxActiveTokensPerUser, list.Count(t => t.IsActive(clock.GetUtcNow())));
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.CreateAsync(TestActors.Ann, "one too many", 90, TestContext.Current.CancellationToken));
@@ -342,13 +408,36 @@ public class PersonalAccessTokenServiceTests
     }
 
     /// <summary>
+    ///     Test that a user cannot revoke the token of somebody else and that the token keeps working.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Revoke_OtherUsersToken_IsRefusedAndTheTokenKeepsWorking()
+    {
+        // Arrange: ann has a token; bob exists too
+        var (service, tokens, users, _, _) = await CreateAsync();
+        await users.CreateAsync("bob", "Bob", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var created = await service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken);
+
+        // Act: bob revokes ann's token, then the token is used
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.RevokeAsync(TestActors.Bob, created.Token.Id, TestContext.Current.CancellationToken));
+        var result = await service.AuthenticateAsync(created.Value, TestContext.Current.CancellationToken);
+
+        // Assert: refused as not found, the token is not revoked, still works, and no revocation is audited
+        Assert.Equal(DomainRule.TokenNotFound, exception.Rule);
+        Assert.Null(Assert.Single(tokens.Rows).Revoked);
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(tokens.Audits, a => a.Action == "token.revoked");
+    }
+
+    /// <summary>
     ///     Test that a token made with an API token cannot create or revoke tokens.
     /// </summary>
     [Fact]
     public async Task PersonalAccessTokenService_CreateAndRevoke_ApiTokenActor_IsRefused()
     {
         // Arrange: a token and an actor that arrived through it
-        var (service, _, _, _, _) = await CreateAsync();
+        var (service, tokens, _, _, _) = await CreateAsync();
         var created = await service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken);
         var viaApi = new Actor("ann", "Ann") { ApiTokenId = created.Token.DisplayId };
 
@@ -358,9 +447,12 @@ public class PersonalAccessTokenServiceTests
         var revoke = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.RevokeAsync(viaApi, created.Token.Id, TestContext.Current.CancellationToken));
 
-        // Assert: both are refused as not allowed
+        // Assert: both are refused as not allowed, nothing was created, and the token was not revoked and still works
         Assert.Equal(DomainRule.ActorNotAllowed, create.Rule);
         Assert.Equal(DomainRule.ActorNotAllowed, revoke.Rule);
+        var row = Assert.Single(tokens.Rows);
+        Assert.Null(row.Revoked);
+        Assert.True((await service.AuthenticateAsync(created.Value, TestContext.Current.CancellationToken)).Succeeded);
     }
 
     /// <summary>
@@ -547,25 +639,82 @@ public class PersonalAccessTokenServiceTests
     }
 
     /// <summary>
-    ///     Test that an unknown or disabled owner cannot create or list tokens.
+    ///     Test that an unknown user cannot list tokens.
     /// </summary>
     [Fact]
-    public async Task PersonalAccessTokenService_CreateAndList_UnknownOrDisabledOwner_IsRefused()
+    public async Task PersonalAccessTokenService_List_UnknownOwner_IsRefused()
+    {
+        // Arrange: a service with ann only
+        var (service, tokens, _, _, _) = await CreateAsync();
+
+        // Act: list as nobody known
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ListAsync(TestActors.Eve, TestContext.Current.CancellationToken));
+
+        // Assert: refused as not allowed and nothing is stored
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Empty(tokens.Rows);
+    }
+
+    /// <summary>
+    ///     Test that an unknown user cannot create a token.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Create_UnknownOwner_IsRefused()
+    {
+        // Arrange: a service with ann only
+        var (service, tokens, _, _, _) = await CreateAsync();
+
+        // Act: create as nobody known
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(TestActors.Eve, "build server", 90, TestContext.Current.CancellationToken));
+
+        // Assert: refused as not allowed, nothing is stored, and nothing is audited
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Empty(tokens.Rows);
+        Assert.Empty(tokens.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a disabled user cannot create a token.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Create_DisabledOwner_IsRefused()
     {
         // Arrange: a service with ann, who is then disabled
         var (service, tokens, users, _, _) = await CreateAsync();
         await users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);
 
-        // Act: create as the disabled user and as nobody known
-        var disabled = await Assert.ThrowsAsync<DomainRuleException>(
+        // Act: create as the disabled user
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken));
-        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ListAsync(TestActors.Eve, TestContext.Current.CancellationToken));
 
-        // Assert: both are refused as not allowed and nothing is stored
-        Assert.Equal(DomainRule.ActorNotAllowed, disabled.Rule);
-        Assert.Equal(DomainRule.ActorNotAllowed, unknown.Rule);
+        // Assert: refused as not allowed, nothing is stored, and nothing is audited
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
         Assert.Empty(tokens.Rows);
+        Assert.Empty(tokens.Audits);
+    }
+
+    /// <summary>
+    ///     Test that the first use of a token records the time of the use.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Authenticate_FirstUse_RecordsTheTime()
+    {
+        // Arrange: a token that was never used
+        var (service, tokens, _, clock, _) = await CreateAsync();
+        var created = await service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken);
+        Assert.Null(tokens.Rows[0].LastUsed);
+        Assert.Equal(0, tokens.TouchCount);
+
+        // Act: use the token a minute later
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var result = await service.AuthenticateAsync(created.Value, TestContext.Current.CancellationToken);
+
+        // Assert: the use succeeded and the store holds the time of the use, written once
+        Assert.True(result.Succeeded);
+        Assert.Equal(clock.GetUtcNow(), tokens.Rows[0].LastUsed);
+        Assert.Equal(1, tokens.TouchCount);
     }
 
     /// <summary>

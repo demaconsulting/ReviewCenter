@@ -48,6 +48,8 @@ N/A - standard test environment. The tests need no database, no files, and no ne
   token actor is refused; users without a second factor, with a temporary password, or with the feature off need no
   code.
 - A challenge whose user is invalidated while its code is checked is not given back.
+- A wrong code at a signature is refused, counted toward the lockout, and recorded as `signature.reauth-failed`; the
+  status never shows the secret or recovery codes.
 
 #### Test Scenarios
 
@@ -64,12 +66,35 @@ differ and a code of the first secret no longer confirms. This scenario is teste
 `CurrentPasswordIncorrect` and no row exists. This scenario is tested by
 `TotpService_BeginEnrollmentAsync_WrongPassword_ThrowsAndStoresNothing`.
 
-**TotpService_BeginEnrollmentAsync_UnavailableAccount_ThrowsTotpNotAvailable**: A theory over an API token actor, an
-external account, and an account that must change its password; each raises `TotpNotAvailable`. This scenario is
-tested by `TotpService_BeginEnrollmentAsync_UnavailableAccount_ThrowsTotpNotAvailable`.
+**TotpService_BeginEnrollmentAsync_ExternalAccount_ThrowsTotpNotAvailable**: An account of an identity provider starts
+an enrollment; `TotpNotAvailable` is raised with the message that a second factor is not available for this account,
+and no row is stored. This scenario is tested by
+`TotpService_BeginEnrollmentAsync_ExternalAccount_ThrowsTotpNotAvailable`.
+
+**TotpService_BeginEnrollmentAsync_TemporaryPassword_ThrowsTotpNotAvailable**: An account that must change its
+password starts an enrollment; `TotpNotAvailable` is raised with the same message and no row is stored. This scenario
+is tested by `TotpService_BeginEnrollmentAsync_TemporaryPassword_ThrowsTotpNotAvailable`.
+
+**TotpService_BeginEnrollmentAsync_ApiTokenActor_ThrowsTotpNotAvailable**: A request that comes with an API token
+starts an enrollment; `TotpNotAvailable` is raised with the same message and no row is stored. This scenario is tested
+by `TotpService_BeginEnrollmentAsync_ApiTokenActor_ThrowsTotpNotAvailable`.
+
+**TotpService_AccountOperations_ApiTokenActor_ThrowTotpNotAvailable**: A theory over the confirmation, the
+cancellation, the removal, and the new recovery codes; each raises `TotpNotAvailable` for an API token actor. This
+scenario is tested by `TotpService_AccountOperations_ApiTokenActor_ThrowTotpNotAvailable`.
+
+**TotpService_AccountOperations_FeatureDisabled_ThrowTotpNotAvailable**: The same four operations raise
+`TotpNotAvailable` for an ordinary user while the feature is switched off. This scenario is tested by
+`TotpService_AccountOperations_FeatureDisabled_ThrowTotpNotAvailable`.
+
+**TotpService_GetStatusAsync_ExternalOrTemporaryPasswordAccount_IsNotAvailable**: A theory over an account of an
+identity provider and an account that must change its password; the status is the feature on, not available, not
+enrolled, and no codes left. This scenario is tested by
+`TotpService_GetStatusAsync_ExternalOrTemporaryPasswordAccount_IsNotAvailable`.
 
 **TotpService_BeginEnrollmentAsync_FeatureDisabled_ThrowsTotpNotAvailable**: With the feature switched off, starting
-raises `TotpNotAvailable` and the status reports the feature as off and not available. This scenario is tested by
+raises `TotpNotAvailable` with the fixed message, and the status reports the feature as off and not available. This
+scenario is tested by
 `TotpService_BeginEnrollmentAsync_FeatureDisabled_ThrowsTotpNotAvailable`.
 
 **TotpService_BeginEnrollmentAsync_AlreadyEnrolled_ThrowsTotpAlreadyEnrolled**: An enrolled user starts again and
@@ -89,6 +114,10 @@ still confirms. This scenario is tested by `TotpService_ConfirmEnrollmentAsync_W
 sixteen minutes; even a code that is right now raises `TotpEnrollmentExpired`. This scenario is tested by
 `TotpService_ConfirmEnrollmentAsync_AfterFifteenMinutes_ThrowsTotpEnrollmentExpired`.
 
+**TotpService_ConfirmEnrollmentAsync_ExactlyFifteenMinutes_Confirms**: A started enrollment waits exactly fifteen
+minutes; a code that is right now confirms it, returns ten recovery codes, and the status shows the user as enrolled.
+This scenario is tested by `TotpService_ConfirmEnrollmentAsync_ExactlyFifteenMinutes_Confirms`.
+
 **TotpService_ConfirmEnrollmentAsync_NothingStarted_ThrowsTotpNotEnrolled**: Confirming without a started enrollment
 raises `TotpNotEnrolled`. This scenario is tested by
 `TotpService_ConfirmEnrollmentAsync_NothingStarted_ThrowsTotpNotEnrolled`.
@@ -97,9 +126,31 @@ raises `TotpNotEnrolled`. This scenario is tested by
 enrollment and leaves a confirmed one active. This scenario is tested by
 `TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed`.
 
+**TotpService_CompleteSignInAsync_CodeWithinTheWindow_SignsIn**: A theory over the code of the step before, of the
+current step, and of the step after it; each signs in the user. This scenario is tested by
+`TotpService_CompleteSignInAsync_CodeWithinTheWindow_SignsIn`.
+
+**TotpService_CompleteSignInAsync_TwoUsers_SignsInTheUserOfTheChallenge**: Two users are enrolled and one has a pending
+sign-in. A code of the other secret fails without a user, the code of the own secret signs in the user of the
+challenge, and the other user never signs in. This scenario is tested by
+`TotpService_CompleteSignInAsync_TwoUsers_SignsInTheUserOfTheChallenge`.
+
+**TotpService_CompleteSignInAsync_DisabledUser_IsChallengeInvalid**: The user is disabled after the first step; even a
+right code gives `ChallengeInvalid` without a user, uses up no step, and counts no failure. This scenario is tested by
+`TotpService_CompleteSignInAsync_DisabledUser_IsChallengeInvalid`.
+
+**TotpService_CompleteSignInAsync_RecoveryCodeSpellings_AreAccepted**: A theory over a recovery code in lower case, with
+spaces for hyphens, without hyphens, and padded with blanks; each signs in with the recovery code and leaves nine codes
+unused; the same code is then refused and another recovery code still signs in. This scenario is tested by
+`TotpService_CompleteSignInAsync_RecoveryCodeSpellings_AreAccepted`.
+
 **TotpService_CompleteSignInAsync_CodeOfTheEnrollment_IsAReplay**: The code that confirmed the enrollment fails at
 sign-in, and the code of the next step signs in. This scenario is tested by
 `TotpService_CompleteSignInAsync_CodeOfTheEnrollment_IsAReplay`.
+
+**TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen**: An enrolled user who never signed in has no
+last sign-in time after the password step and after a wrong code; the completed second step stores the time of the
+clock. This scenario is tested by `TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen`.
 
 **TotpService_CompleteSignInAsync_WindowAndOrder_AcceptsPlusMinusOneStepOnlyOnceForward**: Codes two steps away are
 refused, a code one step behind is accepted once, the current step is accepted, and an older step is refused
@@ -107,8 +158,8 @@ afterwards. This scenario is tested by
 `TotpService_CompleteSignInAsync_WindowAndOrder_AcceptsPlusMinusOneStepOnlyOnceForward`.
 
 **TotpService_CompleteSignInAsync_WrongReusedMalformed_AreIndistinguishable**: A reused code, a wrong code, a short
-code, text, a long code, and no code each give exactly the same failed result without a user. This scenario is tested
-by `TotpService_CompleteSignInAsync_WrongReusedMalformed_AreIndistinguishable`.
+code, text, a long code, no code, and an empty code each give exactly the same failed result without a user. This
+scenario is tested by `TotpService_CompleteSignInAsync_WrongReusedMalformed_AreIndistinguishable`.
 
 **TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds**: Several pending sign-ins of one user present
 the same code in parallel; exactly one succeeds and the step moves forward once. This scenario is tested by
@@ -143,8 +194,16 @@ so four more failures do not lock. This scenario is tested by
 `TotpService_CompleteSignInAsync_Success_ClearsTheCounter`.
 
 **TotpService_CompleteSignInAsync_BadChallenge_IsChallengeInvalid**: A theory over a missing, garbage, foreign-client,
-used, expired, and user-disabled challenge; none signs in and none carries a user. This scenario is tested by
+used, and expired challenge; each gives exactly `ChallengeInvalid` and carries no user. This scenario is tested by
 `TotpService_CompleteSignInAsync_BadChallenge_IsChallengeInvalid`.
+
+**TotpService_CompleteSignInAsync_WrongCode_RecordsTheFailureWithAFixedText**: A wrong code at the second step writes
+one audit entry whose actor is the user and whose text is the fixed `wrong or reused code (sign-in)` without the code.
+This scenario is tested by `TotpService_CompleteSignInAsync_WrongCode_RecordsTheFailureWithAFixedText`.
+
+**TotpService_VerifyForSignatureAsync_WrongCode_ReturnsFalseAndCountsTheFailure**: A wrong code at a signature returns
+false, counts one failure, writes one `signature.reauth-failed` entry, and uses up no step. This scenario is tested by
+`TotpService_VerifyForSignatureAsync_WrongCode_ReturnsFalseAndCountsTheFailure`.
 
 **TotpService_CompleteSignInAsync_ForeignClient_DoesNotSpendTheChallenge**: Another address tries first and gets
 `ChallengeInvalid`; the owner address then still signs in. This scenario is tested by
@@ -160,8 +219,19 @@ read the secret, the right code fails and a recovery code signs in. This scenari
 `TotpService_CompleteSignInAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks`.
 
 **TotpService_DisableAsync_PasswordAndCode_RemovesAndInvalidatesPendingSignIns**: A wrong password and a wrong code are
-refused; the right ones remove the enrollment with an audit entry, end the pending sign-in, and let the password alone
-sign in. This scenario is tested by `TotpService_DisableAsync_PasswordAndCode_RemovesAndInvalidatesPendingSignIns`.
+refused; the right ones remove the enrollment with an audit entry, delete the recovery codes, end the pending sign-in
+(the challenge can no longer be peeked), and let the password alone sign in. This scenario is tested by
+`TotpService_DisableAsync_PasswordAndCode_RemovesAndInvalidatesPendingSignIns`.
+
+**TotpService_DisableAsync_WrongPassword_ThrowsAndKeepsTheSecondFactor**: A wrong password with a right code raises
+`CurrentPasswordIncorrect`; the enrollment stays active, the ten recovery code hashes are unchanged, no step is used up,
+and no removal is audited. This scenario is tested by
+`TotpService_DisableAsync_WrongPassword_ThrowsAndKeepsTheSecondFactor`.
+
+**TotpService_DisableAsync_WrongCode_ThrowsCountsAndKeepsTheSecondFactor**: A wrong code with the right password raises
+`TotpCodeIncorrect`; the enrollment stays active, the recovery code hashes are unchanged, one failure is counted and
+audited, and no removal is audited. This scenario is tested by
+`TotpService_DisableAsync_WrongCode_ThrowsCountsAndKeepsTheSecondFactor`.
 
 **TotpService_DisableAsync_RecoveryCode_Removes**: A recovery code removes the enrollment and its use is audited. This
 scenario is tested by `TotpService_DisableAsync_RecoveryCode_Removes`.
@@ -173,28 +243,56 @@ scenario is tested by `TotpService_DisableAsync_RecoveryCode_Removes`.
 regeneration; a code issues ten new codes, the old codes stop working, a new code works, and the regeneration is
 audited. This scenario is tested by `TotpService_RegenerateRecoveryCodesAsync_PasswordAndCode_ReplacesTheCodes`.
 
+**TotpService_RegenerateRecoveryCodesAsync_WrongPassword_ThrowsAndKeepsTheCodes**: A wrong password with a right code
+raises `CurrentPasswordIncorrect`; the ten old code hashes are unchanged and unused, no step is used up, and no
+regeneration is audited. This scenario is tested by
+`TotpService_RegenerateRecoveryCodesAsync_WrongPassword_ThrowsAndKeepsTheCodes`.
+
+**TotpService_RegenerateRecoveryCodesAsync_WrongCode_ThrowsAndKeepsTheCodes**: A wrong code with the right password
+raises `TotpCodeIncorrect`; the ten old code hashes are unchanged and unused, no regeneration is audited, and one
+failure is counted. This scenario is tested by `TotpService_RegenerateRecoveryCodesAsync_WrongCode_ThrowsAndKeepsTheCodes`.
+
 **TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns**: A system administrator resets a
-user; the enrollment is removed, the audit entry names the administrator and the target, and the pending sign-in ends.
-This scenario is tested by `TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns`.
+user; the enrollment is removed, the audit entry names the administrator and the target, and the pending sign-in ends
+(the challenge can no longer be peeked). This scenario is tested by
+`TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns`.
 
 **TotpService_ResetAsync_NotASystemAdministrator_ThrowsActorNotAllowed**: A theory over an ordinary user, a project
-administrator, the target itself, an API token administrator, a disabled administrator, and an unknown caller; each
-raises `ActorNotAllowed`. This scenario is tested by
+administrator, the target itself, and an unknown caller; each raises `ActorNotAllowed`, the second factor of the user
+stays, and no reset is audited. This scenario is tested by
 `TotpService_ResetAsync_NotASystemAdministrator_ThrowsActorNotAllowed`.
 
-**TotpService_ResetAsync_UnknownOrNotEnrolled_Throws**: Resetting an unknown user or a user without a second factor is
-refused. This scenario is tested by `TotpService_ResetAsync_UnknownOrNotEnrolled_Throws`.
+**TotpService_ResetAsync_ApiTokenAdministrator_ThrowsActorNotAllowed**: A system administrator who acts through an API
+token is refused with `ActorNotAllowed` and the second factor of the user stays. This scenario is tested by
+`TotpService_ResetAsync_ApiTokenAdministrator_ThrowsActorNotAllowed`.
+
+**TotpService_ResetAsync_DisabledAdministrator_ThrowsActorNotAllowed**: A disabled system administrator is refused with
+`ActorNotAllowed` and the second factor of the user stays. This scenario is tested by
+`TotpService_ResetAsync_DisabledAdministrator_ThrowsActorNotAllowed`.
+
+**TotpService_ResetAsync_UnknownUser_ThrowsUserNotFound**: Resetting a user who does not exist raises `UserNotFound`.
+This scenario is tested by `TotpService_ResetAsync_UnknownUser_ThrowsUserNotFound`.
+
+**TotpService_ResetAsync_UserWithoutSecondFactor_ThrowsTotpNotEnrolled**: Resetting a user without a second factor
+raises `TotpNotEnrolled`. This scenario is tested by
+`TotpService_ResetAsync_UserWithoutSecondFactor_ThrowsTotpNotEnrolled`.
 
 **TotpService_ListEnrolledUserIdsAsync_HoldsConfirmedEnrollmentsOnly**: Only the user with a confirmed enrollment is
 listed; a pending one and a plain one are not. This scenario is tested by
 `TotpService_ListEnrolledUserIdsAsync_HoldsConfirmedEnrollmentsOnly`.
 
 **TotpService_WholeLifeCycle_NeverPutsSecretsOrCodesInAuditOrErrors**: A user enrolls, fails, signs in with a code and a
-recovery code, regenerates, and is removed; no audit entry and no error message holds a secret, a code, or a recovery
-code. This scenario is tested by `TotpService_WholeLifeCycle_NeverPutsSecretsOrCodesInAuditOrErrors`.
+recovery code, regenerates, and is removed. The pending sign-in tokens, the secret, the typed codes, and the recovery
+codes are collected as four separate kinds; each kind is checked on its own, and none of its values is in any audit
+entry or in any error message. The failure is audited, and the messages are checked separately from the audit text.
+This scenario is tested by `TotpService_WholeLifeCycle_NeverPutsSecretsOrCodesInAuditOrErrors`.
 
 **TotpService_GetStatusAsync_ApiTokenActor_IsNotAvailable**: The status for an API token actor reports the feature as
 not available. This scenario is tested by `TotpService_GetStatusAsync_ApiTokenActor_IsNotAvailable`.
+
+**TotpService_GetStatusAsync_Enrolled_ShowsNeitherSecretNorRecoveryCodes**: After the setup is confirmed, the status is
+exactly the feature on, available, enrolled, and ten codes left, and its text holds neither the secret nor any recovery
+code. This scenario is tested by `TotpService_GetStatusAsync_Enrolled_ShowsNeitherSecretNorRecoveryCodes`.
 
 **TotpService_NullArguments_Throw**: Null arguments raise `ArgumentNullException`. This scenario is tested by
 `TotpService_NullArguments_Throw`.
@@ -209,10 +307,13 @@ blank code; for an enrolled user the right password alone is refused with `TotpC
 unchanged, and the failure counter is not cleared. This scenario is tested by
 `TotpService_ChangeOwnPasswordAsync_NoCode_IsRefusedCountsAndKeepsTheHash`.
 
-**TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash**: A wrong code raises
-`TotpCodeIncorrect` and counts as a failure; a wrong password raises `CurrentPasswordIncorrect`; neither changes the
-hash. This scenario is tested by
-`TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash`.
+**TotpService_ChangeOwnPasswordAsync_WrongCode_IsRefusedCountedAndKeepsTheHash**: A wrong code with the right password
+raises `TotpCodeIncorrect`, counts one failure, keeps the hash, and uses up no step. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_WrongCode_IsRefusedCountedAndKeepsTheHash`.
+
+**TotpService_ChangeOwnPasswordAsync_WrongPassword_IsRefusedBeforeTheCodeIsLookedAt**: A wrong password with a right
+code raises `CurrentPasswordIncorrect`, keeps the hash, and uses up no step. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_WrongPassword_IsRefusedBeforeTheCodeIsLookedAt`.
 
 **TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused**: The code of a step that was already accepted is refused
 and the hash is unchanged. This scenario is tested by `TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused`.
@@ -230,8 +331,9 @@ try with the right code is refused while it is locked. This scenario is tested b
 `TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount`.
 
 **TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter**: Password-only attempts
-between wrong codes do not reset the shared counter, so the account is locked after five failures in total. This
-scenario is tested by `TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter`.
+between wrong codes do not reset the shared counter, so the account is locked after five failures in total; the hash
+stays. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter`.
 
 **TotpService_ChangeOwnPasswordAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks**: With the protector unable
 to read the secret, a code is refused and a recovery code changes the password. This scenario is tested by
@@ -241,9 +343,13 @@ to read the secret, a code is refused and a recovery code changes the password. 
 `ActorNotAllowed` and nothing changes. This scenario is tested by
 `TotpService_ChangeOwnPasswordAsync_ApiTokenActor_ThrowsActorNotAllowed`.
 
-**TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks**: A theory over a user without a
-second factor and a user with one while the feature is switched off; the password alone changes the password. This
-scenario is tested by `TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks`.
+**TotpService_ChangeOwnPasswordAsync_NotEnrolled_PasswordAloneWorks**: A user without a second factor changes the
+password with the password alone. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_NotEnrolled_PasswordAloneWorks`.
+
+**TotpService_ChangeOwnPasswordAsync_FeatureDisabled_PasswordAloneWorks**: A user with a second factor changes the
+password with the password alone while the feature is switched off. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_FeatureDisabled_PasswordAloneWorks`.
 
 **TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode**: A user with a temporary password changes it with
 the password alone. This scenario is tested by `TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode`.
