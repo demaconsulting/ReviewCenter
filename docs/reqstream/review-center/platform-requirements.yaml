@@ -7,7 +7,9 @@
 # ReviewCenter is distributed as a self-contained single-file executable for win-x64 and linux-x64
 # (net10.0 only; the .NET runtime is bundled, so no .NET installation is needed). The evidence is the
 # self-validation that CI runs on the published executable, extracted from its release archive, on
-# windows-latest and ubuntu-latest, with no .NET runtime available to it.
+# windows-latest and ubuntu-latest, with no .NET runtime available to it. The requirements claim that the
+# executable is self-contained, which that run shows; the single-file packaging is a build setting that the
+# self-validation does not observe, so it is not claimed here.
 #
 # Test links can include a source filter prefix (e.g. "windows@", "ubuntu@", "net10.0@") to restrict
 # which test results count as evidence for a requirement. This is critical for platform and runtime
@@ -23,7 +25,7 @@ sections:
   - title: Platform Support
     requirements:
       - id: ReviewCenter-Platform-Windows
-        title: The tool shall execute successfully on Windows (win-x64) as a self-contained single-file executable.
+        title: The tool shall execute successfully on Windows (win-x64) as a self-contained executable.
         tags: [system]
         justification: |
           DEMA Consulting tools must support Windows as a major development platform. Operators install a
@@ -41,7 +43,7 @@ sections:
           - "windows@ReviewCenter_HostStart"
 
       - id: ReviewCenter-Platform-Linux
-        title: The tool shall execute successfully on Linux (linux-x64) as a self-contained single-file executable.
+        title: The tool shall execute successfully on Linux (linux-x64) as a self-contained executable.
         tags: [system]
         justification: |
           DEMA Consulting tools must support Linux for CI/CD and containerized environments. The published

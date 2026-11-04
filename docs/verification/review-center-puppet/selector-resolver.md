@@ -15,7 +15,7 @@ N/A - standard test environment.
 - All unit tests pass with zero failures.
 - A plain name and a `testid:` name resolve to a `data-testid` attribute selector, with quotes escaped.
 - `css=`, `text=`, `role=`, and CSS selectors pass through unchanged.
-- Empty and white-space selectors are rejected.
+- Empty, white-space, and null selectors are rejected.
 
 ### Test Scenarios
 
@@ -24,5 +24,6 @@ N/A - standard test environment.
 `role=button[name="Save"]`, and `#main` are returned exactly as given. Tested by
 `SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector`.
 
-**SelectorResolver_Resolve_Blank_ThrowsArgumentException**: An empty selector and a selector of two spaces each
-cause an `ArgumentException`. Tested by `SelectorResolver_Resolve_Blank_ThrowsArgumentException`.
+**SelectorResolver_Resolve_Blank_ThrowsArgumentException**: A null selector causes an `ArgumentNullException`; an empty
+selector, a selector of two spaces, and a `testid:` prefix without a name each cause an `ArgumentException`. Tested by
+`SelectorResolver_Resolve_Blank_ThrowsArgumentException`.

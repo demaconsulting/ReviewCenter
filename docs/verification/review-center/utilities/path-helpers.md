@@ -14,12 +14,16 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- Valid relative paths are combined correctly and the returned path equals the expected result.
-- Path traversal patterns cause `ArgumentException` with message containing "Invalid path
-  component".
-- Absolute paths supplied as the relative argument cause `ArgumentException`.
-- Null inputs cause `ArgumentNullException`.
-- A filename beginning with `".."` that is not a traversal sequence is accepted correctly.
+- A plain or nested relative path is combined with the base path and the returned path equals the expected result
+  (`SafeCombine`).
+- A relative path that starts with `./` is combined with the base path (`SafeCombine-CurrentDirectory`).
+- An empty relative path returns the base path (`SafeCombine-EmptyPath`).
+- A name that only begins with two dots, such as `..data`, is accepted as a name inside the base path
+  (`SafeCombine-DotDotName`).
+- A relative path that climbs out of the base path with `..` segments, at its start or in its middle, causes
+  `ArgumentException` with a message containing "Invalid path component" (`SafeCombine-Traversal`).
+- An absolute path supplied as the relative argument causes `ArgumentException` (`SafeCombine-AbsolutePath`).
+- A null base path and a null relative path each cause `ArgumentNullException` (`SafeCombine-NullArgument`).
 
 #### Test Scenarios
 

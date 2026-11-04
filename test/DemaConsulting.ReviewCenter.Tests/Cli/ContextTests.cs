@@ -43,6 +43,12 @@ public class ContextTests
         Assert.False(context.Help);
         Assert.False(context.Silent);
         Assert.False(context.Validate);
+        Assert.False(context.CheckConfig);
+        Assert.False(context.Serve);
+        Assert.False(context.UserAdd);
+        Assert.False(context.AuditVerify);
+        Assert.False(context.KeysReprotect);
+        Assert.False(context.SystemAdmin);
         Assert.Null(context.ResultsFile);
         Assert.Equal(1, context.HeadingDepth);
         Assert.Equal(0, context.ExitCode);
@@ -246,6 +252,7 @@ public class ContextTests
 
         // Assert: serve is requested and the default URL applies
         Assert.True(context.Serve);
+        Assert.Equal("http://localhost:5000", context.Urls);
         Assert.Equal(Context.DefaultUrls, context.Urls);
     }
 
@@ -308,18 +315,13 @@ public class ContextTests
     }
 
     /// <summary>
-    ///     Test that incorrect use of the user add verb and its options is rejected with a message.
+    ///     Test that a user add verb with only one of the two names is rejected with a message.
     /// </summary>
     /// <param name="arguments">The arguments, joined by a space.</param>
     /// <param name="expected">The text the message must contain.</param>
     [Theory]
-    [InlineData("user", "add action")]
-    [InlineData("user remove", "add action")]
     [InlineData("user add --display-name Ann", "requires --username and --display-name")]
     [InlineData("user add --username ann", "requires --username and --display-name")]
-    [InlineData("user add --username ann --display-name Ann --role Admin", "Unsupported argument '--role'")]
-    [InlineData("--username ann", "require the user add verb")]
-    [InlineData("--system-admin", "require the user add verb")]
     public void Context_Create_UserAddMisuse_ThrowsArgumentException(string arguments, string expected)
     {
         // Act: parse the arguments
@@ -328,6 +330,123 @@ public class ContextTests
         // Assert: refused with a message that says what is wrong
         var argumentException = Assert.IsType<ArgumentException>(exception);
         Assert.Contains(expected, argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the user verb without the add action is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("user")]
+    [InlineData("user remove")]
+    public void Context_Create_UserAddWrongAction_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the add action
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("add action", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that each user add option without the user add verb is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("--username ann")]
+    [InlineData("--display-name Ann")]
+    [InlineData("--system-admin")]
+    public void Context_Create_UserAddOptionsWithoutVerb_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the missing verb
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("require the user add verb", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the removed --role option of the user add verb is rejected as an unsupported argument.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UserAddRoleOption_ThrowsArgumentException()
+    {
+        // Act: parse a user add with the removed role option
+        var exception = Record.Exception(() =>
+            Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--role", "Admin"]));
+
+        // Assert: the option is unknown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("Unsupported argument '--role'", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the audit verify verb is parsed and is off when not given.
+    /// </summary>
+    [Fact]
+    public void Context_Create_AuditVerifyVerb_SetsAuditVerify()
+    {
+        // Act: parse the verb and a context without it
+        using var context = Context.Create(["audit", "verify"]);
+        using var other = Context.Create([]);
+
+        // Assert: the verb is recorded only when given, and no other verb is set
+        Assert.True(context.AuditVerify);
+        Assert.False(other.AuditVerify);
+        Assert.False(context.UserAdd);
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the audit verb is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("audit")]
+    [InlineData("audit export")]
+    public void Context_Create_AuditMisuse_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the missing action
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("verify", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the keys reprotect verb is parsed and is off when not given.
+    /// </summary>
+    [Fact]
+    public void Context_Create_KeysReprotectVerb_SetsKeysReprotect()
+    {
+        // Act: parse the verb and a context without it
+        using var context = Context.Create(["keys", "reprotect"]);
+        using var other = Context.Create([]);
+
+        // Assert: the verb is recorded only when given, and no other verb is set
+        Assert.True(context.KeysReprotect);
+        Assert.False(other.KeysReprotect);
+        Assert.False(context.AuditVerify);
+        Assert.Equal(0, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the keys verb is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("keys")]
+    [InlineData("keys rotate")]
+    public void Context_Create_KeysMisuse_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the missing action
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("reprotect", argumentException.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -680,22 +799,27 @@ public class ContextTests
     {
         // Arrange: setup test conditions
         var originalError = Console.Error;
+        var originalOut = Console.Out;
         try
         {
             using var errWriter = new StringWriter();
+            using var outWriter = new StringWriter();
             Console.SetError(errWriter);
+            Console.SetOut(outWriter);
             using var context = Context.Create([]);
 
             // Act: execute the operation being tested
             context.WriteError("Test error message");
 
-            // Assert: verify expected behavior
+            // Assert: the message is on the error stream and not on standard output
             var output = errWriter.ToString();
             Assert.Contains("Test error message", output);
+            Assert.DoesNotContain("Test error message", outWriter.ToString());
         }
         finally
         {
             Console.SetError(originalError);
+            Console.SetOut(originalOut);
         }
     }
 

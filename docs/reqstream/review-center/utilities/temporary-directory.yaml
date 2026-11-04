@@ -3,58 +3,156 @@
 #
 # The TemporaryDirectory class owns a uniquely named directory under the system temporary path for the lifetime of
 # an object: self-validation creates all of its files there, and removes them when it is done.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: TemporaryDirectory Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Creation: where the directory is and how it is named
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-TemporaryDirectory-Unique
         title: >-
-          The TemporaryDirectory class shall create a new directory with a GUID name under the system temporary path
-          for every instance.
+          The TemporaryDirectory class shall create a directory with a GUID name directly under the system temporary
+          path.
         justification: |
-          Concurrent or repeated runs must never share files, and a name that cannot be guessed or reused keeps a
-          run away from files that already exist.
+          A name that cannot be guessed or reused keeps a run away from files that already exist, and the system
+          temporary path is where the operating system expects scratch files and cleans up after them.
         tests:
           - TemporaryDirectory_Constructor_Default_CreatesGuidNamedDirectoryUnderTempPath
+
+      - id: ReviewCenter-TemporaryDirectory-Unique-PerInstance
+        title: >-
+          The TemporaryDirectory class shall give two instances that exist at the same time different directories.
+        justification: |
+          Concurrent or repeated runs must never share files; a second instance that reused the directory of the first
+          would find its files and, on disposal, delete the files that the first one still uses.
+        tests:
           - TemporaryDirectory_Constructor_TwoInstances_UseDifferentDirectories
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # GetFilePath: the paths handed out
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-TemporaryDirectory-GetFilePath
         title: >-
-          The TemporaryDirectory class shall return the full path of a file inside the directory for a relative
-          path, create its parent directories, and reject a path that would escape the directory.
+          The TemporaryDirectory class shall return the full path of a file inside the directory for a relative path.
         justification: |
-          Callers build file names from fixed and generated parts; the check that the result stays inside the
-          directory keeps a mistake in a name from writing, or later deleting, anywhere else.
+          Callers build file names from fixed and generated parts and need a full path to write to; a path inside the
+          directory means that everything a run writes is removed with the directory.
         tests:
           - TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents
+
+      - id: ReviewCenter-TemporaryDirectory-GetFilePath-Parents
+        title: >-
+          The TemporaryDirectory class shall create the folders above the file when it returns the path of a file in a
+          nested relative path.
+        justification: |
+          Callers write straight to the returned path, and a write into a folder that does not exist fails; creating
+          the folders here spares every caller from repeating that step.
+        tests:
+          - TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents
+
+      - id: ReviewCenter-TemporaryDirectory-GetFilePath-Escape
+        title: >-
+          The TemporaryDirectory class shall reject a relative path that would escape the directory.
+        justification: |
+          A mistake in a generated name must not write, or later delete, anywhere outside the directory; refusing the
+          path is the security boundary between the names callers build and the file system.
+        tests:
           - TemporaryDirectory_GetFilePath_PathEscapesDirectory_ThrowsArgumentException
+
+      - id: ReviewCenter-TemporaryDirectory-GetFilePath-NullPath
+        title: >-
+          The TemporaryDirectory class shall reject a null relative path.
+        justification: |
+          A missing name is a programming error of the caller; failing at once keeps it from turning into the path of
+          the directory itself.
+        tests:
           - TemporaryDirectory_GetFilePath_NullPath_ThrowsArgumentNullException
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Dispose: removing the directory
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-TemporaryDirectory-Dispose
         title: >-
           The TemporaryDirectory class shall remove the directory and everything in it when it is disposed, including
-          read-only files, never throw because a file is in use or cannot be deleted, and allow repeated disposal.
+          read-only files.
+        justification: |
+          A run must leave nothing behind; git writes its object files read-only, and Windows refuses to delete such a
+          file until the flag is cleared, so the removal has to cope with them.
+        tests:
+          - TemporaryDirectory_Dispose_DirectoryWithReadOnlyFile_DeletesEverything
+
+      - id: ReviewCenter-TemporaryDirectory-Dispose-NoThrow
+        title: >-
+          The TemporaryDirectory class shall not throw from disposal when a file in the directory is held open.
         justification: |
           Cleanup runs in a finally block or at the end of a run and must not hide the real result with an exception
           of its own; a file that a virus scanner still holds is left for the operating system's temporary cleanup.
         tests:
-          - TemporaryDirectory_Dispose_DirectoryWithReadOnlyFile_DeletesEverything
-          - TemporaryDirectory_Dispose_CalledTwice_DoesNotThrow
           - TemporaryDirectory_Dispose_FileInUse_DoesNotThrow
 
+      - id: ReviewCenter-TemporaryDirectory-Dispose-Repeated
+        title: >-
+          The TemporaryDirectory class shall allow the directory to be disposed more than once.
+        justification: |
+          A directory can be disposed explicitly and again by a using block; the second disposal of a directory that
+          is gone must be harmless instead of masking the result of the work.
+        tests:
+          - TemporaryDirectory_Dispose_CalledTwice_DoesNotThrow
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # BoundedRetry: a lock that goes away
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-TemporaryDirectory-BoundedRetry
         title: >-
-          The TemporaryDirectory class shall, when the directory cannot be deleted because a file is still in use,
-          retry the deletion a bounded number of times (five attempts about 75 ms apart by default), succeed when the
-          lock goes away within that time, give up quietly and without a further wait when it does not, and refuse a
-          retry policy that has no attempt or a negative pause.
+          The TemporaryDirectory class shall, when a file in the directory is still in use at the first delete attempt
+          and is released within the retry time, retry the deletion and remove the whole directory.
         justification: |
           A file can stay locked for a moment after the process or database connection that used it was stopped, for
           example while a virus scanner or the indexer still holds it, and Windows refuses to delete such a file. A
-          single attempt left temporary folders behind and a retry without a limit could hang a run, so the number of
-          attempts and the pause are fixed and small, and the total wait stays under half a second.
+          single attempt left temporary folders behind.
         tests:
           - TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry-Default
+        title: >-
+          The TemporaryDirectory class shall by default try to delete the directory five times, with a pause of 75
+          milliseconds between the attempts.
+        justification: |
+          The number of attempts and the pause are fixed and small, so that the total wait stays under half a second:
+          long enough for a scanner to let go and short enough that a cleanup never holds up a run noticeably.
+        tests:
+          - TemporaryDirectory_Constructor_Default_UsesFiveAttemptsAboutSeventyFiveMsApart
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
+        title: >-
+          The TemporaryDirectory class shall, when a file stays locked, give up without an exception after the bounded
+          number of attempts and leave the directory to the operating system.
+        justification: |
+          A retry without a limit could hang a run on a file that is never released; giving up quietly turns a locked
+          folder into a leftover for the operating system's temporary cleanup instead of a failure of work that was
+          already done.
+        tests:
           - TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime
-          - TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry-NoFinalPause
+        title: >-
+          The TemporaryDirectory class shall not pause after the last failed delete attempt, so that a policy of one
+          attempt returns without waiting.
+        justification: |
+          A pause after the last attempt would only delay the return of the call without any chance that the next
+          attempt succeeds, because there is none.
+        tests:
           - TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry-InvalidPolicy
+        title: >-
+          The TemporaryDirectory class shall reject a retry policy with fewer than one attempt or a negative pause.
+        justification: |
+          A policy with no attempt would never delete the directory, and a negative pause is not a time; refusing them
+          when the instance is created keeps a wrong value from showing up later as a folder that is never removed.
+        tests:
+          - TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException

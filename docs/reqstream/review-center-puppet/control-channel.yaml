@@ -4,6 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ControlChannel unit (tools/puppet/ControlChannel.cs)
 # - ControlChannel is the control file plus the loopback TCP protocol between the command and the daemon
+# - Every requirement states one criterion. The first criterion of a topic keeps the original id; the further
+#   criteria of the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -13,15 +15,38 @@ sections:
           - id: ReviewCenterPuppet-ControlChannel-Protocol
             title: >-
               The ControlChannel unit shall carry one JSON request line and one JSON response line per
-              connection over loopback TCP, shall treat a control file whose port does not answer a ping
-              as stale, and shall take the control file path from the environment variable
-              `REVIEWCENTER_PUPPET_CONTROL_FILE` when it is set.
+              connection over loopback TCP.
             justification: |
-              One short connection per command keeps the protocol trivial, and the ping lets a later start
-              replace the control file that a killed daemon left behind instead of refusing to run. A path
-              from the environment lets separate agent sessions each run their own Puppet.
+              One short connection per command keeps the protocol trivial: the command connects, sends one line,
+              reads one line, and leaves.
             tests:
               - ControlChannel_SendAsync_RoundTrip_DeliversRequestAndResponse
+
+          - id: ReviewCenterPuppet-ControlChannel-Protocol-StaleFile
+            title: >-
+              The ControlChannel unit shall report a control file whose port does not answer a ping as stale.
+            justification: |
+              A killed daemon leaves its control file behind; recognizing it as stale lets a later start replace
+              the file instead of refusing to run.
+            tests:
               - ControlChannel_IsAnsweringAsync_StaleControlFile_ReturnsFalse
+
+          - id: ReviewCenterPuppet-ControlChannel-Protocol-EnvironmentVariable
+            title: >-
+              The ControlChannel unit shall take the control file path from the environment variable
+              `REVIEWCENTER_PUPPET_CONTROL_FILE` when it is set.
+            justification: |
+              A path from the environment lets separate agent sessions each run their own Puppet.
+            tests:
+              - ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath
+              - ControlChannel_DefaultControlFile_EnvironmentVariable_IsHonored
+
+          - id: ReviewCenterPuppet-ControlChannel-Protocol-DefaultFile
+            title: >-
+              The ControlChannel unit shall use a well-known control file in the temporary folder when the
+              environment variable `REVIEWCENTER_PUPPET_CONTROL_FILE` is not set or is blank.
+            justification: |
+              Without any setting, every command of one user must find the same Puppet.
+            tests:
               - ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath
               - ControlChannel_DefaultControlFile_EnvironmentVariable_IsHonored

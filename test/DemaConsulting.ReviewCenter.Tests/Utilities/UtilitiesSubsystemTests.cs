@@ -177,8 +177,66 @@ public class UtilitiesSubsystemTests
             Assert.All(files, file => Assert.True(File.Exists(file)));
         }
 
-        // Assert (after disposal): nothing is left behind
+        // Assert (after disposal): nothing is left behind, neither the files nor the directory
         Assert.False(Directory.Exists(directoryPath));
+        Assert.All(files, file => Assert.False(File.Exists(file)));
+    }
+
+    /// <summary>
+    ///     Test that two temporary directories that exist at the same time have different paths.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_TwoDirectories_UseDifferentPaths()
+    {
+        // Arrange: two temporary directories that exist at the same time
+        using var first = new TemporaryDirectory();
+        using var second = new TemporaryDirectory();
+
+        // Act: ask each for the same relative file name
+        var firstFile = first.GetFilePath("shared/name.txt");
+        var secondFile = second.GetFilePath("shared/name.txt");
+
+        // Assert: the directories and the files in them are different
+        Assert.NotEqual(first.DirectoryPath, second.DirectoryPath);
+        Assert.NotEqual(firstFile, secondFile);
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem returns an inline secret as it is given.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned()
+    {
+        // Arrange: an inline secret and no file setting
+
+        // Act: resolve the secret
+        var secret = SecretSource.Resolve("inline-secret", "Test:Secret", null, "Test:SecretFile");
+
+        // Assert: the inline secret is returned unchanged
+        Assert.Equal("inline-secret", secret);
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem refuses a secret that is set inline and in a file, without the secret in the
+    ///     message.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret()
+    {
+        // Arrange: a secret file in a temporary directory and an inline secret
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("secrets/client.txt");
+        File.WriteAllText(path, "file-secret\n");
+
+        // Act: resolve with both settings set
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SecretSource.Resolve("inline-secret", "Test:Secret", path, "Test:SecretFile"));
+
+        // Assert: the message names both settings and holds neither secret
+        Assert.Contains("Test:Secret", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Test:SecretFile", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("inline-secret", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("file-secret", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

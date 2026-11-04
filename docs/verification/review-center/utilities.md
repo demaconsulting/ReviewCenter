@@ -17,18 +17,34 @@ N/A - standard test environment.
 ### Acceptance Criteria
 
 - All integration tests pass with zero failures.
-- Valid relative paths are combined correctly with no exception.
-- Path traversal patterns (e.g., `../`) cause `ArgumentException` to be thrown.
-- Absolute paths supplied as the relative argument cause `ArgumentException` to be thrown.
-- Paths produced by `SafePathCombine` can be passed directly to `Directory.CreateDirectory`.
-- Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed.
-- A secret file written to a `TemporaryDirectory` is resolved by `SecretSource` as its trimmed contents.
+- Valid relative paths are combined with the base directory into full paths that lie inside it, and the paths can be
+  passed directly to `Directory.CreateDirectory` (`SafePaths`).
+- Path traversal patterns (e.g., `../`) cause `ArgumentException` to be thrown (`SafePaths-PathTraversal`).
+- Absolute paths supplied as the relative argument cause `ArgumentException` to be thrown
+  (`SafePaths-AbsolutePath`).
+- Two `TemporaryDirectory` instances that exist at the same time have different paths (`TempFiles`).
+- The paths that `GetFilePath` hands out, including those in nested folders, lie inside the directory
+  (`TempFiles-InsideOnly`).
+- Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed
+  (`TempFiles-Removed`).
+- A secret file written to a `TemporaryDirectory` is resolved by `SecretSource` as its trimmed contents
+  (`SecretSource`).
+- An inline secret is returned as it is given (`SecretSource-Inline`).
+- Once the secret file is gone, resolving it is refused with a message that names the file setting
+  (`SecretSource-Refusal`).
+- A secret that is set inline and in a file is refused with a message that holds neither secret
+  (`SecretSource-NoDisclosure`).
 
 ### Test Scenarios
 
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_TwoDirectories_UseDifferentPaths**: Two `TemporaryDirectory`
+instances exist at the same time and each is asked for the same relative file name; the directories and the files in
+them have different paths. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_TwoDirectories_UseDifferentPaths`.
+
 **UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose**: Files are
-created in nested folders through `TemporaryDirectory.GetFilePath` and written; after the
-instance is disposed neither the files nor the directory exist. This scenario is tested by
+created in nested folders through `TemporaryDirectory.GetFilePath` and written; every path lies inside the directory,
+and after the instance is disposed neither the files nor the directory exist. This scenario is tested by
 `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose`.
 
 **UtilitiesSubsystem_PathResolutionWorkflow_ValidPaths_ResolvesCorrectly**: Multiple valid
@@ -59,3 +75,11 @@ the base directory. This scenario is tested by
 trailing line break is written inside a `TemporaryDirectory`; `SecretSource.Resolve` returns the trimmed secret, and
 once the directory is gone the same call is refused with a message that names the file setting. This scenario is
 tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned**: Only an inline secret is given; `SecretSource.Resolve`
+returns it unchanged. This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret**: A secret file is written inside a
+`TemporaryDirectory` and an inline secret is given as well; `SecretSource.Resolve` throws `InvalidOperationException`
+whose message names both settings and contains neither the inline secret nor the contents of the file. This scenario
+is tested by `UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret`.

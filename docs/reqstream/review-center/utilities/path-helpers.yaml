@@ -4,24 +4,80 @@
 # The PathHelpers class provides safe path-combination utilities that protect
 # against path-traversal attacks by rejecting relative paths containing ".."
 # or absolute paths when a relative path is expected.
+#
+# Every requirement states one criterion. The first criterion keeps the original id; the further criteria are named
+# <original id>-<Aspect>.
 
 sections:
   - title: PathHelpers Unit Requirements
     requirements:
       - id: ReviewCenter-PathHelpers-SafeCombine
-        title: The PathHelpers class shall combine paths safely, preventing path traversal.
+        title: >-
+          The PathHelpers class shall return the base path combined with a plain or nested relative path.
         justification: |
-          Prevents path-traversal vulnerabilities when constructing file paths from
-          user-supplied or external inputs. Paths containing ".." or rooted paths
-          must be rejected to ensure the combined path remains under the base directory.
+          Callers build file paths from a fixed base directory and a name that comes from configuration or from the
+          caller; the ordinary case, a file or a nested folder under the base, must give the plain combination so that
+          the safety checks never change a path that is safe.
         tests:
           - PathHelpers_SafePathCombine_ValidPaths_CombinesCorrectly
+          - PathHelpers_SafePathCombine_NestedPaths_CombinesCorrectly
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-CurrentDirectory
+        title: >-
+          The PathHelpers class shall return the base path combined with a relative path that starts with the current
+          directory reference "./".
+        justification: |
+          A reference to the current directory stays inside the base directory; refusing it would break callers that
+          write their relative paths in that common form.
+        tests:
+          - PathHelpers_SafePathCombine_CurrentDirectoryReference_CombinesCorrectly
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-EmptyPath
+        title: >-
+          The PathHelpers class shall return the base path for an empty relative path.
+        justification: |
+          An empty relative path names the base directory itself; it must not be treated as an error or as a path
+          that leaves the directory, because a caller may legitimately ask for the directory itself.
+        tests:
+          - PathHelpers_SafePathCombine_EmptyRelativePath_ReturnsBasePath
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-DotDotName
+        title: >-
+          The PathHelpers class shall accept a relative path whose name only begins with two dots, such as "..data",
+          as a name inside the base directory.
+        justification: |
+          A check that looks for the text ".." would refuse a folder or file whose name merely starts with two dots,
+          although it stays inside the base directory; only a path that really leaves the directory is a traversal.
+        tests:
+          - PathHelpers_SafePathCombine_DotDotPrefixedName_CombinesCorrectly
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-Traversal
+        title: >-
+          The PathHelpers class shall reject a relative path that climbs out of the base directory with two-dot
+          segments, at its start or in its middle.
+        justification: |
+          A name that comes from outside the program must not be able to reach files above the base directory, for
+          example to read a secret or to overwrite a file; the check is on the resolved path, so a climb in the middle
+          of a path is caught as well as one at its start.
+        tests:
           - PathHelpers_SafePathCombine_PathTraversalWithDoubleDots_ThrowsArgumentException
           - PathHelpers_SafePathCombine_DoubleDotsInMiddle_ThrowsArgumentException
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-AbsolutePath
+        title: >-
+          The PathHelpers class shall reject a relative path argument that is an absolute path.
+        justification: |
+          An absolute path given as the relative part replaces the base directory when two paths are combined, so it
+          would point anywhere in the file system; it must be refused instead of being combined.
+        tests:
           - PathHelpers_SafePathCombine_AbsolutePath_ThrowsArgumentException
-          - PathHelpers_SafePathCombine_NestedPaths_CombinesCorrectly
-          - PathHelpers_SafePathCombine_CurrentDirectoryReference_CombinesCorrectly
-          - PathHelpers_SafePathCombine_EmptyRelativePath_ReturnsBasePath
-          - PathHelpers_SafePathCombine_DotDotPrefixedName_CombinesCorrectly
+
+      - id: ReviewCenter-PathHelpers-SafeCombine-NullArgument
+        title: >-
+          The PathHelpers class shall reject a null base path and a null relative path.
+        justification: |
+          A missing value is a programming error of the caller; failing at once with a clear exception keeps it from
+          turning into an empty path or into a path in the working directory.
+        tests:
           - PathHelpers_SafePathCombine_NullBasePath_ThrowsArgumentNullException
           - PathHelpers_SafePathCombine_NullRelativePath_ThrowsArgumentNullException

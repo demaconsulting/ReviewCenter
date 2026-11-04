@@ -9,37 +9,122 @@ sections:
   - title: Context Unit Requirements
     requirements:
       - id: ReviewCenter-Context-ArgumentParsing
-        title: The Context class shall parse command-line arguments into structured properties.
+        title: >-
+          The Context class shall create a default context with every flag off, no results file, and exit code zero
+          when no arguments are given.
         justification: |
-          Provides a standardized approach to command-line argument parsing and output
-          handling across all DEMA Consulting DotNet Tools.
+          A run without arguments must behave in a known way, so every setting needs a defined starting state.
         tests:
           - Context_Create_NoArguments_ReturnsDefaultContext
+
+      - id: ReviewCenter-Context-ArgumentParsing-Version
+        title: The Context class shall set the version flag when the `-v` or `--version` argument is given.
+        justification: |
+          The tool has to know that the operator asked for the version before it decides what to run.
+        tests:
           - Context_Create_VersionFlag_SetsVersionTrue
           - Context_Create_ShortVersionFlag_SetsVersionTrue
+
+      - id: ReviewCenter-Context-ArgumentParsing-Help
+        title: The Context class shall set the help flag when the `-?`, `-h`, or `--help` argument is given.
+        justification: |
+          The tool has to know that the operator asked for usage information before it decides what to run.
+        tests:
           - Context_Create_HelpFlag_SetsHelpTrue
           - Context_Create_ShortHelpFlag_H_SetsHelpTrue
           - Context_Create_ShortHelpFlag_Question_SetsHelpTrue
+
+      - id: ReviewCenter-Context-ArgumentParsing-Silent
+        title: The Context class shall set the silent flag when the `--silent` argument is given.
+        justification: |
+          Output is routed by the silent flag, so the flag has to be parsed before anything is written.
+        tests:
           - Context_Create_SilentFlag_SetsSilentTrue
+
+      - id: ReviewCenter-Context-ArgumentParsing-Validate
+        title: The Context class shall set the validate flag when the `--validate` argument is given.
+        justification: |
+          The tool has to know that the operator asked for a self-validation run before it decides what to run.
+        tests:
           - Context_Create_ValidateFlag_SetsValidateTrue
+
+      - id: ReviewCenter-Context-ArgumentParsing-Results
+        title: The Context class shall record the file name that follows the `--results` argument.
+        justification: |
+          The validation run needs to know where the operator wants the result file written.
+        tests:
           - Context_Create_ResultsFlag_SetsResultsFile
-          - Context_Create_LogFlag_OpensLogFile
+
+      - id: ReviewCenter-Context-ArgumentParsing-ResultAlias
+        title: >-
+          The Context class shall record the file name that follows the legacy `--result` argument as the results
+          file.
+        justification: |
+          Scripts written for the earlier spelling of the option must keep working when the tool is upgraded.
+        tests:
           - Context_Create_ResultAliasFlag_SetsResultsFile
+
+      - id: ReviewCenter-Context-ArgumentParsing-Depth
+        title: The Context class shall record the heading depth that follows the `--depth` argument.
+        justification: |
+          The validation report is embedded in larger documents, so the operator chooses its heading level.
+        tests:
           - Context_Create_DepthFlag_SetsHeadingDepth
+
+      - id: ReviewCenter-Context-ArgumentParsing-DepthDefault
+        title: The Context class shall use a heading depth of 1 when the `--depth` argument is not given.
+        justification: |
+          A report that is not embedded must start at the top-level heading without the operator asking for it.
+        tests:
           - Context_Create_NoDepthFlag_ReturnsDefaultHeadingDepth
 
-      - id: ReviewCenter-Context-InvalidArgs
-        title: The Context class shall reject unknown or malformed command-line arguments with a descriptive error.
+      - id: ReviewCenter-Context-ArgumentParsing-Log
+        title: The Context class shall create the log file named by the `--log` argument.
         justification: |
-          Providing clear feedback for invalid arguments helps users quickly correct
-          mistakes and prevents silent misconfiguration.
+          The log file has to exist as soon as the context is created, so that nothing written afterwards is lost.
+        tests:
+          - Context_Create_LogFlag_OpensLogFile
+
+      - id: ReviewCenter-Context-InvalidArgs
+        title: >-
+          The Context class shall reject an unknown command-line argument with an error that reports the argument as
+          unsupported.
+        justification: |
+          A misspelled argument must be found when the arguments are parsed, because ignoring it would run the tool
+          with settings that the operator did not intend.
         tests:
           - Context_Create_UnknownArgument_ThrowsArgumentException
+          - Context_Create_UserAddRoleOption_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-InvalidArgs-MissingValue
+        title: >-
+          The Context class shall reject the `--log`, `--results`, `--result`, or `--depth` argument when the value
+          that it needs is missing, with an error that names the argument.
+        justification: |
+          An argument at the end of the command line has no value to use, and guessing one would write to or read
+          from a place that the operator did not choose.
+        tests:
           - Context_Create_LogFlag_WithoutValue_ThrowsArgumentException
           - Context_Create_ResultsFlag_WithoutValue_ThrowsArgumentException
           - Context_Create_ResultAliasFlag_WithoutValue_ThrowsArgumentException
           - Context_Create_DepthFlag_WithoutValue_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-InvalidArgs-DepthNotInteger
+        title: >-
+          The Context class shall reject a `--depth` value that is not an integer with an error that names the
+          argument.
+        justification: |
+          A heading depth that cannot be read would otherwise be replaced by a default without a warning.
+        tests:
           - Context_Create_DepthFlag_NonIntegerValue_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-InvalidArgs-DepthOutOfRange
+        title: >-
+          The Context class shall reject a `--depth` value that is below 1 or above 6 with an error that names the
+          argument.
+        justification: |
+          Markdown has six heading levels, so a depth outside that range cannot be written as a heading.
+        tests:
           - Context_Create_DepthFlag_ZeroValue_ThrowsArgumentException
           - Context_Create_DepthFlag_ExceedsMaxValue_ThrowsArgumentException
 
@@ -59,31 +144,42 @@ sections:
           inspection of tool output without requiring console capture.
         tests:
           - Context_Create_LogFlag_OpensLogFile
+
+      - id: ReviewCenter-Context-LogOutput-LogErrors
+        title: The Context class shall additionally write error messages to the log file when the log flag is set.
+        justification: |
+          The error that ended a run is the line that an investigation of that run needs most, so it must be in the
+          log file as well as on the console.
+        tests:
           - Context_WriteError_WritesToLogFile
 
       - id: ReviewCenter-Context-Silent
-        title: The Context class shall suppress console output when the silent flag is set.
+        title: The Context class shall suppress normal console output when the silent flag is set.
         justification: |
-          Enables automated scripts and CI/CD pipelines to run the tool without
-          cluttering output logs.
+          Scripts and pipelines that parse the output of other tools need the tool to stay quiet on standard output.
         tests:
           - Context_Create_SilentFlag_SetsSilentTrue
           - Context_WriteLine_Silent_DoesNotWriteToConsole
+
+      - id: ReviewCenter-Context-Silent-ErrorSilent
+        title: The Context class shall suppress error output on the console when the silent flag is set.
+        justification: |
+          A run that is silent by request must not write on the error stream either, or it would clutter the logs of
+          the pipeline that started it.
+        tests:
           - Context_WriteError_Silent_DoesNotWriteToConsole
 
       - id: ReviewCenter-Context-ErrorOutput
         title: The Context class shall write error messages to stderr.
         justification: |
-          Error messages must be written to stderr so they remain visible to the user
-          without polluting stdout, which consumers may pipe or redirect for data capture.
+          A consumer that pipes or redirects standard output for data capture must not find error text in the data.
         tests:
           - Context_WriteError_NotSilent_WritesToConsole
 
       - id: ReviewCenter-Context-ExitCode
         title: The Context class shall track errors and expose a non-zero exit code when errors have occurred.
         justification: |
-          Callers (scripts, CI/CD pipelines) must be able to detect failure conditions
-          programmatically via the process exit code.
+          A script or pipeline that starts the tool can only find out that a run failed from the process exit code.
         tests:
           - Context_WriteError_SetsErrorExitCode
 
@@ -97,89 +193,179 @@ sections:
           - Context_Create_LogFlag_InvalidPath_ThrowsInvalidOperationException
 
       - id: ReviewCenter-Context-Serve
-        title: The Context class shall record whether the serve verb was specified.
+        title: The Context class shall record that the serve verb was specified.
         justification: |
           The web server must only be started when the operator asked for it, so the parsed
-          context has to distinguish an invocation with the serve verb from one without it.
+          context has to say that the serve verb was given.
         tests:
           - Context_Create_ServeVerb_SetsServe
+
+      - id: ReviewCenter-Context-Serve-Absent
+        title: The Context class shall leave the serve action off when the serve verb is not specified.
+        justification: |
+          A run for another purpose, such as a self-validation, must never start a web server by accident.
+        tests:
           - Context_Create_NoServeVerb_SetsServeFalse
 
       - id: ReviewCenter-Context-Urls
-        title: >-
-          The Context class shall record the listen URL supplied with `--urls`, defaulting to
-          http://localhost:5000, and shall reject a missing or invalid URL or the option
-          without the serve verb with a descriptive error.
+        title: The Context class shall record the listen URL supplied with `--urls`.
         justification: |
-          The listen address must be known before the server starts, and a sensible default
-          that is reachable only from the local machine keeps a freshly started server private
-          unless the operator asks otherwise. A value that is not an absolute http or https URL
-          cannot be bound, so it is reported at argument parsing time with a clear message
-          instead of failing later during server start-up.
+          The listen address must be known before the server starts.
+        tests:
+          - Context_Create_UrlsFlag_SetsUrls
+
+      - id: ReviewCenter-Context-Urls-Default
+        title: The Context class shall use http://localhost:5000 as the listen URL when `--urls` is not supplied.
+        justification: |
+          A default that is reachable only from the local machine keeps a freshly started server private unless the
+          operator asks otherwise.
         tests:
           - Context_Create_ServeVerb_SetsServe
-          - Context_Create_UrlsFlag_SetsUrls
-          - Context_Create_UrlsWithoutServe_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-Urls-Missing
+        title: The Context class shall reject `--urls` without a value with an error that names the option.
+        justification: |
+          An option at the end of the command line has no address to listen on, and guessing one could expose the
+          server on an address that the operator did not choose.
+        tests:
           - Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-Urls-Invalid
+        title: >-
+          The Context class shall reject a `--urls` value that is not an absolute http or https URL with an error
+          that names the option.
+        justification: |
+          A value that cannot be bound is reported at argument parsing time with a clear message instead of failing
+          later during server start-up.
+        tests:
           - Context_Create_InvalidUrls_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-Urls-RequiresServe
+        title: The Context class shall reject `--urls` when the serve verb is not specified.
+        justification: |
+          The option only has meaning for the serve verb, so accepting it elsewhere would hide a forgotten verb from
+          the operator.
+        tests:
+          - Context_Create_UrlsWithoutServe_ThrowsArgumentException
 
       - id: ReviewCenter-Context-UserAdd
         title: >-
-          The Context class shall record whether the user add verb was specified, together with the user name, the
-          display name, and whether the `--system-admin` switch was given, which is not the case by default.
+          The Context class shall record the user add verb together with the user name and the display name that
+          are given with it.
         justification: |
           The command that creates a user must only run when the operator asked for it, and it needs the details
-          of the user. An ordinary user is the safe default, because the right to see every project must be asked
-          for.
+          of the user.
         tests:
           - Context_Create_UserAddVerb_SetsUserAddAndOptions
+
+      - id: ReviewCenter-Context-UserAdd-SystemAdmin
+        title: The Context class shall record the `--system-admin` switch when it is given with the user add verb.
+        justification: |
+          The right to see every project is given to a user only when the operator asks for it.
+        tests:
+          - Context_Create_UserAddVerb_SetsUserAddAndOptions
+
+      - id: ReviewCenter-Context-UserAdd-OrdinaryDefault
+        title: >-
+          The Context class shall leave the system administrator switch off when the user add verb is given
+          without `--system-admin`.
+        justification: |
+          An ordinary user is the safe default, because the right to see every project must be asked for.
+        tests:
           - Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser
 
       - id: ReviewCenter-Context-UserAddMisuse
         title: >-
-          The Context class shall reject with a descriptive error a user add verb without a user name or display
-          name, the user add options (including `--system-admin`) without the verb, and any option for
-          giving the password on the command line.
+          The Context class shall reject the user add verb when the user name or the display name is missing, with an
+          error that names both options.
         justification: |
-          A mistake must be found when the arguments are parsed, with a clear message. A password option is not
-          offered, because a password on the command line is visible to other processes and kept in shell
-          history.
+          A user cannot be created without the two names that identify the account, so a missing name must be found
+          when the arguments are parsed, with a clear message.
         tests:
           - Context_Create_UserAddMisuse_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-UserAddMisuse-WrongAction
+        title: >-
+          The Context class shall reject the user verb when it is not followed by the add action, with an error that
+          names the add action.
+        justification: |
+          A mistyped action must be found when the arguments are parsed, rather than creating no user and reporting
+          nothing.
+        tests:
+          - Context_Create_UserAddWrongAction_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-UserAddMisuse-OptionsWithoutVerb
+        title: >-
+          The Context class shall reject the `--username`, `--display-name`, and `--system-admin` options when the
+          user add verb is not specified, with an error that names the verb.
+        justification: |
+          Options without their verb would hide a forgotten verb from the operator.
+        tests:
+          - Context_Create_UserAddOptionsWithoutVerb_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-UserAddMisuse-PasswordOption
+        title: The Context class shall reject a `--password` option for the user add verb as an unsupported argument.
+        justification: |
+          A password on the command line is visible to other processes and kept in shell history.
+        tests:
           - Context_Create_PasswordOption_IsNotSupported
 
       - id: ReviewCenter-Context-AuditVerify
-        title: >-
-          The Context class shall accept the audit verify verb to signal that the audit trail is to be verified, and
-          shall reject the audit verb without the verify action or with another action.
+        title: The Context class shall record the audit verify verb to signal that the audit trail is to be verified.
         justification: |
-          Verifying the trail is an explicit action, and a mistyped action must be found when the arguments are
-          parsed, with a clear message.
+          Verifying the trail is an explicit action that must only run when the operator asked for it.
         tests:
           - Context_Create_AuditVerifyVerb_SetsAuditVerify
+
+      - id: ReviewCenter-Context-AuditVerify-Misuse
+        title: >-
+          The Context class shall reject the audit verb when the verify action is missing or another action is
+          given, with an error that names the verify action.
+        justification: |
+          A mistyped action must be found when the arguments are parsed, with a clear message.
+        tests:
           - Context_Create_AuditMisuse_ThrowsArgumentException
 
       - id: ReviewCenter-Context-KeysReprotect
         title: >-
-          The Context class shall accept the keys reprotect verb to signal that the Data Protection key is to be
-          rotated and the stored secrets protected again, and shall reject the keys verb without the reprotect action
-          or with another action.
+          The Context class shall record the keys reprotect verb to signal that the Data Protection key is to be
+          rotated and the stored secrets protected again.
         justification: |
-          Rotating the key is an explicit action, and a mistyped action must be found when the arguments are parsed,
-          with a clear message.
+          Rotating the key is an explicit action that must only run when the operator asked for it.
         tests:
           - Context_Create_KeysReprotectVerb_SetsKeysReprotect
+
+      - id: ReviewCenter-Context-KeysReprotect-Misuse
+        title: >-
+          The Context class shall reject the keys verb when the reprotect action is missing or another action is
+          given, with an error that names the reprotect action.
+        justification: |
+          A mistyped action must be found when the arguments are parsed, with a clear message.
+        tests:
           - Context_Create_KeysMisuse_ThrowsArgumentException
 
       - id: ReviewCenter-Context-CheckConfig
         title: >-
-          The Context class shall accept the `--check-config` option to signal that the configured database and key ring
-          are to be checked as part of the self-validation run, and shall reject the option when `--validate` is not
-          given.
+          The Context class shall record the `--check-config` option when it is given together with `--validate`.
         justification: |
-          The option adds a check to a validation run, so on its own it would silently do nothing; the mistake must be
-          found when the arguments are parsed, with a clear message.
+          The option adds a check of the configured database and key ring to a validation run, so the run has to
+          be told that the check was requested.
         tests:
           - Context_Create_CheckConfigWithValidate_SetsCheckConfigTrue
+
+      - id: ReviewCenter-Context-CheckConfig-Default
+        title: The Context class shall leave the check-config option off when `--check-config` is not given.
+        justification: |
+          The default self-validation run is hermetic and must not look at the configured database or keys.
+        tests:
           - Context_Create_ValidateWithoutCheckConfig_LeavesCheckConfigFalse
+
+      - id: ReviewCenter-Context-CheckConfig-RequiresValidate
+        title: >-
+          The Context class shall reject the `--check-config` option when `--validate` is not given, with an error
+          that names `--validate`.
+        justification: |
+          The option adds a check to a validation run, so on its own it would silently do nothing; the mistake must
+          be found when the arguments are parsed, with a clear message.
+        tests:
           - Context_Create_CheckConfigWithoutValidate_ThrowsArgumentException

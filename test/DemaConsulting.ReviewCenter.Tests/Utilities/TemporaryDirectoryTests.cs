@@ -64,6 +64,23 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
+    ///     Test that the default retry policy is five delete attempts with a pause of 75 ms between them.
+    /// </summary>
+    [Fact]
+    public void TemporaryDirectory_Constructor_Default_UsesFiveAttemptsAboutSeventyFiveMsApart()
+    {
+        // Arrange: nothing to set up; the default policy is what the parameterless constructor passes on
+
+        // Act: read the default policy
+        var attempts = TemporaryDirectory.DefaultDeleteAttempts;
+        var delay = TemporaryDirectory.DefaultRetryDelay;
+
+        // Assert: five attempts, 75 ms apart
+        Assert.Equal(5, attempts);
+        Assert.Equal(TimeSpan.FromMilliseconds(75), delay);
+    }
+
+    /// <summary>
     ///     Test that GetFilePath returns a path inside the directory and creates the folders above it.
     /// </summary>
     [Fact]
@@ -75,9 +92,14 @@ public class TemporaryDirectoryTests
         // Act: ask for a file two folders down
         var path = directory.GetFilePath("one/two/file.txt");
 
-        // Assert: the path is inside the directory and its parent folder exists
+        // Assert: the path is the file inside the directory and its parent folder exists
+        var expected = Path.GetFullPath(Path.Combine(directory.DirectoryPath, "one", "two", "file.txt"));
+        Assert.Equal(expected, Path.GetFullPath(path));
         Assert.StartsWith(directory.DirectoryPath, path, StringComparison.Ordinal);
         Assert.True(Directory.Exists(Path.GetDirectoryName(path)));
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(directory.DirectoryPath, "one", "two")),
+            Path.GetFullPath(Path.GetDirectoryName(path)!));
         Assert.False(File.Exists(path));
     }
 

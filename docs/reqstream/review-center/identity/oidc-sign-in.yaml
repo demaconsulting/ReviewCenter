@@ -237,6 +237,9 @@ sections:
           server. The reading and the rules of the file are those of the shared SecretSource unit.
         children:
           - ReviewCenter-Utilities-SecretSource
+          - ReviewCenter-Utilities-SecretSource-Inline
+          - ReviewCenter-Utilities-SecretSource-Refusal
+          - ReviewCenter-Utilities-SecretSource-NoDisclosure
         tests:
           - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
 

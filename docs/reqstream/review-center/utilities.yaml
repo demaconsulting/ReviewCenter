@@ -6,59 +6,163 @@
 # - The Utilities subsystem spans PathHelpers.cs (safe path-combination utilities), TemporaryDirectory.cs (scratch
 #   directories), and SecretSource.cs (secrets given inline or in a file)
 # - Subsystem requirements describe the shared utility behavior available to all other subsystems
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>. Each requirement links only the subsystem tests that show it; the
+# unit requirements that implement it are its children.
 
 sections:
   - title: Utilities Subsystem Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Safe paths
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-Utilities-SafePaths
         title: >-
-          The Utilities subsystem shall provide safe file path manipulation that
-          prevents path traversal and absolute path injection.
+          The Utilities subsystem shall combine a base directory and a relative path into a full path that lies inside
+          the base directory.
         justification: |
-          The Utilities subsystem provides shared path utilities consumed by other subsystems.
-          When constructing file paths from caller-supplied inputs, the subsystem must reject
-          path traversal sequences (such as '..') and absolute paths to prevent unintended
-          file system access. This requirement captures the subsystem-level safety guarantee
-          that all consumers of the Utilities subsystem can rely upon.
+          The Utilities subsystem provides shared path utilities consumed by other subsystems. The combined path is
+          the one that every consumer opens, creates or deletes, so the guarantee that it lies inside the base
+          directory is what the consumers rely upon.
         children:
           - ReviewCenter-PathHelpers-SafeCombine
+          - ReviewCenter-PathHelpers-SafeCombine-CurrentDirectory
+          - ReviewCenter-PathHelpers-SafeCombine-EmptyPath
+          - ReviewCenter-PathHelpers-SafeCombine-NullArgument
         tests:
           - UtilitiesSubsystem_PathResolutionWorkflow_ValidPaths_ResolvesCorrectly
           - UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories
+
+      - id: ReviewCenter-Utilities-SafePaths-PathTraversal
+        title: >-
+          The Utilities subsystem shall reject a relative path that climbs out of the base directory with two-dot
+          segments.
+        justification: |
+          When a path is built from a name that a caller supplies, a traversal sequence such as '..' must not reach
+          files above the base directory; the subsystem refuses it for every consumer instead of each consumer
+          checking on its own.
+        children:
+          - ReviewCenter-PathHelpers-SafeCombine-Traversal
+          - ReviewCenter-PathHelpers-SafeCombine-DotDotName
+        tests:
           - UtilitiesSubsystem_PathTraversalValidation_DangerousPaths_ThrowsException
+
+      - id: ReviewCenter-Utilities-SafePaths-AbsolutePath
+        title: >-
+          The Utilities subsystem shall reject an absolute path that is given as the relative path.
+        justification: |
+          An absolute path replaces the base directory when two paths are combined, so it would point anywhere in the
+          file system; the subsystem refuses it for every consumer so that no name from outside can inject one.
+        children:
+          - ReviewCenter-PathHelpers-SafeCombine-AbsolutePath
+        tests:
           - UtilitiesSubsystem_AbsolutePathRejection_ThrowsException
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Temporary files
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-Utilities-TempFiles
         title: >-
-          The Utilities subsystem shall provide a temporary directory that is uniquely named, hands out only paths
-          inside itself, and is removed when it is disposed.
+          The Utilities subsystem shall give every temporary directory its own unique path.
         justification: |
           Self-validation, and any other code that needs scratch files, must be able to create files without
-          colliding with other runs, without writing outside its own folder, and without leaving them behind. This
-          requirement captures that guarantee for the consumers of the Utilities subsystem.
+          colliding with other runs; two directories that are alive at the same time must never be the same one.
         children:
           - ReviewCenter-TemporaryDirectory-Unique
+          - ReviewCenter-TemporaryDirectory-Unique-PerInstance
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_TwoDirectories_UseDifferentPaths
+
+      - id: ReviewCenter-Utilities-TempFiles-InsideOnly
+        title: >-
+          The Utilities subsystem shall hand out only paths that lie inside the temporary directory for the file
+          names that a caller gives.
+        justification: |
+          Code that needs scratch files must not write outside its own folder; every path the directory hands out is
+          inside it, so that nothing else in the file system is touched by a run.
+        children:
           - ReviewCenter-TemporaryDirectory-GetFilePath
-          - ReviewCenter-TemporaryDirectory-Dispose
-          - ReviewCenter-TemporaryDirectory-BoundedRetry
+          - ReviewCenter-TemporaryDirectory-GetFilePath-Parents
+          - ReviewCenter-TemporaryDirectory-GetFilePath-Escape
+          - ReviewCenter-TemporaryDirectory-GetFilePath-NullPath
         tests:
           - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose
 
+      - id: ReviewCenter-Utilities-TempFiles-Removed
+        title: >-
+          The Utilities subsystem shall remove the temporary directory and every file in it, including files in
+          nested folders, when it is disposed.
+        justification: |
+          A run must not leave its scratch files behind; the removal covers the whole directory, so that the code that
+          created the files does not have to remember each one.
+        children:
+          - ReviewCenter-TemporaryDirectory-Dispose
+          - ReviewCenter-TemporaryDirectory-Dispose-NoThrow
+          - ReviewCenter-TemporaryDirectory-Dispose-Repeated
+          - ReviewCenter-TemporaryDirectory-BoundedRetry
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-Default
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-NoFinalPause
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-InvalidPolicy
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Secrets
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-Utilities-SecretSource
         title: >-
-          The Utilities subsystem shall resolve a secret that is given inline or as the path of a file, so that a
-          service can take its secrets from a file that the operating system or a secret store provides, and shall
-          refuse a wrong setting with a message that names the setting and never holds the secret.
+          The Utilities subsystem shall resolve a secret that is given as the path of a file to the contents of the
+          file with the white space around them removed.
         justification: |
-          Every service that holds a secret needs the same rules: one source, a file that is trimmed and bounded, and
-          a clear message at start-up. Keeping them in one shared unit keeps the services from each deciding it
-          differently, and keeps the secret out of the messages. This requirement captures that guarantee for the
-          consumers of the Utilities subsystem.
+          A service can take its secrets from a file that the operating system or a secret store provides, and such a
+          file usually ends with a line break that is not part of the secret. Keeping the rules in one shared unit
+          keeps the services from each deciding it differently.
         children:
-          - ReviewCenter-SecretSource-Inline
           - ReviewCenter-SecretSource-File
-          - ReviewCenter-SecretSource-Conflict
-          - ReviewCenter-SecretSource-FileProblems
-          - ReviewCenter-SecretSource-NoDisclosure
+          - ReviewCenter-SecretSource-File-Trimmed
+          - ReviewCenter-SecretSource-File-SizeLimit
         tests:
           - UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret
+
+      - id: ReviewCenter-Utilities-SecretSource-Inline
+        title: >-
+          The Utilities subsystem shall resolve a secret that is given inline to that value.
+        justification: |
+          Existing deployments give the secret inline, or through an environment variable that maps to it; that form
+          must keep working next to the file form for every service that holds a secret.
+        children:
+          - ReviewCenter-SecretSource-Inline
+          - ReviewCenter-SecretSource-Inline-Neither
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned
+
+      - id: ReviewCenter-Utilities-SecretSource-Refusal
+        title: >-
+          The Utilities subsystem shall refuse a secret file setting that points to a file that does not exist, with a
+          message that names the file setting.
+        justification: |
+          A secret that silently falls back to nothing turns a mistake in the setting into a start that appears to
+          work and fails later; a clear message at start-up lets the operator fix it at once.
+        children:
+          - ReviewCenter-SecretSource-FileProblems
+          - ReviewCenter-SecretSource-FileProblems-Unreadable
+          - ReviewCenter-SecretSource-FileProblems-Empty
+          - ReviewCenter-SecretSource-FileProblems-TooLarge
+          - ReviewCenter-SecretSource-FileProblems-NotUtf8
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret
+
+      - id: ReviewCenter-Utilities-SecretSource-NoDisclosure
+        title: >-
+          The Utilities subsystem shall refuse a secret that is set both inline and in a file with a message that does
+          not hold the secret.
+        justification: |
+          The message of a failed start reaches the console, the journal, and the log collection of the operator; the
+          secret must never be in it, even in the refusal that has the secret in hand.
+        children:
+          - ReviewCenter-SecretSource-Conflict
+          - ReviewCenter-SecretSource-NoDisclosure
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret

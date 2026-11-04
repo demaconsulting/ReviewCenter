@@ -19,6 +19,8 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Hosting;
+using Microsoft.Data.Sqlite;
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
@@ -152,8 +154,8 @@ public class ProgramTests
 
             // Assert: verify expected behavior
             var output = outWriter.ToString();
-            Assert.Contains("ReviewCenter version", output);
-            Assert.Contains("Copyright", output);
+            Assert.Contains($"ReviewCenter version {Program.Version}", output);
+            Assert.Contains("Copyright (c) DEMA Consulting", output);
             Assert.Equal(0, context.ExitCode);
         }
         finally
@@ -408,12 +410,239 @@ public class ProgramTests
             Assert.Contains("--username", output);
             Assert.Contains("--display-name", output);
             Assert.Contains("--system-admin", output);
-            Assert.Contains("REVIEWCENTER_PASSWORD", output);
         }
         finally
         {
             Console.SetOut(originalOut);
         }
+    }
+
+    /// <summary>
+    ///     Test that the help text documents where the password of the user add verb is read from.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithHelpFlag_ListsUserAddPasswordSources()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            using var context = Context.Create(["--help"]);
+
+            // Act: print help
+            Program.Run(context);
+
+            // Assert: the environment variable, standard input and the prompt are documented
+            var output = outWriter.ToString();
+            Assert.Contains("the password is read from the REVIEWCENTER_PASSWORD", output);
+            Assert.Contains("environment variable, else standard input, else a prompt", output);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the audit verify verb.
+    /// </summary>
+    [Fact]
+    public void Program_Run_Help_DocumentsAuditVerify()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            using var help = Context.Create(["--help"]);
+
+            // Act: print help
+            Program.Run(help);
+
+            // Assert: the verb is documented
+            Assert.Contains("audit verify", outWriter.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the keys reprotect verb.
+    /// </summary>
+    [Fact]
+    public void Program_Run_Help_DocumentsKeysReprotect()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            using var help = Context.Create(["--help"]);
+
+            // Act: print help
+            Program.Run(help);
+
+            // Assert: the verb is documented
+            Assert.Contains("keys reprotect", outWriter.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Test that Run with the user add verb creates the user in the configured database, with the password from
+    ///     the environment, and never prints the password.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithUserAddVerb_PasswordFromEnvironment_CreatesUser()
+    {
+        // Arrange: a new database and the password in the environment, not on the command line
+        const string password = "correct horse battery";
+        var connectionString = TestDatabase.NewConnectionString();
+
+        // Act: dispatch the user add verb
+        var (exitCode, output, error) = RunWithDatabase(
+            connectionString, password, "user", "add", "--username", "dispatch.user", "--display-name", "Dispatch User");
+
+        // Assert: success, the user is in the configured database, and the password is never printed
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Created user 'dispatch.user'.", output);
+        Assert.DoesNotContain(password, output + error);
+        Assert.Equal(1L, CountUsers(connectionString, "dispatch.user"));
+    }
+
+    /// <summary>
+    ///     Test that Run with the user add verb reports a user name that already exists as an error with exit code 1.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithUserAddVerb_DuplicateUser_ReportsErrorWithExitCodeOne()
+    {
+        // Arrange: a database that already holds the user
+        const string password = "correct horse battery";
+        var connectionString = TestDatabase.NewConnectionString();
+        string[] arguments = ["user", "add", "--username", "dispatch.user", "--display-name", "Dispatch User"];
+        var (firstExitCode, _, _) = RunWithDatabase(connectionString, password, arguments);
+        Assert.Equal(0, firstExitCode);
+
+        // Act: dispatch the same user add verb again
+        var (exitCode, output, error) = RunWithDatabase(connectionString, password, arguments);
+
+        // Assert: an error with exit code 1, no second user, and the password is never printed
+        Assert.Equal(1, exitCode);
+        Assert.Contains("already exists", error);
+        Assert.DoesNotContain(password, output + error);
+        Assert.Equal(1L, CountUsers(connectionString, "dispatch.user"));
+    }
+
+    /// <summary>
+    ///     Test that Run with the audit verify verb runs the audit trail verification: a database file that does not
+    ///     exist is reported as an error with exit code 1 and is not created.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithAuditVerifyVerb_MissingDatabase_ReportsErrorWithExitCodeOne()
+    {
+        // Arrange: a database path in a folder that does not exist
+        var folder = Path.Combine(TestDatabase.Root, "missing-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(folder, "missing.db");
+
+        // Act: dispatch the audit verify verb
+        var (exitCode, _, error) = RunWithDatabase($"Data Source={path};Pooling=False", null, "audit", "verify");
+
+        // Assert: the verification reports the missing file, and nothing was created
+        Assert.Equal(1, exitCode);
+        Assert.Contains("The database file does not exist", error);
+        Assert.False(File.Exists(path), "The verification must never create the database");
+        Assert.False(Directory.Exists(folder), "The verification must never create the folder of the database");
+    }
+
+    /// <summary>
+    ///     Test that Run with the keys reprotect verb runs the key rotation: a database file that does not exist is
+    ///     refused with exit code 1 and is not created.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithKeysReprotectVerb_MissingDatabase_ReportsErrorWithExitCodeOne()
+    {
+        // Arrange: a database path in a folder that does not exist
+        var folder = Path.Combine(TestDatabase.Root, "missing-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(folder, "missing.db");
+
+        // Act: dispatch the keys reprotect verb
+        var (exitCode, _, error) = RunWithDatabase($"Data Source={path};Pooling=False", null, "keys", "reprotect");
+
+        // Assert: the rotation refuses the missing file, and nothing was created
+        Assert.Equal(1, exitCode);
+        Assert.Contains("The database file does not exist", error);
+        Assert.False(File.Exists(path), "The rotation must never create the database");
+        Assert.False(Directory.Exists(folder), "The rotation must never create the folder of the database");
+    }
+
+    /// <summary>
+    ///     Runs the program with the arguments against the given database, capturing the console output and error.
+    /// </summary>
+    /// <param name="connectionString">The connection string put into the configuration environment variable.</param>
+    /// <param name="password">The password put into its environment variable, or <c>null</c> to leave it as it is.</param>
+    /// <param name="arguments">The command-line arguments.</param>
+    /// <returns>The exit code, the standard output and the standard error.</returns>
+    /// <remarks>
+    ///     The environment variables are process-wide, so the previous values are put back afterwards. The class is in
+    ///     the sequential collection, which keeps the other tests that read them from running at the same time.
+    /// </remarks>
+    private static (int ExitCode, string Output, string Error) RunWithDatabase(
+        string connectionString,
+        string? password,
+        params string[] arguments)
+    {
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        var previousConnectionString = Environment.GetEnvironmentVariable(TestDatabase.ConnectionStringVariable);
+        var previousPassword = Environment.GetEnvironmentVariable(UserCommand.PasswordVariable);
+        try
+        {
+            using var outWriter = new StringWriter();
+            using var errorWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            Console.SetError(errorWriter);
+            Environment.SetEnvironmentVariable(TestDatabase.ConnectionStringVariable, connectionString);
+            if (password is not null)
+            {
+                Environment.SetEnvironmentVariable(UserCommand.PasswordVariable, password);
+            }
+
+            using var context = Context.Create(arguments);
+            Program.Run(context);
+            return (context.ExitCode, outWriter.ToString(), errorWriter.ToString());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(UserCommand.PasswordVariable, previousPassword);
+            Environment.SetEnvironmentVariable(TestDatabase.ConnectionStringVariable, previousConnectionString);
+            Console.SetError(originalError);
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Counts the users with a user name in a database.
+    /// </summary>
+    /// <param name="connectionString">The connection string of the database.</param>
+    /// <param name="username">The user name.</param>
+    /// <returns>The number of users with that name.</returns>
+    private static long CountUsers(string connectionString, string username)
+    {
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM Users WHERE Username = $name";
+        command.Parameters.AddWithValue("$name", username);
+        return (long)command.ExecuteScalar()!;
     }
 }
 

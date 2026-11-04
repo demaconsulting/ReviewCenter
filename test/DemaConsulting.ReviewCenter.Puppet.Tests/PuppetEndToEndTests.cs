@@ -87,6 +87,10 @@ public class PuppetEndToEndTests
             var go = await Run("goto", "/");
             Assert.Equal(0, go.Code);
             Assert.StartsWith("HTTP 200", go.Output, StringComparison.Ordinal);
+            var footer = go.Output.ReplaceLineEndings("\n").Split('\n').Single(line => line.StartsWith("@ ", StringComparison.Ordinal));
+            Assert.StartsWith($"@ {server.Url}", footer, StringComparison.Ordinal);
+            Assert.EndsWith("\"", footer, StringComparison.Ordinal);
+            Assert.Contains("  \"", footer, StringComparison.Ordinal);
             Assert.Equal("{\"a\":1}", (await Run("eval", "({a: 1})")).Output.Split('\n')[0].Trim());
             var snapshot = await Run("snapshot");
             Assert.Contains("testid=signin-link", snapshot.Output, StringComparison.Ordinal);
@@ -109,7 +113,7 @@ public class PuppetEndToEndTests
             Assert.StartsWith("Invalid user name or password.", (await Run("text", "login-error")).Output, StringComparison.Ordinal);
             Assert.Equal(0, (await Run("fill", "login-username-input", UserName)).Code);
             Assert.Equal(0, (await Run("fill", "login-password-input", UserPassword)).Code);
-            Assert.Equal(0, (await Run("click", "login-button")).Code);
+            Assert.Equal(0, (await Run("press", "Enter", "login-password-input")).Code);
             Assert.Equal(0, (await Run("wait", "current-user")).Code);
             Assert.StartsWith("Puppet Admin", (await Run("text", "current-user")).Output, StringComparison.Ordinal);
 
@@ -124,6 +128,8 @@ public class PuppetEndToEndTests
             Assert.Equal(0, (await Run("click", "create-project-button")).Code);
             Assert.Equal(0, (await Run("wait", "project-name")).Code);
             Assert.StartsWith("Puppet Project", (await Run("text", "project-name")).Output, StringComparison.Ordinal);
+            Assert.Equal(0, (await Run("wait", "text=Puppet Project")).Code);
+            Assert.Contains("Puppet Project", (await Run("text")).Output, StringComparison.Ordinal);
 
             // Act and assert: choosing the dark theme on the account page applies at once and is remembered
             Assert.Equal(0, (await Run("goto", "/account")).Code);
@@ -131,17 +137,31 @@ public class PuppetEndToEndTests
             Assert.Equal(0, (await Run("wait", "css=html[data-theme=dark]")).Code);
             Assert.StartsWith("dark", (await Run("eval", "localStorage.getItem('reviewcenter-theme')")).Output.Trim('"'), StringComparison.Ordinal);
 
+            // Act and assert: a console error is reported once, by the footer of the command that follows it
+            var probe = await Run("eval", "console.error('probe')");
+            var afterProbe = await Run("eval", "1");
+            var laterCommand = await Run("eval", "2");
+            const string probeEvent = "! console.error: probe";
+            Assert.Single((probe.Output + afterProbe.Output).ReplaceLineEndings("\n").Split('\n'), line => line == probeEvent);
+            Assert.DoesNotContain(probeEvent, laterCommand.Output, StringComparison.Ordinal);
+
             // Act and assert: a missing element fails fast with a one-line message and exit code 1
             var missing = await Run("click", "no-such-element");
             Assert.Equal(1, missing.Code);
             Assert.Contains("no-such-element", missing.Error, StringComparison.Ordinal);
 
-            // Act and assert: the screenshot is a PNG
+            // Act and assert: the screenshot of the page and of one element is a PNG
             Assert.Equal(0, (await Run("screenshot", shot)).Code);
             var png = await File.ReadAllBytesAsync(shot, cancellation);
             Assert.True(png.Length > 1000);
             Assert.Equal([0x89, 0x50, 0x4E, 0x47], png[..4]);
+            var elementShot = Path.Combine(directory.FullName, "element.png");
+            Assert.Equal(0, (await Run("screenshot", elementShot, "--selector", "theme-dark")).Code);
+            Assert.Equal([0x89, 0x50, 0x4E, 0x47], (await File.ReadAllBytesAsync(elementShot, cancellation))[..4]);
             Assert.Equal(0, (await Run("viewport", "800x600")).Code);
+            Assert.StartsWith("800", (await Run("eval", "innerWidth")).Output, StringComparison.Ordinal);
+            Assert.Equal(0, (await Run("theme", "light")).Code);
+            Assert.StartsWith("false", (await Run("eval", "matchMedia('(prefers-color-scheme: dark)').matches")).Output, StringComparison.Ordinal);
             Assert.Equal(0, (await Run("theme", "dark")).Code);
             Assert.StartsWith("true", (await Run("eval", "matchMedia('(prefers-color-scheme: dark)').matches")).Output, StringComparison.Ordinal);
             Assert.Equal(0, (await Run("console")).Code);

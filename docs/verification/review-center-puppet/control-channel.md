@@ -17,7 +17,8 @@ N/A - standard test environment. The tests bind a free loopback port.
 - A request sent with `SendAsync` reaches the handler of `ServeAsync` and the response arrives intact, including a
   multi-line result, the URL, the title, and the events.
 - A port that nobody listens on does not answer the ping.
-- The control file path is the configured one when given, and the well-known temporary file otherwise.
+- The control file path is the configured one when given, and the well-known temporary file otherwise (the
+  requirements for the environment variable and for the default file are both shown by the two path tests).
 
 ### Test Scenarios
 

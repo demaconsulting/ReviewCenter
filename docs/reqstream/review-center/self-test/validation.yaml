@@ -17,7 +17,11 @@ sections:
           in the deployment environment. A summary is printed for human review.
         children:
           - ReviewCenter-Utilities-SafePaths
+          - ReviewCenter-Utilities-SafePaths-PathTraversal
+          - ReviewCenter-Utilities-SafePaths-AbsolutePath
           - ReviewCenter-Utilities-TempFiles
+          - ReviewCenter-Utilities-TempFiles-InsideOnly
+          - ReviewCenter-Utilities-TempFiles-Removed
         tests:
           - Validation_Run_WithSilentContext_PrintsSummary
 

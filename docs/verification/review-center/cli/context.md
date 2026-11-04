@@ -24,8 +24,10 @@ N/A - standard test environment.
   https URL is rejected with an `ArgumentException`.
 - `UserAdd` is true only for the `user add` verb, which records `--username`, `--display-name`, and the switch
   `--system-admin` (an ordinary user when omitted).
-- `user add` without the add action or without both names, the options without the verb, and the removed `--role`
-  option are rejected with an `ArgumentException`; there is no password option.
+- `user add` without both names, the user verb without the add action, the options without the verb, and the removed
+  `--role` option are rejected with an `ArgumentException`; there is no password option.
+- The `audit verify` and `keys reprotect` verbs are recorded, and the verbs without their action or with another
+  action are rejected with an `ArgumentException` that names the missing action.
 
 #### Test Scenarios
 
@@ -145,7 +147,7 @@ scenario is tested by `Context_WriteError_WritesToLogFile`.
 scenario is tested by `Context_Create_LogFlag_InvalidPath_ThrowsInvalidOperationException`.
 
 **Context_Create_ServeVerb_SetsServe**: `Context.Create` is called with `["serve"]`; the `Serve`
-property is true and `Urls` equals the default listen address. This scenario is tested by
+property is true and `Urls` equals the default listen address `http://localhost:5000`. This scenario is tested by
 `Context_Create_ServeVerb_SetsServe`.
 
 **Context_Create_NoServeVerb_SetsServeFalse**: `Context.Create` is called with an empty argument
@@ -178,21 +180,39 @@ name are recorded, and `SystemAdmin` is true. This scenario is tested by
 both names but without the switch; `SystemAdmin` is false, so the user is an ordinary user. A context created without
 arguments has `UserAdd` false. This scenario is tested by `Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser`.
 
-**Context_Create_UserAddMisuse_ThrowsArgumentException**: A theory over incorrect use: `user` and `user remove`
-(no add action), `user add` with only one of the two names, the removed `--role` option (an unsupported argument), and
-`--username` or `--system-admin` without the verb; an `ArgumentException` whose message says what is
-wrong is thrown for each. This scenario is tested by `Context_Create_UserAddMisuse_ThrowsArgumentException`.
+**Context_Create_UserAddMisuse_ThrowsArgumentException**: A theory over `user add` with only the display name and
+with only the user name; an `ArgumentException` whose message says that `--username` and `--display-name` are
+required is thrown for each. This scenario is tested by `Context_Create_UserAddMisuse_ThrowsArgumentException`.
+
+**Context_Create_UserAddWrongAction_ThrowsArgumentException**: A theory over `user` alone and `user remove`; an
+`ArgumentException` whose message names the add action is thrown for each. This scenario is tested by
+`Context_Create_UserAddWrongAction_ThrowsArgumentException`.
+
+**Context_Create_UserAddOptionsWithoutVerb_ThrowsArgumentException**: A theory over `--username ann`,
+`--display-name Ann`, and `--system-admin` without the verb; an `ArgumentException` whose message says that the
+options require the user add verb is thrown for each. This scenario is tested by
+`Context_Create_UserAddOptionsWithoutVerb_ThrowsArgumentException`.
+
+**Context_Create_UserAddRoleOption_ThrowsArgumentException**: `Context.Create` is called with `user add`, both names,
+and the removed `--role Admin` option; an `ArgumentException` whose message says that `--role` is an unsupported
+argument is thrown. This scenario is tested by `Context_Create_UserAddRoleOption_ThrowsArgumentException`.
 
 **Context_Create_PasswordOption_IsNotSupported**: `Context.Create` is called with `user add` and a `--password`
 option; an `ArgumentException` containing "Unsupported argument" is thrown, so a password cannot be given on the
 command line. This scenario is tested by `Context_Create_PasswordOption_IsNotSupported`.
 
-**Audit verify verb**: `Context.Create` with `audit verify` sets `AuditVerify` and is off otherwise, which is tested
-by `Context_Create_AuditVerifyVerb_SetsAuditVerify`; `audit` alone or with another action is rejected with an
-`ArgumentException`, which is tested by `Context_Create_AuditMisuse_ThrowsArgumentException`. Both tests are defined
-in `CliSubsystemTests.cs`.
+**Context_Create_AuditVerifyVerb_SetsAuditVerify**: `Context.Create` with `audit verify` sets `AuditVerify` and no
+other verb, and a context created without arguments has `AuditVerify` false. This scenario is tested by
+`Context_Create_AuditVerifyVerb_SetsAuditVerify`.
 
-**Keys reprotect verb**: `Context.Create` with `keys reprotect` sets `KeysReprotect` and is off otherwise, which is
-tested by `Context_Create_KeysReprotectVerb_SetsKeysReprotect`; `keys` alone or with another action is rejected with an
-`ArgumentException`, which is tested by `Context_Create_KeysMisuse_ThrowsArgumentException`. Both tests are defined in
-`CliSubsystemTests.cs`.
+**Context_Create_AuditMisuse_ThrowsArgumentException**: A theory over `audit` alone and `audit export`; an
+`ArgumentException` whose message names the `verify` action is thrown for each. This scenario is tested by
+`Context_Create_AuditMisuse_ThrowsArgumentException`.
+
+**Context_Create_KeysReprotectVerb_SetsKeysReprotect**: `Context.Create` with `keys reprotect` sets `KeysReprotect`,
+no other verb, and exit code 0, and a context created without arguments has `KeysReprotect` false. This scenario is
+tested by `Context_Create_KeysReprotectVerb_SetsKeysReprotect`.
+
+**Context_Create_KeysMisuse_ThrowsArgumentException**: A theory over `keys` alone and `keys rotate`; an
+`ArgumentException` whose message names the `reprotect` action is thrown for each. This scenario is tested by
+`Context_Create_KeysMisuse_ThrowsArgumentException`.
