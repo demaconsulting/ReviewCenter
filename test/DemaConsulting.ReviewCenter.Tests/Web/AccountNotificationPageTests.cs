@@ -68,6 +68,7 @@ public class AccountNotificationPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='notifications-card'] button"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-explanation']"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-mode-select']"));
+        Assert.Empty(cut.FindAll("[data-testid='notifications-help-link']"));
         Assert.Equal(0, NotificationStore.Calls);
     }
 
@@ -92,6 +93,25 @@ public class AccountNotificationPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='notifications-confirm-form']"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-remove-button']"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-unavailable']"));
+    }
+
+    /// <summary>
+    ///     Test that the card links to the e-mail notifications help topic while the feature is set up.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic()
+    {
+        // Arrange: a local user and notifications that are on
+        await CreateAnnAsync();
+        SwitchNotificationsOn();
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: the link is in the card and leads to the topic
+        var link = cut.Find("[data-testid='notifications-card'] [data-testid='notifications-help-link']");
+        Assert.Equal("/help/email-notifications", link.GetAttribute("href"));
+        Assert.Equal("About e-mail notifications", link.TextContent.Trim());
     }
 
     /// <summary>

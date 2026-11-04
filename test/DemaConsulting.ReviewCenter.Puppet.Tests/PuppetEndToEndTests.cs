@@ -406,12 +406,17 @@ public class PuppetEndToEndTests
         /// <param name="seedUser">Whether to create an administrator (<c>UserName</c>) before the server starts.</param>
         /// <param name="gitCachePath">The folder for the server's clones of repositories, or <c>null</c> for the default.</param>
         /// <param name="extraUsers">Ordinary users to create besides the administrator (with the same password), or <c>null</c> for none.</param>
+        /// <param name="notificationFolder">
+        ///     The folder that receives the e-mail the server writes as <c>.eml</c> files (the file sender of the
+        ///     e-mail notifications), or <c>null</c> to leave e-mail notifications switched off.
+        /// </param>
         /// <returns>The running server; disposing it kills the process tree.</returns>
         public static async Task<TestServer> StartAsync(
             CancellationToken cancellationToken,
             bool seedUser = false,
             string? gitCachePath = null,
-            IReadOnlyList<(string Name, string DisplayName)>? extraUsers = null)
+            IReadOnlyList<(string Name, string DisplayName)>? extraUsers = null,
+            string? notificationFolder = null)
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -435,6 +440,17 @@ public class PuppetEndToEndTests
             if (gitCachePath is not null)
             {
                 info.Environment["Git__CachePath"] = gitCachePath;
+            }
+
+            // E-mail notifications are off unless a folder is given; then the server writes every mail as a file into
+            // it, and its links start with the loopback address of this server
+            if (notificationFolder is not null)
+            {
+                info.Environment["Notifications__Enabled"] = "true";
+                info.Environment["Notifications__Sender"] = "File";
+                info.Environment["Notifications__File__Directory"] = notificationFolder;
+                info.Environment["Notifications__FromAddress"] = "reviewcenter@example.com";
+                info.Environment["Notifications__BaseUrl"] = url;
             }
 
             // A signed-in flow needs a user: the command line creates the first administrator, as an operator would,

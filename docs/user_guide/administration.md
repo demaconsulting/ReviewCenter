@@ -521,7 +521,10 @@ nobody receives a notification mail without having confirmed an address and chos
 
 A mail never holds review text. The confirmation mail names the installation and the code, and says that the code is
 valid for 30 minutes. A notification mail names the kind of news, the project, and the review, and links to the
-review; it never holds a comment, an answer, a verdict, or an outcome (see What Is Mailed below).
+review; it never holds a comment, an answer, a verdict, or an outcome (see What Is Mailed below). The users read about
+it in the Help topic **E-mail notifications** (`/help/email-notifications`), which the Account page links to while the
+feature is on. The default `--validate` run proves, without a mail server and without reading your settings, that a
+mail is composed without review content and written as one file (the `ReviewCenter_NotificationMail` test).
 
 ### Settings
 
@@ -720,7 +723,7 @@ mode. A disabled user, and a user with a temporary password, get none.
 dotnet ReviewCenter.dll --validate --check-config
 ```
 
-The `ReviewCenter_ConfiguredNotifications` check, the last of the twelve, reads the settings the way the server does,
+The `ReviewCenter_ConfiguredNotifications` check, the last of the thirteen, reads the settings the way the server does,
 applies the checks of the server start, and reports the sender, for the `Smtp` sender the server, the port, the
 protection, and whether the password comes from a file, and every warning. It never connects to a mail server, never
 sends a mail, and never prints a password, a path, or an address. While notifications are off it is skipped. See

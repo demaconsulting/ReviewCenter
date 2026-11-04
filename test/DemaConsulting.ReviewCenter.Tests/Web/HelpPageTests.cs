@@ -726,6 +726,95 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the e-mail notifications topic is the last topic, listed after the checklist template topic, with
+    ///     its page link and its one-line summary in the index.
+    /// </summary>
+    [Fact]
+    public void HelpPage_Render_ListsEmailNotificationsTopicAfterChecklistTemplate()
+    {
+        // Assert: the topic follows the checklist template topic in the reading order
+        var slugs = HelpTopics.All.Select(topic => topic.Slug).ToList();
+        Assert.Equal(slugs.IndexOf("checklist-template") + 1, slugs.IndexOf("email-notifications"));
+        Assert.Equal("email-notifications", slugs[^1]);
+
+        // Act: render the index
+        var help = Render<HelpPage>();
+
+        // Assert: the index has the link to the topic page, with the title as text, and the summary
+        var link = help.Find("[data-testid='help-topic-link-email-notifications']");
+        Assert.Equal("/help/email-notifications", link.GetAttribute("href"));
+        Assert.Equal("E-mail notifications", link.TextContent);
+        Assert.Contains(
+            "Get news by e-mail, confirm your address with a code, choose when, and stop it.",
+            help.Markup,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the e-mail notifications topic says what a mail tells and that comments, answers, verdicts,
+    ///     outcomes, file contents and passwords are never mailed.
+    /// </summary>
+    [Fact]
+    public void HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever()
+    {
+        // Act: render the topic page
+        var page = Render<HelpNotificationsPage>();
+
+        // Assert: the title, and that the feature exists only when the administrator has set up mail
+        var text = page.Markup;
+        Assert.Equal("E-mail notifications", page.Find("h1").TextContent);
+        Assert.Contains("when the administrator has set up mail for this server", text, StringComparison.Ordinal);
+
+        // Assert: what a mail names, and that the subject names no review
+        Assert.Contains("It names the kind of news", text, StringComparison.Ordinal);
+        Assert.Contains("The subject line never names a review.", text, StringComparison.Ordinal);
+
+        // Assert: what is never mailed, each one on its own list entry
+        Assert.Contains("<li>No comments and no answers.</li>", text, StringComparison.Ordinal);
+        Assert.Contains("<li>No verdicts and no outcomes of a review.</li>", text, StringComparison.Ordinal);
+        Assert.Contains("<li>No contents of any file.</li>", text, StringComparison.Ordinal);
+        Assert.Contains("<li>No password.", text, StringComparison.Ordinal);
+
+        // Assert: nothing in the topic says that a masked kind of content is part of a mail
+        Assert.DoesNotContain("is mailed", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
+    ///     Test that the e-mail notifications topic explains the confirmation with a code, the three settings, how to
+    ///     stop the mail and what the Account card says while mail is not set up, in plain words.
+    /// </summary>
+    [Fact]
+    public void HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop()
+    {
+        // Act: render the topic page
+        var page = Render<HelpNotificationsPage>();
+
+        // Assert: the confirmation steps with the labels of the Account card
+        var text = page.Markup;
+        Assert.Contains("<strong>Send confirmation code</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("a 6-digit code", text, StringComparison.Ordinal);
+        Assert.Contains("The code works for 30 minutes.", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Confirm address</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("only the newest one works", text, StringComparison.Ordinal);
+
+        // Assert: the three settings, with the one that is off first
+        Assert.Contains("<strong>No e-mail</strong>: nothing is sent.", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Daily summary</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Every change</strong>", text, StringComparison.Ordinal);
+
+        // Assert: how to stop, and the case of a server without mail
+        Assert.Contains("<strong>Remove my address</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("the administrator has not switched on e-mail for this server", text, StringComparison.Ordinal);
+
+        // Assert: plain words, no technical terms
+        foreach (var jargon in new[] { "SMTP", "token", "hash", "TLS", "Notifications:", "IMAP" })
+        {
+            Assert.DoesNotContain(jargon, text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]
