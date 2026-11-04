@@ -9,28 +9,74 @@ sections:
     requirements:
       - id: ReviewCenter-ApiDocument-Document
         title: >-
-          The ApiDocument unit shall serve, without a token, an OpenAPI document at /api/openapi.json that describes
-          the API and names the bearer scheme that its routes need, and shall mark the evidence index and the
-          attestation PDF as the only two operations that can also be called without credentials, by an empty
-          security alternative next to the two schemes. The request schemas shall list as required only the members that
-          the API requires: the id and title of a review, and the repository and the head revision of a repository
-          source.
+          The ApiDocument unit shall serve, without a token, an OpenAPI document at /api/openapi.json that describes the
+          operations of the API under /api, including the project list, the evidence index and the attestation PDF,
+          and not the document itself.
         justification: |
           A client generator and a person who starts to write a script need the contract of the API, and they can
-          fetch it before they have a token. A generator that read an empty alternative on any other operation would
-          drop the credentials from calls that need them, so the alternative must appear only where it is true. A
-          generator that treated an optional member as required would force clients to send what the API does not need.
+          fetch it before they have a token.
         tests:
           - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Document-Version
+        title: >-
+          The ApiDocument unit shall give the OpenAPI document the fixed version 1.
+        justification: |
+          A version that does not change with every build lets a client see when the contract itself changed.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Document-NoServer
+        title: >-
+          The ApiDocument unit shall not name a server address in the OpenAPI document.
+        justification: |
+          The same document is used wherever the application runs, and an address that was written into it would be
+          wrong for every other installation.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Document-Scheme
+        title: >-
+          The ApiDocument unit shall describe in the OpenAPI document the bearer scheme and the HTTP Basic scheme that
+          the routes of the API accept for a personal access token.
+        justification: |
+          A client generator must know how to send the token, and a tool that can send only HTTP Basic credentials must
+          see that it may.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Document-OpenOperations
+        title: >-
+          The ApiDocument unit shall mark the evidence index and the attestation PDF as the only two operations that
+          can also be called without credentials, by an empty security alternative next to the two schemes.
+        justification: |
+          A generator that read an empty alternative on any other operation would drop the credentials from calls that
+          need them, so the alternative must appear only where it is true.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Document-RequiredMembers
+        title: >-
+          The ApiDocument unit shall list in the request schemas as required only the members that the API requires:
+          the id and title of a review, and the repository and the head revision of a repository source.
+        justification: |
+          A generator that treated an optional member as required would force clients to send what the API does not
+          need.
+        tests:
           - ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires
 
       - id: ReviewCenter-ApiDocument-Snapshot
         title: >-
-          The ApiDocument unit shall produce the same document on every start, and the document shall equal the copy
-          that is kept in the documentation.
+          The ApiDocument unit shall produce the same document on every start.
         justification: |
-          A document that changes between starts could not be compared, and a comparison with the kept copy
-          catches a change of the API that was not documented.
+          A document that changes between starts could not be compared.
         tests:
           - ApiDocument_Get_TwoApplications_AreIdentical
+
+      - id: ReviewCenter-ApiDocument-Snapshot-Committed
+        title: >-
+          The ApiDocument unit shall produce a document that equals the copy that is kept in the documentation.
+        justification: |
+          A comparison with the kept copy catches a change of the API that was not documented.
+        tests:
           - ApiDocument_Get_MatchesCommittedSnapshot

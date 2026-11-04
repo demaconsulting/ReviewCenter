@@ -620,6 +620,7 @@ public sealed class FileKeyProviderTests
         Assert.Contains(warnings, w => w.Contains("'signing.pfx'", StringComparison.Ordinal) && w.Contains("640", StringComparison.Ordinal));
         Assert.Contains(warnings, w => w.Contains("'password.txt'", StringComparison.Ordinal) && w.Contains("604", StringComparison.Ordinal));
         Assert.All(warnings, w => Assert.DoesNotContain(folder.DirectoryPath, w, StringComparison.Ordinal));
+        Assert.All(warnings, w => Assert.Contains("chmod 600", w, StringComparison.Ordinal));
         Assert.Empty(strictWarnings);
     }
 
@@ -759,6 +760,67 @@ public sealed class FileKeyProviderTests
         Assert.True(key.Info.RequireTrustedKey);
         Assert.False(key.Info.IsSelfSigned);
     }
+
+    /// <summary>
+    ///     Test that the format is told from the content and not from the file extension: a PKCS #12 file with the
+    ///     extension of a PEM file, and a PEM file with the extension of a PFX file, are both loaded.
+    /// </summary>
+    [Fact]
+    public void FileKeyProvider_GetSigningKey_FormatByContent_IgnoresTheFileExtension()
+    {
+        // Arrange: PKCS #12 content in a file named .pem, and PEM content in a file named .pfx
+        using var folder = new TemporaryDirectory();
+        using var issued = Issue();
+        var pfx = WritePfx(folder, issued, Password, chain: false);
+        var (pem, _) = WritePem(folder, issued, Password, separateKey: false, chain: false);
+        var pfxAsPem = folder.GetFilePath("pkcs12-content.pem");
+        var pemAsPfx = folder.GetFilePath("pem-content.pfx");
+        File.Copy(pfx, pfxAsPem);
+        File.Copy(pem, pemAsPfx);
+        RestrictToOwner(pfxAsPem);
+        RestrictToOwner(pemAsPfx);
+        using var pfxProvider = Create(new AttestationOptions { CertificatePath = pfxAsPem, CertificatePassword = Password });
+        using var pemProvider = Create(new AttestationOptions { CertificatePath = pemAsPfx, CertificatePassword = Password });
+
+        // Act: load each key
+        var fromPfx = pfxProvider.GetSigningKey();
+        var fromPem = pemProvider.GetSigningKey();
+
+        // Assert: both gave the signer
+        Assert.Equal(issued.Signer.Thumbprint, fromPfx.Info.Thumbprint, ignoreCase: true);
+        Assert.Equal(issued.Signer.Thumbprint, fromPem.Info.Thumbprint, ignoreCase: true);
+    }
+
+    /// <summary>
+    ///     Test that loading the key writes no file and changes no file: the private key is held in memory only.
+    /// </summary>
+    [Fact]
+    public void FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_WritesAndChangesNoFile()
+    {
+        // Arrange: a protected PFX in a folder, and the content of the folder before the load
+        using var folder = new TemporaryDirectory();
+        using var issued = Issue();
+        var path = WritePfx(folder, issued, Password, chain: true);
+        using var provider = Create(new AttestationOptions { CertificatePath = path, CertificatePassword = Password });
+        var before = Snapshot(folder.DirectoryPath);
+
+        // Act: load the key and describe it
+        provider.GetSigningKey();
+        provider.Describe();
+
+        // Assert: the folder holds the same files with the same content
+        Assert.Equal(before, Snapshot(folder.DirectoryPath));
+    }
+
+    /// <summary>
+    ///     Lists the files of a folder with the hash of their content.
+    /// </summary>
+    /// <param name="directory">The folder.</param>
+    /// <returns>One entry for each file, in the order of the names.</returns>
+    private static List<string> Snapshot(string directory) =>
+        [.. Directory.GetFiles(directory)
+            .Order(StringComparer.Ordinal)
+            .Select(file => Path.GetFileName(file) + ":" + Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file))))];
 
     /// <summary>
     ///     Creates the provider under test, with the fixed clock.

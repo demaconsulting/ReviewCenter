@@ -82,6 +82,14 @@ tested by
 listed, in order, from the first remark to the last, and there is no line about findings that were left out. This
 scenario is tested by `AttestationRenderer_Render_ManyFindings_ListsEveryFinding`.
 
+**AttestationRenderer_Render_ManyFindings_ListsThemInTheOrderGiven**: A review with 130 numbered findings is rendered.
+The locations of the findings are in the text in exactly the order of the document. This scenario is tested by
+`AttestationRenderer_Render_ManyFindings_ListsThemInTheOrderGiven`.
+
+**AttestationRenderer_Render_ManyFindings_ContinueOntoFurtherPages**: A review with 130 findings is rendered. The
+document has more pages than the sample, and the last finding is in the text. This scenario is tested by
+`AttestationRenderer_Render_ManyFindings_ContinueOntoFurtherPages`.
+
 **AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded**: A document without a finding is rendered. The findings
 section says that no finding or comment was included in the report. This scenario is tested by
 `AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded`.
@@ -105,6 +113,10 @@ reply, no line that starts "Finding by", and no heading with the bare location. 
 rendered. The rejected one has the title "Review attestation - REJECTED" (also in the document title property) and the
 banner text; the approved one has neither. This scenario is tested by
 `AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection`.
+
+**AttestationRenderer_Render_Rejected_PrintsBannerBetweenTitleAndReviewSection**: A rejected document is rendered. The
+first line of the banner follows the title line directly, and the Review section comes after the banner. This scenario
+is tested by `AttestationRenderer_Render_Rejected_PrintsBannerBetweenTitleAndReviewSection`.
 
 **AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText**: Documents with a rejection, an approval, and a blank
 conclusion text are rendered. The section prints the outcome, the reasons for a rejection or the conclusion of an
@@ -133,6 +145,11 @@ slot shows its signer, the time, and the digest it covers. This scenario is test
 digest. The digest is a single line and is not wrapped. This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine`.
 
+**AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds**: A document with the reviewer names turned
+off is rendered, with slots that hold the labels `Reviewer 1` and `Reviewer 2` instead of names. The labels and the
+signer with the role are printed as they are, and the names of the sample are not in the text. This scenario is tested
+by `AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds`.
+
 **AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion**: The audit anchor and the tool version are
 rendered. The text has the head hash, the number of entries, and the version. This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion`.
@@ -142,7 +159,8 @@ the PDF hold the fingerprint and the review identifier. This scenario is tested 
 `AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId`.
 
 **AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice**: A document with a self-signed key is rendered. The text has
-the notice that the key is self-signed and not an organization key. This scenario is tested by
+the notice that the key is self-signed and not an organization key, with the advice that it is for development and test
+only. This scenario is tested by
 `AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice`.
 
 **AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice**: A document with an organization key is
@@ -154,9 +172,22 @@ for code signing only and with one that is not. The text of the first has the co
 wrapped paragraph joined), the second does not, and the self-signed notice is printed in both. This scenario is tested
 by `AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies`.
 
-**AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves**: A document is rendered. The text states what the
-signature proves, that it does not prove who the reviewers are, and that the time is the clock of the server and not a
-trusted timestamp. This scenario is tested by `AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves`.
+**AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves**: A document is rendered. The text has the heading
+"What this signature proves" and the statement that the signature proves that the document has not changed since it was
+signed. This scenario is tested by `AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves`.
+
+**AttestationRenderer_Render_Document_SaysTheSignatureProvesTheOriginOfTheKey**: A document is rendered. The statement,
+with its wrapped lines joined, says that the document was produced by the holder of the signing key named in the
+document. This scenario is tested by `AttestationRenderer_Render_Document_SaysTheSignatureProvesTheOriginOfTheKey`.
+
+**AttestationRenderer_Render_Document_SaysTheSignatureDoesNotIdentifyTheReviewers**: A document is rendered. The
+statement, with its wrapped lines joined, says that the signature does not identify the reviewers and that the reviewers
+were authenticated by ReviewCenter, which recorded their sign-offs. This scenario is tested by
+`AttestationRenderer_Render_Document_SaysTheSignatureDoesNotIdentifyTheReviewers`.
+
+**AttestationRenderer_Render_Document_SaysTheSigningTimeIsNotATrustedTimestamp**: A document is rendered. The statement,
+with its wrapped lines joined, says that the signing time comes from the server clock and is not a trusted timestamp.
+This scenario is tested by `AttestationRenderer_Render_Document_SaysTheSigningTimeIsNotATrustedTimestamp`.
 
 **AttestationRenderer_Render_SameDocument_ProducesIdenticalBytes**: The same document is rendered twice. The bytes are
 equal. This scenario is tested by `AttestationRenderer_Render_SameDocument_ProducesIdenticalBytes`.
@@ -179,6 +210,11 @@ This scenario is tested by `AttestationRenderer_Render_NullDocument_Throws`.
 rendered. The Content scope section follows the review section, shows each switch, says that nothing is left out, and
 says that the record digest covers the complete record. This scenario is tested by
 `AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut`.
+
+**AttestationRenderer_Render_Document_PrintsContentScopeDirectlyAfterReviewSection**: A document with the default
+settings is rendered. The Review section comes first and holds the fingerprint, no other section heading is between it
+and the Content scope heading, and the list of files comes after the Content scope. This scenario is tested by
+`AttestationRenderer_Render_Document_PrintsContentScopeDirectlyAfterReviewSection`.
 
 **AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo**: A document for a request without signing in is
 rendered. The Content scope section says that the request was made without signing in. This scenario is tested by

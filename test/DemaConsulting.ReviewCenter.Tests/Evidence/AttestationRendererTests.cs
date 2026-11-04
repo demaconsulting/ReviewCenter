@@ -401,6 +401,43 @@ public class AttestationRendererTests
     }
 
     /// <summary>
+    ///     Test that the findings are listed in the order in which the document holds them.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ManyFindings_ListsThemInTheOrderGiven()
+    {
+        // Arrange: the sample with 130 resolved findings, numbered in the order of the document
+        var document = Sample() with { Findings = Threads(130) };
+
+        // Act: render
+        var locations = Render(document).TextLines
+            .Where(line => line.StartsWith("src/f", StringComparison.Ordinal))
+            .ToList();
+
+        // Assert: the locations come in exactly the order of the document
+        var expected = Enumerable.Range(0, 130).Select(i => $"src/f{i:D3}.txt, lines 1-2").ToList();
+        Assert.Equal(expected, locations);
+    }
+
+    /// <summary>
+    ///     Test that a list of findings that does not fit on one page continues onto further pages.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ManyFindings_ContinueOntoFurtherPages()
+    {
+        // Arrange: the page count of the sample, and the sample with 130 resolved findings
+        var shortPages = Render(Sample()).PageCount;
+        var document = Sample() with { Findings = Threads(130) };
+
+        // Act: render
+        var pdf = Render(document);
+
+        // Assert: more pages than the sample, and the last finding is on one of them
+        Assert.True(pdf.PageCount > shortPages);
+        Assert.Contains("remark 129", pdf.TextLines);
+    }
+
+    /// <summary>
     ///     Builds a comment of numbered words, which makes any cut or loss visible.
     /// </summary>
     /// <param name="count">The number of words.</param>
@@ -489,6 +526,38 @@ public class AttestationRendererTests
     }
 
     /// <summary>
+    ///     Test that the names of the reviewers are printed exactly as the document holds them, also when the
+    ///     evidence settings turn the reviewer names off.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds()
+    {
+        // Arrange: reviewer names off, and slots that hold labels instead of names
+        var signedAt = new DateTimeOffset(2025, 3, 3, 4, 5, 6, TimeSpan.Zero);
+        var document = Sample(content: EvidenceSettings.Default with { IncludeReviewerNames = false }) with
+        {
+            Slots =
+            [
+                new AttestationSlot(
+                    1,
+                    "Reviewer 1",
+                    "Reviewer 2",
+                    new AttestationSignature("Reviewer 2", "Alternate", signedAt, "ReviewCenter record v1", Digest, "I reviewed it"))
+            ]
+        };
+
+        // Act: render
+        var lines = Render(document).TextLines;
+
+        // Assert: the labels of the document are printed as they are, and the names of the sample are not
+        Assert.Contains("Reviewer 1", lines);
+        Assert.Contains("Reviewer 2", lines);
+        Assert.Contains("Reviewer 2 (Alternate)", lines);
+        Assert.DoesNotContain("Ann (ann)", lines);
+        Assert.DoesNotContain("Bob (bob)", lines);
+    }
+
+    /// <summary>
     ///     Test that the 64-character record digest of a signed slot is shown on one line, not wrapped.
     /// </summary>
     [Fact]
@@ -553,6 +622,7 @@ public class AttestationRendererTests
 
         // Assert: the notice is printed, the key facts and the flag
         Assert.Contains(lines, l => l.StartsWith("SELF-SIGNED KEY - NOT AN ORGANIZATION KEY", StringComparison.Ordinal));
+        Assert.Contains("Dev/test only", string.Join(' ', lines), StringComparison.Ordinal);
         Assert.Contains("CN=Self signed test key", lines);
         Assert.Contains("0123456789ABCDEF0123456789ABCDEF01234567", lines);
         Assert.Contains("yes", lines);
@@ -617,6 +687,57 @@ public class AttestationRendererTests
         Assert.Contains(lines, l => l.Length > 30 && AttestationRenderer.ProvesStatement.StartsWith(l, StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("proves that this document has not changed", StringComparison.Ordinal));
         Assert.Contains("does not identify the reviewers", AttestationRenderer.ProvesStatement, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the document says that the signature proves that the document was produced by the holder of the
+    ///     signing key.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Document_SaysTheSignatureProvesTheOriginOfTheKey()
+    {
+        // Arrange: a sample document
+
+        // Act: render; the statement is a wrapped paragraph, so the lines are joined again
+        var text = string.Join(' ', Render(Sample()).TextLines);
+
+        // Assert: the origin of the document is the holder of the key named in the document
+        Assert.Contains("produced by the holder of the signing key named above", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the document says that the signature does not identify the reviewers, whose sign-offs the
+    ///     document lists.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Document_SaysTheSignatureDoesNotIdentifyTheReviewers()
+    {
+        // Arrange: a sample document
+
+        // Act: render; the statement is a wrapped paragraph, so the lines are joined again
+        var text = string.Join(' ', Render(Sample()).TextLines);
+
+        // Assert: the reviewers are not identified by the signature but by the sign-offs that the tool recorded
+        Assert.Contains("It does not identify the reviewers", text, StringComparison.Ordinal);
+        Assert.Contains("authenticated by ReviewCenter, which recorded their sign-offs", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the document says that the signing time is the time of the server and not a trusted timestamp.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Document_SaysTheSigningTimeIsNotATrustedTimestamp()
+    {
+        // Arrange: a sample document
+
+        // Act: render; the statement is a wrapped paragraph, so the lines are joined again
+        var text = string.Join(' ', Render(Sample()).TextLines);
+
+        // Assert: the time comes from the clock of the server and is not trusted
+        Assert.Contains(
+            "signing time comes from the server clock and is not a trusted timestamp",
+            text,
+            StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -712,6 +833,35 @@ public class AttestationRendererTests
             lines);
         Assert.Contains("Findings and comments in this report", lines);
         Assert.Contains("Files (2)", lines);
+    }
+
+    /// <summary>
+    ///     Test that the content scope follows the review section directly, before the list of files.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Document_PrintsContentScopeDirectlyAfterReviewSection()
+    {
+        // Arrange, Act
+        var lines = Render(Sample()).TextLines.ToList();
+
+        // Assert: the review section comes first, and no other section heading is between it and the content scope
+        var review = lines.IndexOf("Review");
+        var scope = lines.IndexOf("Content scope");
+        Assert.True(review >= 0 && scope > review);
+        var between = lines.Skip(review + 1).Take(scope - review - 1).ToList();
+        Assert.Contains("fingerprint-1234", between);
+        string[] otherHeadings =
+        [
+            "Files (2)",
+            "Checklist",
+            "Findings and comments in this report",
+            "Conclusion",
+            "Reviewer sign-offs",
+            "Audit trail",
+            "Digital signature"
+        ];
+        Assert.DoesNotContain(between, heading => otherHeadings.Contains(heading));
+        Assert.True(lines.IndexOf("Files (2)") > scope);
     }
 
     /// <summary>

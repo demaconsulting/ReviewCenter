@@ -17,6 +17,10 @@ The attestation of a concluded review (an approval or a rejection, with findings
 appendix) and what it must never print are verified with tests defined in `AttestationServiceRejectedTests.cs`, with
 the same fixture, which concludes a review as rejected with `RejectAsync`.
 
+The visibility tests that name a user who may or may not view the project build the service over the real
+`ProjectAccess` rules and the user store of the fixture, instead of the double that lets everybody in. The test of the
+strict audit record makes the audit store of the fixture refuse the next entry.
+
 #### Test Environment
 
 N/A - standard test environment (everything runs in memory).
@@ -31,13 +35,15 @@ N/A - standard test environment (everything runs in memory).
   review that does not change is attested after the second check, which runs once and before the audit event.
 - A problem of the key or of the signer is reported as an unavailable key, and nothing is recorded.
 - A complete review gives a signed PDF of the review, and its release is recorded with the digest, the chain head, the
-  hash of the PDF, and the key; each request records its own event.
+  hash of the PDF, and the key; each request records its own event. The PDF prints every check with its outcome, the
+  sign-off of the slot, the head of the audit chain, and the signing key.
 - The PDF shows the consolidated checklist of the submitted ballots and the time of each answer (of the lowest agreeing
   slot). Answering again with the same outcomes later changes that time but neither the record digest nor the approval,
   because the digest covers only the agreed outcomes.
-- A user who cannot see the project is answered `NotFound`, like a missing review. The unit tests have no case for
-  this guard; it is verified over HTTP by `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
-  and `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
+- A user who cannot see the project is answered `NotFound`, like a missing review, with no key request and no audit
+  event, and a user who may see it gets the PDF; the unit tests use the real `ProjectAccess` rules for these two cases,
+  and the `Api` subsystem verifies the same guard over HTTP.
+- When the audit event cannot be written the request fails and no event exists, so no attestation is released.
 - The evidence settings of the project decide the content: with the defaults the PDF has everything; with the
   reviewer names off every person is a label (`Reviewer N (primary)`, `Reviewer N (alternate)`, `Participant N`) and the
   requester is a signed-in user; with the threads, the files, or the checklist wording off the section is missing; and
@@ -130,9 +136,10 @@ shows the time of the later answers, neither the time of the signature nor the t
 tested by
 `AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval`.
 
-**AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash**: A complete review is asked
-for. An `attestation.generated` event of the actor has the record digest, the chain head, the SHA-256 of the PDF, and
-the key. This scenario is tested by
+**AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash**: One audit entry is recorded
+first, and a complete review is then asked for. An `attestation.generated` event of the actor has the project, the
+review, the record digest, the chain head as it was before the request (the head of the audit trail after that first
+entry), the SHA-256 of the PDF, and the key. This scenario is tested by
 `AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash`.
 
 **AttestationService_GenerateAsync_AskedTwice_RecordsTwoEvents**: The attestation is asked for twice. There are two
@@ -288,5 +295,53 @@ scenario is tested by
 
 **AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers**: An approved review and an
 approved follow-up that carried every Pass answer are asked for. The follow-up's attestation names the followed review
-and the carried counts, and the original's names neither the row nor the marks. This scenario is tested by
+and the carried counts (every answer, and no thread, because a review with an open thread cannot be signed; the count
+of a thread that was carried is shown by the renderer scenarios), and the original's names neither the row nor the
+marks. This scenario is tested by
 `AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers`.
+
+**AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview**: The service is built over
+the real project access rules. A user who is no member of the project asks for the review that exists, and a member asks
+for a review that does not exist. The status of the user who may not view is `NotFound` with the same message as for the
+missing review, there is no content, the key provider was not called, and no attestation event exists. This scenario is
+tested by `AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview`.
+
+**AttestationService_GenerateAsync_ActorMayViewProject_ReturnsPdf**: With the same real access rules, a member of the
+project asks for the attestation of a complete review. The status is `Ok` and the PDF has a signature that verifies.
+This scenario is tested by `AttestationService_GenerateAsync_ActorMayViewProject_ReturnsPdf`.
+
+**AttestationService_GenerateAsync_AuditRecordFails_ThrowsAndRecordsNothing**: The audit store refuses the next entry
+and the attestation of a complete review is asked for. The failure reaches the caller, so no document is returned, and
+the audit trail has no attestation event. This scenario is tested by
+`AttestationService_GenerateAsync_AuditRecordFails_ThrowsAndRecordsNothing`.
+
+**AttestationService_GenerateAsync_CompleteReview_PrintsEveryCheckWithItsOutcome**: A complete review in which every
+check was answered with Pass is asked for. For every check of the checklist the PDF has a line with the identifier of
+the check and the outcome `Pass`. This scenario is tested by
+`AttestationService_GenerateAsync_CompleteReview_PrintsEveryCheckWithItsOutcome`.
+
+**AttestationService_GenerateAsync_CompleteReview_PrintsSignOffOfTheSlot**: A complete review whose only slot was
+signed by Ann is asked for. The PDF has the "Reviewer sign-offs" section with "Slot 1", the two reviewers of the slot,
+and a line for the signature of the primary reviewer. This scenario is tested by
+`AttestationService_GenerateAsync_CompleteReview_PrintsSignOffOfTheSlot`.
+
+**AttestationService_GenerateAsync_CompleteReview_PrintsAuditChainHead**: One audit entry is recorded and the
+attestation of a complete review is asked for. The head hash of the audit chain is printed in the "Audit trail" section
+of the PDF. This scenario is tested by `AttestationService_GenerateAsync_CompleteReview_PrintsAuditChainHead`.
+
+**AttestationService_GenerateAsync_CompleteReview_PrintsSigningKey**: The attestation of a complete review is asked for
+with a known key. The thumbprint of the key is printed in the "Digital signature" section of the PDF. This scenario is
+tested by `AttestationService_GenerateAsync_CompleteReview_PrintsSigningKey`.
+
+**AttestationService_GenerateAsync_RejectedNamesOff_LeavesTypedTextAsItIs**: The reviewer names are off for a rejected
+review. A finding whose text is "Ann owns the loop bound" and a ballot justification "Ask Ann before you decide." both
+mention a name that people typed. The finding is still listed as "Finding by Reviewer 1 (primary)", and the finding text
+and the justification are printed exactly as they were typed. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedNamesOff_LeavesTypedTextAsItIs`.
+
+**AttestationService_GenerateAsync_NamesOffSeveralParticipants_NumbersThemInOrderOfFirstNaming**: The reviewer names
+are off. Cyd starts a finding thread and Ann, Dee, and Cyd reply, all included in the report. The finding is by
+`Participant 1`, the reply of Ann is by `Reviewer 1 (primary)`, the reply of Dee is by `Participant 2`, the second reply
+of Cyd is again by `Participant 1`, there is no `Participant 3`, and no user name or display name is printed. This
+scenario is tested by
+`AttestationService_GenerateAsync_NamesOffSeveralParticipants_NumbersThemInOrderOfFirstNaming`.

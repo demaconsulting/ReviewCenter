@@ -11,262 +11,880 @@ sections:
     requirements:
       - id: ReviewCenter-AttestationKeyProvider-Selection
         title: >-
-          The AttestationKeyProvider unit shall choose the SelfSigned provider when no provider or SelfSigned is
-          configured, the CertificateStore provider when CertificateStore is configured and the File provider when
-          File is configured, hand the SelfSigned provider the Data Protection provider that protects its key, and
-          refuse any other value with an error that names the Attestation:Provider setting and lists the three
-          providers.
+          The AttestationKeyProviderFactory class shall choose the SelfSigned provider when no provider or SelfSigned
+          is configured.
         justification: |
-          Which key signs the attestation is the most important choice of an operator. A misspelled value must stop the
-          server with a clear message and never silently fall back to a different kind of key. The key at rest is
-          protected by the key ring of the server, so the factory must pass that ring on.
+          Which key signs the attestation is the most important choice of an operator, and a new installation must
+          work without any configuration, so the self-signed key is the default.
         tests:
           - AttestationKeyProviderFactory_Create_BlankOrSelfSigned_SelectsSelfSignedProvider
+
+      - id: ReviewCenter-AttestationKeyProvider-Selection-CertificateStore
+        title: >-
+          The AttestationKeyProviderFactory class shall choose the CertificateStore provider when CertificateStore is
+          configured.
+        justification: |
+          An organization that keeps its signing key in a certificate store selects that provider by name.
+        tests:
           - AttestationKeyProviderFactory_Create_CertificateStore_SelectsCertificateStoreProvider
+
+      - id: ReviewCenter-AttestationKeyProvider-Selection-File
+        title: >-
+          The AttestationKeyProviderFactory class shall choose the File provider when File is configured.
+        justification: |
+          An organization that deploys its signing key as a file selects that provider by name.
+        tests:
           - AttestationKeyProviderFactory_Create_File_SelectsFileProvider
+
+      - id: ReviewCenter-AttestationKeyProvider-Selection-Unknown
+        title: >-
+          The AttestationKeyProviderFactory class shall refuse any other provider value with an error that names the
+          Attestation:Provider setting and lists the three providers.
+        justification: |
+          A misspelled value must stop the server with a clear message and never silently fall back to a different
+          kind of key.
+        tests:
           - AttestationKeyProviderFactory_Create_UnknownProvider_ThrowsNamingTheSetting
 
       - id: ReviewCenter-AttestationKeyProvider-File
         title: >-
-          The FileKeyProvider class shall load the signing key from the configured PFX or PKCS #12 file, or from a
-          PEM certificate with the private key in the same file or in the file named by PrivateKeyPath (which is
-          ignored for a PFX), detecting the
-          format from the content, keep the private key in memory only and clear the bytes that it read from the files,
-          take the other certificates of the file as the
-          chain of the signer without the signer itself and without a self-signed root, apply the RequireTrustedKey
-          rules like every provider, and report a missing path, a missing file, a file that is not a certificate with
-          a private key, a legacy encrypted PEM key (with the remedy of converting it to PKCS #8), a missing password
-          and a wrong password as errors that name the setting or the file and that
-          hold neither the password nor, in the form for the configuration check, the folder.
+          The FileKeyProvider class shall load the signing key from the configured PFX or PKCS #12 file, using the
+          password of the CertificatePassword setting.
         justification: |
           Many organizations keep their signing certificate in a file that an administrator deploys, for example from
-          a secret store, and not in a certificate store. The server must use that file without writing the key
-          anywhere, and an operator can correct a problem only when the message says which setting or file has it.
+          a secret store, and not in a certificate store. A PKCS #12 file is the usual form of such a file.
         tests:
           - FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_LoadsSignerAndKey
+
+      - id: ReviewCenter-AttestationKeyProvider-File-PemKeyFile
+        title: >-
+          The FileKeyProvider class shall load the signing key from a PEM certificate with the private key in the file
+          named by PrivateKeyPath.
+        justification: |
+          Tools such as OpenSSL and ACME clients write the certificate and the key to two PEM files, and the server
+          must use them as they are.
+        tests:
+          - FileKeyProvider_GetSigningKey_PemWithSeparateKeyAndChain_LoadsSignerAndChain
+          - FileKeyProvider_GetSigningKey_EncryptedPemWithSeparateKey_LoadsSignerWithPassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-PemOneFile
+        title: >-
+          The FileKeyProvider class shall load the signing key from a PEM certificate with the private key in the same
+          file.
+        justification: |
+          A single PEM file that holds the certificate and the key is a common way to deploy a signing certificate.
+        tests:
+          - FileKeyProvider_GetSigningKey_EncryptedPemInOneFile_LoadsSignerWithPassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-Format
+        title: >-
+          The FileKeyProvider class shall detect the format of the certificate file from its content and not from the
+          extension of the file name.
+        justification: |
+          File names are chosen by the administrator who deploys the file, and a wrong extension must not make a
+          valid key unusable.
+        tests:
+          - FileKeyProvider_GetSigningKey_FormatByContent_IgnoresTheFileExtension
+
+      - id: ReviewCenter-AttestationKeyProvider-File-Chain
+        title: >-
+          The FileKeyProvider class shall take the other certificates of the file as the chain of the signer, without
+          the signer itself and without a self-signed root.
+        justification: |
+          The attestation carries the chain so that a PDF reader can build the path to the root of the organization.
+          The signer is carried separately, and a self-signed root is already known to the reader.
+        tests:
           - FileKeyProvider_GetSigningKey_PfxWithIntermediateAndRoot_ChainHoldsTheIntermediateOnly
           - FileKeyProvider_GetSigningKey_PemWithSeparateKeyAndChain_LoadsSignerAndChain
-          - FileKeyProvider_GetSigningKey_EncryptedPemInOneFile_LoadsSignerWithPassword
-          - FileKeyProvider_GetSigningKey_EncryptedPemWithSeparateKey_LoadsSignerWithPassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-PfxIgnoresKeyPath
+        title: >-
+          The FileKeyProvider class shall ignore PrivateKeyPath when the certificate file is a PFX or PKCS #12 file.
+        justification: |
+          A PKCS #12 file holds its own key, so a leftover PrivateKeyPath setting must neither fail the start nor
+          replace the key of the file.
+        tests:
+          - FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt
+
+      - id: ReviewCenter-AttestationKeyProvider-File-ReadOnly
+        title: >-
+          The FileKeyProvider class shall keep the private key in memory and write or change no file when it loads the
+          key.
+        justification: |
+          The server must use a deployed key without writing the key anywhere, so that the file stays the only copy
+          that an administrator has to protect.
+        tests:
+          - FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_WritesAndChangesNoFile
+
+      - id: ReviewCenter-AttestationKeyProvider-File-NoPath
+        title: >-
+          The FileKeyProvider class shall report a missing certificate path as an error that names the setting.
+        justification: |
+          An operator can correct a configuration only when the message says which setting has the problem.
+        tests:
           - FileKeyProvider_GetSigningKey_NoCertificatePath_NamesTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-File-Missing
+        title: >-
+          The FileKeyProvider class shall report a certificate file that does not exist as an error that names the
+          file.
+        justification: |
+          A path with a typo or a file that was not deployed is the most common mistake, and the message must show
+          which file the server looked for.
+        tests:
           - FileKeyProvider_GetSigningKey_MissingFile_NamesTheFileAndTheCheckMessageNamesNoFolder
+
+      - id: ReviewCenter-AttestationKeyProvider-File-MissingKey
+        title: >-
+          The FileKeyProvider class shall report a private key file that does not exist as an error that names the
+          setting.
+        justification: |
+          The private key file is a second path, and the operator must be told which of the two settings is wrong.
+        tests:
           - FileKeyProvider_GetSigningKey_MissingKeyFile_NamesTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-File-AsksPassword
+        title: >-
+          The FileKeyProvider class shall report a protected file for which no password is configured as an error that
+          asks for the password.
+        justification: |
+          A protected key without a password can never be loaded, and the message must tell the operator what to add.
+        tests:
           - FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword
           - FileKeyProvider_GetSigningKey_EncryptedPemWithoutPassword_AsksForThePassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-WrongPassword
+        title: >-
+          The FileKeyProvider class shall report a wrong password as an error that says so.
+        justification: |
+          A password that does not open the file is a different mistake than a missing password, and the operator must
+          be able to tell them apart.
+        tests:
           - FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-NoPasswordEcho
+        title: >-
+          The FileKeyProvider class shall put the password into neither the message nor the log when the password is
+          wrong.
+        justification: |
+          A password that is wrong by one character is nearly the right password, and an error message or a log is a
+          place where a secret must never appear.
+        tests:
+          - FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword
+
+      - id: ReviewCenter-AttestationKeyProvider-File-KeyFileErrors
+        title: >-
+          The FileKeyProvider class shall name the private key file in the error for a problem with a separate
+          encrypted private key.
+        justification: |
+          With two files, the operator must know which one has the problem.
+        tests:
           - FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile
+
+      - id: ReviewCenter-AttestationKeyProvider-File-NotCertificate
+        title: >-
+          The FileKeyProvider class shall report a file that is not a certificate with a private key as an error that
+          says so.
+        justification: |
+          A wrong file at the configured path, such as a public certificate alone, must be reported as what it is.
+        tests:
           - FileKeyProvider_GetSigningKey_FileThatIsNotACertificate_SaysSo
+
+      - id: ReviewCenter-AttestationKeyProvider-File-LegacyPem
+        title: >-
+          The FileKeyProvider class shall report a legacy encrypted PEM private key as an error that gives the remedy
+          of converting the key to PKCS #8.
+        justification: |
+          The legacy encryption of a PEM key is not supported by the platform, and the operator needs to know that a
+          conversion solves it.
+        tests:
           - FileKeyProvider_GetSigningKey_LegacyEncryptedPemKey_AsksToConvertToPkcs8
-          - FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt
-          - FileKeyProvider_GetSigningKey_ValidOrganizationCertificateWithRequireTrustedKey_Accepts
-          - FileKeyProvider_GetSigningKey_ExpiredWithRequireTrustedKey_IsRefused
+
+      - id: ReviewCenter-AttestationKeyProvider-File-NoFolder
+        title: >-
+          The FileKeyProvider class shall name no folder in the errors that it offers for the configuration check.
+        justification: |
+          The configuration check is archived as evidence, and the folder of a deployment must not be printed into it.
+        tests:
+          - FileKeyProvider_GetSigningKey_MissingFile_NamesTheFileAndTheCheckMessageNamesNoFolder
+          - FileKeyProvider_GetSigningKey_MissingKeyFile_NamesTheSetting
+          - FileKeyProvider_GetSigningKey_LegacyEncryptedPemKey_AsksToConvertToPkcs8
 
       - id: ReviewCenter-AttestationKeyProvider-FileSecret
         title: >-
-          The FileKeyProvider class shall take the password of the file from CertificatePassword or from the contents
-          of the file named by CertificatePasswordFile, trimmed of surrounding white space, through the SecretSource
-          unit, refuse both settings
-          together and a password file that does not exist with the messages of that unit, refuse a key that is not
-          protected by a password when DataProtection:RequireEncryptedKeys is set, and otherwise load it with a
-          warning that names the file and not the folder.
+          The FileKeyProvider class shall take the password of the file from the contents of the file named by
+          CertificatePasswordFile, trimmed of surrounding white space.
         justification: |
-          A password in a file keeps it out of the process environment and the configuration, and an operator who
-          requires encrypted keys must not end up with a signing key on disk that anyone who can read the file can use.
+          A password in a file keeps it out of the process environment and the configuration, and the trailing newline
+          that editors and secret stores add must not become part of the password.
         tests:
           - FileKeyProvider_GetSigningKey_PfxWithPasswordFile_LoadsSigner
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-Conflict
+        title: >-
+          The FileKeyProvider class shall refuse CertificatePassword and CertificatePasswordFile set together with an
+          error that says that only one of them may be set.
+        justification: |
+          Two sources for one password leave it open which one is in force, and the server must not guess.
+        tests:
           - FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-MissingFile
+        title: >-
+          The FileKeyProvider class shall refuse a CertificatePasswordFile that does not exist with an error that names
+          the file, and with a message for the configuration check that names the file without its folder.
+        justification: |
+          A password file that was not deployed must stop the start with a message that shows which file is missing.
+        tests:
+          - FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-Unprotected
+        title: >-
+          The FileKeyProvider class shall load a private key that is not protected by a password and warn about it,
+          naming the file and not the folder.
+        justification: |
+          A key that anyone who can read the file can use is a risk that the operator should hear about, but a
+          deployment can have a reason for it, so the server still starts.
+        tests:
           - FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning
-          - FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-Protected
+        title: >-
+          The FileKeyProvider class shall treat a private key that sits in an encrypted part of a PFX file as protected
+          and not warn about it.
+        justification: |
+          Many tools encrypt the part of the file that holds the key and not the key itself, and a false warning would
+          teach the operator to ignore the real ones.
+        tests:
           - FileKeyProvider_GetSigningKey_PfxWithKeyBagInEncryptedSafe_IsTreatedAsProtected
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-PasswordNotUsed
+        title: >-
+          The FileKeyProvider class shall treat a private key that is stored without protection in a PFX file as not
+          protected and warn about it, even when a password is set.
+        justification: |
+          A password in the settings does not protect a key that the file holds in the clear, and the operator must not
+          be given a false assurance.
+        tests:
+          - FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected
+
+      - id: ReviewCenter-AttestationKeyProvider-FileSecret-RequireEncrypted
+        title: >-
+          The FileKeyProvider class shall refuse a private key that is not protected by a password when
+          DataProtection:RequireEncryptedKeys is set.
+        justification: |
+          An operator who requires encrypted keys must not end up with a signing key on disk that anyone who can read
+          the file can use.
+        tests:
           - FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused
+          - FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected
 
       - id: ReviewCenter-AttestationKeyProvider-FilePermissions
         title: >-
-          The FileKeyProvider class shall, on Linux and macOS, warn when the file that holds the private key (the
-          private key file for a PEM certificate with a separate one, otherwise the certificate file; PrivateKeyPath
-          is ignored for a PFX) or the password file can be accessed by the group or by others, with a message that
-          names the file, the mode and a remedy and not the folder.
+          The FileKeyProvider class shall, on Linux, warn when the file that holds the private key can be accessed by
+          the group or by others, with a message that names the file, the mode and a remedy and not the folder.
         justification: |
-          A private key or a password that other accounts of the machine can read is not protected, and the operator
-          must hear about it at start. The warning is advice, because a deployment can have a reason for a shared
-          group, so the server still starts.
+          A private key that other accounts of the machine can read is not protected, and the operator must hear about
+          it at start. The warning is advice, because a deployment can have a reason for a shared group, so the server
+          still starts.
         tests:
           - ubuntu@FileKeyProvider_GetSigningKey_FilesReadableByOthersOnUnix_WarnsAboutEachOfThem
+
+      - id: ReviewCenter-AttestationKeyProvider-FilePermissions-PasswordFile
+        title: >-
+          The FileKeyProvider class shall, on Linux, warn when the password file can be accessed by the group or by
+          others, with a message that names the file, the mode and a remedy and not the folder.
+        justification: |
+          A password that other accounts of the machine can read opens the key as well as a readable key does.
+        tests:
+          - ubuntu@FileKeyProvider_GetSigningKey_FilesReadableByOthersOnUnix_WarnsAboutEachOfThem
+
+      - id: ReviewCenter-AttestationKeyProvider-FilePermissions-OnlyKeyFile
+        title: >-
+          The FileKeyProvider class shall, on Linux, check the permissions of the private key file for a PEM
+          certificate with a separate key, and of the certificate file otherwise, and not of any other file.
+        justification: |
+          A public certificate is meant to be readable, and a warning about it would be noise; the PrivateKeyPath
+          setting of a PFX file is ignored and so is its file.
+        tests:
           - ubuntu@FileKeyProvider_GetSigningKey_SeparateKeyOrPfxWithKeyPath_ChecksOnlyTheFileThatHoldsTheKey
 
       - id: ReviewCenter-AttestationKeyProvider-Expiry
         title: >-
-          The AttestationKeyProvider unit shall warn, for the CertificateStore and File providers, when the
-          certificate ends within ExpiryWarningDays (30 by default) or has ended, naming the thumbprint and the date,
-          log the warning once for each wording when the key is used, show it in the status of the key, warn for an
-          expired certificate also when RequireTrustedKey is not set, warn about nothing when ExpiryWarningDays is 0,
-          and refuse a negative value with an error that names the setting. The self-signed key shall not get this
-          warning, because the server replaces it when it has ended.
+          The AttestationKeyPolicy class shall warn, naming the thumbprint and the date, when a certificate ends within
+          the configured number of days.
         justification: |
           An attestation signed with an expired certificate is reported as untrusted by a PDF reader. The operator
-          must hear about the end of the certificate in time to replace it, and also when the certificate has ended
-          and the server still signs because the trusted key policy is off. The self-signed key renews itself.
+          must hear about the end of the certificate in time to replace it.
         tests:
           - AttestationKeyPolicy_ExpiryWarning_EndsWithinDaysOrHasEnded_NamesThumbprintAndDate
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-Expired
+        title: >-
+          The AttestationKeyPolicy class shall warn, naming the thumbprint and the date, that a certificate has expired
+          when it has ended.
+        justification: |
+          A certificate that has ended needs a different message than one that is about to end, because the signed
+          attestations are already reported as untrusted.
+        tests:
+          - AttestationKeyPolicy_ExpiryWarning_EndsWithinDaysOrHasEnded_NamesThumbprintAndDate
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-Disabled
+        title: >-
+          The AttestationKeyPolicy class shall give no expiry warning when the number of days is 0.
+        justification: |
+          An operator who has another way to watch the certificates must be able to turn the warning off.
+        tests:
           - AttestationKeyPolicy_ExpiryWarning_FarAwayOrDisabled_ReturnsNull
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-FarAway
+        title: >-
+          The AttestationKeyPolicy class shall give no expiry warning when a certificate ends later than the number of
+          days.
+        justification: |
+          A warning that is always shown teaches the operator to ignore it.
+        tests:
+          - AttestationKeyPolicy_ExpiryWarning_FarAwayOrDisabled_ReturnsNull
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-DefaultPeriod
+        title: >-
+          The AttestationKeyProviderBase class shall warn thirty days before the end of a certificate when
+          ExpiryWarningDays is not set.
+        justification: |
+          A month is enough time to order and deploy a new certificate, so an operator who sets nothing is still
+          warned in time.
+        tests:
+          - AttestationKeyProviderBase_Describe_DefaultWarningDays_WarnsAt29DaysAndNotAt31Days
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-LoggedOnce
+        title: >-
+          The AttestationKeyProviderBase class shall log the expiry warning once, however often the key is used.
+        justification: |
+          The key is used for every attestation, and a log that repeats one warning for each of them hides the other
+          entries.
+        tests:
           - AttestationKeyProviderBase_GetSigningKey_ExpiredKeyWithoutPolicy_WarnsOnceAndStillSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-Status
+        title: >-
+          The AttestationKeyProviderBase class shall show the expiry warning in the status of the key when the
+          certificate ends within the number of days.
+        justification: |
+          The review page shows the status, so the operator sees the warning without reading the log.
+        tests:
           - AttestationKeyProviderBase_Describe_EndsSoonOrLater_WarnsOnlyWhenSoon
-          - AttestationKeyProviderFactory_Create_NegativeExpiryWarningDays_ThrowsNamingTheSetting
-          - AttestationKeyProviderFactory_Create_SelfSigned_StatusHasNoExpiryWarning
           - FileKeyProvider_Describe_EndsWithinWarningDays_WarnsUnlessDisabledOrFarAway
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-ExpiredUnrestricted
+        title: >-
+          The AttestationKeyProviderBase class shall warn about an expired certificate, and still sign, when
+          RequireTrustedKey is not set.
+        justification: |
+          With the trusted key policy off the server still signs with the expired certificate, and the operator must
+          hear that the attestation will be reported as untrusted.
+        tests:
+          - AttestationKeyProviderBase_GetSigningKey_ExpiredKeyWithoutPolicy_WarnsOnceAndStillSigns
           - FileKeyProvider_GetSigningKey_ExpiredWithoutRequireTrustedKey_SignsAndWarns
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-Setting
+        title: >-
+          The AttestationKeyProviderFactory class shall refuse a negative ExpiryWarningDays with an error that names
+          the setting.
+        justification: |
+          A negative number of days has no meaning, and the operator must be told which setting is wrong.
+        tests:
+          - AttestationKeyProviderFactory_Create_NegativeExpiryWarningDays_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-Expiry-SelfSignedNone
+        title: >-
+          The SelfSignedKeyProvider class shall give no expiry warning in the status of its key.
+        justification: |
+          The server replaces the self-signed key when it has ended, so a warning about its end would ask the operator
+          to do something that is not needed.
+        tests:
+          - AttestationKeyProviderFactory_Create_SelfSigned_StatusHasNoExpiryWarning
 
       - id: ReviewCenter-AttestationKeyProvider-SelfSigned
         title: >-
-          The SelfSignedKeyProvider class shall create an RSA key with a self-signed certificate of a limited validity
-          period in the file attestation-selfsigned.pfx.protected in the configured folder when none exists, reload
-          and use the same key afterwards, return the same key on every call, and let concurrent first uses end with
-          one key for everyone.
+          The SelfSignedKeyProvider class shall create an RSA key with a self-signed certificate in the file
+          attestation-selfsigned.pfx.protected in the configured folder when none exists.
         justification: |
           A new installation must produce an attestation without any configuration, so the server makes a key of its
-          own. The key must persist, because attestations signed with different keys after every restart could not be
-          compared, and concurrent requests must not each create a different key.
+          own.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FirstUse_CreatesSelfSignedKeyFile
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSigned-Validity
+        title: >-
+          The SelfSignedKeyProvider class shall give the certificate a validity period that starts ten minutes before
+          its creation and lasts about ten years.
+        justification: |
+          A key that never ends cannot be replaced after a compromise, and the margin at the start covers a clock that
+          runs a little behind on the machine that checks the attestation.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_FirstUse_SetsTheValidityPeriod
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSigned-Reload
+        title: >-
+          The SelfSignedKeyProvider class shall reload and use the key of an existing file and not create a new one.
+        justification: |
+          Attestations signed with different keys after every restart could not be compared, so the key must persist.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_ExistingFile_ReloadsTheSameKeyAndSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSigned-Stable
+        title: >-
+          The SelfSignedKeyProvider class shall return the same key on every call.
+        justification: |
+          The key is used for every attestation, and it must be loaded once and not on every signing.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_RepeatedCalls_ReturnTheSameKey
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSigned-Concurrent
+        title: >-
+          The SelfSignedKeyProvider class shall end concurrent first uses with one key for everyone.
+        justification: |
+          Concurrent requests at the start must not each create a different key.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_ConcurrentFirstUse_CreatesOneKeyForEveryone
 
       - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected
         title: >-
           The SelfSignedKeyProvider class shall store the key only as bytes that the Data Protection key ring has
-          protected, so that the file is not a readable PFX and reloads with the same ring after a restart; shall
-          ignore a plaintext file of an earlier version with a warning that tells the operator to delete it, and
-          create a new key; shall report a file that the ring cannot decrypt as an error that names the file and tells
-          the operator to restore the ring or delete the file; shall archive an expired key as a retired file and
-          create a new key with a warning; and shall put no key, password or ciphertext into a message.
+          protected, so that the file is not a readable PFX.
         justification: |
           A key file that anyone who can read the folder can use would let that person sign attestations. Tying the
-          file to the key ring protects it at rest, and the ring is already part of every backup and restore. An old
-          unprotected file is never trusted or migrated, so a leaked file cannot become the key again. An expired key
-          would make the attestation fail, and the old PDFs stay valid because they carry their own certificate.
+          file to the key ring protects it at rest.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FirstUse_FileIsNotAReadablePfx
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-Restart
+        title: >-
+          The SelfSignedKeyProvider class shall reload the protected key with the same key ring after a restart.
+        justification: |
+          The key ring is already part of every backup and restore, so the key must survive a restart that keeps it.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_RestartWithPersistedRing_ReloadsTheSameKey
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-OtherRing
+        title: >-
+          The SelfSignedKeyProvider class shall report a key file that the key ring cannot decrypt as an error that
+          names the file and tells the operator to restore the key ring or delete the file, and shall keep the file.
+        justification: |
+          A key ring that was lost must not silently replace the key, and the operator must know the two ways out.
+          Keeping the file leaves the choice with the operator.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-LegacyPlain
+        title: >-
+          The SelfSignedKeyProvider class shall ignore a plaintext key file of an earlier version, leave it untouched
+          and create a new key.
+        justification: |
+          An old unprotected file is never trusted or migrated, so a leaked file cannot become the key again.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-LegacyPlainWarning
+        title: >-
+          The SelfSignedKeyProvider class shall warn, naming the plaintext key file of an earlier version, that the
+          operator should delete it.
+        justification: |
+          The old file still holds a private key that anyone who can read the folder can use, so the operator must be
+          told to remove it.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-Expired
+        title: >-
+          The SelfSignedKeyProvider class shall archive an expired key as a retired file and keep it.
+        justification: |
+          The old PDFs stay valid because they carry their own certificate, and the retired key is kept for evidence
+          and not deleted.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-ExpiredReplaced
+        title: >-
+          The SelfSignedKeyProvider class shall create a new key when it has archived an expired key.
+        justification: |
+          An expired key would make the attestation fail, so the server replaces it without a manual step.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-ExpiredWarning
+        title: >-
+          The SelfSignedKeyProvider class shall warn, naming the thumbprint of the old key, that it replaced an expired
+          key.
+        justification: |
+          The operator must be told that the key changed, because attestations from now on carry another certificate.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected-NoSecretsInMessages
+        title: >-
+          The SelfSignedKeyProvider class shall put no key, password or ciphertext into a message.
+        justification: |
+          Messages are shown and logged, and a secret that appears there is no longer a secret.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages
 
       - id: ReviewCenter-AttestationKeyProvider-NoCreate
         title: >-
-          The AttestationKeyProvider unit shall, when it is told not to create a key, describe an existing key
-          without changing any file, when no key exists report that a key will be created on first start without
-          creating the folder or a file, and when a regular file stands where the folder should be report an error
-          that names Attestation:SelfSignedFolder instead.
+          The SelfSignedKeyProvider class shall, when it is told not to create a key and no key exists, report that a
+          key will be created on first start.
         justification: |
-          A configuration check must be safe to run on a production installation. A check that created the key as a
-          side effect would hide the very state the operator wants to see and would write with the wrong account. A
-          check that reports a key that will be created where the start would fail would be wrong.
+          A configuration check must be safe to run on a production installation, and it must show the operator the
+          state that the start will find.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing
-          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting
-          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing
+
+      - id: ReviewCenter-AttestationKeyProvider-NoCreate-NothingCreated
+        title: >-
+          The SelfSignedKeyProvider class shall, when it is told not to create a key and no key exists, create neither
+          the folder nor a file.
+        justification: |
+          A check that created the key as a side effect would hide the very state the operator wants to see and would
+          write with the wrong account.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing
           - AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing
+
+      - id: ReviewCenter-AttestationKeyProvider-NoCreate-Existing
+        title: >-
+          The SelfSignedKeyProvider class shall, when it is told not to create a key, describe an existing key without
+          changing any file.
+        justification: |
+          A configuration check must not archive an expired key or change anything else of a production installation.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing
+
+      - id: ReviewCenter-AttestationKeyProvider-NoCreate-FolderIsFile
+        title: >-
+          The SelfSignedKeyProvider class shall, when it is told not to create a key and a regular file stands where
+          the folder should be, report an error that names Attestation:SelfSignedFolder.
+        justification: |
+          A check that reports a key that will be created where the start would fail would be wrong.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting
 
       - id: ReviewCenter-AttestationKeyProvider-SelfSignedWarning
         title: >-
           The SelfSignedKeyProvider class shall log a warning that the key is self-signed and for development and test
-          only when it creates or loads the key, and shall not log any secret.
+          only when it creates the key.
         justification: |
-          The operator must be told that the default key is not an organization key, and a log is one place where a
-          secret must never appear.
+          The operator must be told that the default key is not an organization key.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedWarning-OnLoad
+        title: >-
+          The SelfSignedKeyProvider class shall log a warning that the key is self-signed and for development and test
+          only when it loads an existing key.
+        justification: |
+          The server starts far more often with an existing key than with a new one, and the warning must not depend
+          on the first start.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_ExistingFile_LogsSelfSignedWarning
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedWarning-NoSecret
+        title: >-
+          The SelfSignedKeyProvider class shall log the thumbprint of the key it creates and no private key material.
+        justification: |
+          A log is one place where a secret must never appear.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets
 
       - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors
         title: >-
-          The SelfSignedKeyProvider class shall report a folder that is not set, a folder that is a file, and a key
-          file that cannot be read as an attestation key error that names the setting or the file, shall offer a
-          message without any folder path for a report that prints none, and shall report a cryptographic failure
-          while a key is created as a failure to create the key and not as a file that cannot be decrypted.
+          The SelfSignedKeyProvider class shall report a folder that is not set as an error that names the setting.
         justification: |
-          An operator can correct a problem only when the message names the setting or the file that has it. The
-          configuration check is archived, so it must not print a folder path, and an error while a key is created
-          must not send the operator to delete a key file that is fine.
+          An operator can correct a problem only when the message names the setting that has it.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FolderNotSet_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors-FolderIsFile
+        title: >-
+          The SelfSignedKeyProvider class shall report a folder that is a file as an error that names the setting.
+        justification: |
+          A regular file at the place of the folder is a mistake of the configuration, and the message must say which
+          setting to correct.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors-Corrupt
+        title: >-
+          The SelfSignedKeyProvider class shall report a key file that cannot be read as an attestation key as an error
+          that names the file.
+        justification: |
+          A damaged file must be named so that the operator can restore it or delete it.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile
-          - SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors-NoFolderInMessage
+        title: >-
+          The SelfSignedKeyProvider class shall offer, for the storage and unreadable-file errors, a message without
+          any folder path for a report that prints none.
+        justification: |
+          The configuration check is archived, so it must not print a folder path.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors-ProtectFails
+        title: >-
+          The SelfSignedKeyProvider class shall report a cryptographic failure while a key is created as a failure to
+          create the key and not as a file that cannot be decrypted.
+        justification: |
+          An error while a key is created must not send the operator to delete a key file that is fine.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable
 
       - id: ReviewCenter-AttestationKeyProvider-CertificateStore
         title: >-
           The CertificateStoreKeyProvider class shall find the certificate with the configured thumbprint in the
-          configured store and location, accept a thumbprint copied from a certificate dialog, keep the handle of the
-          private key without exporting it, and report an unknown location, a malformed thumbprint, a certificate that
-          is not in the store, and a certificate without a private key as errors that name the setting.
+          configured store and location, and sign with it.
         justification: |
           An organization key lives in a certificate store, on a smart card, or in a hardware module, and the server
-          must use it where it is. The thumbprint is usually copied from a dialog together with invisible characters.
+          must use it where it is.
+        tests:
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+          - CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-PrivateKeyInStore
+        title: >-
+          The CertificateStoreKeyProvider class shall keep the private key in the store and not export it.
+        justification: |
+          A key that is kept in a store or a hardware module is protected there, and an export would copy it into the
+          memory of the server.
+        tests:
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-Thumbprint
+        title: >-
+          The CertificateStoreKeyProvider class shall accept a thumbprint copied from a certificate dialog, with spaces
+          and invisible characters, and use it as upper-case hexadecimal text.
+        justification: |
+          The thumbprint is usually copied from a dialog together with invisible characters, and the operator cannot
+          see them.
         tests:
           - CertificateStoreKeyProvider_NormalizeThumbprint_CopiedText_GivesUpperCaseHex
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-ThumbprintInvalid
+        title: >-
+          The CertificateStoreKeyProvider class shall report a missing or malformed thumbprint as an error that names
+          the setting.
+        justification: |
+          A thumbprint that cannot be used must be reported as such, and not as a certificate that is not in the store.
+        tests:
           - CertificateStoreKeyProvider_NormalizeThumbprint_MissingOrMalformed_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-Location
+        title: >-
+          The CertificateStoreKeyProvider class shall report an unknown store location as an error that names the
+          setting.
+        justification: |
+          Only the locations of the platform exist, and the operator must be told which setting holds a wrong one.
+        tests:
           - CertificateStoreKeyProvider_GetSigningKey_UnknownStoreLocation_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-NotFound
+        title: >-
+          The CertificateStoreKeyProvider class shall report a certificate that is not in the store as an error that
+          names the thumbprint and the store.
+        justification: |
+          The most common mistake is a certificate that was installed in another store or for another account, so the
+          message must show where the server looked.
+        tests:
           - CertificateStoreKeyProvider_GetSigningKey_CertificateNotInStore_ThrowsNamingThumbprintAndStore
-          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore-NoPrivateKey
+        title: >-
+          The CertificateStoreKeyProvider class shall report a certificate without a private key as an error that says
+          that it has no private key.
+        justification: |
+          A certificate that was imported without its key cannot sign, and the message must say so and not that the
+          certificate is missing.
+        tests:
           - CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws
-          - CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate
 
       - id: ReviewCenter-AttestationKeyProvider-Describe
         title: >-
-          The AttestationKeyProvider unit shall describe the state of the key without ever throwing: available with
-          the public description of the key, or unavailable with the message of the key error, and for any other
-          non-fatal failure unavailable with a message that holds no detail (the detail goes to the log).
+          The AttestationKeyProviderBase class shall describe a key that is found as available, with the public
+          description of the key.
         justification: |
-          The review page asks for the status on every render. A platform failure while the key is loaded (a malformed
-          folder or store name, a broken certificate chain) must not turn into an error page for the whole review.
+          The review page asks for the status on every render, and it shows the certificate that signs.
+        tests:
+          - AttestationKeyProviderBase_Describe_KeyFound_ReportsAvailableWithTheDescription
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-Describe-Unavailable
+        title: >-
+          The AttestationKeyProviderBase class shall describe a key that cannot be loaded because of a key error as
+          unavailable, with the message of the error.
+        justification: |
+          The operator must see why there is no key, and a problem of the configuration must not turn into an error
+          page for the whole review.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting
           - CertificateStoreKeyProvider_GetSigningKey_CertificateNotInStore_ThrowsNamingThumbprintAndStore
-          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+
+      - id: ReviewCenter-AttestationKeyProvider-Describe-UnexpectedFailure
+        title: >-
+          The AttestationKeyProviderBase class shall describe a key that cannot be loaded because of any other
+          non-fatal failure as unavailable, with a message that holds no detail of the failure.
+        justification: |
+          A platform failure while the key is loaded, such as a malformed folder or store name or a broken certificate
+          chain, must not turn into an error page, and its detail must not reach the page.
+        tests:
           - SelfSignedKeyProvider_Describe_UnexpectedFailure_ReportsUnavailableWithoutDetail
 
       - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey
         title: >-
-          The AttestationKeyProvider unit shall, when RequireTrustedKey is set, refuse a self-signed certificate, a
-          certificate whose key usage does not allow digital signatures or non-repudiation, and a certificate that is
-          not within its validity period, on every call and not only the first, and shall accept an organization
-          certificate; the check shall not claim to check chain trust or revocation.
+          The AttestationKeyPolicy class shall refuse a self-signed certificate when RequireTrustedKey is set.
         justification: |
-          An organization that requires an organization key must not get an attestation signed with anything else. A
-          certificate can expire while the server runs, so the rule applies to every signing. Naming what is checked
-          keeps the setting from being read as a promise of trust that the server does not examine.
+          An organization that requires an organization key must not get an attestation signed with anything else.
+        tests:
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndSelfSigned_Throws
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Off
+        title: >-
+          The AttestationKeyPolicy class shall accept a self-signed certificate when RequireTrustedKey is not set.
+        justification: |
+          A development installation signs with the self-signed key, so the rule must apply only when it is asked for.
         tests:
           - AttestationKeyPolicy_Enforce_PolicyOff_AcceptsSelfSignedKey
-          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndSelfSigned_Throws
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Organization
+        title: >-
+          The AttestationKeyPolicy class shall accept an organization certificate when RequireTrustedKey is set.
+        justification: |
+          The rule must refuse the wrong keys without refusing the right one.
+        tests:
           - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndOrganizationKey_Accepts
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoSigningUsage
+        title: >-
+          The AttestationKeyPolicy class shall refuse a certificate whose key usage does not allow digital signatures or
+          non-repudiation when RequireTrustedKey is set.
+        justification: |
+          A certificate that is not meant for signing would make the attestation fail in a PDF reader.
+        tests:
           - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndNoSigningUsage_Throws
-          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndOutsideValidity_Throws
           - AttestationKeyPolicy_HasSigningKeyUsage_Usage_AllowsOnlyDigitalSignatureOrNonRepudiation
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoKeyUsageExtension
+        title: >-
+          The AttestationKeyPolicy class shall treat a certificate without a key usage extension as allowed to sign.
+        justification: |
+          The standard does not restrict the use of a certificate that has no key usage extension.
+        tests:
           - AttestationKeyPolicy_HasSigningKeyUsage_NoExtension_AllowsSigning
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Validity
+        title: >-
+          The AttestationKeyPolicy class shall refuse a certificate that is not within its validity period when
+          RequireTrustedKey is set.
+        justification: |
+          A certificate that has not started or has ended is reported as untrusted by a PDF reader.
+        tests:
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndOutsideValidity_Throws
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-EveryCall
+        title: >-
+          The SelfSignedKeyProvider class shall check RequireTrustedKey on every call and not only the first.
+        justification: |
+          A certificate can expire while the server runs, so every signing must be checked and not only the first.
+        tests:
           - SelfSignedKeyProvider_GetSigningKey_RequireTrustedKey_IsCheckedOnEveryCall
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Store
+        title: >-
+          The CertificateStoreKeyProvider class shall refuse a self-signed certificate from the store when
+          RequireTrustedKey is set.
+        justification: |
+          The rule applies to every provider, and a self-signed certificate can be installed in a store.
+        tests:
           - CertificateStoreKeyProvider_GetSigningKey_RequireTrustedKeyAndSelfSignedCertificate_Throws
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-File
+        title: >-
+          The FileKeyProvider class shall accept a valid organization certificate from the file when RequireTrustedKey
+          is set.
+        justification: |
+          The rule applies to every provider, and a valid organization certificate from a file must pass it.
+        tests:
+          - FileKeyProvider_GetSigningKey_ValidOrganizationCertificateWithRequireTrustedKey_Accepts
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-FileExpired
+        title: >-
+          The FileKeyProvider class shall refuse an expired certificate from the file when RequireTrustedKey is set.
+        justification: |
+          A certificate can expire while the server runs, and the file provider must refuse it like every provider.
+        tests:
+          - FileKeyProvider_GetSigningKey_ExpiredWithRequireTrustedKey_IsRefused
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoChainCheck
+        title: >-
+          The AttestationKeyPolicy class shall not claim in its refusals to check chain trust or revocation.
+        justification: |
+          Naming what is checked keeps the setting from being read as a promise of trust that the server does not
+          examine; the PDF reader checks the chain and the revocation.
+        tests:
+          - AttestationKeyPolicy_Enforce_RefusalMessages_DoNotMentionChainOrRevocation
 
       - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning
         title: >-
-          The AttestationKeyProvider unit shall warn, without refusing the certificate for that reason, when the
-          extended key usage of
-          a certificate allows code signing and none of the document signing purposes (e-mail protection, Microsoft or
-          Adobe document signing, any purpose), with the text "This certificate is a code-signing certificate. Adobe
-          Acrobat will not trust it for document signatures; use a document-signing certificate for production.", log
-          that warning once when the key is first loaded, and report the classification in the description of the key.
-          A certificate without an extended key usage shall not be classified as code signing only, and the
-          RequireTrustedKey rules and the lack of a chain and revocation check shall be unchanged.
+          The AttestationKeyPolicy class shall classify a certificate as code signing only when its extended key usage
+          allows code signing and none of the document signing purposes (e-mail protection, Microsoft or Adobe
+          document signing, any purpose).
         justification: |
           A code-signing certificate is not meant for documents and Adobe Acrobat does not trust it for document
-          signatures, but some organizations have only such a certificate. The operator should know, and the decision
-          stays with them. The server does not check the chain or revocation; the PDF reader does.
+          signatures, but some organizations have only such a certificate.
         tests:
           - AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NoExtension
+        title: >-
+          The AttestationKeyPolicy class shall not classify a certificate without an extended key usage as code signing
+          only.
+        justification: |
+          A certificate without an extended key usage is not restricted, and a warning about it would be false.
+        tests:
+          - AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning-Wording
+        title: >-
+          The AttestationKeyPolicy class shall word the code-signing warning as "This certificate is a code-signing
+          certificate. Adobe Acrobat will not trust it for document signatures; use a document-signing certificate for
+          production."
+        justification: |
+          The operator should know why the certificate is a poor choice and what to use instead, and the decision stays
+          with them.
+        tests:
           - AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning-InfoFlag
+        title: >-
+          The AttestationSigningKey class shall report the code-signing classification in the description of the key.
+        justification: |
+          The review page shows the description, so it can show the warning next to the certificate.
+        tests:
           - AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning-LoggedOnce
+        title: >-
+          The AttestationKeyProviderBase class shall log the code-signing warning once when the key is first loaded.
+        justification: |
+          The key is used for every attestation, and a log that repeats one warning for each of them hides the other
+          entries.
+        tests:
+          - AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NotRefused
+        title: >-
+          The AttestationKeyProviderBase class shall not refuse a code-signing certificate for that reason, and shall
+          leave the RequireTrustedKey rules unchanged.
+        justification: |
+          Some organizations have only a code-signing certificate, and the decision to use it stays with them.
+        tests:
           - AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse

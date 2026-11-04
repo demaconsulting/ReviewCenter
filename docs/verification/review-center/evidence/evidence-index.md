@@ -10,7 +10,9 @@ the helper `AttestationFixture`, and reviews that carry a review-set id, which o
 project with fixed reviews and files, and read the index over HTTP with HTTP Basic credentials, as ReviewMark does. They
 check the document against the golden file `TestData/evidence-index.golden.json`, against a reader and a classifier that
 mirror the rules of ReviewMark 1.4.0, and against an independent implementation of its fingerprint algorithm that is
-also checked against vectors that were verified with ReviewMark itself.
+also checked against vectors that were verified with ReviewMark itself. These contract tests are linked to the Evidence
+subsystem requirements `ReviewCenter-Evidence-Index`, `-Index-Schema`, `-Index-Fingerprint`, and `-Index-Semantics`,
+because they run through the real application.
 
 #### Test Environment
 
@@ -31,10 +33,8 @@ running server is a manual check.
 - The document of the fixed project is the golden file, has the schema that ReviewMark reads, and loads without one
   entry overwriting another.
 - The fingerprints are the ones that the algorithm of ReviewMark gives for the same files.
-- The index of a project is built for an actor, and a user who cannot see the project is refused like a missing
-  project. The unit tests have no case for this guard; it is verified over HTTP by
-  `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` and
-  `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
+- The index of a project is built for a member and for a system administrator who is not a member, and a user who cannot
+  see the project is refused like a missing project, with the same rule and message.
 - A build without an actor is refused like a missing project unless the project has switched on the anonymous evidence
   index, and is served when it has.
 
@@ -59,16 +59,18 @@ scenario is tested by `EvidenceIndexService_Build_RejectedConcludedReview_IsNeve
 scenario is tested by `EvidenceIndexService_Build_NoSetId_IsSkipped`.
 
 **EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion**: Two complete reviews have the same id and
-fingerprint and were completed on different days. The one completed last is listed, with its date. This scenario is
-tested by `EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion`.
+fingerprint and were completed on different days. The index has one entry for the id and fingerprint, not two, and it
+is the one completed last, with its date. ReviewMark keeps the last of two entries with the same id and fingerprint, so
+a duplicate would make the result depend on the order. This scenario is tested by
+`EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion`.
 
 **EvidenceIndexService_Build_SameCompletionTime_KeepsLowestReviewId**: Two complete reviews have the same id and
 fingerprint and the same completion time. The one with the lowest review id is listed. This scenario is tested by
 `EvidenceIndexService_Build_SameCompletionTime_KeepsLowestReviewId`.
 
-**EvidenceIndexService_Build_Order_IsByIdThenFingerprint**: Several complete reviews are added in an arbitrary order.
-The
-entries are ordered by id and then by fingerprint, in ordinal order. This scenario is tested by
+**EvidenceIndexService_Build_Order_IsByIdThenFingerprint**: Several complete reviews are added in an arbitrary order;
+two of them have the same review-set id and different fingerprints. Each fingerprint gets a separate entry, so there
+are three entries, and they are ordered by id and then by fingerprint, in ordinal order. This scenario is tested by
 `EvidenceIndexService_Build_Order_IsByIdThenFingerprint`.
 
 **EvidenceIndexService_Build_Date_IsLatestSignatureAsUtcDay**: A review with two slots is signed on different days, the
@@ -79,8 +81,8 @@ last one close to midnight UTC. The date is the UTC day of the last signature. T
 project is empty. This scenario is tested by `EvidenceIndexService_Build_OtherProject_IsNotListed`.
 
 **EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce**: Three complete reviews with a review-set id are built over
-a user store that counts how often the user list is read. All three are listed, and the list was read exactly once. This
-scenario is tested by `EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce`.
+a user store that counts how often the user list is read. All three reviews are listed, and the list was read exactly
+once. This scenario is tested by `EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce`.
 
 **ReviewMarkContract_GoldenIndex_MatchesCommittedFile**: The index of the fixed project is read over HTTP. After the
 line
@@ -105,3 +107,15 @@ an id that is not listed, such as a review set whose only review is not signed. 
 id. The index is built without an actor while the anonymous evidence index is off, and for a project that does not
 exist; both are refused with the rule `ProjectNotFound`. After the setting is switched on, the index built without an
 actor lists the entry. This scenario is tested by `EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting`.
+
+**EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound**: A project has a complete review, and a user who is
+not a member and not a system administrator asks for its index and for the index of a project that does not exist. Both
+are refused with the rule `ProjectNotFound` and the same message. This scenario is tested by
+`EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound`.
+
+**EvidenceIndexService_Build_MemberActor_ListsEntries**: A project has a complete review, and a member asks for its
+index. The review is listed. This scenario is tested by `EvidenceIndexService_Build_MemberActor_ListsEntries`.
+
+**EvidenceIndexService_Build_SystemAdministratorNotMember_ListsEntries**: A project has a complete review, and a system
+administrator who is not a member asks for its index. The review is listed. This scenario is tested by
+`EvidenceIndexService_Build_SystemAdministratorNotMember_ListsEntries`.

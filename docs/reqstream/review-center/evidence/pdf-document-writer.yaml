@@ -9,15 +9,95 @@ sections:
     requirements:
       - id: ReviewCenter-PdfDocumentWriter-Structure
         title: >-
-          The PdfDocumentWriter class shall write a PDF 1.5 document of A4 pages with a classic cross-reference table,
-          at least one page, a header and a footer with a page number on every page, new pages as the content grows,
-          and the document properties it was given.
+          The PdfDocumentWriter class shall write a PDF 1.5 document.
         justification: |
-          The attestation must open in every PDF reader and must be able to grow with the review. A plain and
-          well-known file structure also lets the signer add a signature to it as an incremental update.
+          The attestation must open in every PDF reader, and a plain and well-known file version is what the signer
+          needs to add a certifying signature to it.
+        tests:
+          - PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-CrossReference
+        title: >-
+          The PdfDocumentWriter class shall write a classic cross-reference table that matches the objects of the
+          document.
+        justification: |
+          A plain cross-reference table lets the signer add a signature to the file as an incremental update.
         tests:
           - PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming
           - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-OnePage
+        title: >-
+          The PdfDocumentWriter class shall write a document without content as a document of one page.
+        justification: |
+          A review always yields a document, and a PDF without a page does not open in every reader.
+        tests:
+          - PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-Pages
+        title: >-
+          The PdfDocumentWriter class shall continue the content on new pages as the content grows.
+        justification: |
+          A review can have any number of files, answers, and comments, so the document must be able to grow.
+        tests:
+          - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-PageNumber
+        title: >-
+          The PdfDocumentWriter class shall show the page number and the number of pages on every page.
+        justification: |
+          A reader of a printed attestation can see that no page is missing.
+        tests:
+          - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-Header
+        title: >-
+          The PdfDocumentWriter class shall show the header text on every page.
+        justification: |
+          Every page of a printed attestation must say what it belongs to.
+        tests:
+          - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-Footer
+        title: >-
+          The PdfDocumentWriter class shall show the footer text on every page.
+        justification: |
+          Every page of a printed attestation must carry the same closing line.
+        tests:
+          - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-PageSize
+        title: >-
+          The PdfDocumentWriter class shall give every page the size of an A4 sheet.
+        justification: |
+          The attestation is printed and archived, and the A4 sheet is the common size for that.
+        tests:
+          - PdfDocumentWriter_Build_LongBody_EveryPageIsA4
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-Metadata
+        title: >-
+          The PdfDocumentWriter class shall record the title, author, subject, keywords, and creation date that it was
+          given in the document properties.
+        justification: |
+          A PDF reader and an archive show the properties, so they must say what the document is and when it was made.
+        tests:
+          - PdfDocumentWriter_Build_Info_RecordsMetadata
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-CreatorProducer
+        title: >-
+          The PdfDocumentWriter class shall record the creator and the producer that it was given in the document
+          properties.
+        justification: |
+          A reader of the properties can tell which program made the document.
+        tests:
+          - PdfDocumentWriter_Build_Info_RecordsCreatorAndProducer
+
+      - id: ReviewCenter-PdfDocumentWriter-Structure-MetadataUnicode
+        title: >-
+          The PdfDocumentWriter class shall keep characters beyond the ASCII range intact in the document properties.
+        justification: |
+          A title with a project or file name in another script must not be damaged in the properties.
+        tests:
           - PdfDocumentWriter_Build_Info_RecordsMetadata
 
       - id: ReviewCenter-PdfDocumentWriter-Deterministic
@@ -31,28 +111,71 @@ sections:
 
       - id: ReviewCenter-PdfDocumentWriter-Layout
         title: >-
-          The PdfDocumentWriter class shall wrap a paragraph at word boundaries within the width of the text, break a
-          word that is wider than a line between characters, start a new line at every line feed, and wrap the value
-          of a row beside its label.
+          The PdfDocumentWriter class shall wrap a paragraph at word boundaries so that no line is wider than the text.
         justification: |
           File names, digests, and comments have no fixed length. Text that ran past the edge of the page would be cut
           off in the document that is meant to be complete evidence.
         tests:
           - PdfDocumentWriter_Paragraph_LongText_WrapsAtWordsWithinTheTextWidth
+
+      - id: ReviewCenter-PdfDocumentWriter-Layout-LongWord
+        title: >-
+          The PdfDocumentWriter class shall break a word that is wider than a line between characters.
+        justification: |
+          A digest or a path has no space at which it could wrap, and it must not run off the page.
+        tests:
           - PdfDocumentWriter_Paragraph_WordWiderThanTheLine_IsBrokenBetweenCharacters
+
+      - id: ReviewCenter-PdfDocumentWriter-Layout-LineFeed
+        title: >-
+          The PdfDocumentWriter class shall start a new line at every line feed of a paragraph.
+        justification: |
+          A comment of a reviewer can have several lines, and the document must show them as written.
+        tests:
           - PdfDocumentWriter_Paragraph_LineFeeds_StartNewLines
+
+      - id: ReviewCenter-PdfDocumentWriter-Layout-Row
+        title: >-
+          The PdfDocumentWriter class shall wrap the value of a row that is too long for one line over several lines.
+        justification: |
+          A row has a label and a value, and the value can be a long file name or comment.
+        tests:
+          - PdfDocumentWriter_Row_LongValue_WrapsBesideTheLabel
+
+      - id: ReviewCenter-PdfDocumentWriter-Layout-RowLabel
+        title: >-
+          The PdfDocumentWriter class shall show the label of a row once when the value of the row wraps.
+        justification: |
+          A label that was repeated on every line would make one entry look like several.
+        tests:
           - PdfDocumentWriter_Row_LongValue_WrapsBesideTheLabel
 
       - id: ReviewCenter-PdfDocumentWriter-Text
         title: >-
-          The PdfDocumentWriter class shall escape parentheses and the backslash so that text reads back unchanged,
-          and shall show a character that the standard WinAnsi encoding of the built-in fonts does not have as a
-          question mark.
+          The PdfDocumentWriter class shall escape parentheses and the backslash so that text reads back unchanged.
         justification: |
-          The document uses the standard fonts that every reader has, so it needs no embedded font. A reviewer name
-          or a file name with a character outside that encoding must not corrupt the file; showing a question mark
-          is the honest and safe result.
+          A reviewer name or a file name with a parenthesis or a backslash must not end the text string early or
+          corrupt the file.
         tests:
           - PdfDocumentWriter_Paragraph_ParenthesesAndBackslash_AreEscapedAndReadBackIntact
+
+      - id: ReviewCenter-PdfDocumentWriter-Text-WinAnsi
+        title: >-
+          The PdfDocumentWriter class shall keep a character of the standard WinAnsi encoding of the built-in fonts
+          unchanged.
+        justification: |
+          The document uses the standard fonts that every reader has, so it needs no embedded font, and the letters of
+          western languages must stay as they are.
+        tests:
+          - PdfDocumentWriter_ToWinAnsi_Text_KeepsWinAnsiAndReplacesTheRest
+
+      - id: ReviewCenter-PdfDocumentWriter-Text-Replacement
+        title: >-
+          The PdfDocumentWriter class shall show a character that the standard WinAnsi encoding of the built-in fonts
+          does not have as a question mark.
+        justification: |
+          A reviewer name or a file name with a character outside that encoding must not corrupt the file; showing a
+          question mark is the honest and safe result.
+        tests:
           - PdfDocumentWriter_ToWinAnsi_Text_KeepsWinAnsiAndReplacesTheRest
           - PdfDocumentWriter_Paragraph_UnicodeBeyondWinAnsi_IsShownAsQuestionMarks

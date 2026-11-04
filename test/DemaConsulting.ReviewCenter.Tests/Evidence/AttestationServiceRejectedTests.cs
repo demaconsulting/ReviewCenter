@@ -210,6 +210,37 @@ public class AttestationServiceRejectedTests
     }
 
     /// <summary>
+    ///     Test that with the reviewer names off, the words that people typed into a finding and into a justification
+    ///     are printed as they are, even when they name a person.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_RejectedNamesOff_LeavesTypedTextAsItIs()
+    {
+        // Arrange: a rejected review whose finding and whose justification name a person, in a project without names
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        var threads = TestServices.Threads(fixture.Store, fixture.Clock);
+        var finding = await threads.StartThreadAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Ann owns the loop bound", cancellationToken, includeInReport: true);
+        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, finding.Id, TestActors.Ann, cancellationToken, resolutionNote: "Loop bound fixed");
+        await fixture.AddSecondSlotWithBallotAsync(ChecklistOutcome.Fail, "Ask Ann before you decide.");
+        await fixture.RejectAsync("Not ready.");
+        await fixture.SignSecondSlotAsync();
+        await SetEvidenceAsync(fixture, EvidenceSettings.Default with { IncludeReviewerNames = false });
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Bob, cancellationToken);
+
+        // Assert: the people are labels, and the typed words are printed unchanged
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.Contains(lines, l => l.StartsWith("Finding by Reviewer 1 (primary),", StringComparison.Ordinal));
+        Assert.Contains("Ann owns the loop bound", lines);
+        Assert.Contains(lines, l => l.StartsWith("Justification: Ask Ann before you decide.", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that with the checklist wording off, the ballots appendix prints identifiers and outcomes but neither
     ///     the question text nor the section title.
     /// </summary>

@@ -13,7 +13,8 @@ N/A - standard test environment (everything runs in memory).
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- An empty document is a valid one-page PDF 1.5 file, and a long body continues onto numbered pages.
+- An empty document is a valid one-page PDF 1.5 file, and a long body continues onto numbered A4 pages.
+- The creator and the producer are recorded in the information dictionary.
 - The same input gives the same bytes.
 - Text is wrapped at word boundaries, an over-wide word is broken, line feeds start lines, and the value of a row wraps
   beside its label.
@@ -61,6 +62,12 @@ written. The document shows question marks for them. This scenario is tested by
 **PdfDocumentWriter_Build_Info_RecordsMetadata**: A document is built with title, subject, author, keywords, and a
 creation time. The information dictionary holds them. This scenario is tested by
 `PdfDocumentWriter_Build_Info_RecordsMetadata`.
+
+**PdfDocumentWriter_Build_Info_RecordsCreatorAndProducer**: A document is built with a creator and a producer. The
+information dictionary holds both. This scenario is tested by `PdfDocumentWriter_Build_Info_RecordsCreatorAndProducer`.
+
+**PdfDocumentWriter_Build_LongBody_EveryPageIsA4**: A body that is longer than a page is written. Every page has the
+A4 media box. This scenario is tested by `PdfDocumentWriter_Build_LongBody_EveryPageIsA4`.
 
 **PdfDocumentWriter_Row_LongValue_WrapsBesideTheLabel**: A row with a long value is written. The value wraps in its
 column beside the label and does not run into it. This scenario is tested by

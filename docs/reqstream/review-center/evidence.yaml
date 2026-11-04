@@ -29,20 +29,90 @@ sections:
           glance.
         children:
           - ReviewCenter-PdfDocumentWriter-Structure
+          - ReviewCenter-PdfDocumentWriter-Structure-CrossReference
+          - ReviewCenter-PdfDocumentWriter-Structure-OnePage
+          - ReviewCenter-PdfDocumentWriter-Structure-Pages
+          - ReviewCenter-PdfDocumentWriter-Structure-PageNumber
+          - ReviewCenter-PdfDocumentWriter-Structure-Header
+          - ReviewCenter-PdfDocumentWriter-Structure-Footer
+          - ReviewCenter-PdfDocumentWriter-Structure-PageSize
+          - ReviewCenter-PdfDocumentWriter-Structure-Metadata
+          - ReviewCenter-PdfDocumentWriter-Structure-CreatorProducer
+          - ReviewCenter-PdfDocumentWriter-Structure-MetadataUnicode
           - ReviewCenter-PdfDocumentWriter-Deterministic
           - ReviewCenter-PdfDocumentWriter-Layout
+          - ReviewCenter-PdfDocumentWriter-Layout-LongWord
+          - ReviewCenter-PdfDocumentWriter-Layout-LineFeed
+          - ReviewCenter-PdfDocumentWriter-Layout-Row
+          - ReviewCenter-PdfDocumentWriter-Layout-RowLabel
           - ReviewCenter-PdfDocumentWriter-Text
+          - ReviewCenter-PdfDocumentWriter-Text-WinAnsi
+          - ReviewCenter-PdfDocumentWriter-Text-Replacement
           - ReviewCenter-AttestationRenderer-Review
+          - ReviewCenter-AttestationRenderer-Review-Revisions
+          - ReviewCenter-AttestationRenderer-Review-Fingerprint
+          - ReviewCenter-AttestationRenderer-Review-Upload
+          - ReviewCenter-AttestationRenderer-Review-FileList
+          - ReviewCenter-AttestationRenderer-Review-FileCount
           - ReviewCenter-AttestationRenderer-Findings
+          - ReviewCenter-AttestationRenderer-Findings-LongComment
+          - ReviewCenter-AttestationRenderer-Findings-CommentPages
+          - ReviewCenter-AttestationRenderer-Findings-NoChecklist
+          - ReviewCenter-AttestationRenderer-Findings-List
+          - ReviewCenter-AttestationRenderer-Findings-Status
+          - ReviewCenter-AttestationRenderer-Findings-LongFindingComment
+          - ReviewCenter-AttestationRenderer-Findings-None
+          - ReviewCenter-AttestationRenderer-Findings-Discussion
           - ReviewCenter-AttestationRenderer-AnswerTimes
+          - ReviewCenter-AttestationRenderer-AnswerTimes-Utc
+          - ReviewCenter-AttestationRenderer-AnswerTimes-None
           - ReviewCenter-AttestationRenderer-FindingList
+          - ReviewCenter-AttestationRenderer-FindingList-Order
+          - ReviewCenter-AttestationRenderer-FindingList-Pages
           - ReviewCenter-AttestationRenderer-Conclusion
+          - ReviewCenter-AttestationRenderer-Conclusion-Text
+          - ReviewCenter-AttestationRenderer-Conclusion-RejectionHeading
+          - ReviewCenter-AttestationRenderer-Conclusion-RejectedTitle
+          - ReviewCenter-AttestationRenderer-Conclusion-RejectedBanner
+          - ReviewCenter-AttestationRenderer-Conclusion-BannerPlacement
+          - ReviewCenter-AttestationRenderer-Conclusion-NoBanner
           - ReviewCenter-AttestationRenderer-BallotAppendix
+          - ReviewCenter-AttestationRenderer-BallotAppendix-Answers
+          - ReviewCenter-AttestationRenderer-BallotAppendix-NotApplicable
+          - ReviewCenter-AttestationRenderer-BallotAppendix-Fingerprint
+          - ReviewCenter-AttestationRenderer-BallotAppendix-Omitted
+          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOff
+          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOffIdentifiers
           - ReviewCenter-AttestationRenderer-SignOffs
+          - ReviewCenter-AttestationRenderer-SignOffs-SignedAt
+          - ReviewCenter-AttestationRenderer-SignOffs-Digest
+          - ReviewCenter-AttestationRenderer-SignOffs-DigestLine
+          - ReviewCenter-AttestationRenderer-SignOffs-AuditHead
+          - ReviewCenter-AttestationRenderer-SignOffs-ToolVersion
+          - ReviewCenter-AttestationRenderer-SignOffs-ToolVersionProperty
+          - ReviewCenter-AttestationRenderer-SignOffs-Names
           - ReviewCenter-AttestationRenderer-Output
+          - ReviewCenter-AttestationRenderer-Output-Deterministic
+          - ReviewCenter-AttestationRenderer-Output-Pages
+          - ReviewCenter-AttestationRenderer-Output-Unicode
+          - ReviewCenter-AttestationRenderer-Output-Arguments
           - ReviewCenter-AttestationService-ReopenHistory
+          - ReviewCenter-AttestationService-ReopenHistory-NeverReopened
+          - ReviewCenter-AttestationService-ReopenHistory-NoNames
+          - ReviewCenter-AttestationService-ReopenHistory-Locked
           - ReviewCenter-AttestationService-CheckThreadLabel
           - ReviewCenter-AttestationService-Report
+          - ReviewCenter-AttestationService-Report-Conclusion
+          - ReviewCenter-AttestationService-Report-Excluded
+          - ReviewCenter-AttestationService-Report-DigestCoverage
+          - ReviewCenter-AttestationService-Report-Discussion
+          - ReviewCenter-AttestationService-Report-Appendix
+          - ReviewCenter-AttestationService-Report-SlotOrder
+          - ReviewCenter-AttestationService-Report-BallotFingerprint
+          - ReviewCenter-AttestationService-Report-NamesOff
+          - ReviewCenter-AttestationService-Report-WordingOff
+          - ReviewCenter-AttestationService-Report-ThreadsOff
+          - ReviewCenter-AttestationService-Report-NotConcluded
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 
@@ -56,13 +126,31 @@ sections:
           something only when a PDF reader or any CMS library can check them without ReviewCenter.
         children:
           - ReviewCenter-AttestationSigner-Signature
+          - ReviewCenter-AttestationSigner-Signature-Ecdsa
+          - ReviewCenter-AttestationSigner-Signature-Digest
+          - ReviewCenter-AttestationSigner-Signature-SigningTime
+          - ReviewCenter-AttestationSigner-Signature-SignerCertificate
           - ReviewCenter-AttestationSigner-NonExportableKey
           - ReviewCenter-AttestationSigner-Structure
+          - ReviewCenter-AttestationSigner-Structure-CrossReference
+          - ReviewCenter-AttestationSigner-Structure-SignatureField
+          - ReviewCenter-AttestationSigner-Structure-Filter
+          - ReviewCenter-AttestationSigner-Structure-Reason
+          - ReviewCenter-AttestationSigner-Structure-Date
+          - ReviewCenter-AttestationSigner-Structure-ByteRange
           - ReviewCenter-AttestationSigner-Certification
+          - ReviewCenter-AttestationSigner-Certification-Catalog
+          - ReviewCenter-AttestationSigner-Certification-Verifies
+          - ReviewCenter-AttestationSigner-Certification-Covered
+          - ReviewCenter-AttestationSigner-Certification-Permission
           - ReviewCenter-AttestationSigner-TamperEvident
+          - ReviewCenter-AttestationSigner-TamperEvident-Appended
           - ReviewCenter-AttestationSigner-Chain
+          - ReviewCenter-AttestationSigner-Chain-TooLarge
           - ReviewCenter-AttestationSigner-Deterministic
           - ReviewCenter-AttestationSigner-Refusals
+          - ReviewCenter-AttestationSigner-Refusals-NotAttestation
+          - ReviewCenter-AttestationSigner-Arguments
           - ReviewCenter-OTS-Pkcs-DetachedSignature
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
@@ -81,20 +169,104 @@ sections:
           of a certificate before the readers of the attestations do.
         children:
           - ReviewCenter-AttestationKeyProvider-Selection
+          - ReviewCenter-AttestationKeyProvider-Selection-CertificateStore
+          - ReviewCenter-AttestationKeyProvider-Selection-File
+          - ReviewCenter-AttestationKeyProvider-Selection-Unknown
           - ReviewCenter-AttestationKeyProvider-SelfSigned
+          - ReviewCenter-AttestationKeyProvider-SelfSigned-Validity
+          - ReviewCenter-AttestationKeyProvider-SelfSigned-Reload
+          - ReviewCenter-AttestationKeyProvider-SelfSigned-Stable
+          - ReviewCenter-AttestationKeyProvider-SelfSigned-Concurrent
           - ReviewCenter-AttestationKeyProvider-SelfSignedProtected
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-Restart
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-OtherRing
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-LegacyPlain
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-LegacyPlainWarning
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-Expired
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-ExpiredReplaced
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-ExpiredWarning
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected-NoSecretsInMessages
           - ReviewCenter-AttestationKeyProvider-NoCreate
+          - ReviewCenter-AttestationKeyProvider-NoCreate-NothingCreated
+          - ReviewCenter-AttestationKeyProvider-NoCreate-Existing
+          - ReviewCenter-AttestationKeyProvider-NoCreate-FolderIsFile
           - ReviewCenter-AttestationKeyProvider-SelfSignedWarning
+          - ReviewCenter-AttestationKeyProvider-SelfSignedWarning-OnLoad
+          - ReviewCenter-AttestationKeyProvider-SelfSignedWarning-NoSecret
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors
+          - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-FolderIsFile
+          - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-Corrupt
+          - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-NoFolderInMessage
+          - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-ProtectFails
           - ReviewCenter-AttestationKeyProvider-CertificateStore
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-PrivateKeyInStore
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-Thumbprint
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-ThumbprintInvalid
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-Location
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-NotFound
+          - ReviewCenter-AttestationKeyProvider-CertificateStore-NoPrivateKey
           - ReviewCenter-AttestationKeyProvider-File
+          - ReviewCenter-AttestationKeyProvider-File-PemKeyFile
+          - ReviewCenter-AttestationKeyProvider-File-PemOneFile
+          - ReviewCenter-AttestationKeyProvider-File-Format
+          - ReviewCenter-AttestationKeyProvider-File-Chain
+          - ReviewCenter-AttestationKeyProvider-File-PfxIgnoresKeyPath
+          - ReviewCenter-AttestationKeyProvider-File-ReadOnly
+          - ReviewCenter-AttestationKeyProvider-File-NoPath
+          - ReviewCenter-AttestationKeyProvider-File-Missing
+          - ReviewCenter-AttestationKeyProvider-File-MissingKey
+          - ReviewCenter-AttestationKeyProvider-File-AsksPassword
+          - ReviewCenter-AttestationKeyProvider-File-WrongPassword
+          - ReviewCenter-AttestationKeyProvider-File-NoPasswordEcho
+          - ReviewCenter-AttestationKeyProvider-File-KeyFileErrors
+          - ReviewCenter-AttestationKeyProvider-File-NotCertificate
+          - ReviewCenter-AttestationKeyProvider-File-LegacyPem
+          - ReviewCenter-AttestationKeyProvider-File-NoFolder
           - ReviewCenter-AttestationKeyProvider-FileSecret
+          - ReviewCenter-AttestationKeyProvider-FileSecret-Conflict
+          - ReviewCenter-AttestationKeyProvider-FileSecret-MissingFile
+          - ReviewCenter-AttestationKeyProvider-FileSecret-Unprotected
+          - ReviewCenter-AttestationKeyProvider-FileSecret-Protected
+          - ReviewCenter-AttestationKeyProvider-FileSecret-PasswordNotUsed
+          - ReviewCenter-AttestationKeyProvider-FileSecret-RequireEncrypted
           - ReviewCenter-AttestationKeyProvider-FilePermissions
+          - ReviewCenter-AttestationKeyProvider-FilePermissions-PasswordFile
+          - ReviewCenter-AttestationKeyProvider-FilePermissions-OnlyKeyFile
           - ReviewCenter-AttestationKeyProvider-Expiry
+          - ReviewCenter-AttestationKeyProvider-Expiry-Expired
+          - ReviewCenter-AttestationKeyProvider-Expiry-Disabled
+          - ReviewCenter-AttestationKeyProvider-Expiry-FarAway
+          - ReviewCenter-AttestationKeyProvider-Expiry-DefaultPeriod
+          - ReviewCenter-AttestationKeyProvider-Expiry-LoggedOnce
+          - ReviewCenter-AttestationKeyProvider-Expiry-Status
+          - ReviewCenter-AttestationKeyProvider-Expiry-ExpiredUnrestricted
+          - ReviewCenter-AttestationKeyProvider-Expiry-Setting
+          - ReviewCenter-AttestationKeyProvider-Expiry-SelfSignedNone
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Off
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Organization
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoSigningUsage
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoKeyUsageExtension
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Validity
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-EveryCall
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Store
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-File
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-FileExpired
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoChainCheck
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NoExtension
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-Wording
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-InfoFlag
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-LoggedOnce
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NotRefused
           - ReviewCenter-AttestationKeyProvider-Describe
+          - ReviewCenter-AttestationKeyProvider-Describe-Unavailable
+          - ReviewCenter-AttestationKeyProvider-Describe-UnexpectedFailure
           - ReviewCenter-AttestationRenderer-KeyStatement
+          - ReviewCenter-AttestationRenderer-KeyStatement-Organization
+          - ReviewCenter-AttestationRenderer-KeyStatement-OrganizationNoNotice
+          - ReviewCenter-AttestationRenderer-KeyStatement-CodeSigning
+          - ReviewCenter-AttestationRenderer-KeyStatement-NoCodeSigningNote
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 
@@ -106,6 +278,9 @@ sections:
           A reader who takes a signature for more than it is would be misled by the tool that made it.
         children:
           - ReviewCenter-AttestationRenderer-ProvesStatement
+          - ReviewCenter-AttestationRenderer-ProvesStatement-KeyOrigin
+          - ReviewCenter-AttestationRenderer-ProvesStatement-ReviewerIdentity
+          - ReviewCenter-AttestationRenderer-ProvesStatement-SigningTime
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 
@@ -120,14 +295,58 @@ sections:
           audit head, and recording each release keeps the trail complete about who took a copy.
         children:
           - ReviewCenter-AttestationService-Approved
+          - ReviewCenter-AttestationService-Approved-Rejected
+          - ReviewCenter-AttestationService-Approved-NotRejectedMark
+          - ReviewCenter-AttestationService-Approved-NotFound
+          - ReviewCenter-AttestationService-Approved-NotComplete
+          - ReviewCenter-AttestationService-Approved-RecordChanged
+          - ReviewCenter-AttestationService-Approved-NoKeyRequest
           - ReviewCenter-AttestationService-Revalidation
+          - ReviewCenter-AttestationService-Revalidation-BallotFingerprint
+          - ReviewCenter-AttestationService-Revalidation-NoLongerComplete
+          - ReviewCenter-AttestationService-Revalidation-SlotsChanged
+          - ReviewCenter-AttestationService-Revalidation-Settings
+          - ReviewCenter-AttestationService-Revalidation-Unchanged
+          - ReviewCenter-AttestationService-Revalidation-NoDocument
+          - ReviewCenter-AttestationService-Revalidation-NothingRecorded
           - ReviewCenter-AttestationService-Document
+          - ReviewCenter-AttestationService-Document-Checklist
+          - ReviewCenter-AttestationService-Document-AnswerTime
+          - ReviewCenter-AttestationService-Document-SignOffs
+          - ReviewCenter-AttestationService-Document-AuditHead
+          - ReviewCenter-AttestationService-Document-Key
+          - ReviewCenter-AttestationService-Document-FileName
+          - ReviewCenter-AttestationService-Document-DefaultSettings
+          - ReviewCenter-AttestationService-Document-NamesOff
+          - ReviewCenter-AttestationService-Document-ThreadsOff
+          - ReviewCenter-AttestationService-Document-FilesOff
+          - ReviewCenter-AttestationService-Document-ChecklistWordingOff
+          - ReviewCenter-AttestationService-Document-SignedAfterSettings
           - ReviewCenter-AttestationService-KeyUnavailable
+          - ReviewCenter-AttestationService-KeyUnavailable-SignerFailure
+          - ReviewCenter-AttestationService-KeyUnavailable-NothingRecorded
           - ReviewCenter-AttestationService-Audit
+          - ReviewCenter-AttestationService-Audit-EveryRelease
+          - ReviewCenter-AttestationService-Audit-AnonymousActor
+          - ReviewCenter-AttestationService-Audit-Outcome
+          - ReviewCenter-AttestationService-Audit-Strict
           - ReviewCenter-AttestationService-Arguments
           - ReviewCenter-AttestationEndpoint-Authorization
+          - ReviewCenter-AttestationEndpoint-Authorization-NothingGenerated
+          - ReviewCenter-AttestationEndpoint-Authorization-NothingRecorded
+          - ReviewCenter-AttestationEndpoint-Authorization-AnonymousSwitches
           - ReviewCenter-AttestationEndpoint-Download
+          - ReviewCenter-AttestationEndpoint-Download-ContentType
+          - ReviewCenter-AttestationEndpoint-Download-FileName
+          - ReviewCenter-AttestationEndpoint-Download-NoCache
+          - ReviewCenter-AttestationEndpoint-Download-AuditEvent
+          - ReviewCenter-AttestationEndpoint-Download-DefaultKey
           - ReviewCenter-AttestationEndpoint-Statuses
+          - ReviewCenter-AttestationEndpoint-Statuses-NotComplete
+          - ReviewCenter-AttestationEndpoint-Statuses-Changed
+          - ReviewCenter-AttestationEndpoint-Statuses-ChangedNothingRecorded
+          - ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailable
+          - ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailableNothingRecorded
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
           - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
@@ -144,11 +363,59 @@ sections:
           same approvals.
         children:
           - ReviewCenter-EvidenceIndex-Completed
+          - ReviewCenter-EvidenceIndex-Completed-Several
+          - ReviewCenter-EvidenceIndex-Completed-Incomplete
+          - ReviewCenter-EvidenceIndex-Completed-Changed
+          - ReviewCenter-EvidenceIndex-Completed-Rejected
+          - ReviewCenter-EvidenceIndex-Completed-OtherProject
           - ReviewCenter-EvidenceIndex-Identity
+          - ReviewCenter-EvidenceIndex-Identity-NoSetId
           - ReviewCenter-EvidenceIndex-Fields
+          - ReviewCenter-EvidenceIndex-Fields-Fingerprint
           - ReviewCenter-EvidenceIndex-Order
+          - ReviewCenter-EvidenceIndex-Order-Entries
+          - ReviewCenter-EvidenceIndex-Order-LatestCompletion
+          - ReviewCenter-EvidenceIndex-Order-LowestReviewId
         tests:
           - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-Evidence-Index-Schema
+        title: >-
+          The Evidence subsystem shall give the evidence index the schema that ReviewMark reads as the index of an
+          evidence source.
+        justification: |
+          ReviewMark reads the evidence index of a project from this server instead of from a file. An index that its
+          reader cannot load, or that loses entries, would report approved reviews as missing.
+        children:
+          - ReviewCenter-EvidenceIndex-Fields
+        tests:
+          - ReviewMarkContract_Index_HasTheSchemaReviewMarkReads
+
+      - id: ReviewCenter-Evidence-Index-Fingerprint
+        title: >-
+          The Evidence subsystem shall give each entry of the evidence index the fingerprint that the algorithm of
+          ReviewMark computes for the same files.
+        justification: |
+          ReviewMark compares the fingerprint of an entry with the one it computes from the files in the repository, so
+          the two must come from the same algorithm.
+        children:
+          - ReviewCenter-EvidenceIndex-Fields-Fingerprint
+        tests:
+          - ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm
+
+      - id: ReviewCenter-Evidence-Index-Semantics
+        title: >-
+          The Evidence subsystem shall build the evidence index so that the matching rules of ReviewMark find the entry
+          current for the fingerprint of a listed review, stale for another fingerprint of a listed id, and missing for
+          an id that is not listed.
+        justification: |
+          The index is useful only if ReviewMark draws the right conclusion from it: an approved review must satisfy
+          its review-set, and a changed file or a review-set that nobody reviewed must not.
+        children:
+          - ReviewCenter-EvidenceIndex-Identity
+          - ReviewCenter-EvidenceIndex-Order-Entries
+        tests:
+          - ReviewMarkContract_Index_FollowsReviewMarkSemantics
 
       - id: ReviewCenter-Evidence-Visibility
         title: >-
@@ -165,8 +432,23 @@ sections:
           review that is not complete from one that does not exist.
         children:
           - ReviewCenter-AttestationService-Visibility
+          - ReviewCenter-AttestationService-Visibility-Member
+          - ReviewCenter-AttestationService-Visibility-AnonymousOff
+          - ReviewCenter-AttestationService-Visibility-AnonymousUnknownProject
+          - ReviewCenter-AttestationService-Visibility-AnonymousOn
+          - ReviewCenter-AttestationService-Visibility-AnonymousIncomplete
+          - ReviewCenter-AttestationService-Visibility-AnonymousRejected
           - ReviewCenter-AttestationEndpoint-Visibility
+          - ReviewCenter-AttestationEndpoint-Visibility-SameAsMissing
+          - ReviewCenter-AttestationEndpoint-Visibility-NothingRecorded
+          - ReviewCenter-AttestationEndpoint-Visibility-Member
+          - ReviewCenter-AttestationEndpoint-Visibility-SystemAdmin
           - ReviewCenter-EvidenceIndex-Visibility
+          - ReviewCenter-EvidenceIndex-Visibility-Member
+          - ReviewCenter-EvidenceIndex-Visibility-SystemAdmin
+          - ReviewCenter-EvidenceIndex-Visibility-Anonymous
+          - ReviewCenter-EvidenceIndex-Visibility-AnonymousOff
+          - ReviewCenter-EvidenceIndex-Visibility-AnonymousMissing
         tests:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
@@ -187,11 +469,54 @@ sections:
           the release must be traceable even when nobody signed in.
         children:
           - ReviewCenter-AttestationService-Revalidation
+          - ReviewCenter-AttestationService-Revalidation-BallotFingerprint
+          - ReviewCenter-AttestationService-Revalidation-NoLongerComplete
+          - ReviewCenter-AttestationService-Revalidation-SlotsChanged
+          - ReviewCenter-AttestationService-Revalidation-Settings
+          - ReviewCenter-AttestationService-Revalidation-Unchanged
+          - ReviewCenter-AttestationService-Revalidation-NoDocument
+          - ReviewCenter-AttestationService-Revalidation-NothingRecorded
           - ReviewCenter-AttestationService-Document
+          - ReviewCenter-AttestationService-Document-Checklist
+          - ReviewCenter-AttestationService-Document-AnswerTime
+          - ReviewCenter-AttestationService-Document-SignOffs
+          - ReviewCenter-AttestationService-Document-AuditHead
+          - ReviewCenter-AttestationService-Document-Key
+          - ReviewCenter-AttestationService-Document-FileName
+          - ReviewCenter-AttestationService-Document-DefaultSettings
+          - ReviewCenter-AttestationService-Document-NamesOff
+          - ReviewCenter-AttestationService-Document-ThreadsOff
+          - ReviewCenter-AttestationService-Document-FilesOff
+          - ReviewCenter-AttestationService-Document-ChecklistWordingOff
+          - ReviewCenter-AttestationService-Document-SignedAfterSettings
           - ReviewCenter-AttestationService-Labels
+          - ReviewCenter-AttestationService-Labels-Participant
+          - ReviewCenter-AttestationService-Labels-Answerer
+          - ReviewCenter-AttestationService-Labels-SamePerson
+          - ReviewCenter-AttestationService-Labels-Requester
+          - ReviewCenter-AttestationService-Labels-Anonymous
+          - ReviewCenter-AttestationService-Labels-TypedText
           - ReviewCenter-AttestationService-Audit
+          - ReviewCenter-AttestationService-Audit-EveryRelease
+          - ReviewCenter-AttestationService-Audit-AnonymousActor
+          - ReviewCenter-AttestationService-Audit-Outcome
+          - ReviewCenter-AttestationService-Audit-Strict
           - ReviewCenter-AttestationRenderer-ContentScope
+          - ReviewCenter-AttestationRenderer-ContentScope-Placement
+          - ReviewCenter-AttestationRenderer-ContentScope-NothingLeftOut
+          - ReviewCenter-AttestationRenderer-ContentScope-SwitchStates
+          - ReviewCenter-AttestationRenderer-ContentScope-LeftOut
+          - ReviewCenter-AttestationRenderer-ContentScope-Anonymous
+          - ReviewCenter-AttestationRenderer-ContentScope-SignedIn
+          - ReviewCenter-AttestationRenderer-ContentScope-SettingsTime
           - ReviewCenter-AttestationRenderer-ContentSwitches
+          - ReviewCenter-AttestationRenderer-ContentSwitches-ThreadsNote
+          - ReviewCenter-AttestationRenderer-ContentSwitches-GitContext
+          - ReviewCenter-AttestationRenderer-ContentSwitches-GitContextNote
+          - ReviewCenter-AttestationRenderer-ContentSwitches-ChecklistWording
+          - ReviewCenter-AttestationRenderer-ContentSwitches-ChecklistWordingIdentifiers
+          - ReviewCenter-AttestationRenderer-ContentSwitches-Files
+          - ReviewCenter-AttestationRenderer-ContentSwitches-AlwaysIncluded
         tests:
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
@@ -208,7 +533,11 @@ sections:
           people outside the tool has to say which are which.
         children:
           - ReviewCenter-AttestationService-FollowUp
+          - ReviewCenter-AttestationService-FollowUp-CarriedMarks
+          - ReviewCenter-AttestationService-FollowUp-NotFollowing
           - ReviewCenter-AttestationRenderer-FollowUp
+          - ReviewCenter-AttestationRenderer-FollowUp-Marks
+          - ReviewCenter-AttestationRenderer-FollowUp-NotFollowing
         tests:
           - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
           - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks

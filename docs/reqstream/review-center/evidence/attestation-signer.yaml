@@ -9,19 +9,52 @@ sections:
     requirements:
       - id: ReviewCenter-AttestationSigner-Signature
         title: >-
-          The AttestationSigner class shall sign a PDF with an RSA key or an ECDSA key into a detached CMS signature
-          that verifies against the byte ranges of the document.
+          The AttestationSigner class shall sign a PDF with an RSA key into a detached CMS signature that verifies
+          against the byte ranges of the document.
         justification: |
           Organizations hold their signing keys as RSA or as ECDSA keys. A signature that a PDF reader or any CMS
           library verifies is what makes the attestation checkable without ReviewCenter.
+        tests:
+          - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
+
+      - id: ReviewCenter-AttestationSigner-Signature-Ecdsa
+        title: >-
+          The AttestationSigner class shall sign a PDF with an ECDSA key into a detached CMS signature that verifies
+          against the byte ranges of the document.
+        justification: |
+          An organization that holds an ECDSA key must be able to sign with it as well.
+        tests:
+          - AttestationSigner_Sign_EcdsaKey_ProducesVerifiableDetachedSignature
+
+      - id: ReviewCenter-AttestationSigner-Signature-Digest
+        title: >-
+          The AttestationSigner class shall use SHA-256 as the digest algorithm of the signature.
+        justification: |
+          SHA-256 is the digest that current readers and policies accept.
+        tests:
+          - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
+
+      - id: ReviewCenter-AttestationSigner-Signature-SigningTime
+        title: >-
+          The AttestationSigner class shall record the signing time that it was given as a signed attribute of the
+          signature.
+        justification: |
+          A reader shows when the attestation was signed, and the time is covered by the signature.
+        tests:
+          - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
+
+      - id: ReviewCenter-AttestationSigner-Signature-SignerCertificate
+        title: >-
+          The AttestationSigner class shall embed the certificate of the signing key in the signature.
+        justification: |
+          A reader needs the certificate of the signer to verify the signature and to show who signed.
         tests:
           - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
           - AttestationSigner_Sign_EcdsaKey_ProducesVerifiableDetachedSignature
 
       - id: ReviewCenter-AttestationSigner-NonExportableKey
         title: >-
-          The AttestationSigner class shall sign with the handle of the private key and need no access to the key
-          material, so that a key that cannot be exported can sign.
+          The AttestationSigner class shall sign with a key that cannot be exported.
         justification: |
           A key in a hardware module, on a smart card, or marked as not exportable in the certificate store is the
           safe way to keep an organization key. The signer must work with it as it is.
@@ -30,52 +63,145 @@ sections:
 
       - id: ReviewCenter-AttestationSigner-Structure
         title: >-
-          The AttestationSigner class shall keep the original bytes of the document unchanged and add a signature
-          field, a form, and a signature dictionary with the adbe.pkcs7.detached filter, in which the byte range
-          covers everything except the hexadecimal signature value.
+          The AttestationSigner class shall keep the original bytes of the document unchanged at the start of the
+          signed document.
         justification: |
-          An incremental update keeps the document the reviewers saw as it was, and a byte range that excludes only
-          the signature itself means that any other change breaks the signature.
+          An incremental update keeps the document the reviewers saw as it was.
         tests:
           - AttestationSigner_Sign_Output_StartsWithTheOriginalBytes
+
+      - id: ReviewCenter-AttestationSigner-Structure-CrossReference
+        title: >-
+          The AttestationSigner class shall add the signature with a cross-reference section of its own that is
+          consistent with the objects of the signed document.
+        justification: |
+          A reader finds the objects of the update through the cross-reference chain, and a broken chain makes the
+          document unreadable or suspect.
+        tests:
+          - AttestationSigner_Sign_Output_StartsWithTheOriginalBytes
+
+      - id: ReviewCenter-AttestationSigner-Structure-SignatureField
+        title: >-
+          The AttestationSigner class shall declare a form with a signature field for the signature.
+        justification: |
+          A PDF reader shows and verifies a signature only when a form declares its signature field.
+        tests:
           - AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter
+
+      - id: ReviewCenter-AttestationSigner-Structure-Filter
+        title: >-
+          The AttestationSigner class shall write the signature dictionary with the adbe.pkcs7.detached sub-filter.
+        justification: |
+          Adobe-compatible readers recognize a detached CMS signature by this sub-filter.
+        tests:
+          - AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter
+
+      - id: ReviewCenter-AttestationSigner-Structure-Reason
+        title: >-
+          The AttestationSigner class shall record the reason that it was given in the signature dictionary.
+        justification: |
+          A reader shows the reason of the signature to the person who opens the document.
+        tests:
+          - AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter
+
+      - id: ReviewCenter-AttestationSigner-Structure-Date
+        title: >-
+          The AttestationSigner class shall record the signing time that it was given in the signature dictionary.
+        justification: |
+          A reader shows when the document was signed.
+        tests:
+          - AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter
+
+      - id: ReviewCenter-AttestationSigner-Structure-ByteRange
+        title: >-
+          The AttestationSigner class shall give the signature a byte range that covers everything except the
+          hexadecimal signature value.
+        justification: |
+          A byte range that excludes only the signature itself means that any other change breaks the signature.
+        tests:
           - AttestationSigner_Sign_ByteRange_CoversEverythingExceptTheContentsHex
 
       - id: ReviewCenter-AttestationSigner-Certification
         title: >-
-          The AttestationSigner class shall make the signature a certifying signature that allows no changes: a
-          DocMDP reference with permission 1 in the signature dictionary, named by the permissions of the catalog, so
-          that the permission is covered by the signature and a changed permission breaks it.
+          The AttestationSigner class shall make the signature a certifying signature that allows no changes, with
+          the DocMDP permission 1.
         justification: |
           An attestation must not be changed after it was signed, not even by form filling or commenting. A
           signature without the DocMDP entry is an approval signature, for which a PDF reader allows later changes.
           Readers state the permission to the person who opens the document.
         tests:
           - AttestationSigner_Sign_Output_IsCertifiedWithDocMdpNoChangesAllowed
+
+      - id: ReviewCenter-AttestationSigner-Certification-Catalog
+        title: >-
+          The AttestationSigner class shall name the signature of the document in the permissions of the catalog.
+        justification: |
+          A reader finds the certification through the permissions of the catalog, and they must name the same
+          signature that the signature field holds.
+        tests:
+          - AttestationSigner_Sign_Output_IsCertifiedWithDocMdpNoChangesAllowed
+
+      - id: ReviewCenter-AttestationSigner-Certification-Verifies
+        title: >-
+          The AttestationSigner class shall produce a certifying signature that still verifies over the byte range,
+          for an RSA key and for an ECDSA key.
+        justification: |
+          The certification must not cost the signature its validity, whichever kind of key the organization holds.
+        tests:
           - AttestationSigner_Sign_CertifiedOutput_SignatureStillVerifiesOverTheByteRange
+
+      - id: ReviewCenter-AttestationSigner-Certification-Covered
+        title: >-
+          The AttestationSigner class shall include the permission in the bytes that the signature covers.
+        justification: |
+          A permission that the signature does not cover could be weakened without a trace.
+        tests:
+          - AttestationSigner_Sign_CertifiedOutput_SignatureStillVerifiesOverTheByteRange
+
+      - id: ReviewCenter-AttestationSigner-Certification-Permission
+        title: >-
+          The AttestationSigner class shall produce a signature that no longer verifies when the permission is
+          changed.
+        justification: |
+          A changed permission would let later changes pass as allowed, so it must break the signature.
+        tests:
           - AttestationSigner_Sign_CertifiedOutput_TamperedPermission_SignatureNoLongerVerifies
 
       - id: ReviewCenter-AttestationSigner-TamperEvident
         title: >-
           The AttestationSigner class shall produce a signature that no longer verifies when a byte of the signed
-          content is changed, and whose byte range does not cover data that is appended after the signing.
+          content is changed.
         justification: |
-          The signature is worth something only if a change shows. A reader must also be able to see that appended
-          data is not covered, which is how a PDF reader reports a changed document.
+          The signature is worth something only if a change shows.
         tests:
           - AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
+
+      - id: ReviewCenter-AttestationSigner-TamperEvident-Appended
+        title: >-
+          The AttestationSigner class shall give the signature a byte range that does not cover data that is appended
+          after the signing.
+        justification: |
+          A reader must be able to see that appended data is not covered, which is how a PDF reader reports a changed
+          document.
+        tests:
           - AttestationSigner_Sign_DataAppendedAfterSigning_IsNotCoveredByTheByteRange
 
       - id: ReviewCenter-AttestationSigner-Chain
         title: >-
-          The AttestationSigner class shall embed the signer certificate and the intermediate certificates of the key,
-          and shall report with an attestation key error that names the problem, instead of writing a broken
-          document, when they do not fit into the space reserved for the signature.
+          The AttestationSigner class shall embed the intermediate certificates of the key in the signature.
         justification: |
-          A reader can follow the chain to the organization root only when the certificates are in the signature, and
-          the reserved space is fixed before the signature is known.
+          A reader can follow the chain to the organization root only when the certificates are in the signature.
         tests:
           - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
+
+      - id: ReviewCenter-AttestationSigner-Chain-TooLarge
+        title: >-
+          The AttestationSigner class shall report with an attestation key error that says the signature is too large
+          when the certificates do not fit into the space reserved for the signature.
+        justification: |
+          The reserved space is fixed before the signature is known, and the operator must learn that the chain of the
+          key is the problem.
+        tests:
           - AttestationSigner_Sign_ChainTooLargeForTheReservedSpace_ThrowsKeyException
 
       - id: ReviewCenter-AttestationSigner-Deterministic
@@ -89,11 +215,25 @@ sections:
 
       - id: ReviewCenter-AttestationSigner-Refusals
         title: >-
-          The AttestationSigner class shall refuse a document that is already signed and a document that does not have
-          the layout of the PdfDocumentWriter class.
+          The AttestationSigner class shall refuse a document that is already signed.
         justification: |
-          The signer finds the places it changes by the layout of its own writer. Refusing anything else is safer than
-          guessing, and a second signature would invalidate the first.
+          A second signature would invalidate the first.
         tests:
           - AttestationSigner_Sign_AlreadySignedPdf_Throws
+
+      - id: ReviewCenter-AttestationSigner-Refusals-NotAttestation
+        title: >-
+          The AttestationSigner class shall refuse a document that does not have the layout of an attestation document.
+        justification: |
+          The signer finds the places it changes by the layout of the attestation documents. Refusing anything else is
+          safer than guessing.
+        tests:
           - AttestationSigner_Sign_NotAnAttestationPdf_ThrowsInvalidOperation
+
+      - id: ReviewCenter-AttestationSigner-Arguments
+        title: >-
+          The AttestationSigner class shall refuse a missing document, key, or reason with an argument exception.
+        justification: |
+          A missing input is a programming error, and the exception names it.
+        tests:
+          - AttestationSigner_Sign_NullArgument_Throws

@@ -4,53 +4,164 @@
 # The AttestationRenderer class turns the record of a completed review into the unsigned attestation PDF, with the
 # PdfDocumentWriter class. It states what the record contains, which key will sign it, and what the signature proves
 # and does not prove.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: AttestationRenderer Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Review: which review and which content the document is about
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-Review
         title: >-
-          The AttestationRenderer class shall show the identity of the review, its project, its revisions or the fact
-          that its files were uploaded, its content fingerprint, and a list of its files with their status, as far as
-          the evidence settings of the project include the revisions and the files; the fingerprint and the number of
-          files are always shown.
+          The AttestationRenderer class shall show the project, the title and the identifier of the review.
         justification: |
-          A reader of the attestation must be able to tell which review and which content it is about, and to compare
-          the fingerprint with the one the tool shows, without opening the tool. A project may keep the names of its
-          files out of the document, and the fingerprint still identifies the content.
+          A reader of the attestation must be able to tell which review it is about without opening the tool.
         tests:
           - AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-Review-Revisions
+        title: >-
+          The AttestationRenderer class shall show the repository and the head and baseline revisions of a review that
+          comes from a repository, when the evidence settings include the git context.
+        justification: |
+          The revisions tie the document to the exact content that was reviewed.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-Review-Fingerprint
+        title: >-
+          The AttestationRenderer class shall always show the content fingerprint of the review, whatever the evidence
+          settings leave out.
+        justification: |
+          A reader can compare the fingerprint with the one the tool shows, and the fingerprint still identifies the
+          content when a project keeps the files and the git context out of the document.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint
+          - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
+          - AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-AttestationRenderer-Review-Upload
+        title: >-
+          The AttestationRenderer class shall state that the files were uploaded to ReviewCenter, and show no head
+          revision, for a review that has no repository.
+        justification: |
+          A review of uploaded files has no revisions, and the reader must not look for them.
+        tests:
           - AttestationRenderer_Render_UploadedReview_SaysFilesWereUploaded
+
+      - id: ReviewCenter-AttestationRenderer-Review-FileList
+        title: >-
+          The AttestationRenderer class shall list each file of the review with its path, status, size and SHA-256
+          hash, when the evidence settings include the files.
+        justification: |
+          The list shows which files the reviewers approved and in which state each file was.
+        tests:
+          - AttestationRenderer_Render_Document_ListsFilesWithStatus
+
+      - id: ReviewCenter-AttestationRenderer-Review-FileCount
+        title: >-
+          The AttestationRenderer class shall show the number of files of the review, also when the evidence settings
+          leave out the list of files.
+        justification: |
+          A project may keep the names of its files out of the document, and the count still tells a reader how many
+          files the fingerprint covers.
+        tests:
           - AttestationRenderer_Render_Document_ListsFilesWithStatus
           - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Findings: the checklist answers and the findings and comments of the report
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-Findings
         title: >-
-          The AttestationRenderer class shall show every checklist answer with its comment in full, never truncated, say
-          so when the review has no checklist, and list the findings and included comments that the reviewers put in
-          the report, each thread with its location, its status (Resolved or Open) and its included comments in full,
-          with none of them cut or counted away, list a thread whose starting comment is not included as a discussion
-          thread, not as a finding, as far as the evidence settings of the project include the checklist wording and
-          the threads.
+          The AttestationRenderer class shall show every checklist answer with its outcome and its comment.
         justification: |
-          The approval is based on what the reviewers found and answered. An attestation that left it out would prove
-          that someone signed, but not what they were signing, and a comment that is cut is a reviewer answer that the
-          signed evidence no longer shows. The settings leave out whole parts, never a part of a part.
+          The approval is based on what the reviewers answered. An attestation that left the answers out would prove
+          that someone signed, but not what they were signing.
         tests:
           - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
+
+      - id: ReviewCenter-AttestationRenderer-Findings-LongComment
+        title: >-
+          The AttestationRenderer class shall print the comment of a checklist answer in full, with no cut, however
+          long it is.
+        justification: |
+          A comment that is cut is a reviewer answer that the signed evidence no longer shows.
+        tests:
           - AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull
+
+      - id: ReviewCenter-AttestationRenderer-Findings-CommentPages
+        title: >-
+          The AttestationRenderer class shall continue a checklist comment that does not fit on one page onto further
+          pages without losing any of it.
+        justification: |
+          A very long comment must stay complete in the document, whatever the number of pages it needs.
+        tests:
           - AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss
+
+      - id: ReviewCenter-AttestationRenderer-Findings-NoChecklist
+        title: >-
+          The AttestationRenderer class shall say that the review has no checklist when it has none.
+        justification: |
+          A reader must be able to tell a review without a checklist from a document that lost its checklist.
+        tests:
           - AttestationRenderer_Render_NoChecklist_SaysSo
+
+      - id: ReviewCenter-AttestationRenderer-Findings-List
+        title: >-
+          The AttestationRenderer class shall list each finding and included comment of the report with the location
+          of its thread and, for each of its included comments, the author, the time and the text.
+        justification: |
+          The findings are what the reviewers put in the report, and the signed evidence must show them.
+        tests:
           - AttestationRenderer_Render_Document_PrintsFindingsWithTheirComments
-          - AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded
-          - AttestationRenderer_Render_LongFindingComment_IsPrintedInFull
+
+      - id: ReviewCenter-AttestationRenderer-Findings-Status
+        title: >-
+          The AttestationRenderer class shall print the status of each thread of the report, Resolved or Open, right
+          after its location.
+        justification: |
+          A reader must see which findings were dealt with and which are still open when the review concluded.
+        tests:
           - AttestationRenderer_Render_FindingStatus_PrintsResolvedAndOpen
+
+      - id: ReviewCenter-AttestationRenderer-Findings-LongFindingComment
+        title: >-
+          The AttestationRenderer class shall print an included comment of a thread in full, with no cut, however
+          long it is.
+        justification: |
+          A comment that is cut is a reviewer statement that the signed evidence no longer shows.
+        tests:
+          - AttestationRenderer_Render_LongFindingComment_IsPrintedInFull
+
+      - id: ReviewCenter-AttestationRenderer-Findings-None
+        title: >-
+          The AttestationRenderer class shall say that no finding or comment was included in the report when the report
+          has none.
+        justification: |
+          A reader must be able to tell a review without findings from a document that lost its findings.
+        tests:
+          - AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded
+
+      - id: ReviewCenter-AttestationRenderer-Findings-Discussion
+        title: >-
+          The AttestationRenderer class shall head a thread whose starting comment is not included as a discussion
+          thread, and shall not present it as a finding.
+        justification: |
+          A reply without the comment it answers is not a finding, and calling it one would misstate the report.
+        tests:
           - AttestationRenderer_Render_DiscussionThread_IsNotPresentedAsFinding
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # AnswerTimes: when each checklist answer was given
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-AnswerTimes
         title: >-
-          The AttestationRenderer class shall print with every checklist answer the time it was given, in UTC to the
-          second in the same format as the other times of the document, and print no time for an answer that has none.
+          The AttestationRenderer class shall print with every checklist answer the time it was given, to the second.
         justification: |
           A burst of answers within a few seconds becomes visible to the reader of the PDF. The time is outside the
           record digest, so showing it changes no signature; the PDF signature protects it like the rest of the
@@ -59,139 +170,575 @@ sections:
           - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
           - AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc
 
+      - id: ReviewCenter-AttestationRenderer-AnswerTimes-Utc
+        title: >-
+          The AttestationRenderer class shall print the time of a checklist answer in UTC, also when the time was given
+          with another offset.
+        justification: |
+          One time zone for the whole document keeps the times comparable.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc
+
+      - id: ReviewCenter-AttestationRenderer-AnswerTimes-None
+        title: >-
+          The AttestationRenderer class shall print no time for a checklist answer that has none.
+        justification: |
+          A missing time must not be shown as an invented one.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # FindingList: no cap on the findings
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-FindingList
         title: >-
-          The AttestationRenderer class shall list every finding it is given, however many there are, in the order of
-          the document, and continue onto further pages.
+          The AttestationRenderer class shall list every finding it is given, however many there are, with none cut
+          away or replaced by a count.
         justification: |
           A finding is a reviewer's reason and is part of the record that was signed, so it must not be dropped for
-          the sake of size. The document is made in memory for a review that has a bounded number of threads, and
-          the pages grow with it.
+          the sake of size.
         tests:
           - AttestationRenderer_Render_ManyFindings_ListsEveryFinding
 
+      - id: ReviewCenter-AttestationRenderer-FindingList-Order
+        title: >-
+          The AttestationRenderer class shall list the findings in the order in which it is given them.
+        justification: |
+          The order of the document is the order of the report, and a reader compares the two.
+        tests:
+          - AttestationRenderer_Render_ManyFindings_ListsThemInTheOrderGiven
+
+      - id: ReviewCenter-AttestationRenderer-FindingList-Pages
+        title: >-
+          The AttestationRenderer class shall continue the list of findings onto further pages when it does not fit on
+          one page.
+        justification: |
+          The document is made in memory for a review that has a bounded number of threads, and the pages grow with it.
+        tests:
+          - AttestationRenderer_Render_ManyFindings_ContinueOntoFurtherPages
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Conclusion: the outcome, and the rejection marks
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-Conclusion
         title: >-
-          The AttestationRenderer class shall print the outcome and the conclusion text of the review in a Conclusion
-          section, shall title the document Review attestation - REJECTED and print a banner framed by rules at the
-          head of the first page for a rejection only, and shall print no banner for an approval.
+          The AttestationRenderer class shall print the outcome of the review, Approved or Rejected, in a Conclusion
+          section.
         justification: |
-          A reader of a rejection must see at once that it is a rejection and why, and a document that states an
-          approval must not carry any rejection mark.
+          A reader of the attestation must see how the review concluded.
         tests:
-          - AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection
           - AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText
 
+      - id: ReviewCenter-AttestationRenderer-Conclusion-Text
+        title: >-
+          The AttestationRenderer class shall print the conclusion text of the review in the Conclusion section.
+        justification: |
+          The text holds the reasons for a rejection, or the conclusion of the reviewers for an approval.
+        tests:
+          - AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion-RejectionHeading
+        title: >-
+          The AttestationRenderer class shall head the conclusion text of a rejected review Reasons for rejection, and
+          shall not use that heading for an approved review.
+        justification: |
+          A reader of a rejection must see that the text gives the reasons for it.
+        tests:
+          - AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion-RejectedTitle
+        title: >-
+          The AttestationRenderer class shall title the document Review attestation - REJECTED for a rejected review.
+        justification: |
+          A reader of a rejection must see at once that it is a rejection.
+        tests:
+          - AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion-RejectedBanner
+        title: >-
+          The AttestationRenderer class shall print a banner stating that the review concluded as rejected and is not
+          evidence that the reviewed content passed, for a rejected review.
+        justification: |
+          A rejected review must not be mistaken for evidence that the content passed.
+        tests:
+          - AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion-BannerPlacement
+        title: >-
+          The AttestationRenderer class shall print the banner of a rejected review directly under the title, before
+          the Review section.
+        justification: |
+          A banner at the head of the first page is seen before anything else.
+        tests:
+          - AttestationRenderer_Render_Rejected_PrintsBannerBetweenTitleAndReviewSection
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion-NoBanner
+        title: >-
+          The AttestationRenderer class shall print no banner and no REJECTED title for an approved review.
+        justification: |
+          A document that states an approval must not carry any rejection mark.
+        tests:
+          - AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # BallotAppendix: the final ballot of every slot
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-BallotAppendix
         title: >-
-          The AttestationRenderer class shall print a Ballots appendix, when it is given one, with every reviewer slot,
-          its signer, each of its answers with the outcome, the justification and the time, the answers of its sections
-          and the fingerprint of the ballots, with the question text left out and the identifiers kept when the
-          checklist wording is off, and shall print no appendix when it is given none.
+          The AttestationRenderer class shall print, when it is given one, a Ballots appendix that names every
+          reviewer slot with its reviewer.
         justification: |
-          The appendix shows the final ballots of the slots of a concluded review. Its fingerprint is the one that the
-          record digest module computes, so a reader can tie the appendix to the record.
+          The appendix shows the final ballots of the slots of a concluded review, so a reader can see who answered.
         tests:
           - AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-Answers
+        title: >-
+          The AttestationRenderer class shall print in the Ballots appendix each answer of a slot with its identifier,
+          its question text, its outcome, its justification, and who gave it and when.
+        justification: |
+          A reader sees what each reviewer answered and why, and not only what the reviewers agree on.
+        tests:
+          - AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-NotApplicable
+        title: >-
+          The AttestationRenderer class shall print in the Ballots appendix the reason of a section that a slot marked
+          not applicable.
+        justification: |
+          A section that a reviewer skipped must say why.
+        tests:
+          - AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-Fingerprint
+        title: >-
+          The AttestationRenderer class shall print in the Ballots appendix the fingerprint of the ballots with its
+          version.
+        justification: |
+          Its fingerprint is the one that the record digest module computes, so a reader can tie the appendix to the
+          record.
+        tests:
+          - AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-Omitted
+        title: >-
+          The AttestationRenderer class shall print no Ballots appendix and no ballot fingerprint when it is given no
+          ballots.
+        justification: |
+          A review without a checklist has no ballots, and an empty appendix would suggest that something is missing.
+        tests:
           - AttestationRenderer_Render_NoBallotAppendix_OmitsTheSection
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-WordingOff
+        title: >-
+          The AttestationRenderer class shall leave out the question text and the section titles of the Ballots
+          appendix when the evidence settings turn the checklist wording off.
+        justification: |
+          The appendix follows the checklist-wording switch like the checklist, so the wording cannot leave the server
+          by this way.
+        tests:
           - AttestationRenderer_Render_BallotAppendixWordingOff_PrintsIdentifiersOnly
 
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix-WordingOffIdentifiers
+        title: >-
+          The AttestationRenderer class shall print the identifiers, outcomes and justifications of the answers of the
+          Ballots appendix when the evidence settings turn the checklist wording off.
+        justification: |
+          The identifiers still name the checks, and the outcomes and justifications are the reviewers' own words.
+        tests:
+          - AttestationRenderer_Render_BallotAppendixWordingOff_PrintsIdentifiersOnly
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # SignOffs: who signed, what the signature covers, the audit head, the tool version
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-SignOffs
         title: >-
-          The AttestationRenderer class shall show every reviewer slot with the signer, the time of the signature, and
-          the digest the signature covers, the head of the audit trail, and the version of the tool, with the names
-          that the document holds.
+          The AttestationRenderer class shall show every reviewer slot with its reviewers and the signer of its
+          signature.
         justification: |
-          The in-record signatures are the evidence of who approved. The audit head ties the document to the audit
-          trail, and the tool version tells a reader which rules produced it. The names are already final text when
-          they reach the renderer, so a project that keeps the names out of its PDFs is served without the renderer
-          knowing about it (see the AttestationService labels).
+          The in-record signatures are the evidence of who approved.
         tests:
           - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
-          - AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine
-          - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
-          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
 
+      - id: ReviewCenter-AttestationRenderer-SignOffs-SignedAt
+        title: >-
+          The AttestationRenderer class shall show the time of the signature of every signed reviewer slot in UTC.
+        justification: |
+          A reader must see when each reviewer approved.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-Digest
+        title: >-
+          The AttestationRenderer class shall show the record digest that the signature of a slot covers, with its
+          digest version.
+        justification: |
+          The digest shows which record the reviewer signed.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-DigestLine
+        title: >-
+          The AttestationRenderer class shall print the record digest of a signature on one line.
+        justification: |
+          A digest that wraps cannot be compared with a printed copy at a glance.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-AuditHead
+        title: >-
+          The AttestationRenderer class shall show the head of the audit trail with its hash, the number of entries
+          and whether the hash chain is intact.
+        justification: |
+          The audit head ties the document to the audit trail.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-ToolVersion
+        title: >-
+          The AttestationRenderer class shall name the version of the tool in the footer of every page.
+        justification: |
+          The tool version tells a reader which rules produced the document, also on a single printed page.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-ToolVersionProperty
+        title: >-
+          The AttestationRenderer class shall name the version of the tool in the author property of the document.
+        justification: |
+          A reader of the property dialog sees which version made the document.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs-Names
+        title: >-
+          The AttestationRenderer class shall print the names of the reviewers exactly as the document holds them,
+          also when the evidence settings turn the reviewer names off.
+        justification: |
+          The names are already final text when they reach the renderer, so a project that keeps the names out of its
+          PDFs is served without the renderer knowing about it.
+        tests:
+          - AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds
+          - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ContentScope: what the document contains and what it leaves out
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-ContentScope
         title: >-
-          The AttestationRenderer class shall always print, directly after the review section, a Content scope section
-          that states which sections the evidence settings left out, whether the request was anonymous, and the
-          settings that were in effect when the document was made, and shall say that nothing is left out when every
-          switch is on.
+          The AttestationRenderer class shall print a Content scope section in every document, also when every
+          evidence switch is off.
         justification: |
           A reader of a reduced document must be able to tell a section that was left out by the project from a
           section that never existed. The statement is part of the signed bytes, so it cannot be removed afterwards.
         tests:
           - AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut
-          - AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo
           - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
 
-      - id: ReviewCenter-AttestationRenderer-ContentSwitches
+      - id: ReviewCenter-AttestationRenderer-ContentScope-Placement
         title: >-
-          The AttestationRenderer class shall, for a switch that is off in the evidence settings, leave out the whole
-          findings section and say so, replace the repository and revisions by a statement that the git context is
-          omitted, leave out the text of the checklist questions and print the identifiers, outcomes and
-          justifications only, or leave out the list of files while the file count and the fingerprint stay, and shall
-          keep the parts that are always included.
+          The AttestationRenderer class shall print the Content scope section directly after the Review section.
         justification: |
-          A project decides how much of its review may leave the server. Each switch must remove what it says and no
-          more, and what proves the approval, the outcomes, the signatures, the fingerprint and the audit head, must
-          stay.
+          A reader sees what the document leaves out before reading the parts that follow.
+        tests:
+          - AttestationRenderer_Render_Document_PrintsContentScopeDirectlyAfterReviewSection
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-NothingLeftOut
+        title: >-
+          The AttestationRenderer class shall state in the Content scope section that nothing is left out when every
+          evidence switch is on.
+        justification: |
+          A reader must not have to guess whether a part is missing by accident.
+        tests:
+          - AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-SwitchStates
+        title: >-
+          The AttestationRenderer class shall state in the Content scope section for each evidence switch whether its
+          part is Included or Omitted.
+        justification: |
+          The state of every switch shows the reader exactly which settings produced the document.
+        tests:
+          - AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-LeftOut
+        title: >-
+          The AttestationRenderer class shall name in the Content scope section each part that the evidence settings
+          left out.
+        justification: |
+          A reader of a reduced document must be able to tell which parts the project kept out of it.
         tests:
           - AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo
-          - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
-          - AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly
-          - AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions
           - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-Anonymous
+        title: >-
+          The AttestationRenderer class shall state in the Content scope section that the request came without signing
+          in when it did.
+        justification: |
+          A document that was handed out without a sign-in must say so on its face.
+        tests:
+          - AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-SignedIn
+        title: >-
+          The AttestationRenderer class shall state in the Content scope section that the request came from a signed-in
+          user when it did.
+        justification: |
+          The statement tells the reader how the document was obtained, in either case.
+        tests:
+          - AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut
+
+      - id: ReviewCenter-AttestationRenderer-ContentScope-SettingsTime
+        title: >-
+          The AttestationRenderer class shall state in the Content scope section that the evidence settings are those
+          in effect at the time the document was made, with that time.
+        justification: |
+          The settings of a project can change, and the reader must know which ones this document followed.
+        tests:
+          - AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ContentSwitches: each switch removes what it says and no more
+      # ---------------------------------------------------------------------------------------------------------------
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches
+        title: >-
+          The AttestationRenderer class shall leave out every finding and comment of the findings section when the
+          evidence settings turn the discussion threads off.
+        justification: |
+          A project decides how much of its review may leave the server. Each switch must remove what it says and no
+          more.
+        tests:
+          - AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-ThreadsNote
+        title: >-
+          The AttestationRenderer class shall say in the findings section that the discussion is not included by
+          project setting when the evidence settings turn the discussion threads off.
+        justification: |
+          A reader must be able to tell an omitted discussion from a review that had none.
+        tests:
+          - AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-GitContext
+        title: >-
+          The AttestationRenderer class shall leave out the repository and both revisions of the review when the
+          evidence settings turn the git context off.
+        justification: |
+          A project may keep the names of its repository and its commits out of the document.
+        tests:
+          - AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-GitContextNote
+        title: >-
+          The AttestationRenderer class shall state that the git context is omitted in place of the repository and the
+          revisions when the evidence settings turn the git context off.
+        justification: |
+          A reader must be able to tell an omitted git context from a review that had none.
+        tests:
+          - AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-ChecklistWording
+        title: >-
+          The AttestationRenderer class shall leave out the question text and the section titles of the checklist when
+          the evidence settings turn the checklist wording off.
+        justification: |
+          A project may keep the wording of its checklist out of the document.
+        tests:
+          - AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-ChecklistWordingIdentifiers
+        title: >-
+          The AttestationRenderer class shall print the identifiers, outcomes and comments of the checks when the
+          evidence settings turn the checklist wording off.
+        justification: |
+          The identifiers still name the checks, and the outcomes and comments are the reviewers' own words and what
+          proves the approval.
+        tests:
+          - AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-Files
+        title: >-
+          The AttestationRenderer class shall leave out the list of files, with their paths and hashes, when the
+          evidence settings turn the file list off.
+        justification: |
+          A project may keep the names of its files out of the document.
+        tests:
+          - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches-AlwaysIncluded
+        title: >-
+          The AttestationRenderer class shall keep the review identity, the content fingerprint, the checklist
+          outcomes, the sign-offs with the record digest and the digital signature section when every evidence switch
+          is off.
+        justification: |
+          What proves the approval, the outcomes, the signatures, the fingerprint and the signing key, must stay
+          whatever a project leaves out.
+        tests:
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # KeyStatement: which key signs the document
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-KeyStatement
         title: >-
-          The AttestationRenderer class shall name the subject and the issuer of the signing certificate and print no
-          warning for an organization key, and shall print a prominent notice that the key is self-signed, not an
-          organization key, and for development and test only, for a self-signed key, and one line that a code-signing
-          certificate is not trusted by Adobe Acrobat for document signatures, for a code-signing-only key.
+          The AttestationRenderer class shall print a prominent notice that the key is self-signed, not an organization
+          key, and for development and test only, when the signing key is self-signed.
         justification: |
           A document that looks official but is signed with a key that anyone can create must say so on its face.
           Whoever reads a printed copy never sees the user interface.
         tests:
           - AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice
+
+      - id: ReviewCenter-AttestationRenderer-KeyStatement-Organization
+        title: >-
+          The AttestationRenderer class shall name the subject and the issuer of the signing certificate of an
+          organization key.
+        justification: |
+          A reader decides whether to trust the key from the certificate that it belongs to.
+        tests:
           - AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice
+
+      - id: ReviewCenter-AttestationRenderer-KeyStatement-OrganizationNoNotice
+        title: >-
+          The AttestationRenderer class shall print no self-signed notice for an organization key.
+        justification: |
+          A warning on a document that is signed properly would teach readers to ignore it.
+        tests:
+          - AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice
+
+      - id: ReviewCenter-AttestationRenderer-KeyStatement-CodeSigning
+        title: >-
+          The AttestationRenderer class shall print a note that Adobe Acrobat does not trust a code-signing certificate
+          for document signatures when the signing certificate is for code signing only.
+        justification: |
+          A reader who opens the document in Acrobat would otherwise see a warning without an explanation.
+        tests:
           - AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies
 
+      - id: ReviewCenter-AttestationRenderer-KeyStatement-NoCodeSigningNote
+        title: >-
+          The AttestationRenderer class shall print no code-signing note when the signing certificate is not for code
+          signing only.
+        justification: |
+          The note must not suggest a problem that the certificate does not have.
+        tests:
+          - AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ProvesStatement: what the signature proves and does not prove
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-ProvesStatement
         title: >-
-          The AttestationRenderer class shall state in the document what the signature proves (integrity since signing
-          and the origin of the server key), and that it does not prove who the reviewers are, that the reviewer
-          identity is the re-authenticated signatures in the record, and that the signing time is the clock of the
-          server and not a trusted timestamp.
+          The AttestationRenderer class shall state in the document that the signature proves that the document has not
+          changed since it was signed.
         justification: |
           A digital signature is easy to overstate. The document must not claim more than the server can stand behind.
         tests:
           - AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves
 
+      - id: ReviewCenter-AttestationRenderer-ProvesStatement-KeyOrigin
+        title: >-
+          The AttestationRenderer class shall state in the document that the signature proves that the document was
+          produced by the holder of the signing key.
+        justification: |
+          The origin of the key is the second thing that the signature establishes.
+        tests:
+          - AttestationRenderer_Render_Document_SaysTheSignatureProvesTheOriginOfTheKey
+
+      - id: ReviewCenter-AttestationRenderer-ProvesStatement-ReviewerIdentity
+        title: >-
+          The AttestationRenderer class shall state in the document that the signature does not identify the reviewers,
+          whose identity is that of the sign-offs that the tool recorded.
+        justification: |
+          The signature belongs to the server key, and the reader must not take it for the signature of a person.
+        tests:
+          - AttestationRenderer_Render_Document_SaysTheSignatureDoesNotIdentifyTheReviewers
+
+      - id: ReviewCenter-AttestationRenderer-ProvesStatement-SigningTime
+        title: >-
+          The AttestationRenderer class shall state in the document that the signing time comes from the clock of the
+          server and is not a trusted timestamp.
+        justification: |
+          A reader must not take the time of the signature for a time that a third party vouches for.
+        tests:
+          - AttestationRenderer_Render_Document_SaysTheSigningTimeIsNotATrustedTimestamp
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Output: properties, repeatable bytes, pages, characters, arguments
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-Output
         title: >-
-          The AttestationRenderer class shall set the properties of the document from the fingerprint and the review
-          identity, write the same bytes for the same document, continue onto further pages when the review is large,
-          show characters outside the standard encoding as question marks, and reject a missing document.
+          The AttestationRenderer class shall set the properties of the document from the content fingerprint and the
+          identity of the review.
         justification: |
-          Reviews differ greatly in size and in the characters in their names. The result must still be a complete
-          document that is the same every time for the same input.
+          The property dialog of a reader identifies the review without opening the text.
         tests:
           - AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId
+
+      - id: ReviewCenter-AttestationRenderer-Output-Deterministic
+        title: >-
+          The AttestationRenderer class shall write the same bytes for the same document.
+        justification: |
+          The result must be the same every time for the same input, so that a repeated request gives the same
+          document.
+        tests:
           - AttestationRenderer_Render_SameDocument_ProducesIdenticalBytes
+
+      - id: ReviewCenter-AttestationRenderer-Output-Pages
+        title: >-
+          The AttestationRenderer class shall continue onto further pages when the review does not fit on one page.
+        justification: |
+          Reviews differ greatly in size, and the result must still be a complete document.
+        tests:
           - AttestationRenderer_Render_ManyFiles_BreaksIntoSeveralPages
+
+      - id: ReviewCenter-AttestationRenderer-Output-Unicode
+        title: >-
+          The AttestationRenderer class shall show characters outside the standard encoding of the fonts as question
+          marks.
+        justification: |
+          Names come in many scripts, and the standard fonts cannot show all of them; a question mark keeps the file
+          valid.
+        tests:
           - AttestationRenderer_Render_UnicodeNames_AreReplacedByQuestionMarks
+
+      - id: ReviewCenter-AttestationRenderer-Output-Arguments
+        title: >-
+          The AttestationRenderer class shall reject a missing document with an ArgumentNullException.
+        justification: |
+          A missing document is a programming error and must fail at once, not produce an empty attestation.
+        tests:
           - AttestationRenderer_Render_NullDocument_Throws
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # FollowUp: the review that this review follows
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AttestationRenderer-FollowUp
         title: >-
-          The AttestationRenderer class shall state in the Review section of the document, only for a follow-up review,
-          the review it follows and how many answers and threads it carried, and shall mark with the review they came
-          from the checklist items, the not-applicable sections and the threads that were carried, and print nothing of
-          the kind for a review that does not follow another.
+          The AttestationRenderer class shall state in the Review section of a follow-up review the review it follows
+          and how many answers and threads it carried.
         justification: |
           The document is what a reader outside the tool sees. Telling carried answers from fresh ones shows how much of
-          the approval rests on work done in an earlier review, and leaving the lines out of other reviews keeps their
-          documents as they were.
+          the approval rests on work done in an earlier review.
+        tests:
+          - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks
+
+      - id: ReviewCenter-AttestationRenderer-FollowUp-Marks
+        title: >-
+          The AttestationRenderer class shall mark each carried checklist item, not-applicable section and thread with
+          the review it was carried from.
+        justification: |
+          A reader sees which parts of the approval come from earlier work.
+        tests:
+          - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks
+
+      - id: ReviewCenter-AttestationRenderer-FollowUp-NotFollowing
+        title: >-
+          The AttestationRenderer class shall print neither a followed review nor a carried mark for a review that does
+          not follow another.
+        justification: |
+          Leaving the lines out of other reviews keeps their documents as they were.
         tests:
           - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks

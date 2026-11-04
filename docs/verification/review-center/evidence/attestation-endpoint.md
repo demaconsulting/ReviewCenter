@@ -16,22 +16,41 @@ N/A - standard test environment (a temporary database and key folder are created
 
 - All tests pass with zero failures.
 - A visitor who is not signed in is redirected to the sign-in page, also when the project has switched on the
-  anonymous attestation PDFs; that setting opens only the API route.
+  anonymous attestation PDFs; that setting opens only the API route. The key is not used and nothing is recorded.
 - A completed review is downloaded as a signed PDF with the right content type, a file name, and no caching, and the
   download is recorded in the audit trail; with the default configuration it is signed by the key that the server created.
 - A signed-in caller who asks for a review that is not complete gets 409 (a request without a token gets the 404 of an
   unknown review on the API route, see the `Api` subsystem).
 - An unknown review is 404, a review that is not complete is 409, a review that changed during generation is 409, and
   an unusable key is 500 without an audit event.
-- A signed-in user who is not a member of the project gets an empty 404, like a project that does not exist; the
-  tests of this guard are `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` and the route tests of
-  `ApiProjectAccessTests.cs`, which are described in the `Api` subsystem.
+- A member who is not a system administrator and a system administrator who is not a member get the document. A signed-in
+  user who is neither gets an empty 404, the same answer as for a project that does not exist, with no signing and no
+  audit event.
 
 #### Test Scenarios
 
 **AttestationEndpoint_Get_SignedOut_RedirectsToLogin**: The address is requested without signing in. The answer is a
-redirect to the sign-in page. This scenario is tested by `AttestationEndpoint_Get_SignedOut_RedirectsToLogin`, and, with
-both anonymous settings on, by `AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn`.
+redirect to the sign-in page, the key is not used, and nothing is recorded. This scenario is tested by
+`AttestationEndpoint_Get_SignedOut_RedirectsToLogin`.
+
+**AttestationEndpoint_Get_SignedOutWithAnonymousSwitchesOn_RedirectsToLogin**: The project switches on the anonymous
+index and the anonymous attestation PDFs, and the address is requested without signing in. The answer is a redirect to
+the sign-in page, the key is not used, and nothing is recorded. This scenario is tested by
+`AttestationEndpoint_Get_SignedOutWithAnonymousSwitchesOn_RedirectsToLogin`.
+
+**AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing**: A user who is signed in, is not a
+member, and is not a system administrator requests the address of a complete review and the address of a project
+that does not exist. Both answers are 404 with the same empty body, no PDF is sent, the key is not used, and no
+event is recorded. This scenario is tested by
+`AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing`.
+
+**AttestationEndpoint_Get_MemberSession_ReturnsPdf**: A member who is not a system administrator requests the address
+of a complete review. The answer is 200 with a PDF. This scenario is tested by
+`AttestationEndpoint_Get_MemberSession_ReturnsPdf`.
+
+**AttestationEndpoint_Get_SystemAdministratorNotMember_ReturnsPdf**: A system administrator who is not a member requests
+the address of a complete review. The answer is 200 with a PDF. This scenario is tested by
+`AttestationEndpoint_Get_SystemAdministratorNotMember_ReturnsPdf`.
 
 **AttestationEndpoint_Get_UnknownReview_Answers404**: The address of a review that does not exist is requested. The
 answer is 404. This scenario is tested by `AttestationEndpoint_Get_UnknownReview_Answers404`.

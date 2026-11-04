@@ -69,6 +69,9 @@ route of the attestation stay closed (`AnonymousEvidenceAccess_BothOn_OtherRoute
 `Retry-After` (`AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter` and
 `AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`; the bound of the table at 4096 addresses is verified by the
 tests of `AnonymousRateLimitTests.cs`). The details are in the `ApiTokenAuthentication` verification.
+These tests are the evidence of the subsystem requirements `ReviewCenter-Api-AnonymousEvidence` and its parts
+`-OpenRoutes`, `-Index`, `-Pdf`, `-Audited`, `-Limit`, and `-RetryAfter`, because a criterion that is shown only by the
+real application with both routes open belongs to the subsystem and not to a unit.
 The two operations in the document are verified by `ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme`.
 
 **ApiProjectAccess scenarios**: The tests in `ApiProjectAccessTests.cs` run the real application and call every route
@@ -83,7 +86,10 @@ administrator who is no member are served (no 404, 403, or 401) by every route.
 member, none for an outsider, and both projects for a system administrator.
 `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` shows that the web route of the attestation answers a
 signed-in non-member like a missing project. `ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce` shows that
-the token of a member is served, and that the same token gets 404 after the member is removed from the project.
+the token of a member is served, and that the same token gets 404 after the member is removed from the project. These
+tests are the evidence of the subsystem requirement `ReviewCenter-Api-ProjectAccess` and of its parts `-SameAnswer`,
+`-Served`, `-ListProjects`, and `-Removed`, one test each.
+
 **ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd**: A token is created for a user through the service, and the
 list of projects is requested with it as a bearer token. The answer is 200. The token is revoked through the service,
 and the same request is answered with 401. This scenario is tested by
@@ -130,9 +136,24 @@ is not valid is a 400 problem that creates nothing. They are tested by
 
 **Review progress**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the progress fields: the list
 of the reviews of a project shows `approved`, `slotsRequired`, `slotsSigned`, `slotsOutOfDate`, and `lastActivity`
-beside `dueDate` and `overdue`, and the committed copy of the document of the API contains them. They are tested by
-`ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity` and
-`ApiDocument_Get_MatchesCommittedSnapshot`.
+beside `dueDate` and `overdue`, and the committed copy of the document of the API contains them. The list of a project
+is built from one read of the review list, as the page of the project does. They are tested by
+`ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity`,
+`ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce`, and `ApiDocument_Get_MatchesCommittedSnapshot`.
+
+**Read-only role (Auditor)**: The tests of `ApiAuditor` verify the subsystem requirement for the Auditor: the token of
+an Auditor member reads the project, the review list, the progress overview, and the review, and is refused a write
+(the creation of a review) with 403, while the token of a user who is no member of the project gets 404 and nothing is
+stored. They are tested by `ApiAuditor_Reads_Token_ServeTheProject` and
+`ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404`.
+
+**Audit export**: The tests of `AuditExportEndpoints` verify the subsystem requirement for the audit export through the
+real application: a project administrator gets the CSV of the project with its headers, a plain member gets 403 and a
+user who is no member or a missing project gets 404 from the project export, and the whole-trail export is 403 for a
+project administrator, a member, and an outsider, that is, for everybody who is not a system administrator. They are
+tested by `AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders`,
+`AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404`, and
+`AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403`.
 
 **Follow-up review**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the follow-up review: a
 review created with a `followsReviewId` shows it in the answer, the list, and the details, a review that follows

@@ -990,9 +990,18 @@ sections:
           setting are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Evidence-Index
+          - ReviewCenter-Evidence-Index-Schema
+          - ReviewCenter-Evidence-Index-Fingerprint
+          - ReviewCenter-Evidence-Index-Semantics
           - ReviewCenter-Evidence-Visibility
           - ReviewCenter-Api-EvidenceJourney
           - ReviewCenter-Api-AnonymousEvidence
+          - ReviewCenter-Api-AnonymousEvidence-OpenRoutes
+          - ReviewCenter-Api-AnonymousEvidence-Index
+          - ReviewCenter-Api-AnonymousEvidence-Pdf
+          - ReviewCenter-Api-AnonymousEvidence-Audited
+          - ReviewCenter-Api-AnonymousEvidence-Limit
+          - ReviewCenter-Api-AnonymousEvidence-RetryAfter
         tests:
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
@@ -1434,6 +1443,10 @@ sections:
           - ReviewCenter-Web-ProjectAccess-SystemAdminRecheck
           - ReviewCenter-Web-ProjectAccess-SystemAdminLost
           - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Api-ProjectAccess-SameAnswer
+          - ReviewCenter-Api-ProjectAccess-Served
+          - ReviewCenter-Api-ProjectAccess-ListProjects
+          - ReviewCenter-Api-ProjectAccess-Removed
           - ReviewCenter-Evidence-Visibility
           - ReviewCenter-Storage-Memberships
           - ReviewCenter-Storage-Memberships-OnePerUser
@@ -1794,6 +1807,10 @@ sections:
           - ReviewCenter-Api-Document
           - ReviewCenter-Api-EvidenceJourney
           - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Api-ProjectAccess-SameAnswer
+          - ReviewCenter-Api-ProjectAccess-Served
+          - ReviewCenter-Api-ProjectAccess-ListProjects
+          - ReviewCenter-Api-ProjectAccess-Removed
           - ReviewCenter-Hosting-ApiServices
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd

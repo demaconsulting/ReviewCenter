@@ -242,6 +242,48 @@ public class AttestationContentSettingsTests
     }
 
     /// <summary>
+    ///     Test that with the names off, people without a seat are numbered as participants in the order in which they
+    ///     are first named, and that one person has one label wherever the person is named.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_NamesOffSeveralParticipants_NumbersThemInOrderOfFirstNaming()
+    {
+        // Arrange: cyd starts a finding, then ann (primary of the seat), dee and cyd again reply with included comments
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        var cyd = new Actor("cyd", "Cyd");
+        var threads = TestServices.Threads(fixture.Store, fixture.Clock);
+        var thread = await threads.StartThreadAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", null, null, ThreadSide.Head), cyd, "First finding", cancellationToken, includeInReport: true);
+        await threads.ReplyAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, TestActors.Ann, "Reply of the first", cancellationToken, includeInReport: true);
+        await threads.ReplyAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, TestActors.Dee, "Reply of the second", cancellationToken, includeInReport: true);
+        await threads.ReplyAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, cyd, "Reply of the third", cancellationToken, includeInReport: true);
+        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, cyd, cancellationToken, resolutionNote: "Bound checked");
+        await fixture.SignAsync();
+        Assert.True(await fixture.Store.UpdateEvidenceSettingsAsync(
+            fixture.ProjectId,
+            EvidenceSettings.Default,
+            EvidenceSettings.Default with { IncludeReviewerNames = false },
+            AuditDraft.By(TestActors.Ann, EvidenceSettingsService.ChangedAction, "x", fixture.ProjectId),
+            cancellationToken));
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Bob, cancellationToken);
+
+        // Assert: the people without a seat are numbered in the order of their first naming, a person keeps the label
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.DoesNotMatch(_people, string.Join("\n", lines));
+        Assert.DoesNotMatch(new Regex(@"\bdee\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(10)), string.Join("\n", lines));
+        Assert.Contains(lines, l => l.StartsWith("Finding by Participant 1,", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("Reply by Reviewer 1 (primary),", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("Reply by Participant 2,", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("Reply by Participant 1,", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("Participant 3", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Arranges a signed review in which cyd, who holds no seat, started and resolved a thread.
     /// </summary>
     /// <param name="settings">The evidence settings of the project; the defaults when <c>null</c>.</param>
