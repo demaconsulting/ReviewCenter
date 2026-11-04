@@ -496,6 +496,36 @@ public partial class IntegrationTests
     }
 
     /// <summary>
+    ///     Test that the user add verb reads the password from the first line of redirected standard input when the
+    ///     environment variable is not set, creates the user, and never prints the password.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser()
+    {
+        // Arrange: a new database, no password in the environment, and the password on standard input
+        const string password = "correct horse battery";
+        var connectionString = TestDatabase.NewConnectionString();
+        var environment = new Dictionary<string, string>
+        {
+            [TestDatabase.ConnectionStringVariable] = connectionString,
+            ["REVIEWCENTER_PASSWORD"] = string.Empty
+        };
+
+        // Act: add a user whose password is piped in
+        var exitCode = Runner.RunWithInput(
+            out var output, password + "\n", environment, "dotnet", _dllPath, "user", "add", "--username", "ann", "--display-name", "Ann");
+
+        // Assert: success without the password in the output, and the user signs in with the piped password
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Created user 'ann'.", output);
+        Assert.DoesNotContain(password, output);
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
+        var user = await app.Services.GetRequiredService<UserService>()
+            .AuthenticateAsync("ann", password, TestContext.Current.CancellationToken);
+        Assert.Equal("Ann", user?.DisplayName);
+    }
+
+    /// <summary>
     ///     Test that the user add verb without any password source fails with a clear message instead of hanging.
     /// </summary>
     [Fact]

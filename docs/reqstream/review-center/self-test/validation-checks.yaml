@@ -866,6 +866,15 @@ sections:
         tests:
           - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
 
+      - id: ReviewCenter-ValidationChecks-Hermetic-PermissionsOnlyKeys
+        title: >-
+          The default checks shall choose permissions-only key protection for the isolated hosts they start.
+        justification: |
+          The key store of the operating system is shared by the whole machine. A run that chose it would make the
+          qualification depend on, and change, the state of the machine.
+        tests:
+          - SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection
+
       - id: ReviewCenter-ValidationChecks-FastCommit
         title: >-
           The checks shall speed up the commits of their throw-away SQLite database, which is inside the temporary

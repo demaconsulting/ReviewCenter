@@ -45,6 +45,15 @@ numbered configuration variables as an authorization header for the location. Th
 set; the environment cannot read the system or user configuration, cannot prompt, and runs no askpass program. This
 scenario is tested by `GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment`.
 
+**GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit**: A variable of the server process that git does not
+need is not in the environment of the start information, while the listed `PATH` is; the previous value of the
+variable is restored afterwards. This scenario is tested by
+`GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit`.
+
+**GitRunner_BuildStartInfo_Anonymous_DisablesHooks**: The start information sets the hooks folder to the null device
+with a `-c` option, so that git runs no hooks. This scenario is tested by
+`GitRunner_BuildStartInfo_Anonymous_DisablesHooks`.
+
 **GitRunner_Redact_RemovesEverySecretForm**: The token, the user name and token, the base64 header value, and the user
 information of an address are removed from text. This scenario is tested by `GitRunner_Redact_RemovesEverySecretForm`.
 
@@ -111,8 +120,20 @@ exit code and error text. This scenario is tested by `GitRunner_RunAsync_RealGit
 `GitAccessFailed`. This scenario is tested by `GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed`.
 
 **GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit**: A call to a server that never answers is
-stopped at the time limit with `GitTimeout`, and git is no longer running. This scenario is tested by
+stopped at the time limit of one second with `GitTimeout`, and the call returns in less than 30 seconds. This scenario
+is tested by
 `GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit`.
+
+**GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself**: A fake git program (a script) answers the version check, and
+for the next call writes one line to a file every second and never ends. With a time limit of two seconds the call ends
+with `GitTimeout`; the file has lines from before the stop, and half a second after the stop and again two and a half
+seconds later its size is the same, so the fake git is gone. This scenario is tested by
+`GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself`.
+
+**GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess**: The same fake git also starts a child program that
+writes one line to its own file every second and never ends. After the call has ended with `GitTimeout`, the file of the
+child has lines from before the stop and does not grow any more, so the child of git is gone as well. This scenario is
+tested by `GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess`.
 
 **GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret**: Git sends the token as a basic authorization
 header to a local server that refuses it; the refusal is `GitAccessFailed` with the denied-access message, and neither

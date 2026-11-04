@@ -116,6 +116,30 @@ public class SecretScanTests
     }
 
     /// <summary>
+    ///     Test that a second-factor secret that the ring cannot read is counted and named by the id of its user,
+    ///     apart from the repository tokens.
+    /// </summary>
+    [Fact]
+    public async Task SecretScan_ScanAsync_ForeignSecondFactorSecret_CountsAndNamesOnlyThatUser()
+    {
+        // Arrange: one secret of the ring and one that was protected by another ring, and no repository token
+        using var install = new Install();
+        install.AddTotp(1);
+        using var other = new Install();
+        install.AddProtectedTotp(2, other.TotpSecrets.Protect(2, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]));
+
+        // Act
+        var result = await install.ScanAsync();
+
+        // Assert: two second-factor secrets, one unreadable and named by its user id; no token is involved
+        Assert.Equal(2, result.TotpSecrets);
+        Assert.Equal(1, result.UnreadableTotpSecrets);
+        Assert.Equal([2], result.UnreadableUserIds);
+        Assert.Equal(0, result.UnreadableRepositoryTokens);
+        Assert.Empty(result.UnreadableRepositoryIds);
+    }
+
+    /// <summary>
     ///     Test that an empty ring with secrets in the database counts them all as unreadable without asking the ring,
     ///     which would create a key.
     /// </summary>
@@ -137,6 +161,29 @@ public class SecretScanTests
         Assert.Equal(2, result.ProtectedSecrets);
         Assert.Equal(2, result.UnreadableSecrets);
         Assert.Empty(lost.KeyFiles());
+    }
+
+    /// <summary>
+    ///     Test that a key folder that does not exist is a ring without keys, and that the scan does not create it.
+    /// </summary>
+    [Fact]
+    public async Task SecretScan_ScanAsync_MissingKeyFolder_ReportsEmptyRingAndCreatesNoFolder()
+    {
+        // Arrange: a database with a secret and a key folder that does not exist
+        using var install = new Install();
+        install.AddToken(1, TokenText);
+        var missing = install.Folder.GetFilePath("no-keys");
+
+        // Act
+        var result = await SecretScan.ScanAsync(
+            missing, install.Database, install.Credentials, install.TotpSecrets, TestContext.Current.CancellationToken);
+
+        // Assert: a ring without keys next to a secret that cannot be read, and no folder was created
+        Assert.Equal(0, result.KeyFiles);
+        Assert.Equal(0, result.PlaintextKeyFiles);
+        Assert.True(result.RingIsEmpty);
+        Assert.Equal(1, result.UnreadableSecrets);
+        Assert.False(Directory.Exists(missing), "The scan must never create the key folder");
     }
 
     /// <summary>
@@ -277,6 +324,31 @@ public class SecretScanTests
     }
 
     /// <summary>
+    ///     Test that the scan decrypts the secrets of the ring but never protects a value, which would create a key.
+    /// </summary>
+    [Fact]
+    public async Task SecretScan_ScanAsync_Secrets_NeverCallsProtect()
+    {
+        // Arrange: secrets that are seeded before the protectors are wrapped, so that seeding is not counted
+        using var install = new Install();
+        install.AddToken(1, TokenText);
+        install.AddTotp(2);
+        var credentials = new CountingCredentials(install.Credentials);
+        var totpSecrets = new CountingTotpSecrets(install.TotpSecrets);
+
+        // Act
+        var result = await SecretScan.ScanAsync(
+            install.KeysFolder, install.Database, credentials, totpSecrets, TestContext.Current.CancellationToken);
+
+        // Assert: the scan decrypted every secret and protected nothing
+        Assert.Equal(0, credentials.ProtectCalls);
+        Assert.Equal(0, totpSecrets.ProtectCalls);
+        Assert.Equal(1, result.RepositoryTokens);
+        Assert.Equal(1, result.TotpSecrets);
+        Assert.Equal(0, result.UnreadableSecrets);
+    }
+
+    /// <summary>
     ///     Test that a long list of ids is shortened in a message.
     /// </summary>
     [Fact]
@@ -326,6 +398,51 @@ public class SecretScanTests
                 Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))),
                 File.GetLastWriteTimeUtc(path)))
             .ToList();
+
+    /// <summary>
+    ///     A token protector that counts how often a value is protected and otherwise passes everything on.
+    /// </summary>
+    /// <param name="inner">The protector to pass on to.</param>
+    private sealed class CountingCredentials(ICredentialProtector inner) : ICredentialProtector
+    {
+        /// <summary>
+        ///     Gets the number of calls of <see cref="Protect"/>.
+        /// </summary>
+        public int ProtectCalls { get; private set; }
+
+        /// <inheritdoc />
+        public string Protect(string plainText)
+        {
+            ProtectCalls++;
+            return inner.Protect(plainText);
+        }
+
+        /// <inheritdoc />
+        public string Unprotect(string protectedText) => inner.Unprotect(protectedText);
+    }
+
+    /// <summary>
+    ///     A second-factor secret protector that counts how often a value is protected and otherwise passes everything
+    ///     on.
+    /// </summary>
+    /// <param name="inner">The protector to pass on to.</param>
+    private sealed class CountingTotpSecrets(ITotpSecretProtector inner) : ITotpSecretProtector
+    {
+        /// <summary>
+        ///     Gets the number of calls of <see cref="Protect"/>.
+        /// </summary>
+        public int ProtectCalls { get; private set; }
+
+        /// <inheritdoc />
+        public string Protect(int userId, byte[] secret)
+        {
+            ProtectCalls++;
+            return inner.Protect(userId, secret);
+        }
+
+        /// <inheritdoc />
+        public byte[] Unprotect(int userId, string protectedSecret) => inner.Unprotect(userId, protectedSecret);
+    }
 
     /// <summary>
     ///     A production installation over a temporary folder: the database with the current schema and the key ring
@@ -402,6 +519,13 @@ public class SecretScanTests
         /// <param name="id">The id of the repository.</param>
         /// <param name="cipher">The protected text.</param>
         public void AddProtectedToken(int id, string cipher) => SecretSeed.AddRepositoryToken(ConnectionString, id, cipher);
+
+        /// <summary>
+        ///     Stores a protected second-factor secret in the row of a user.
+        /// </summary>
+        /// <param name="userId">The id of the user.</param>
+        /// <param name="cipher">The protected text.</param>
+        public void AddProtectedTotp(int userId, string cipher) => SecretSeed.AddTotpSecret(ConnectionString, userId, cipher);
 
         /// <summary>
         ///     Protects a second-factor secret with the ring and stores it.

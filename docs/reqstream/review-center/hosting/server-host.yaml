@@ -15,160 +15,408 @@ sections:
         tests:
           - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
 
+      - id: ReviewCenter-ServerHost-Health-NoSignIn
+        title: >-
+          The ServerHost class shall answer the /health route to a visitor who is not signed in.
+        justification: |
+          A liveness probe cannot sign in, while every other page of the server is closed to a visitor who is not
+          signed in.
+        tests:
+          - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+
       - id: ReviewCenter-ServerHost-Logging
         title: >-
-          The ServerHost class shall write a start-up log entry that exposes the listen URL as a
-          named, machine-readable value when the server has started.
+          The ServerHost class shall write one information-level start-up log entry when the server has started.
         justification: |
-          A start-up entry confirms to operators that the server is accepting requests and
-          where. Exposing the URL as a named value, rather than only as text, lets log aggregation
-          tools filter and correlate entries.
+          A start-up entry confirms to operators that the server is accepting requests.
+        tests:
+          - ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry
+
+      - id: ReviewCenter-ServerHost-Logging-UrlValue
+        title: >-
+          The ServerHost class shall expose the listen URL as a named value of the start-up log entry.
+        justification: |
+          Log aggregation tools filter and correlate entries on a named value, which they cannot do on text that is
+          only part of the message.
         tests:
           - ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry
 
       - id: ReviewCenter-ServerHost-SilentMode
         title: >-
-          The ServerHost class shall omit console logging when the silent option is set and
-          shall include console logging otherwise.
+          The ServerHost class shall omit console logging when the silent option is set.
         justification: |
-          The silent option must hold for the long-running server just as it does for every
-          other action, so that automated environments do not receive unwanted console output,
-          while interactive operators see the server log by default.
+          The silent option must hold for the long-running server just as it does for every other action, so that
+          automated environments do not receive unwanted console output.
         tests:
           - ServerHost_CreateApplication_Silent_OmitsConsoleProvider
+
+      - id: ReviewCenter-ServerHost-SilentMode-ConsoleDefault
+        title: >-
+          The ServerHost class shall include console logging when the silent option is not set.
+        justification: |
+          Interactive operators see the server log by default.
+        tests:
           - ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider
 
       - id: ReviewCenter-ServerHost-Database
         title: >-
-          The ServerHost class shall read the Database settings, register the database store and the project,
-          review, user, and signing services for the pages, and create the database when the application is
+          The ServerHost class shall create the database file named in the Database settings when the application is
           built.
         justification: |
-          The composition root is the one place that connects the pages to the database. Creating the database
-          while building the application means a ready database exists before the first request and a failure
-          is found before the server starts.
+          Creating the database while building the application means a ready database exists before the first
+          request and a failure is found before the server starts.
         tests:
           - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+
+      - id: ReviewCenter-ServerHost-Database-ProjectService
+        title: >-
+          The ServerHost class shall provide a project service that works against the configured database.
+        justification: |
+          The pages reach the data only through the registered services, so the composition root must connect them to
+          the configured database.
+        tests:
+          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+
+      - id: ReviewCenter-ServerHost-Database-Persistence
+        title: >-
+          The ServerHost class shall keep the stored data when the application is started again on the same database.
+        justification: |
+          Reviews and users must survive a restart of the server.
+        tests:
           - ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData
+
+      - id: ReviewCenter-ServerHost-Database-UserService
+        title: >-
+          The ServerHost class shall provide a user service that stores users in the configured database.
+        justification: |
+          Sign-in and the administration of users need stored users.
+        tests:
           - ServerHost_AddServices_Configured_RegistersUserService
+
+      - id: ReviewCenter-ServerHost-Database-SigningService
+        title: >-
+          The ServerHost class shall provide the signing service as one shared instance.
+        justification: |
+          One instance serializes the approvals of the whole process.
+        tests:
           - ServerHost_AddServices_Configured_RegistersSigningService
+
+      - id: ReviewCenter-ServerHost-Database-InboxService
+        title: >-
+          The ServerHost class shall provide the inbox service and its store as shared instances that work against the
+          configured database.
+        justification: |
+          The inbox pages reach the data only through the registered service, and one instance serves the whole
+          process.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersInboxService
+
+      - id: ReviewCenter-ServerHost-InputValidation
+        title: >-
+          The ServerHost class shall refuse a missing context with an argument exception.
+        justification: |
+          A programming error must surface at the call and not as a null reference inside the pipeline.
+        tests:
+          - ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException
 
       - id: ReviewCenter-ServerHost-Authentication
         title: >-
-          The ServerHost class shall set up cookie sign-in with a session cookie that is HttpOnly, SameSite Lax,
-          and Secure when the request is over HTTPS, lasting the number of hours set in Auth:SessionHours (8 by
-          default), shall fail with an error that names Auth:SessionHours when that value is not a positive
-          number, shall fail with an error that names Auth:RevalidationSeconds when that value, the seconds
-          between two checks of the user of an open page (30 by default), is below 5, shall require a signed-in
-          user for all pages except the home page and the login page, and shall map the sign-in and sign-out
-          endpoints, keeping the /health route open to everyone.
+          The ServerHost class shall fail with an error that names Auth:SessionHours when the session length is not a
+          positive number.
         justification: |
-          The composition root is the one place where authentication is connected to the pages. A wrong session
-          length or check interval must stop the server at start-up with a clear message, a too short interval
-          would turn the check of open pages into constant database load, and the pages must be closed by
-          default so that a new page cannot be left open by mistake.
+          A wrong session length must stop the server at start-up with a clear message instead of giving every user a
+          session that never works or never ends.
         tests:
           - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-Authentication-RevalidationInterval
+        title: >-
+          The ServerHost class shall fail with an error that names Auth:RevalidationSeconds when the seconds between
+          two checks of the user of an open page are below 5.
+        justification: |
+          A too short interval would turn the check of open pages into constant database load.
+        tests:
           - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
-          - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
-          - SignIn_PublicPage_Anonymous_IsServed
-          - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits
+        title: >-
+          The ServerHost class shall fail with an error that names the Identity:Throttle setting when a sign-in
+          throttle limit is not positive.
+        justification: |
+          A wrong limit would switch off or distort the protection against guessing passwords, so it must stop the
+          server at start-up.
+        tests:
+          - ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits-Window
+        title: >-
+          The ServerHost class shall fail with an error that names the Identity:Throttle setting when the sign-in
+          throttle window is outside 1 to 86400 seconds.
+        justification: |
+          A window of no length would never count a failure, and one of many days would lock a name for too long.
+        tests:
+          - ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits-AddressBelowName
+        title: >-
+          The ServerHost class shall fail with an error that names the Identity:Throttle setting when the per-address
+          sign-in throttle limit is below the per-name limit.
+        justification: |
+          An address limit below the name limit would make the name limit unreachable from a single address.
+        tests:
+          - ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleAccepted
+        title: >-
+          The ServerHost class shall build the application with the default sign-in throttle settings.
+        justification: |
+          The defaults have to work, or an administrator cannot keep the throttle at all.
+        tests:
+          - ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleAccepted-Explicit
+        title: >-
+          The ServerHost class shall build the application with valid explicit sign-in throttle settings.
+        justification: |
+          The largest allowed window has to work, or an administrator cannot choose the throttle.
+        tests:
+          - ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication
+
+      - id: ReviewCenter-ServerHost-Authentication-ProtectedPages
+        title: >-
+          The ServerHost class shall redirect a visitor who is not signed in from a protected page to the login page.
+        justification: |
+          Review data must only be reached by identified users, and the pages must be closed by default so that a new
+          page cannot be left open by mistake.
+        tests:
+          - ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin
+
+      - id: ReviewCenter-ServerHost-Authentication-PublicPages
+        title: >-
+          The ServerHost class shall serve the home page and the login page to a visitor who is not signed in.
+        justification: |
+          Nobody could sign in if the page that asks for the credentials were closed.
+        tests:
+          - ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed
 
       - id: ReviewCenter-ServerHost-GitSettings
         title: >-
-          The ServerHost class shall fail with an error that names Git:TimeoutSeconds, before it serves any request,
-          when that value, the time limit of every git call in seconds (120 by default), is not between 1 and 3600.
+          The ServerHost class shall fail with an error that names Git:TimeoutSeconds when the time limit of a git call
+          is not between 1 and 3600 seconds.
         justification: |
-          A zero, negative or huge limit would either silently fall back to a default the operator did not choose
-          or let a hung git call block a repository for hours, so a wrong value must stop the server at start-up
-          with a message that names the setting.
+          A zero, negative or huge limit would either silently fall back to a default the operator did not choose or
+          let a hung git call block a repository for hours, so a wrong value must stop the server at start-up with a
+          message that names the setting.
         tests:
           - ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-GitSettings-Limits
+        title: >-
+          The ServerHost class shall use a git time limit of 1 second and of 3600 seconds as configured.
+        justification: |
+          The limits of the accepted range are valid values and must not be refused.
+        tests:
           - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
+
+      - id: ReviewCenter-ServerHost-GitSettings-Default
+        title: >-
+          The ServerHost class shall use a git time limit of 120 seconds when Git:TimeoutSeconds is not set.
+        justification: |
+          A new installation must work without configuration and must still bound every git call.
+        tests:
+          - ServerHost_CreateApplication_NoGitSettings_UsesDefaultTimeout
 
       - id: ReviewCenter-ServerHost-DatabaseFailure
         title: >-
-          The ServerHost class shall fail with an error that begins Failed to prepare the database when the
-          database settings cannot be used, and shall report that error and return exit code 1 when running the
-          server.
+          The ServerHost class shall fail with an error that says Failed to prepare the database and names the
+          provider when the database provider is not supported.
         justification: |
-          Operators need one clear message for any database problem (an unsupported provider, an unusable
-          location), and a non-zero exit code so that a supervisor or script notices the failure.
+          Operators need one clear message for a database problem.
         tests:
           - ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-DatabaseFailure-ExitCode
+        title: >-
+          The ServerHost class shall return exit code 1 when running the server with an unsupported database provider.
+        justification: |
+          A non-zero exit code lets a supervisor or script notice the failure.
+        tests:
           - ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne
+
+      - id: ReviewCenter-ServerHost-DatabaseFailure-LocationExitCode
+        title: >-
+          The ServerHost class shall return exit code 1 when running the server with a database location that cannot
+          be used.
+        justification: |
+          A non-zero exit code lets a supervisor or script notice the failure of a location that is unusable, such as
+          a folder where the file should be.
+        tests:
           - ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne
+
+      - id: ReviewCenter-ServerHost-DatabaseFailure-ErrorReported
+        title: >-
+          The ServerHost class shall report the text of the database error through the context when running the
+          server.
+        justification: |
+          An operator must be able to read why the start failed, on the error output or in the log file.
+        tests:
+          - ServerHost_RunAsync_UnsupportedProvider_ReportsTheError
 
       - id: ReviewCenter-ServerHost-IsolatedSettings
         title: >-
-          The ServerHost class shall, when it is given isolated settings, build the application from an empty builder
-          that reads only those settings and the command line address, with the full routing and the Kestrel server
-          but no configuration file, environment variable or host default, so that nothing on the machine can change
-          the address, the environment name or the database it uses.
+          The ServerHost class shall, when it is given isolated settings, listen only on the address of the command
+          line and ignore an ambient listen address.
         justification: |
-          The self-validation host check must prove the deployed executable on any machine. The default builder reads
-          appsettings.json, the ASPNETCORE and DOTNET variables and a user secrets store, so a broken file or an
-          ambient listen address would fail or redirect the check for reasons that have nothing to do with the
-          build under test. The isolated build removes those inputs while the production routes, including the
-          ones with constraints, still work.
+          The self-validation host check must prove the deployed executable on any machine. An ambient listen address
+          would redirect the check for reasons that have nothing to do with the build under test.
         tests:
           - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
-          - ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins
+
+      - id: ReviewCenter-ServerHost-IsolatedSettings-Environment
+        title: >-
+          The ServerHost class shall, when it is given isolated settings, run in the Production environment whatever
+          the ambient environment variables say.
+        justification: |
+          An ambient Development environment would change the behavior of the host under test.
+        tests:
+          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+
+      - id: ReviewCenter-ServerHost-IsolatedSettings-AmbientData
+        title: >-
+          The ServerHost class shall, when it is given isolated settings, keep its database, key ring and git cache out
+          of the places that ambient settings name.
+        justification: |
+          Ambient settings must neither be used nor written, or the check would change the data of the machine it
+          runs on.
+        tests:
+          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+
+      - id: ReviewCenter-ServerHost-IsolatedSettings-Routes
+        title: >-
+          The ServerHost class shall, when it is given isolated settings, serve the production routes including those
+          with constraints.
+        justification: |
+          The isolated builder starts empty and must not lose routing features that the production host has.
+        tests:
           - ServerHost_CreateApplication_IsolatedSettings_ConstrainedRoutesWork
+
+      - id: ReviewCenter-ServerHost-IsolatedSettings-DefaultHostAmbient
+        title: >-
+          The ServerHost class shall, when it is not given isolated settings, let the ambient listen address decide
+          where it listens.
+        justification: |
+          This is the normal behavior of the deployed host, and it shows that the poison of the isolated test is
+          effective, so that the isolated test cannot pass by accident.
+        tests:
+          - ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins
 
       - id: ReviewCenter-ServerHost-AuditServices
         title: >-
-          The ServerHost class shall register the audit appender, the audit store, and the audit service once for the
-          whole process, shared by the server and by the command-line verbs, with a logging hook that writes a
-          warning, never shown to the user, when the audit trail cannot be written.
+          The ServerHost class shall provide the audit appender, the audit store, and the audit service as one shared
+          instance each.
         justification: |
-          One gate shared by all stores is what keeps the hash chain linear, and the operator must learn from the
-          log when the trail could not be written.
+          One gate shared by all stores is what keeps the hash chain linear.
         tests:
-          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
-          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
+          - ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons
+
+      - id: ReviewCenter-ServerHost-AuditServices-FailureWarning
+        title: >-
+          The ServerHost class shall write a warning to the log when an audit entry cannot be stored.
+        justification: |
+          The operator must learn from the log when the trail could not be written.
+        tests:
+          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
+
+      - id: ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
+        title: >-
+          The ServerHost class shall not fail the caller when an audit entry cannot be stored.
+        justification: |
+          The user whose action triggered the entry must not be disturbed by a failure of the trail.
+        tests:
+          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
 
       - id: ReviewCenter-ServerHost-ProjectAccess
         title: >-
-          The ServerHost class shall register the project access rules (`IProjectAccess`) once for the whole
-          process, as a singleton shared by the services, the endpoints, and the pages, before the services that use
-          them.
+          The ServerHost class shall provide the project access rules as one shared instance.
         justification: |
-          The rules read the stored users and memberships afresh on every call, so one shared instance holds no
-          state that could go stale, and every service decides visibility the same way.
+          The rules read the stored users and memberships afresh on every call, so one shared instance holds no state
+          that could go stale, and every service decides visibility the same way.
         tests:
-          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton
 
       - id: ReviewCenter-ServerHost-RepositoryServices
         title: >-
-          The ServerHost class shall register the repository registry, the credential protector, and the git content
-          source once for the whole process, reading the Git settings, with the git cache folder
-          (Git:CachePath) and the key ring folder (DataProtection:KeysPath) defaulting to folders beside the
-          database file.
+          The ServerHost class shall provide the repository service as one shared instance.
         justification: |
-          The composition root is the one place that connects the registry to the database, the key ring, and git.
-          Defaults beside the database mean a new installation works without configuration and the data, the keys,
-          and the cache are kept and backed up together.
+          The repository registry is one set of data, so the whole process must use one service for it.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
+      - id: ReviewCenter-ServerHost-RepositoryServices-GitSource
+        title: >-
+          The ServerHost class shall provide the git content source for the repository service.
+        justification: |
+          The registry reads the content of a repository through the git content source.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
+      - id: ReviewCenter-ServerHost-RepositoryServices-GitCacheDefault
+        title: >-
+          The ServerHost class shall keep the git cache in a git-cache folder beside the database file when
+          Git:CachePath is not set.
+        justification: |
+          A new installation works without configuration, and the data and the cache are kept and backed up together.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
+      - id: ReviewCenter-ServerHost-RepositoryServices-KeysFolderDefault
+        title: >-
+          The ServerHost class shall keep the key ring in a keys folder beside the database file when
+          DataProtection:KeysPath is not set or is blank.
+        justification: |
+          A new installation works without configuration, and the data and the keys are kept and backed up together.
         tests:
           - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
           - ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder
 
+      - id: ReviewCenter-ServerHost-RepositoryServices-KeysFolderConfigured
+        title: >-
+          The ServerHost class shall keep the key ring in the folder named by DataProtection:KeysPath when it is set.
+        justification: |
+          The operator decides where the keys live, for example on a volume that is backed up separately.
+        tests:
+          - ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder
+
+      - id: ReviewCenter-ServerHost-RepositoryServices-TokenProtection
+        title: >-
+          The ServerHost class shall provide a credential protector that encrypts a repository token and decrypts it
+          again.
+        justification: |
+          Repository tokens are stored encrypted, so the protector must turn a token into text that does not contain
+          it and back.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
       - id: ReviewCenter-ServerHost-PlannerServices
         title: >-
-          The ServerHost class shall register the review planner and the parser of the review-set file once for the
-          whole process.
+          The ServerHost class shall provide the review planner as one shared instance.
         justification: |
-          The planner is used by the pages that offer a review for every review-set of a repository, and the
-          composition root is the one place that connects it to the review service, the signing service, the git
-          source, and the parser.
+          The pages that offer a review for every review-set of a repository all use one planner.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
+
+      - id: ReviewCenter-ServerHost-PlannerServices-Parser
+        title: >-
+          The ServerHost class shall provide the parser of the review-set file as one shared instance.
+        justification: |
+          The planner reads the review-sets of a repository through the parser.
         tests:
           - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
 
       - id: ReviewCenter-ServerHost-KeyRing
         title: >-
-          The ServerHost class shall keep the Data Protection key ring in a folder, protected as the key ring
-          settings say, so that a token encrypted before a restart is readable after it.
+          The ServerHost class shall keep the Data Protection key ring in a folder so that a token encrypted before a
+          restart is readable after it.
         justification: |
           Without a persisted key ring the keys would be new at every start, and every stored token would become
           unreadable.
@@ -177,156 +425,626 @@ sections:
 
       - id: ReviewCenter-ServerHost-KeyRingFailure
         title: >-
-          The ServerHost class shall fail with an error that names the key ring folder and DataProtection:KeysPath,
-          before serving requests, when the key ring folder cannot be written.
+          The ServerHost class shall fail with an error that names DataProtection:KeysPath when the key ring folder
+          cannot be written.
         justification: |
           A key ring that cannot be saved would silently fall back to keys that are lost at the next restart. The
           operator must learn that at start-up and correct the setting.
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
 
+      - id: ReviewCenter-ServerHost-KeyRingFailure-NamesFolder
+        title: >-
+          The ServerHost class shall name the key ring folder in the error that stops the start because the folder
+          cannot be written.
+        justification: |
+          The operator must find the folder that is wrong without searching the file system.
+        tests:
+          - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
+
       - id: ReviewCenter-ServerHost-KeyProtection
         title: >-
-          The ServerHost class shall, wherever it registers the services (the server and the command-line verbs), apply
-          the protection that the KeyRingProtection class chose to the key files, and shall, at the server start only,
-          check the ring before the probe round trip creates a key and fail with an error that names the setting at
-          fault, before serving requests, when the key ring settings are invalid, the certificate cannot be loaded, the
-          certificate does not open the existing ring, or DataProtection:RequireEncryptedKeys is true and the ring is
-          not encrypted.
+          The ServerHost class shall store the key files of the key ring encrypted with the configured certificate.
         justification: |
-          The composition root is the one place that connects the key ring to the settings and to the start-up
-          checks. The check must run before the probe because the probe would create a new key, hiding a wrong
-          certificate behind a start that appears to work. The command-line verbs register the same services but do
-          not use the key ring, so they do not check it.
+          The composition root is the one place that connects the key ring to the settings. A key file that holds its
+          secret in clear text would give a copy of the folder, for example in a backup, access to every stored token
+          and every second-factor secret.
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+
+      - id: ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
+        title: >-
+          The ServerHost class shall read a value that was protected with a certificate-protected key ring again after
+          a restart over the same ring.
+        justification: |
+          Encryption of the key files must not make the stored tokens unreadable when the server starts again.
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+
+      - id: ReviewCenter-ServerHost-KeyProtection-NoPasswordLogged
+        title: >-
+          The ServerHost class shall not write the certificate password to any log entry when it protects the key
+          ring.
+        justification: |
+          A log that holds the password defeats the protection of the key files.
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+
+      - id: ReviewCenter-ServerHost-KeyProtection-InvalidSettings
+        title: >-
+          The ServerHost class shall fail with an error that names the setting at fault when the key ring settings are
+          invalid.
+        justification: |
+          A wrong setting, such as an unknown protection or a certificate protection without a certificate, must stop
+          the server at start-up with a message that leads to the setting.
+        tests:
           - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
-          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+
+      - id: ReviewCenter-ServerHost-KeyProtection-NoKeyOnFailure
+        title: >-
+          The ServerHost class shall create no new key file when the check of the key ring fails.
+        justification: |
+          The probe round trip would create a new key and hide a wrong setting or a wrong certificate behind a start
+          that appears to work, with tokens that are then protected by a key nobody intended.
+        tests:
+          - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-ServerHost-KeyProtection-CertificateUnreadable
+        title: >-
+          The ServerHost class shall fail with an error that names DataProtection:CertificatePath and the path when the
+          certificate file is missing.
+        justification: |
+          The operator must learn which setting is wrong and which file is meant, before the server starts.
+        tests:
+          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+
+      - id: ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
+        title: >-
+          The ServerHost class shall fail with an error that says the password is wrong or the file is not a
+          certificate with a private key when the certificate file cannot be opened with the configured password.
+        justification: |
+          A wrong password and a file without a private key look the same to the operator, so the message names both
+          possible causes.
+        tests:
+          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+
+      - id: ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
+        title: >-
+          The ServerHost class shall not show the certificate password or the password that was tried in the error
+          that stops the start because the certificate cannot be opened.
+        justification: |
+          The error names the certificate file and is read by the administrator who fixes it, so it must not repeat the
+          password that opened the certificate or the one that failed.
+        tests:
+          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+
+      - id: ReviewCenter-ServerHost-KeyProtection-WrongCertificate
+        title: >-
+          The ServerHost class shall fail with an error that names DataProtection:CertificatePath and
+          DataProtection:PreviousCertificatePaths when the certificate does not open the existing key ring.
+        justification: |
+          The operator must supply the certificate that protects the existing ring, as the current or as a previous
+          certificate, instead of ending up with a second ring that cannot read the stored tokens.
+        tests:
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
+        title: >-
+          The ServerHost class shall fail with an error that names DataProtection:RequireEncryptedKeys and the key file
+          when that setting is true and the key ring holds a key file that is not encrypted.
+        justification: |
+          An administrator who demands encrypted keys must not get a ring with a key in clear text on the disk.
+        tests:
           - ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError
-          - SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection
+
+      - id: ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
+        title: >-
+          The ServerHost class shall fail to start, with an error that names DataProtection:Protection, when DPAPI
+          protection is chosen on an operating system other than Windows.
+        justification: |
+          DPAPI exists only on Windows. A start that silently used another protection would give a different
+          protection than the operator asked for.
+        tests:
+          - ubuntu@ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
+        title: >-
+          The ServerHost class shall start with the key folder owner-only (mode 0700) on Linux and macOS when the key
+          ring is protected by permissions only.
+        justification: |
+          Without encryption the access rights of the folder are all that protect the keys, so they must admit the
+          account of the server only.
+        tests:
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+
+      - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
+        title: >-
+          The ServerHost class shall start with every key file readable and writable by the owner only (mode 0600) on
+          Linux and macOS when the key ring is protected by permissions only.
+        justification: |
+          Without encryption the access rights of the files are what protect each key, so a file that others can read
+          would give the key away.
+        tests:
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+
+      - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
+        title: >-
+          The ServerHost class shall log a warning at every start that the key ring is not encrypted at rest, naming
+          DataProtection:CertificatePath and DataProtection:RequireEncryptedKeys, when only the permissions of the
+          folder protect the key ring.
+        justification: |
+          A ring that is protected by permissions alone is weaker than an encrypted one, and the operator is told at
+          every start how to improve it.
+        tests:
+          - ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart
 
       - id: ReviewCenter-ServerHost-LostKeyRing
         title: >-
-          The ServerHost class shall, at the server start only and after the key ring check but before the probe round
-          trip creates a key, scan the database for protected secrets without creating a key, and shall fail with an
-          error that names the key folder, the number of secrets, and DataProtection:AllowNewKeyRing, before serving
-          requests, when the folder holds no key file and the database holds protected secrets; with
-          DataProtection:AllowNewKeyRing set it shall start and log a warning with the number of secrets, and when the
-          ring has keys but some secrets cannot be decrypted it shall log an error with the counts per kind and the
-          remedy and shall still start. A fresh installation shall start, and the command-line verbs shall neither
-          scan nor create a key. When the database cannot be read to tell and the folder holds no key file, it shall
-          fail, whatever DataProtection:AllowNewKeyRing says, with an error that names the key folder and
-          Database:ConnectionString and holds no exception text or database location, without creating a key; when the
-          ring has keys it shall log a warning and start.
+          The ServerHost class shall refuse to start, with an error that names the key folder, the number of protected
+          secrets, and DataProtection:AllowNewKeyRing, when the key folder holds no key file and the database holds
+          protected secrets.
         justification: |
           A database restored without the key ring that belongs to it would otherwise start with a brand new ring and
-          make every stored repository token and second-factor secret unreadable without a word. The refusal must
-          come before the probe because the probe is what creates the new key. The escape hatch lets an operator who
-          has accepted the loss start once; secrets that are only partly unreadable do not stop the rest of the server
-          from working, so they are reported loudly instead of refused. A database that cannot be read (a lock, a
-          table that cannot be read) leaves it unknown whether secrets exist, and the escape hatch only accepts the
-          loss of secrets that are known to exist, so an empty ring is refused until the database can be read.
+          make every stored repository token and second-factor secret unreadable without a word.
         tests:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-NoKeyCreated
+        title: >-
+          The ServerHost class shall create no key file when it refuses to start because the key ring is lost.
+        justification: |
+          The refusal must come before the probe round trip, because the probe is what creates the new key, and a
+          new key would hide the loss at the next start.
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-NoSecretShown
+        title: >-
+          The ServerHost class shall not show a stored secret in the error that stops the start because the key ring is
+          lost.
+        justification: |
+          A start-up error reaches logs and terminals, and a secret that is written there is leaked.
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-AllowNewKeyRing
+        title: >-
+          The ServerHost class shall start with a new key when the key folder holds no key file, the database holds
+          protected secrets, and DataProtection:AllowNewKeyRing is set.
+        justification: |
+          An operator who has accepted the loss of the stored secrets must be able to start the server once and enter
+          them again.
+        tests:
           - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
-          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
-          - ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning
-          - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-AllowWarning
+        title: >-
+          The ServerHost class shall log a warning that names DataProtection:AllowNewKeyRing and the number of lost
+          secrets when it starts with a new key ring over stored secrets.
+        justification: |
+          The loss of the stored secrets must stay visible in the log after the operator has accepted it.
+        tests:
+          - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-SomeUnreadable
+        title: >-
+          The ServerHost class shall log an error with the number of unreadable secrets per kind and the remedy when
+          the key ring has keys but some stored secrets cannot be decrypted.
+        justification: |
+          The operator must know which kinds of secrets to replace.
+        tests:
           - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-SomeUnreadableStarts
+        title: >-
+          The ServerHost class shall still start when the key ring has keys but some stored secrets cannot be
+          decrypted.
+        justification: |
+          Secrets that are only partly unreadable do not stop the rest of the server from working, so they are
+          reported loudly and not refused.
+        tests:
+          - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-FreshInstallation
+        title: >-
+          The ServerHost class shall start with a new key ring when the key folder and the database hold no protected
+          secrets.
+        justification: |
+          A new installation must work without configuration.
+        tests:
           - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing
-          - UserCommand_Run_ValidUser_CreatesNoKeyFile
-          - AuditCommand_Run_IntactTrail_CreatesNoKeyFile
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-FreshInstallation-NoError
+        title: >-
+          The ServerHost class shall write no error entry to the log when it starts with a new key ring because the key
+          folder and the database hold no protected secrets.
+        justification: |
+          A new installation must not show a warning that would train operators to ignore warnings.
+        tests:
+          - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-RestartQuiet
+        title: >-
+          The ServerHost class shall start without complaint when the key folder holds the key ring of the database.
+        justification: |
+          A normal restart must be silent, or the real problem is lost among false alarms.
+        tests:
+          - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-RestartQuiet-NoSecondKey
+        title: >-
+          The ServerHost class shall create no second key when it starts with the key folder that holds the key ring of
+          the database.
+        justification: |
+          A second key at every restart would grow the ring without reason and outdate the protected secrets.
+        tests:
+          - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-UnreadableDatabase
+        title: >-
+          The ServerHost class shall refuse to start, with an error that names the key folder and
+          Database:ConnectionString, when the key folder holds no key file and the database cannot be read, whether or
+          not DataProtection:AllowNewKeyRing is set.
+        justification: |
+          A database that cannot be read (a lock, a table that cannot be read) leaves it unknown whether secrets exist,
+          and the escape hatch only accepts the loss of secrets that are known to exist, so an empty ring is refused
+          until the database can be read.
+        tests:
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-UnreadableSanitized
+        title: >-
+          The ServerHost class shall not show exception text or the location of the database in the error that stops
+          the start because the database cannot be read.
+        justification: |
+          The error reaches logs and terminals and must not leak internals of the system.
+        tests:
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-UnreadableNoKey
+        title: >-
+          The ServerHost class shall create no key file when it refuses to start because the database cannot be read.
+        justification: |
+          The refusal must come before the probe round trip, because a new key would hide the loss at the next start.
+        tests:
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeys
+        title: >-
+          The ServerHost class shall start when the key folder holds key files and the database cannot be read.
+        justification: |
+          A ring that has keys loses nothing by starting, so a database that is unreadable for a moment must not stop
+          the server.
+        tests:
+          - ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeysWarning
+        title: >-
+          The ServerHost class shall log a warning that the database could not be read when it starts with a key ring
+          that has keys over a database that cannot be read.
+        justification: |
+          The operator must learn that the check of the stored secrets could not be made.
+        tests:
+          - ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-ServicesCreateNoKey
+        title: >-
+          The ServerHost class shall not create a key file or the key folder when it only registers the services, as
+          the command-line verbs do.
+        justification: |
+          The command-line verbs register the same services but neither scan nor use the key ring, so they must not
+          leave a key behind on a machine that has no key ring.
+        tests:
+          - ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile
 
       - id: ReviewCenter-ServerHost-AttestationServices
         title: >-
-          The ServerHost class shall register the attestation key provider chosen by the Attestation settings, the
-          renderer, the signer, and the attestation service once for the whole process, keep the self-signed key in
-          Attestation:SelfSignedFolder or, by default, in a folder beside the Data Protection keys, hand the File
-          provider the setting DataProtection:RequireEncryptedKeys so that it refuses a key without a password, and
-          map the download of the attestation of a review.
+          The ServerHost class shall provide the attestation signing key of the provider named in Attestation:Provider.
         justification: |
-          The composition root is the one place that connects the Evidence subsystem to the audit trail, the signing
-          service, and the settings. The default folder keeps the self-signed key with the other keys so that it
-          persists across restarts, and one setting decides for every key of the server whether it must be encrypted.
+          The operator chooses where the signing key of the attestations comes from, so the composition root must hand
+          the choice of the Attestation settings to the services that sign.
+        tests:
+          - ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry
+
+      - id: ReviewCenter-ServerHost-AttestationServices-SelfSignedDefault
+        title: >-
+          The ServerHost class shall create the self-signed attestation key in an attestation-selfsigned folder inside
+          the key ring folder when no attestation setting is made.
+        justification: |
+          The default folder keeps the self-signed key with the other keys of the server, which are known to be
+          writable and private to the server and are backed up together.
         tests:
           - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+
+      - id: ReviewCenter-ServerHost-AttestationServices-SelfSignedPersists
+        title: >-
+          The ServerHost class shall use the same self-signed attestation key after a restart.
+        justification: |
+          A new key at every start would break the check of the attestations that were signed earlier.
+        tests:
+          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+
+      - id: ReviewCenter-ServerHost-AttestationServices-SelfSignedConfigured
+        title: >-
+          The ServerHost class shall keep the self-signed attestation key in the folder named by
+          Attestation:SelfSignedFolder when it is set.
+        justification: |
+          The operator decides where the signing key is kept, for example on a volume that is backed up separately.
+        tests:
           - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
-          - ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry
+
+      - id: ReviewCenter-ServerHost-AttestationServices-UnprotectedRefused
+        title: >-
+          The ServerHost class shall fail with an error that names DataProtection:RequireEncryptedKeys and says the key
+          is not protected by a password when that setting is true and the key of the File provider has no password.
+        justification: |
+          One setting decides for every key of the server whether it must be encrypted.
+        tests:
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
+
+      - id: ReviewCenter-ServerHost-AttestationServices-UnprotectedStarts
+        title: >-
+          The ServerHost class shall start when the key of the File provider has no password and
+          DataProtection:RequireEncryptedKeys is not set.
+        justification: |
+          An unprotected key is allowed unless the operator demands encrypted keys.
+        tests:
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
+
+      - id: ReviewCenter-ServerHost-AttestationServices-UnprotectedWarned
+        title: >-
+          The ServerHost class shall log a warning that the key is not protected by a password when it starts with a
+          File provider key that has no password.
+        justification: |
+          An unprotected key is allowed, but the operator must be able to see that it is unprotected.
+        tests:
           - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
 
       - id: ReviewCenter-ServerHost-AttestationKeyProtection
         title: >-
-          The ServerHost class shall build the attestation key provider with the Data Protection provider of the
-          server, so that the self-signed key is protected by the key ring and created at the start of the server, and
-          shall fail before serving requests, with an error that names the protected key file and says to delete it,
-          when the key ring cannot decrypt that file, also when DataProtection:AllowNewKeyRing is set, because that
-          setting accepts only the loss of stored secrets and the server never deletes or replaces a signing key.
-          The command-line verbs shall not create the key.
+          The ServerHost class shall fail at start-up when the key ring cannot decrypt the protected self-signed
+          attestation key file.
         justification: |
-          The self-signed key is a secret in a folder that backups copy. Binding it to the key ring makes the ring the
-          single root of trust to protect and to restore. A ring that was lost must not silently yield a second key
-          that signs under the same name, so the operator has to decide to delete the old file.
+          The self-signed key is bound to the key ring, which is the single root of trust to protect and to restore. A
+          ring that was lost must not silently yield a second key that signs under the same name.
         tests:
-          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile
+
+      - id: ReviewCenter-ServerHost-AttestationKeyProtection-NamesFile
+        title: >-
+          The ServerHost class shall name the protected key file and say to delete it in the error that stops the start
+          because the key ring cannot decrypt the attestation key.
+        justification: |
+          The operator has to decide to delete the old file, so the message must say which file it is and what to do.
+        tests:
+          - ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile
+
+      - id: ReviewCenter-ServerHost-AttestationKeyProtection-AllowNewKeyRing
+        title: >-
+          The ServerHost class shall fail with the same error when the key ring cannot decrypt the protected
+          attestation key file, also when DataProtection:AllowNewKeyRing is set.
+        justification: |
+          That setting accepts only the loss of stored secrets. It must not make the server replace a signing key.
+        tests:
+          - ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile
+
+      - id: ReviewCenter-ServerHost-AttestationKeyProtection-KeyKept
+        title: >-
+          The ServerHost class shall leave the protected attestation key file in place and unchanged when it refuses to
+          start because the key ring cannot decrypt it.
+        justification: |
+          The server never deletes or replaces a signing key.
+        tests:
           - ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile
           - ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile
-          - UserCommand_Run_ValidUser_CreatesNoKeyFile
-          - AuditCommand_Run_IntactTrail_CreatesNoKeyFile
 
       - id: ReviewCenter-ServerHost-AttestationKeyFailure
         title: >-
-          The ServerHost class shall obtain the signing key at start-up and fail, before serving requests, with an
-          error that says the attestation signing key is not usable and names the setting at fault, when the provider
-          is unknown, the thumbprint is missing, the certificate is not in the store, RequireTrustedKey is set with the
-          SelfSigned provider, or the self-signed folder cannot be used.
+          The ServerHost class shall fail with an error that says the attestation signing key is not usable and names
+          Attestation:Provider when the provider is unknown.
         justification: |
-          An operator who chose a certificate must learn at start-up that the choice does not work, and must not find
-          out at the first download. A provider that would not accept the key later would be a trap.
+          An operator who chose a provider must learn at start-up that the choice does not work, and must not find out
+          at the first download.
         tests:
           - ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-AttestationKeyFailure-MissingThumbprint
+        title: >-
+          The ServerHost class shall fail with an error that names Attestation:CertificateThumbprint when the
+          certificate store is chosen without a thumbprint.
+        justification: |
+          An operator who chose a certificate must learn at start-up that the choice is incomplete.
+        tests:
           - ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-AttestationKeyFailure-CertificateNotFound
+        title: >-
+          The ServerHost class shall fail with an error that holds the thumbprint and says the certificate was not
+          found when the certificate is not in the store.
+        justification: |
+          An operator who named a certificate must learn at start-up that it is not there, and which one was meant.
+        tests:
           - ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-AttestationKeyFailure-TrustedKeyRequired
+        title: >-
+          The ServerHost class shall fail with an error that names Attestation:RequireTrustedKey and the self-signed
+          key when RequireTrustedKey is set and the provider is self-signed.
+        justification: |
+          A requirement for a trusted key cannot be met by a self-signed key, and the operator must learn that at
+          start-up and not at the first download.
+        tests:
           - ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-AttestationKeyFailure-FolderUnusable
+        title: >-
+          The ServerHost class shall fail with an error that names Attestation:SelfSignedFolder when the folder of the
+          self-signed key cannot be used.
+        justification: |
+          An operator who chose a folder must learn at start-up that the folder does not work.
+        tests:
           - ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError
 
       - id: ReviewCenter-ServerHost-ApiRegistration
         title: >-
-          The ServerHost class shall register the personal access token service as one service for the server,
-          map the API routes under /api, serve the OpenAPI document without a token, and answer an address under /api
-          that does not exist with a JSON problem document instead of a page.
+          The ServerHost class shall provide the personal access token service as one shared instance.
         justification: |
-          The API can only be used when the server connects the routes and the token service to the pipeline, and a
-          script that mistypes an address must not receive the HTML of the not-found page.
+          The API checks every request against the tokens, so the whole process must use one token service.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-ApiRegistration-Routes
+        title: >-
+          The ServerHost class shall map the API routes under /api.
+        justification: |
+          The API can only be used when the server connects its routes to the pipeline.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-ApiRegistration-Routes-Unauthorized
+        title: >-
+          The ServerHost class shall answer a request without a token to a protected API route with status 401.
+        justification: |
+          The API must be closed to a caller who has no token.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-ApiRegistration-OpenApi
+        title: >-
+          The ServerHost class shall serve the OpenAPI document at /api/openapi.json without a token.
+        justification: |
+          A client needs the description of the API before it has a token.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-ApiRegistration-UnknownAddress
+        title: >-
+          The ServerHost class shall answer an address under /api that does not exist with status 404 and a JSON
+          problem document instead of a page.
+        justification: |
+          A script that mistypes an address must not receive the HTML of the not-found page.
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
 
       - id: ReviewCenter-ServerHost-OidcSettings
         title: >-
-          The ServerHost class shall, when the sign-in with an OpenID Connect provider is turned on, check its settings
-          at the start and stop with an error that names the setting that is wrong (a missing client secret included)
-          and never shows its value or the
-          client secret, shall do nothing for the provider when it is off, and shall keep the address of the callback
-          for itself so that no other route is mapped there.
+          The ServerHost class shall, when sign-in with an OpenID Connect provider is turned on, stop the start with an
+          error that names the setting that is wrong, a missing client secret included.
         justification: |
           A wrong setting of a sign-in must be found by the administrator when the server starts, not by the first
-          person who cannot sign in, and a message that holds the secret would put it in the logs.
+          person who cannot sign in.
         tests:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-OidcSettings-NoSecret
+        title: >-
+          The ServerHost class shall not show the client secret in the error that stops the start because of an invalid
+          OpenID Connect setting.
+        justification: |
+          A message that holds the secret would put it in the logs.
+        tests:
+          - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+          - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-OidcSettings-SecretFile
+        title: >-
+          The ServerHost class shall stop the start with an error that names Identity:Oidc:ClientSecretFile when the
+          client secret file is missing.
+        justification: |
+          A client secret in a file that does not exist is a mistake that the administrator must find when the server
+          starts.
+        tests:
+          - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-OidcSettings-SecretFile-InlineSecret
+        title: >-
+          The ServerHost class shall stop the start with an error that names Identity:Oidc:ClientSecretFile when the
+          client secret file is set together with an inline client secret.
+        justification: |
+          A client secret in two places leaves it unclear which one is meant, and the administrator must find that when
+          the server starts.
+        tests:
+          - ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-OidcSettings-Off
+        title: >-
+          The ServerHost class shall not check the OpenID Connect settings while sign-in with a provider is turned off.
+        justification: |
+          A server that does not use sign-in with a provider must start as it did before, whatever the unused OpenID
+          Connect settings say.
+        tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
-          - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown
+
+      - id: ReviewCenter-ServerHost-OidcSettings-ValidBuilds
+        title: >-
+          The ServerHost class shall build the application when the OpenID Connect settings are valid with https.
+        justification: |
+          The settings that an identity provider needs must not be refused by their own validation.
+        tests:
+          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+
+      - id: ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
+        title: >-
+          The ServerHost class shall build the application when the OpenID Connect settings are valid with http on a
+          loopback host.
+        justification: |
+          A provider that runs on the developer machine is reached with http, which must not be refused by the
+          validation of the settings.
+        tests:
+          - ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication
 
       - id: ReviewCenter-ServerHost-TotpWiring
         title: >-
-          The ServerHost class shall check the settings of the second factor at the start and stop with an error that
-          names the setting that is wrong, shall register the services of the second factor, and shall map the endpoint
-          of the second step of the sign-in only when the feature is on.
+          The ServerHost class shall stop the start with an error that names the setting of the second factor that is
+          wrong.
         justification: |
-          A wrong setting must be found by the administrator when the server starts, and a switched-off feature must not
-          leave an endpoint behind.
+          A wrong setting must be found by the administrator when the server starts.
         tests:
           - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-TotpWiring-DefaultsOn
+        title: >-
+          The ServerHost class shall provide the second factor turned on, with the issuer ReviewCenter, when no setting
+          is made.
+        justification: |
+          The feature is on by default, so a new installation offers it without configuration.
+        tests:
           - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-ServerHost-TotpWiring-SettingsApplied
+        title: >-
+          The ServerHost class shall provide the settings of the second factor as configured.
+        justification: |
+          The settings of the operator must take effect.
+        tests:
+          - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-ServerHost-TotpWiring-SettingsApplied-IssuerTrimmed
+        title: >-
+          The ServerHost class shall provide the issuer of the second factor without the spaces around it.
+        justification: |
+          A stray space in the setting must not end up in the name that an authenticator app shows.
+        tests:
+          - ServerHost_CreateApplication_IssuerWithSurroundingSpaces_ProvidesTheTrimmedIssuer
+
+      - id: ReviewCenter-ServerHost-TotpWiring-EndpointMapped
+        title: >-
+          The ServerHost class shall map the endpoint of the second step of the sign-in when the second factor is
+          turned on.
+        justification: |
+          Without the endpoint the second step of the sign-in cannot be completed.
+        tests:
+          - ServerHost_CreateApplication_TotpOn_CodeEndpointIsMapped
+
+      - id: ReviewCenter-ServerHost-TotpWiring-EndpointOffNotMapped
+        title: >-
+          The ServerHost class shall not map the endpoint of the second step of the sign-in when the second factor is
+          turned off.
+        justification: |
+          A switched-off feature must not leave an endpoint behind.
+        tests:
+          - ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped
 
       - id: ReviewCenter-ServerHost-NotificationInvalidStopsStart
         title: >-

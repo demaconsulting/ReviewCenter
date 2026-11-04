@@ -21,8 +21,19 @@ sections:
           reflects the state of the whole web service.
         children:
           - ReviewCenter-ServerHost-Health
+          - ReviewCenter-ServerHost-Health-NoSignIn
         tests:
           - HostingSubsystem_HealthEndpoint_Requested_ReturnsHealthy
+          - HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer
+
+      - id: ReviewCenter-Hosting-Health-Routes
+        title: >-
+          The Hosting subsystem shall answer requests for the home page with HTTP status 200 without sign-in,
+          alongside the /health URL.
+        justification: |
+          The health route must coexist with the user interface routes, so one server must answer both without a
+          sign-in.
+        tests:
           - HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer
 
       - id: ReviewCenter-Hosting-Logging
@@ -36,7 +47,19 @@ sections:
           same sinks gives a single audit trail for the running service.
         children:
           - ReviewCenter-ServerHost-Logging
+          - ReviewCenter-ServerHost-Logging-UrlValue
           - ReviewCenter-ServerHost-SilentMode
+          - ReviewCenter-ServerHost-SilentMode-ConsoleDefault
+        tests:
+          - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
+
+      - id: ReviewCenter-Hosting-Logging-FrameworkEntries
+        title: >-
+          The Hosting subsystem shall send the log entries of the web framework components to the same sinks as the
+          log entries of the server itself.
+        justification: |
+          One audit trail for the running service needs the framework request entries next to the entries of the
+          server, in the same place.
         tests:
           - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
 
@@ -50,6 +73,21 @@ sections:
           on first use, makes a configuration problem visible immediately, and a restart must not lose data.
         children:
           - ReviewCenter-ServerHost-Database
+          - ReviewCenter-ServerHost-Database-ProjectService
+          - ReviewCenter-ServerHost-Database-Persistence
+          - ReviewCenter-ServerHost-Database-UserService
+          - ReviewCenter-ServerHost-Database-SigningService
+          - ReviewCenter-ServerHost-Database-InboxService
+          - ReviewCenter-ServerHost-InputValidation
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+
+      - id: ReviewCenter-Hosting-Database-Restart
+        title: >-
+          The Hosting subsystem shall serve the stored projects again after the server is restarted on the same
+          database.
+        justification: |
+          What users create must survive a restart of the server, or the pages would be of no use.
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
 
@@ -66,6 +104,14 @@ sections:
           pages unchecked.
         children:
           - ReviewCenter-ServerHost-Authentication
+          - ReviewCenter-ServerHost-Authentication-RevalidationInterval
+          - ReviewCenter-ServerHost-Authentication-ThrottleLimits
+          - ReviewCenter-ServerHost-Authentication-ThrottleLimits-Window
+          - ReviewCenter-ServerHost-Authentication-ThrottleLimits-AddressBelowName
+          - ReviewCenter-ServerHost-Authentication-ThrottleAccepted
+          - ReviewCenter-ServerHost-Authentication-ThrottleAccepted-Explicit
+          - ReviewCenter-ServerHost-Authentication-ProtectedPages
+          - ReviewCenter-ServerHost-Authentication-PublicPages
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
           - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
@@ -80,6 +126,8 @@ sections:
           or is cut short.
         children:
           - ReviewCenter-ServerHost-GitSettings
+          - ReviewCenter-ServerHost-GitSettings-Limits
+          - ReviewCenter-ServerHost-GitSettings-Default
         tests:
           - ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError
           - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
@@ -94,11 +142,37 @@ sections:
           line needs no web page that would itself need a system administrator.
         children:
           - ReviewCenter-UserCommand-Create
+          - ReviewCenter-UserCommand-Create-SystemAdmin
+          - ReviewCenter-UserCommand-Create-OrdinaryUser
+          - ReviewCenter-UserCommand-Create-Report
+          - ReviewCenter-UserCommand-Create-NoPasswordPrinted
+          - ReviewCenter-UserCommand-Create-NoKeyRing
+          - ReviewCenter-UserCommand-Create-Arguments
           - ReviewCenter-UserCommand-Password
+          - ReviewCenter-UserCommand-Password-Prompt
+          - ReviewCenter-UserCommand-Password-Mismatch
+          - ReviewCenter-UserCommand-Password-Backspace
+          - ReviewCenter-UserCommand-Password-NoPassword
+          - ReviewCenter-UserCommand-Password-NoDatabase
           - ReviewCenter-UserCommand-Errors
+          - ReviewCenter-UserCommand-Errors-PasswordTooShort
+          - ReviewCenter-UserCommand-Errors-PasswordNotPrinted
+          - ReviewCenter-UserCommand-Errors-NothingCreated
+          - ReviewCenter-UserCommand-Errors-InvalidUserName
+          - ReviewCenter-UserCommand-Errors-InvalidUserName-NoUser
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+
+      - id: ReviewCenter-Hosting-UserAdd-StandardInput
+        title: >-
+          The Hosting subsystem shall take the password of the new user from standard input when standard input is
+          redirected and no environment variable holds the password.
+        justification: |
+          A script that creates the first system administrator cannot answer a prompt, and a password on the command
+          line would show in the process list, so redirected standard input is the way to hand it over.
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser
 
       - id: ReviewCenter-Hosting-ProjectAccess
         title: >-
@@ -123,6 +197,19 @@ sections:
           immediately with a clear message lets the operator fix the setting.
         children:
           - ReviewCenter-ServerHost-DatabaseFailure
+          - ReviewCenter-ServerHost-DatabaseFailure-ExitCode
+          - ReviewCenter-ServerHost-DatabaseFailure-LocationExitCode
+          - ReviewCenter-ServerHost-DatabaseFailure-ErrorReported
+        tests:
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
+
+      - id: ReviewCenter-Hosting-DatabaseFailure-ExitCode
+        title: >-
+          The Hosting subsystem shall return exit code 1 when the database provider that is configured is not
+          supported.
+        justification: |
+          Scripts and service managers decide on the exit code whether the server started, so a database setting that
+          cannot be used must show as a failure there.
         tests:
           - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
 
@@ -138,8 +225,20 @@ sections:
           exit code.
         children:
           - ReviewCenter-AuditCommand-Verify
+          - ReviewCenter-AuditCommand-Verify-EmptyTrail
+          - ReviewCenter-AuditCommand-Verify-EditedEntry
+          - ReviewCenter-AuditCommand-Verify-DeletedEntry
+          - ReviewCenter-AuditCommand-Verify-Unchanged
+          - ReviewCenter-AuditCommand-Verify-NoKeyRing
           - ReviewCenter-AuditCommand-Errors
+          - ReviewCenter-AuditCommand-Errors-NothingCreated
+          - ReviewCenter-AuditCommand-Errors-FileUri
+          - ReviewCenter-AuditCommand-Errors-FileUriNothingCreated
+          - ReviewCenter-AuditCommand-Errors-Unreadable
+          - ReviewCenter-AuditCommand-Errors-Arguments
           - ReviewCenter-ServerHost-AuditServices
+          - ReviewCenter-ServerHost-AuditServices-FailureWarning
+          - ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
@@ -155,8 +254,41 @@ sections:
           to get there.
         children:
           - ReviewCenter-KeysCommand-Reprotect
+          - ReviewCenter-KeysCommand-Reprotect-KeyProtection
+          - ReviewCenter-KeysCommand-Reprotect-Tokens
+          - ReviewCenter-KeysCommand-Reprotect-SecondFactor
+          - ReviewCenter-KeysCommand-Reprotect-Readable
+          - ReviewCenter-KeysCommand-Reprotect-SecondRun
+          - ReviewCenter-KeysCommand-Reprotect-NoSecrets
+          - ReviewCenter-KeysCommand-Reprotect-KeyFolder
+          - ReviewCenter-KeysCommand-Reprotect-TableUnchanged
+          - ReviewCenter-KeysCommand-Reprotect-Failure
+          - ReviewCenter-KeysCommand-Reprotect-FailureNewKey
+          - ReviewCenter-KeysCommand-Reprotect-CompletedTables
+          - ReviewCenter-KeysCommand-Reprotect-FailureUnchangedTable
+          - ReviewCenter-KeysCommand-Reprotect-FailureRunAgain
+          - ReviewCenter-KeysCommand-Reprotect-FailureNoSecret
           - ReviewCenter-KeysCommand-RefusesUnreadable
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableCount
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableIds
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoChange
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoSecret
+          - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRing
+          - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRingNoKey
+          - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsProblem
+          - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsNoChange
+          - ReviewCenter-KeysCommand-RefusesUnreadable-MissingDatabase
+          - ReviewCenter-KeysCommand-RefusesUnreadable-MissingDatabaseNothingCreated
+          - ReviewCenter-KeysCommand-RefusesUnreadable-Arguments
           - ReviewCenter-KeysCommand-Report
+          - ReviewCenter-KeysCommand-Report-Counts
+          - ReviewCenter-KeysCommand-Report-Counts-SecondFactor
+          - ReviewCenter-KeysCommand-Report-ReferencedKeys
+          - ReviewCenter-KeysCommand-Report-UnreferencedKeys
+          - ReviewCenter-KeysCommand-Report-PayloadHeaders
+          - ReviewCenter-KeysCommand-Report-PayloadHeaders-NotPayload
+          - ReviewCenter-KeysCommand-Report-NextSteps
+          - ReviewCenter-KeysCommand-Report-NoSecret
         tests:
           - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
           - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
@@ -171,6 +303,11 @@ sections:
           key ring, and git. Defaults beside the database mean a new installation works without configuration.
         children:
           - ReviewCenter-ServerHost-RepositoryServices
+          - ReviewCenter-ServerHost-RepositoryServices-GitSource
+          - ReviewCenter-ServerHost-RepositoryServices-GitCacheDefault
+          - ReviewCenter-ServerHost-RepositoryServices-KeysFolderDefault
+          - ReviewCenter-ServerHost-RepositoryServices-KeysFolderConfigured
+          - ReviewCenter-ServerHost-RepositoryServices-TokenProtection
           - ReviewCenter-ServerHost-KeyRing
         tests:
           - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
@@ -185,6 +322,7 @@ sections:
           connects it to the services and the git source it works with.
         children:
           - ReviewCenter-ServerHost-PlannerServices
+          - ReviewCenter-ServerHost-PlannerServices-Parser
         tests:
           - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
 
@@ -197,6 +335,7 @@ sections:
           immediately with a clear message lets the operator fix the setting.
         children:
           - ReviewCenter-ServerHost-KeyRingFailure
+          - ReviewCenter-ServerHost-KeyRingFailure-NamesFolder
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
 
@@ -214,15 +353,92 @@ sections:
           new ring that makes the stored data unreadable.
         children:
           - ReviewCenter-KeyRingProtection-Auto
+          - ReviewCenter-KeyRingProtection-Auto-Windows
+          - ReviewCenter-KeyRingProtection-Auto-Unix
+          - ReviewCenter-KeyRingProtection-Auto-Default
+          - ReviewCenter-KeyRingProtection-Auto-Explicit
+          - ReviewCenter-KeyRingProtection-Auto-Explicit-Spaces
           - ReviewCenter-KeyRingProtection-Dpapi
+          - ReviewCenter-KeyRingProtection-Dpapi-CurrentUser
+          - ReviewCenter-KeyRingProtection-Dpapi-LocalMachine
+          - ReviewCenter-KeyRingProtection-Dpapi-Restart
+          - ReviewCenter-KeyRingProtection-Dpapi-OtherSystem
+          - ReviewCenter-KeyRingProtection-Dpapi-Log
+          - ReviewCenter-KeyRingProtection-Dpapi-FolderRules
           - ReviewCenter-KeyRingProtection-Certificate
+          - ReviewCenter-KeyRingProtection-Certificate-Restart
+          - ReviewCenter-KeyRingProtection-Certificate-Formats
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemInside
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemSeparateKey
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemEncryptedKey
+          - ReviewCenter-KeyRingProtection-Certificate-Password
+          - ReviewCenter-KeyRingProtection-Certificate-PasswordFile
+          - ReviewCenter-KeyRingProtection-Certificate-NoPath
+          - ReviewCenter-KeyRingProtection-Certificate-Missing
+          - ReviewCenter-KeyRingProtection-Certificate-WrongPassword
+          - ReviewCenter-KeyRingProtection-Certificate-NoPrivateKey
+          - ReviewCenter-KeyRingProtection-Certificate-Rsa
+          - ReviewCenter-KeyRingProtection-Certificate-Platform
+          - ReviewCenter-KeyRingProtection-Certificate-BothPasswords
+          - ReviewCenter-KeyRingProtection-Certificate-PasswordHidden
+          - ReviewCenter-KeyRingProtection-Certificate-Log
           - ReviewCenter-KeyRingProtection-PermissionsOnly
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles-StillReadable
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-UnixFolder
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder-NoInheritance
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsInherit
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-Warning
           - ReviewCenter-KeyRingProtection-Require
+          - ReviewCenter-KeyRingProtection-Require-Auto
+          - ReviewCenter-KeyRingProtection-Require-PlaintextRing
+          - ReviewCenter-KeyRingProtection-Require-EncryptedRing
           - ReviewCenter-KeyRingProtection-PreviousCertificates
+          - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword
+          - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword-NoPassword
+          - ReviewCenter-KeyRingProtection-PreviousCertificates-Entry
           - ReviewCenter-KeyRingProtection-WrongKeyGuard
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoCertificate
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoKeyCreated
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-UnreadableKeys
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-ContentHidden
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-MissingFolder
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-RequireEncrypted
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRingNoKey
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyError
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyStart
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-KeyFileCounts
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder-NothingCreated
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-ReadOnly
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-Unreadable
           - ReviewCenter-KeyRingProtection-Validation
+          - ReviewCenter-KeyRingProtection-Validation-Scope
+          - ReviewCenter-KeyRingProtection-Validation-Report
+          - ReviewCenter-KeyRingProtection-Validation-BadType
+          - ReviewCenter-KeyRingProtection-Validation-Binding
+          - ReviewCenter-KeyRingProtection-Validation-Binding-PreviousList
+          - ReviewCenter-KeyRingProtection-Validation-Binding-RequireEncrypted
+          - ReviewCenter-KeyRingProtection-Validation-Binding-LetterCase
           - ReviewCenter-ServerHost-KeyProtection
+          - ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
+          - ReviewCenter-ServerHost-KeyProtection-NoPasswordLogged
+          - ReviewCenter-ServerHost-KeyProtection-InvalidSettings
+          - ReviewCenter-ServerHost-KeyProtection-NoKeyOnFailure
+          - ReviewCenter-ServerHost-KeyProtection-CertificateUnreadable
+          - ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
+          - ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
+          - ReviewCenter-ServerHost-KeyProtection-WrongCertificate
+          - ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
+          - ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
           - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
@@ -240,9 +456,29 @@ sections:
           and has no side effect, so that it can run before the server starts and on a restored copy.
         children:
           - ReviewCenter-SecretScan-RingState
+          - ReviewCenter-SecretScan-RingState-Unencrypted
+          - ReviewCenter-SecretScan-RingState-Empty
+          - ReviewCenter-SecretScan-RingState-MissingFolder
           - ReviewCenter-SecretScan-SecretReadability
+          - ReviewCenter-SecretScan-SecretReadability-Readable
+          - ReviewCenter-SecretScan-SecretReadability-Unreadable
+          - ReviewCenter-SecretScan-SecretReadability-Unreadable-SecondFactor
+          - ReviewCenter-SecretScan-SecretReadability-Ids
+          - ReviewCenter-SecretScan-SecretReadability-Ids-Users
+          - ReviewCenter-SecretScan-SecretReadability-IdList
+          - ReviewCenter-SecretScan-SecretReadability-NoKeyFiles
+          - ReviewCenter-SecretScan-SecretReadability-MalformedKeys
+          - ReviewCenter-SecretScan-SecretReadability-MissingDatabase
+          - ReviewCenter-SecretScan-SecretReadability-MissingTables
+          - ReviewCenter-SecretScan-SecretReadability-NoRows
           - ReviewCenter-SecretScan-ReadOnly
+          - ReviewCenter-SecretScan-ReadOnly-NoDatabase
+          - ReviewCenter-SecretScan-ReadOnly-NoKey
+          - ReviewCenter-SecretScan-ReadOnly-NoKeyFolder
+          - ReviewCenter-SecretScan-ReadOnly-NoProtect
+          - ReviewCenter-SecretScan-ReadOnly-Arguments
           - ReviewCenter-SecretScan-NoDisclosure
+          - ReviewCenter-SecretScan-NoDisclosure-IdsOnly
         tests:
           - SecretScan_ScanAsync_SecretsOfTheRing_AreCountedReadable
           - SecretScan_ScanAsync_OtherRing_CountsEverySecretUnreadableWithIds
@@ -262,6 +498,22 @@ sections:
           acceptable. A database that cannot be read does not tell whether there is a loss to accept.
         children:
           - ReviewCenter-ServerHost-LostKeyRing
+          - ReviewCenter-ServerHost-LostKeyRing-NoKeyCreated
+          - ReviewCenter-ServerHost-LostKeyRing-NoSecretShown
+          - ReviewCenter-ServerHost-LostKeyRing-AllowNewKeyRing
+          - ReviewCenter-ServerHost-LostKeyRing-AllowWarning
+          - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadable
+          - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadableStarts
+          - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation
+          - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation-NoError
+          - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet
+          - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet-NoSecondKey
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableDatabase
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableSanitized
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableNoKey
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeys
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeysWarning
+          - ReviewCenter-ServerHost-LostKeyRing-ServicesCreateNoKey
         tests:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
           - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
@@ -279,7 +531,16 @@ sections:
           key is kept and backed up with the other keys.
         children:
           - ReviewCenter-ServerHost-AttestationServices
+          - ReviewCenter-ServerHost-AttestationServices-SelfSignedDefault
+          - ReviewCenter-ServerHost-AttestationServices-SelfSignedPersists
+          - ReviewCenter-ServerHost-AttestationServices-SelfSignedConfigured
+          - ReviewCenter-ServerHost-AttestationServices-UnprotectedRefused
+          - ReviewCenter-ServerHost-AttestationServices-UnprotectedStarts
+          - ReviewCenter-ServerHost-AttestationServices-UnprotectedWarned
           - ReviewCenter-ServerHost-AttestationKeyProtection
+          - ReviewCenter-ServerHost-AttestationKeyProtection-NamesFile
+          - ReviewCenter-ServerHost-AttestationKeyProtection-AllowNewKeyRing
+          - ReviewCenter-ServerHost-AttestationKeyProtection-KeyKept
         tests:
           - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
           - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
@@ -294,6 +555,10 @@ sections:
           whose key is on a hardware module that is not present does not start.
         children:
           - ReviewCenter-ServerHost-AttestationKeyFailure
+          - ReviewCenter-ServerHost-AttestationKeyFailure-MissingThumbprint
+          - ReviewCenter-ServerHost-AttestationKeyFailure-CertificateNotFound
+          - ReviewCenter-ServerHost-AttestationKeyFailure-TrustedKeyRequired
+          - ReviewCenter-ServerHost-AttestationKeyFailure-FolderUnusable
         tests:
           - ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError
           - ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError
@@ -311,6 +576,10 @@ sections:
           the prefix to the API keeps a script from receiving a web page.
         children:
           - ReviewCenter-ServerHost-ApiRegistration
+          - ReviewCenter-ServerHost-ApiRegistration-Routes
+          - ReviewCenter-ServerHost-ApiRegistration-Routes-Unauthorized
+          - ReviewCenter-ServerHost-ApiRegistration-OpenApi
+          - ReviewCenter-ServerHost-ApiRegistration-UnknownAddress
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
 
@@ -324,6 +593,12 @@ sections:
           start with settings that cannot work.
         children:
           - ReviewCenter-ServerHost-OidcSettings
+          - ReviewCenter-ServerHost-OidcSettings-NoSecret
+          - ReviewCenter-ServerHost-OidcSettings-SecretFile
+          - ReviewCenter-ServerHost-OidcSettings-SecretFile-InlineSecret
+          - ReviewCenter-ServerHost-OidcSettings-Off
+          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds
+          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
         tests:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
@@ -337,6 +612,11 @@ sections:
           A server must not start with settings that cannot work, and a feature that is off must not leave a way in.
         children:
           - ReviewCenter-ServerHost-TotpWiring
+          - ReviewCenter-ServerHost-TotpWiring-DefaultsOn
+          - ReviewCenter-ServerHost-TotpWiring-SettingsApplied
+          - ReviewCenter-ServerHost-TotpWiring-SettingsApplied-IssuerTrimmed
+          - ReviewCenter-ServerHost-TotpWiring-EndpointMapped
+          - ReviewCenter-ServerHost-TotpWiring-EndpointOffNotMapped
         tests:
           - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
           - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings

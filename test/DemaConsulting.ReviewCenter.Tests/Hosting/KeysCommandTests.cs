@@ -74,6 +74,27 @@ public class KeysCommandTests
     }
 
     /// <summary>
+    ///     Test that the command reports the number of second-factor secrets that it re-protected, apart from the
+    ///     repository tokens.
+    /// </summary>
+    [Fact]
+    public void KeysCommand_Run_OnlySecondFactorSecrets_ReportsTheirCount()
+    {
+        // Arrange: three second-factor secrets and no repository token
+        using var install = new Install();
+        install.AddTotp(7);
+        install.AddTotp(8);
+        install.AddTotp(9);
+
+        // Act
+        var (exitCode, output) = Reprotect(install.Folder);
+
+        // Assert: success, with a count of 3 second-factor secrets and 0 tokens
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Re-protected 0 repository token(s) and 3 second-factor secret(s)", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a new key exists afterwards, that every stored payload references it and none the old key, and
     ///     that the report names the old key as one that nothing references any more.
     /// </summary>
@@ -317,9 +338,66 @@ public class KeysCommandTests
     }
 
     /// <summary>
+    ///     Test that the new key file is protected with the configured key-ring protection: with a certificate
+    ///     configured, the new key file holds its key encrypted and not in the clear.
+    /// </summary>
+    [Fact]
+    public void KeysCommand_Run_CertificateConfigured_NewKeyFileIsEncrypted()
+    {
+        // Arrange: an installation without secrets and a certificate that the settings ask for
+        const string certificatePassword = "ring-certificate-password";
+        using var install = new Install();
+        var certificate = KeyRingTestCertificates.WritePfx(install.Folder, "ring", certificatePassword);
+
+        // Act
+        var (exitCode, _) = Reprotect(
+            install.Folder,
+            new Dictionary<string, string?>
+            {
+                ["DataProtection:Protection"] = "Certificate",
+                ["DataProtection:CertificatePath"] = certificate,
+                ["DataProtection:CertificatePassword"] = certificatePassword
+            });
+
+        // Assert: the command succeeded and its one new key file is encrypted, not stored in the clear
+        Assert.Equal(0, exitCode);
+        var text = File.ReadAllText(Assert.Single(install.KeyFiles()));
+        Assert.Contains("<encryptedSecret", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<masterKey", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a table whose re-protection fails part-way is left entirely unchanged: the row that was
+    ///     already re-protected in the transaction is rolled back, and the table that was completed before stays
+    ///     committed.
+    /// </summary>
+    [Fact]
+    public void KeysCommand_Run_FailureInTable_LeavesWholeTableUnchanged()
+    {
+        // Arrange: a token, and two second-factor secrets of which the update of the second one is blocked
+        using var install = new Install();
+        var tokenBefore = install.AddToken(1, TokenText);
+        install.AddTotp(7);
+        install.AddTotp(8);
+        var firstBefore = install.ReadTotp(7);
+        var secondBefore = install.ReadTotp(8);
+        install.BlockTotpUpdates(8);
+
+        // Act
+        var (exitCode, _) = Reprotect(install.Folder);
+
+        // Assert: the command failed, both rows are as they were (the first one was not kept), and the table of the
+        // first step was committed
+        Assert.Equal(1, exitCode);
+        Assert.Equal(firstBefore, install.ReadTotp(7));
+        Assert.Equal(secondBefore, install.ReadTotp(8));
+        Assert.NotEqual(tokenBefore, install.ReadToken(1));
+    }
+
+    /// <summary>
     ///     Test that a failure while the second table is written (here a trigger that aborts every update) is
-    ///     reported honestly: the new key exists, the first table stays re-protected, the second is unchanged, and
-    ///     the command can be run again.
+    ///     reported honestly: the new key exists and the report names it, the first table stays re-protected, the
+    ///     second is unchanged, and the command can be run again.
     /// </summary>
     [Fact]
     public void KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable()
@@ -330,6 +408,7 @@ public class KeysCommandTests
         install.AddTotp(7);
         var totpBefore = install.ReadTotp(7);
         install.BlockTotpUpdates();
+        var keyFilesBefore = install.KeyFiles();
 
         // Act
         var (exitCode, output) = Reprotect(install.Folder);
@@ -338,6 +417,9 @@ public class KeysCommandTests
         Assert.Equal(1, exitCode);
         Assert.Contains("Re-protecting stopped", output, StringComparison.Ordinal);
         Assert.Contains("A new key was created", output, StringComparison.Ordinal);
+        var newKeyFile = Assert.Single(install.KeyFiles().Except(keyFilesBefore));
+        var newKeyId = Guid.Parse(Path.GetFileNameWithoutExtension(newKeyFile)["key-".Length..]);
+        Assert.Contains($"A new key was created ({newKeyId})", output, StringComparison.Ordinal);
         Assert.Contains("(1 repository token(s), 0 second-factor secret(s))", output, StringComparison.Ordinal);
         Assert.Contains("the second-factor secret table, which was being changed, is unchanged", output, StringComparison.Ordinal);
         Assert.Contains("run the command again", output, StringComparison.Ordinal);
@@ -530,16 +612,18 @@ public class KeysCommandTests
             ReadScalar("SELECT \"ProtectedSecret\" FROM \"UserTotps\" WHERE \"UserId\" = $id", userId);
 
         /// <summary>
-        ///     Makes every update of the second-factor table fail, so that the table of the command's second step
-        ///     cannot be written.
+        ///     Makes every update of the second-factor table fail, or only the update of one user's row, so that the
+        ///     table of the command's second step cannot be written.
         /// </summary>
-        public void BlockTotpUpdates()
+        /// <param name="userId">The user whose row cannot be updated, or <c>null</c> for every row.</param>
+        public void BlockTotpUpdates(int? userId = null)
         {
             using var connection = new SqliteConnection(ConnectionString);
             connection.Open();
             using var command = connection.CreateCommand();
             command.CommandText =
                 "CREATE TRIGGER \"BlockTotpUpdates\" BEFORE UPDATE ON \"UserTotps\" " +
+                (userId is null ? string.Empty : $"WHEN OLD.\"UserId\" = {userId.Value} ") +
                 "BEGIN SELECT RAISE(ABORT, 'update blocked by the test'); END";
             command.ExecuteNonQuery();
         }

@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Security.Cryptography;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Storage;
@@ -76,6 +77,30 @@ public class AuditCommandTests
         // Assert: verified, and no key or folder
         Assert.Equal(0, exitCode);
         Assert.False(Directory.Exists(keys), "audit verify must not create the key ring");
+    }
+
+    /// <summary>
+    ///     Test that verifying an intact trail leaves the database file exactly as it was.
+    /// </summary>
+    [Fact]
+    public void AuditCommand_Run_IntactTrail_LeavesDatabaseFileUnchanged()
+    {
+        // Arrange: a database with two audited events, and the content of its file
+        var connectionString = TestDatabase.NewConnectionString();
+        AddUser(connectionString, "ann");
+        AddUser(connectionString, "bob");
+        var file = connectionString.Split(';')[0].Replace("Data Source=", string.Empty, StringComparison.Ordinal);
+        var hashBefore = SHA256.HashData(File.ReadAllBytes(file));
+        var lengthBefore = new FileInfo(file).Length;
+
+        // Act
+        var (exitCode, output) = Verify(connectionString);
+
+        // Assert: the trail was verified, and neither the content of the file nor its size changed
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Audit chain intact: 2 entries", output, StringComparison.Ordinal);
+        Assert.Equal(hashBefore, SHA256.HashData(File.ReadAllBytes(file)));
+        Assert.Equal(lengthBefore, new FileInfo(file).Length);
     }
 
     /// <summary>
