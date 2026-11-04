@@ -61,6 +61,10 @@ repository; ask a project administrator to add one." and shows no form. This sce
 exist; only the enabled ones are offered, by name, with nothing preselected, and the page contains no location and no
 token. This scenario is tested by `PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets`.
 
+**PlanPage_Render_RepositoryWithCredentials_ShowsNoLocationUserNameOrToken**: The one repository is registered with a
+location, a user name, and a token; neither the form nor the shown plan contains any of them. This scenario is tested
+by `PlanPage_Render_RepositoryWithCredentials_ShowsNoLocationUserNameOrToken`.
+
 **PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput**: Choosing Explicit revision shows the baseline text box and
 choosing another mode hides it. This scenario is tested by `PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput`.
 
@@ -78,8 +82,16 @@ the groups without rows are absent. This scenario is tested by
 and modified files, the note names the baseline, and the facts line says so. This scenario is tested by
 `PlanPage_ShowPlan_ExplicitBaseline_CountsChangesSinceTheBaseline`.
 
+**PlanPage_ShowPlan_ExplicitBaselineWithDeletedFile_CountsDeletedFiles**: A file of the core set is deleted since the
+explicit baseline; the counts of the row read "3 changed files (1 added, 1 modified, 1 deleted)". This scenario is
+tested by `PlanPage_ShowPlan_ExplicitBaselineWithDeletedFile_CountsDeletedFiles`.
+
 **PlanPage_ShowPlan_NoBaseline_SaysAllFiles**: With no baseline the facts line says "all files (no baseline)". This
 scenario is tested by `PlanPage_ShowPlan_NoBaseline_SaysAllFiles`.
+
+**PlanPage_ShowPlan_NoEmptySets_HidesTheNothingToReviewGroup**: Both sets of the configuration have files; the plan shows
+the rows to review and neither the list nor the toggle of the sets with nothing to review. This scenario is tested by
+`PlanPage_ShowPlan_NoEmptySets_HidesTheNothingToReviewGroup`.
 
 **PlanPage_Ticks_Clear_UpdatesCreateButtonAndDisablesAtZero**: Clearing the ticks of rows lowers the number on the
 button; at zero it is disabled and a hint says why; ticking again enables it; git was opened once. This scenario is
@@ -87,6 +99,10 @@ tested by `PlanPage_Ticks_Clear_UpdatesCreateButtonAndDisablesAtZero`.
 
 **PlanPage_Ticks_ManyRows_OffersSelectAllAndNone**: With four rows the select all and select none buttons are offered and
 work. This scenario is tested by `PlanPage_Ticks_ManyRows_OffersSelectAllAndNone`.
+
+**PlanPage_Ticks_ThreeRows_OffersNoSelectAllAndNone**: With three rows the create button reads "Create 3 reviews" and
+neither the select all nor the select none button is offered. This scenario is tested by
+`PlanPage_Ticks_ThreeRows_OffersNoSelectAllAndNone`.
 
 **PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews**: Creating shows "2 reviews created.", a link to each
 review, replaces the plan and the form, and stores the reviews with their set identifier and the commit of the plan. This
@@ -103,6 +119,14 @@ by `PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers`.
 **PlanPage_Create_DueDates_DefaultAndRowDate**: A default due date is typed for all the reviews and a date of its own for
 the docs row. After creating, the core review has the default and the docs review has its own date. This scenario is
 tested by `PlanPage_Create_DueDates_DefaultAndRowDate`.
+
+**PlanPage_Create_LaterRowFails_KeepsTheEarlierReview**: A date before today on the docs row, which comes after core,
+fails that row with "1 review created, 1 failed."; the core review stays and is the only review. This scenario is
+tested by `PlanPage_Create_LaterRowFails_KeepsTheEarlierReview`.
+
+**PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow**: A shown plan has a date input for all reviews and one for each
+row, none filled in, and the hint names a calendar day in UTC. This scenario is tested by
+`PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow`.
 
 **PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow**: A date before today on the core row fails that row with a
 message about the due date, the docs row is created without a date, and only one review exists. This scenario is
@@ -122,11 +146,33 @@ tested by `PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateB
 shown in its own group with a reason and no checkbox. This scenario is tested by
 `PlanPage_ShowPlan_SetCannotBePlanned_ShowsReasonInOwnGroup`.
 
+**PlanPage_ShowPlan_SetsOfEveryKind_ListsSetsNeedingReviewFirst**: The configuration lists an empty set, an invalid set,
+a filed set, and a set to review, in that order; the group of the set to review comes before the groups of the invalid,
+the filed, and the empty set in the page. This scenario is tested by
+`PlanPage_ShowPlan_SetsOfEveryKind_ListsSetsNeedingReviewFirst`.
+
+**PlanPage_ShowPlan_MarkupInProblemReason_IsEscaped**: A set whose invalid pattern is markup gives a reason that repeats
+it; the reason is shown as text and no element is created from it. This scenario is tested by
+`PlanPage_ShowPlan_MarkupInProblemReason_IsEscaped`.
+
 **PlanPage_FormChange_DiscardsPlan**: Changing the head or the baseline mode removes the plan. This scenario is tested by
 `PlanPage_FormChange_DiscardsPlan`.
 
+**PlanPage_FormChange_Repository_DiscardsPlan**: Choosing another repository removes the shown plan. This scenario is
+tested by `PlanPage_FormChange_Repository_DiscardsPlan`.
+
+**PlanPage_FormChange_BaselineRevision_DiscardsPlan**: Typing another explicit baseline revision removes the shown plan.
+This scenario is tested by `PlanPage_FormChange_BaselineRevision_DiscardsPlan`.
+
+**PlanPage_FormChange_AfterError_DiscardsError**: After an unknown head gave an error, typing another head removes the
+error. This scenario is tested by `PlanPage_FormChange_AfterError_DiscardsError`.
+
 **PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan**: Reusing the page for another project shows that project with
 an empty head and no plan. This scenario is tested by `PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan`.
+
+**PlanPage_ParametersChange_ResultsShown_ClearsResults**: The results of a creation are shown and the page is reused for
+another project; the results are gone and the form of the other project is shown. This scenario is tested by
+`PlanPage_ParametersChange_ResultsShown_ClearsResults`.
 
 **PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm**: While a plan of the first project is read, the
 page is reused for another project and the old plan arrives: no plan, loading note, or error is shown, and the form of
@@ -187,9 +233,21 @@ form, plan, project name, repository name or set title is shown. This scenario i
 new review page; each shows the `readonly-notice` and no form, and no repository is read. This scenario is tested by
 `NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm`.
 
+**PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm**: An Auditor opens the plan page; it shows the
+`readonly-notice` and no plan form. This scenario is tested by
+`PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm`.
+
+**PlanPage_Render_Auditor_ReadsNoRepositories**: An Auditor opens the plan page; the list of repositories of the
+project is not read and the no-repository message is not shown. This scenario is tested by
+`PlanPage_Render_Auditor_ReadsNoRepositories`.
+
 **PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan**: A member has the form open and the membership is
 removed; asking for the plan shows the not-found message, and nothing of the project, the repository or a plan is in
 the markup. This scenario is tested by `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan`.
+
+**PlanPage_ShowPlan_MembershipRevoked_ReadsNothingFromGit**: A member has the form open and the membership is removed;
+asking for the plan opens no repository. This scenario is tested by
+`PlanPage_ShowPlan_MembershipRevoked_ReadsNothingFromGit`.
 
 **PlanPage_CreateReviews_MembershipRevoked_CreatesNothing**: A member has a plan shown and the membership is removed;
 pressing the create button shows the not-found message without the plan, and no review exists. This scenario is tested

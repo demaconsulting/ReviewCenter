@@ -72,3 +72,9 @@ accepted and one more character makes it refused. This scenario is tested by
 
 **NotificationAddress_TryNormalize_LongLocalPart_Fails**: A local part of 65 characters is refused and one of 64
 characters is accepted. This scenario is tested by `NotificationAddress_TryNormalize_LongLocalPart_Fails`.
+
+**NotificationAddress_TryNormalize_LocalPartOf64_Succeeds**: An address whose local part has exactly 64 characters is
+accepted and returned as it is. This scenario is tested by `NotificationAddress_TryNormalize_LocalPartOf64_Succeeds`.
+
+**NotificationAddress_TryNormalize_AddressOf254_Succeeds**: An address of exactly 254 characters made of valid labels
+is accepted and returned as it is. This scenario is tested by `NotificationAddress_TryNormalize_AddressOf254_Succeeds`.

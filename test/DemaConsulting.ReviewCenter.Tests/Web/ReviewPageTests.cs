@@ -141,6 +141,27 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the summary strip sits below the next-step line and above the file list.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles()
+    {
+        // Arrange: a review of one file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the next-step line comes first, then the strip, then the file list
+        var markup = cut.Markup;
+        var nextStep = markup.IndexOf("data-testid=\"next-step\"", StringComparison.Ordinal);
+        var summary = markup.IndexOf("data-testid=\"review-summary\"", StringComparison.Ordinal);
+        var files = markup.IndexOf("data-testid=\"files-list\"", StringComparison.Ordinal);
+        Assert.InRange(nextStep, 0, summary - 1);
+        Assert.InRange(summary, nextStep, files - 1);
+    }
+
+    /// <summary>
     ///     Test that the review's id, title and fingerprint are shown, and that the always-"Draft" state is not.
     /// </summary>
     [Fact]
@@ -203,6 +224,25 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal("Apollo", cut.Find("[data-testid='project-link']").TextContent);
         Assert.DoesNotContain("selected", cut.Find("[data-testid='file-row-0']").ClassList);
         Assert.Contains("selected", cut.Find("[data-testid='file-row-1']").ClassList);
+    }
+
+    /// <summary>
+    ///     Test that the breadcrumb of a review without a selected file links back to the owning project and is
+    ///     labeled with the project name.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject()
+    {
+        // Arrange: a review in the project named "Apollo"
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page without selecting a file
+        var cut = RenderPage(projectId);
+
+        // Assert: the link goes to the project and is labeled with its name
+        var link = cut.Find("[data-testid='project-link']");
+        Assert.Equal($"/projects/{projectId}", link.GetAttribute("href"));
+        Assert.Equal("Apollo", link.TextContent);
     }
 
     /// <summary>
@@ -477,6 +517,29 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal("Reply", cut.Find($"[data-testid='comment-text-{range.Id}-2']").TextContent);
         Assert.Equal("2025-03-04 05:06 UTC", cut.Find($"[data-testid='comment-time-{range.Id}-1']").TextContent);
         Assert.DoesNotContain("Other file", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the threads of the selected file are listed in the order in which they were created, not in the
+    ///     order of their lines.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder()
+    {
+        // Arrange: three threads on one file, started by three people, the later ones on earlier lines
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "1\n2\n3\n"u8.ToArray()));
+        var first = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 3, 3), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var second = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Second", TestContext.Current.CancellationToken);
+        var third = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Cy, "Third", TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the list follows the order of creation
+        Assert.Equal(
+            [$"thread-{first.Id}", $"thread-{second.Id}", $"thread-{third.Id}"],
+            cut.FindAll("[data-testid='threads-list'] > li").Select(item => item.GetAttribute("data-testid")));
     }
 
     /// <summary>
@@ -853,6 +916,26 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal(TestContent.HashA, detailsElement.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
         Assert.Equal("c.bin", detailsElement.QuerySelector("[data-testid='file-hash-path-2']")?.TextContent);
         Assert.Empty(cut.Find("[data-testid='files-list']").QuerySelectorAll("[data-testid^='file-hash']"));
+    }
+
+    /// <summary>
+    ///     Test that the content of the selected file comes before the review details.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_FileSelected_ShowsContentBeforeDetails()
+    {
+        // Arrange: a review of one file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the numbered lines of the file come before the details in the page
+        var markup = cut.Markup;
+        var content = markup.IndexOf("data-testid=\"file-content\"", StringComparison.Ordinal);
+        var details = markup.IndexOf("data-testid=\"review-details\"", StringComparison.Ordinal);
+        Assert.InRange(content, 0, details - 1);
     }
 
     /// <summary>
@@ -1258,6 +1341,31 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a disabled user is not offered in the primary and the alternate choice list of the add form,
+    ///     while the enabled members are.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_DisabledUser_IsNotOfferedInTheAddForm()
+    {
+        // Arrange: a review of a project whose members are ann, bob and cyd, and cyd is disabled
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await CreateUsersAsync();
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await Users.SetEnabledAsync("cyd", false, TestActors.Ann, cancellationToken);
+
+        // Act: render the page as ann
+        var cut = RenderPage(projectId);
+
+        // Assert: both lists offer bob, and neither offers cyd
+        foreach (var testId in new[] { "new-slot-primary-select", "new-slot-alternate-select" })
+        {
+            var options = cut.Find($"[data-testid='{testId}']").QuerySelectorAll("option").Select(o => o.TextContent).ToList();
+            Assert.Contains("Bob (bob)", options);
+            Assert.DoesNotContain(options, o => o.Contains("(cyd)", StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>
     ///     Test that a slot whose primary and alternate were removed from the project shows the indicator for each,
     ///     and that a slot whose people are still members shows none.
     /// </summary>
@@ -1310,6 +1418,30 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: it is gone
         Assert.Empty(cut.FindAll($"[data-testid='slot-{slotId}']"));
         Assert.NotNull(cut.Find("[data-testid='slots-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that a change of an unsigned slot that the service refuses shows the reason next to the slot and
+    ///     stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_InvalidChoices_ShowsErrorNextToTheSlot()
+    {
+        // Arrange: a slot of ann and bob
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        Assert.Empty(cut.FindAll($"[data-testid='slot-error-{slotId}']"));
+
+        // Act: choose the same user as primary and as alternate and save
+        await cut.Find($"[data-testid='slot-primary-select-{slotId}']").ChangeAsync(ids["cyd"].ToString());
+        await cut.Find($"[data-testid='slot-alternate-select-{slotId}']").ChangeAsync(ids["cyd"].ToString());
+        await cut.Find($"[data-testid='slot-save-{slotId}']").ClickAsync();
+
+        // Assert: the reason is shown next to the slot and the stored slot is unchanged
+        Assert.NotEmpty(cut.Find($"[data-testid='slot-error-{slotId}']").TextContent);
+        var stored = Assert.Single((await Store.GetSnapshotAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.Slots);
+        Assert.Equal(ids["ann"], stored.PrimaryUserId);
+        Assert.Equal(ids["bob"], stored.AlternateUserId);
     }
 
     /// <summary>
@@ -1462,6 +1594,36 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the reviewer lists of an unsigned slot keep the current choice when that reviewer is no longer a
+    ///     member of the project, instead of showing nothing selected.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_NonMemberReviewers_KeepCurrentChoiceInTheLists()
+    {
+        // Arrange: a slot of ann (primary) and bob (alternate), both removed from the project, and an administrator
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        await Users.CreateAsync("root", "Root", UserRole.Admin, SigningPassword, TestContext.Current.CancellationToken);
+        await RevokeMembershipAsync(projectId, "ann");
+        await RevokeMembershipAsync(projectId, "bob");
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: each list holds an extra option for its current reviewer, and that option is the chosen value
+        var primary = cut.Find($"[data-testid='slot-primary-select-{slotId}']");
+        var alternate = cut.Find($"[data-testid='slot-alternate-select-{slotId}']");
+        var primaryOption = cut.Find($"[data-testid='slot-primary-unavailable-{slotId}']");
+        var alternateOption = cut.Find($"[data-testid='slot-alternate-unavailable-{slotId}']");
+        Assert.Equal(ids["ann"].ToString(), primaryOption.GetAttribute("value"));
+        Assert.Equal(ids["bob"].ToString(), alternateOption.GetAttribute("value"));
+        Assert.Equal(ids["ann"].ToString(), primary.GetAttribute("value"));
+        Assert.Equal(ids["bob"].ToString(), alternate.GetAttribute("value"));
+        Assert.Equal("Ann (ann), disabled or no longer a member", primaryOption.TextContent);
+        Assert.Equal("Bob (bob), disabled or no longer a member", alternateOption.TextContent);
+    }
+
+    /// <summary>
     ///     Test that a slot of enabled reviewers adds no extra option to the reviewer lists.
     /// </summary>
     [Fact]
@@ -1563,6 +1725,55 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a user who occupies a slot but has the role of an auditor sees the read-only notice and no
+    ///     sign form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm()
+    {
+        // Arrange: a signable review in which bob is the alternate of the slot; bob sees the sign form
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        SignInAs("bob", "Bob", false);
+        Assert.NotEmpty(RenderPage(projectId).FindAll($"[data-testid='sign-form-{slotId}']"));
+
+        // Act: bob becomes an auditor of the project and the page is drawn again
+        await ChangeMemberRoleAsync(projectId, "bob", ProjectRole.Auditor);
+        var cut = RenderPage(projectId);
+
+        // Assert: bob still holds the slot, sees the read-only notice and gets no sign form
+        Assert.NotEmpty(cut.FindAll("[data-testid='readonly-notice']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-button-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that both the primary and the alternate reviewer of a signable review see the sign form with the
+    ///     outcome Approved, its meaning, and a password field.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignableReview_OccupantsSeeSignFormWithApprovedOutcome()
+    {
+        // Arrange: a signable review of ann (primary) and bob (alternate)
+        var (projectId, slotId, _) = await CreateSignableAsync();
+
+        // Act: render the page as ann, then as bob
+        var asPrimary = RenderPage(projectId);
+        SignInAs("bob", "Bob", UserRole.Reviewer);
+        var asAlternate = RenderPage(projectId);
+
+        // Assert: each of them gets the form with a password field, the outcome and its meaning
+        foreach (var cut in new[] { asPrimary, asAlternate })
+        {
+            Assert.NotNull(cut.Find($"[data-testid='sign-form-{slotId}']"));
+            Assert.Equal("password", cut.Find($"[data-testid='sign-password-{slotId}']").GetAttribute("type"));
+            Assert.Equal("You are signing: APPROVED", cut.Find($"[data-testid='sign-outcome-{slotId}']").TextContent);
+            Assert.Equal(
+                SigningService.MeaningFor(ReviewOutcome.Approved),
+                cut.Find($"[data-testid='sign-meaning-{slotId}']").TextContent);
+        }
+    }
+
+    /// <summary>
     ///     Test that a wrong password is refused with the generic message, signs nothing, and neither the typed
     ///     password nor any value is left in the page.
     /// </summary>
@@ -1614,6 +1825,24 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
         var signature = Assert.Single(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         Assert.Equal((ids["ann"], SlotRole.Primary), (signature.UserId, signature.Role));
+    }
+
+    /// <summary>
+    ///     Test that the summary strip shows how many of the reviewer slots are signed.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignedSlot_SummaryShowsSignedCount()
+    {
+        // Arrange: a review with one slot that ann has signed
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await SignSlotAsync(projectId, slotId);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the reviewers cell of the strip counts the signed slot
+        var cell = cut.Find("[data-testid='summary-reviewers']");
+        Assert.Equal("1 of 1 signed", cell.QuerySelector(".summary-value")!.TextContent);
     }
 
     /// <summary>
@@ -1703,8 +1932,8 @@ public partial class ReviewPageTests : PageTestBase
         // Act: sign with the used code
         await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
-        // Assert: refused
-        Assert.NotNull(cut.Find($"[data-testid='sign-error-{slotId}']"));
+        // Assert: refused with the general message
+        Assert.Equal("The password or the code is incorrect.", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
         Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
 
         // Act: wait for the next step and sign with its code
@@ -1734,8 +1963,8 @@ public partial class ReviewPageTests : PageTestBase
         // Act: sign
         await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
-        // Assert: refused, nothing signed
-        Assert.NotNull(cut.Find($"[data-testid='sign-error-{slotId}']"));
+        // Assert: refused with the general message, nothing signed
+        Assert.Equal("The password or the code is incorrect.", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
         Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
 
@@ -1795,6 +2024,153 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: refused with the reason, nothing stored
         Assert.Contains("changed", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent, StringComparison.Ordinal);
         Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Creates a review that can be signed whose only slot belongs to a user of an identity provider (primary,
+    ///     no alternate), who is signed in.
+    /// </summary>
+    /// <returns>The project identity, the slot identity and the identity of the provider user.</returns>
+    private async Task<(int ProjectId, int SlotId, int UserId)> CreateProviderSignableAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Services.Configure<global::DemaConsulting.ReviewCenter.Identity.OidcOptions>(options =>
+        {
+            options.Enabled = true;
+            options.DisplayName = "Provider";
+        });
+        await CreateUsersAsync();
+        var external = (await Users.SignInExternalAsync(
+            "https://idp.example.com/", "sub-1", "zoe", "Zoe", cancellationToken)).User!;
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var slot = await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", external.Id, null, cancellationToken);
+        await AnswerAllAsync(projectId, new Actor("zoe", "Zoe"));
+        SignInAs("zoe", "Zoe", false);
+        return (projectId, slot.Id, external.Id);
+    }
+
+    /// <summary>
+    ///     Renders the page for <c>REV-1</c> as the sign-in endpoint sends the browser back after a confirmation of
+    ///     identity: with the <c>reauth</c> query value.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reauth">The value of the <c>reauth</c> query parameter.</param>
+    /// <returns>The rendered component.</returns>
+    private IRenderedComponent<ReviewPage> RenderPageAfterConfirmation(int projectId, string reauth)
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.GetUriWithQueryParameter("reauth", reauth));
+        return Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, "REV-1"));
+    }
+
+    /// <summary>
+    ///     Test that a user of an identity provider gets a button that confirms the identity at the provider, and no
+    ///     password field and no sign form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ProviderUser_OffersConfirmationButtonInsteadOfPassword()
+    {
+        // Arrange: a signable review whose slot belongs to a user of the provider, who has not confirmed yet
+        var (projectId, slotId, _) = await CreateProviderSignableAsync();
+
+        // Act: render the page as that user
+        var cut = RenderPage(projectId);
+
+        // Assert: the confirmation button of the provider is offered, and no password field
+        var form = cut.Find($"[data-testid='sign-reauth-form-{slotId}']");
+        Assert.Equal("/auth/oidc/reauth", form.GetAttribute("action"));
+        Assert.Equal(
+            "Confirm identity with Provider",
+            cut.Find($"[data-testid='sign-reauth-{slotId}']").TextContent.Trim());
+        Assert.Empty(cut.FindAll($"[data-testid='sign-password-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that a user of an identity provider who confirmed the identity is offered the signature, with no
+    ///     second request for the confirmation and no password field.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ProviderUserWithConfirmation_OffersSignButton()
+    {
+        // Arrange: a signable review whose slot belongs to a user of the provider, who confirmed the identity
+        var (projectId, slotId, userId) = await CreateProviderSignableAsync();
+        Proofs.Issue(userId, projectId, "REV-1", slotId);
+
+        // Act: render the page as that user
+        var cut = RenderPage(projectId);
+
+        // Assert: the sign form says that the identity is confirmed and offers the sign button
+        Assert.NotNull(cut.Find($"[data-testid='sign-confirmed-{slotId}']"));
+        Assert.NotNull(cut.Find($"[data-testid='sign-button-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-reauth-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-password-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that a failed confirmation because the provider reported no usable sign-in time says exactly that.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ProviderUserMissingAuthTime_NamesTheCause()
+    {
+        // Arrange: a user of the provider, sent back after a confirmation without a usable sign-in time
+        var (projectId, slotId, _) = await CreateProviderSignableAsync();
+
+        // Act: render the page as the sign-in endpoint sends the browser back
+        var cut = RenderPageAfterConfirmation(projectId, "missing-auth-time");
+
+        // Assert: the page names the missing sign-in time, and the confirmation is offered again
+        Assert.Equal(
+            "Provider did not report a usable sign-in time (auth_time). An administrator must check that it sends "
+            + "auth_time as a whole number of seconds since 1970 (see the Identity Providers chapter of the user guide).",
+            cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
+        Assert.NotNull(cut.Find($"[data-testid='sign-reauth-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that a failed confirmation because the sign-in was not recent enough says exactly that.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ProviderUserStaleAuthTime_NamesTheCause()
+    {
+        // Arrange: a user of the provider, sent back after a confirmation whose sign-in was too old
+        var (projectId, slotId, _) = await CreateProviderSignableAsync();
+
+        // Act: render the page as the sign-in endpoint sends the browser back
+        var cut = RenderPageAfterConfirmation(projectId, "stale-auth-time");
+
+        // Assert: the page says that the sign-in was not recent enough
+        Assert.Equal(
+            "Your sign-in at Provider was not recent enough. Try again and sign in when asked.",
+            cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that any other failed confirmation gives the general message, and that a value that is none of the
+    ///     known ones puts no text on the page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ProviderUserFailedConfirmation_ShowsGeneralMessage()
+    {
+        // Arrange: a user of the provider
+        var (projectId, slotId, _) = await CreateProviderSignableAsync();
+
+        // Act: render the page after a failed confirmation
+        var failed = RenderPageAfterConfirmation(projectId, "failed");
+
+        // Assert: the general message for the failure
+        Assert.Equal(
+            "We could not confirm your identity. Sign in again at Provider when asked.",
+            failed.Find($"[data-testid='sign-error-{slotId}']").TextContent);
+
+        // Act: render the page with a value that is none of the known ones
+        var unknown = RenderPageAfterConfirmation(projectId, "x");
+
+        // Assert: no message
+        Assert.Empty(unknown.FindAll($"[data-testid='sign-error-{slotId}']"));
     }
 
     /// <summary>
@@ -2023,6 +2399,59 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal("Overdue", other.Find("[data-testid='review-overdue']").TextContent);
         Assert.Empty(other.FindAll("[data-testid='due-date-form']"));
         Assert.Empty(other.FindAll("[data-testid='review-due-input']"));
+    }
+
+    /// <summary>
+    ///     Test that an administrator of the project who is neither a system administrator nor the creator of the
+    ///     review gets the due date form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_ProjectAdministrator_ShowsTheForm()
+    {
+        // Arrange: a review created by ann, and bob, who is an administrator of the project only
+        await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        await ChangeMemberRoleAsync(project.Id, "bob", ProjectRole.ProjectAdmin);
+        SignInAs("bob", "Bob", false);
+
+        // Act: render the page as bob
+        var cut = RenderPage(project.Id);
+
+        // Assert: the form with the date field and both buttons
+        Assert.NotNull(cut.Find("[data-testid='due-date-form']"));
+        Assert.NotNull(cut.Find("[data-testid='review-due-input']"));
+        Assert.NotNull(cut.Find("[data-testid='review-due-save']"));
+        Assert.NotNull(cut.Find("[data-testid='review-due-clear']"));
+    }
+
+    /// <summary>
+    ///     Test that a due date of today, and one of tomorrow, show no Overdue badge, while the date is shown.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_TodayOrLater_ShowsNoOverdueBadge()
+    {
+        // Arrange: a review whose due date is today (the clock is 2025-03-04)
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var today = DateOnly.FromDateTime(Time.GetUtcNow().UtcDateTime);
+        await Reviews.SetDueDateAsync(projectId, "REV-1", today, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var todayPage = RenderPage(projectId);
+
+        // Assert: the date is shown and the review is not overdue
+        Assert.Equal("Due 2025-03-04 (UTC)", todayPage.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Empty(todayPage.FindAll("[data-testid='review-overdue']"));
+
+        // Act: move the date to tomorrow and render again
+        await Reviews.SetDueDateAsync(projectId, "REV-1", today.AddDays(1), TestActors.Ann, TestContext.Current.CancellationToken);
+        var tomorrowPage = RenderPage(projectId);
+
+        // Assert: still not overdue
+        Assert.Equal("Due 2025-03-05 (UTC)", tomorrowPage.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Empty(tomorrowPage.FindAll("[data-testid='review-overdue']"));
     }
 
     /// <summary>
@@ -2549,6 +2978,31 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a new thread submitted after the membership was removed is refused, stores nothing and leaves
+    ///     only the not-found page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing()
+    {
+        // Arrange: the member has the file selected and has typed the text of a new thread
+        var (projectId, _) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-1']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("late new thread");
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: submit the new thread
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: nothing is shown, and the review still has only its original thread
+        AssertNothingOfTheReviewIsShown(cut);
+        Assert.DoesNotContain("late new thread", cut.Markup, StringComparison.Ordinal);
+        var stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal("confidential-thread-comment", Assert.Single(stored.Comments).Text);
+    }
+
+    /// <summary>
     ///     Creates a review of the files that is approved: one slot of ann (primary) and bob (alternate), signed by
     ///     ann, so that the review is locked.
     /// </summary>
@@ -2670,6 +3124,29 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that an approved review disables the comment button of every line of the file shown.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReview_DisablesTheLineCommentButtons()
+    {
+        // Arrange: an approved review
+        var (projectId, _) = await CreateApprovedAsync();
+
+        // Act: render the page and select the file
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: there are comment buttons, and each is disabled and marked as locked
+        var buttons = cut.FindAll("[data-testid^='line-comment-']");
+        Assert.NotEmpty(buttons);
+        foreach (var button in buttons)
+        {
+            Assert.True(button.HasAttribute("disabled"), $"{button.GetAttribute("data-testid")} is not disabled.");
+            Assert.Equal("true", button.GetAttribute("data-locked"));
+        }
+    }
+
+    /// <summary>
     ///     Test that an approved review shows its existing threads without a reply box.
     /// </summary>
     [Fact]
@@ -2694,6 +3171,34 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that an approved review offers no control to resolve or reopen a thread, while the same thread has
+    ///     that control before the review is concluded.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReviewWithThread_OffersNoResolveOrReopen()
+    {
+        // Arrange: a signable review with a resolved thread, drawn while it is still open
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+        var open = RenderPage(projectId);
+        await open.Find("[data-testid='file-select-0']").ClickAsync();
+        await open.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+        Assert.NotNull(open.Find($"[data-testid='thread-toggle-{thread.Id}']"));
+
+        // Act: sign so that the review is approved and locked, then render the page and expand the thread
+        await SignSlotAsync(projectId, slotId);
+        var locked = RenderPage(projectId);
+        await locked.Find("[data-testid='file-select-0']").ClickAsync();
+        await locked.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+
+        // Assert: the thread is shown, with no control to resolve or reopen it
+        Assert.Equal("Resolved", locked.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
+        Assert.Empty(locked.FindAll($"[data-testid='thread-toggle-{thread.Id}']"));
+    }
+
+    /// <summary>
     ///     Test that a project member who is not an administrator sees the locked review without the reopen form.
     /// </summary>
     [Fact]
@@ -2710,6 +3215,45 @@ public partial class ReviewPageTests : PageTestBase
         Assert.NotNull(cut.Find("[data-testid='review-locked']"));
         Assert.Empty(cut.FindAll("[data-testid='reopen-form']"));
         Assert.Empty(cut.FindAll("[data-testid='reopen-button']"));
+    }
+
+    /// <summary>
+    ///     Test that an administrator of the project who is not a system administrator sees the reopen form on a
+    ///     locked review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReviewProjectAdmin_ShowsReopenForm()
+    {
+        // Arrange: an approved review, viewed by cyd, an administrator of the project only
+        var (projectId, _) = await CreateApprovedAsync();
+        await ChangeMemberRoleAsync(projectId, "cyd", ProjectRole.ProjectAdmin);
+        SignInAs("cyd", "Cyd", isSystemAdmin: false);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: locked, with the form to reopen
+        Assert.NotNull(cut.Find("[data-testid='review-locked']"));
+        Assert.NotNull(cut.Find("[data-testid='reopen-form']"));
+        Assert.NotNull(cut.Find("[data-testid='reopen-reason']"));
+        Assert.NotNull(cut.Find("[data-testid='reopen-button']"));
+    }
+
+    /// <summary>
+    ///     Test that the field for the reason of a reopening is limited to 250 characters.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ReopenForm_LimitsTheReasonLength()
+    {
+        // Arrange: an approved review, viewed by an administrator
+        var (projectId, _) = await CreateApprovedAsync();
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the reason field takes at most 250 characters
+        Assert.Equal("250", cut.Find("[data-testid='reopen-reason']").GetAttribute("maxlength"));
     }
 
     /// <summary>
@@ -2734,9 +3278,43 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='reopen-form']"));
         Assert.Equal("Root", cut.Find("[data-testid='reopen-by-0']").TextContent);
         Assert.Equal("Found a missing file", cut.Find("[data-testid='reopen-reason-0']").TextContent);
-        Assert.NotEmpty(cut.Find("[data-testid='reopen-digest-0']").TextContent);
+        Assert.NotEmpty(cut.Find("[data-testid='reopen-time-0']").TextContent);
+        Assert.Equal(16, cut.Find("[data-testid='reopen-digest-0']").TextContent.Length);
         Assert.Equal("Signed, then the review changed", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
         Assert.Single(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a review that was reopened twice lists the first reopening first, each with who and when.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reopen_TwoReopenings_ListsOldestFirst()
+    {
+        // Arrange: ann signed and reopened the review, bob signed it again, and then root reopened it
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await Users.CreateAsync("root", "Root", UserRole.Admin, SigningPassword, cancellationToken);
+        await SignSlotAsync(projectId, slotId);
+        await Signing.ReopenReviewAsync(new Actor("ann", "Ann"), projectId, "REV-1", "First reason", cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(
+            new Actor("bob", "Bob"), projectId, "REV-1", slotId, approval!.Digest, SigningPassword, cancellationToken);
+        await Signing.ReopenReviewAsync(new Actor("root", "Root"), projectId, "REV-1", "Second reason", cancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the first reopening comes first, then the second, each with the person and the time
+        Assert.Equal("Ann", cut.Find("[data-testid='reopen-by-0']").TextContent);
+        Assert.Equal("First reason", cut.Find("[data-testid='reopen-reason-0']").TextContent);
+        Assert.Equal("Root", cut.Find("[data-testid='reopen-by-1']").TextContent);
+        Assert.Equal("Second reason", cut.Find("[data-testid='reopen-reason-1']").TextContent);
+        var firstTime = cut.Find("[data-testid='reopen-time-0']").TextContent;
+        var secondTime = cut.Find("[data-testid='reopen-time-1']").TextContent;
+        Assert.Equal("2025-03-04 05:06 UTC", firstTime);
+        Assert.Equal("2025-03-04 05:06 UTC", secondTime);
+        Assert.Empty(cut.FindAll("[data-testid='reopen-entry-2']"));
     }
 
     /// <summary>
@@ -2823,6 +3401,58 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that, when the project requires independent reviewers, a member who is not the author of the review
+    ///     does not get the hint that is meant for the author.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_IndependenceOn_OtherMemberSeesNoHint()
+    {
+        // Arrange: a review that ann created, in a project that requires independent reviewers
+        await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        SignInAs("bob", "Bob", UserRole.Reviewer);
+
+        // Act: render the page as bob
+        var cut = RenderPage(project.Id);
+
+        // Assert: the Reviewers card is shown, without the hint
+        Assert.NotNull(cut.Find("[data-testid='reviewers-card']"));
+        Assert.Empty(cut.FindAll("[data-testid='author-independence-hint']"));
+    }
+
+    /// <summary>
+    ///     Test that, when the project does not require independent reviewers, the author of the review is offered
+    ///     again, with every other user, and gets no hint.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_IndependenceOff_OffersTheAuthorAndShowsNoHint()
+    {
+        // Arrange: a review that ann created, in a project where the rule for independent reviewers is switched off
+        await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        await Projects.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, true, false, TestContext.Current.CancellationToken);
+
+        // Act: render the page as ann
+        var cut = RenderPage(project.Id);
+
+        // Assert: no hint, and ann, bob and cyd are in both choice lists
+        Assert.Empty(cut.FindAll("[data-testid='author-independence-hint']"));
+        foreach (var testId in new[] { "new-slot-primary-select", "new-slot-alternate-select" })
+        {
+            var options = cut.Find($"[data-testid='{testId}']").QuerySelectorAll("option").Select(o => o.TextContent).ToList();
+            Assert.Contains("Ann (ann)", options);
+            Assert.Contains("Bob (bob)", options);
+            Assert.Contains("Cyd (cyd)", options);
+        }
+    }
+
+    /// <summary>
     ///     Test that, when the project requires independent reviewers, the author of the review is not offered as a
     ///     reviewer and is told that another member has to review.
     /// </summary>
@@ -2841,9 +3471,12 @@ public partial class ReviewPageTests : PageTestBase
 
         // Assert: the hint is shown and ann is not among the choices; bob and cyd are
         Assert.NotNull(cut.Find("[data-testid='author-independence-hint']"));
-        var options = cut.Find("[data-testid='new-slot-primary-select']").QuerySelectorAll("option").Select(o => o.TextContent).ToList();
-        Assert.DoesNotContain(options, o => o.Contains("(ann)", StringComparison.Ordinal));
-        Assert.Contains(options, o => o.Contains("(bob)", StringComparison.Ordinal));
-        Assert.Contains(options, o => o.Contains("(cyd)", StringComparison.Ordinal));
+        foreach (var testId in new[] { "new-slot-primary-select", "new-slot-alternate-select" })
+        {
+            var options = cut.Find($"[data-testid='{testId}']").QuerySelectorAll("option").Select(o => o.TextContent).ToList();
+            Assert.DoesNotContain(options, o => o.Contains("(ann)", StringComparison.Ordinal));
+            Assert.Contains(options, o => o.Contains("(bob)", StringComparison.Ordinal));
+            Assert.Contains(options, o => o.Contains("(cyd)", StringComparison.Ordinal));
+        }
     }
 }

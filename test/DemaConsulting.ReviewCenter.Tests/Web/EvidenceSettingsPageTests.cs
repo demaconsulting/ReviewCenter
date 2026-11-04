@@ -310,7 +310,8 @@ public class EvidenceSettingsPageTests : PageTestBase
 
         // Act and assert: the index alone exposes no PDF content, so there is no line about people
         await SetAsync(cut, "anonymous-index", on: true);
-        Assert.NotEmpty(cut.FindAll("[data-testid='evidence-anonymous-warning']"));
+        var exposure = cut.Find("[data-testid='evidence-anonymous-warning']").TextContent;
+        Assert.Contains("Anyone who can reach this server can read what you opened, without signing in.", exposure, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='evidence-anonymous-people-warning']"));
 
         // Act and assert: anonymous PDFs with threads and names on name both

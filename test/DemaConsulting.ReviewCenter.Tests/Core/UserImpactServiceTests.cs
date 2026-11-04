@@ -171,6 +171,39 @@ public class UserImpactServiceTests
     }
 
     /// <summary>
+    ///     Test that several slots of one review that wait for the same user are ordered by slot number.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber()
+    {
+        // Arrange: ann is the alternate of slot 1, the primary of slot 2, and the primary of slot 3 of one review
+        // (slots 2 and 3 are arranged in the store, which the rules of the signing service would refuse)
+        var setup = await ArrangeAsync();
+        await setup.World.CreateReviewAsync("r1");
+        await setup.World.AddSlotAsync("r1", "bob", "ann");
+        foreach (var unused in new[] { 2, 3 })
+        {
+            await setup.World.Store.AddSlotAsync(
+                new ReviewerSlot
+                {
+                    ProjectId = setup.World.ProjectId,
+                    ReviewId = "r1",
+                    PrimaryUserId = setup.IdOf("ann")
+                },
+                _ => AuditTestExtensions.Draft(),
+                Ct);
+        }
+
+        // Act
+        var impact = await setup.ImpactOfAsync("ann");
+
+        // Assert: exactly the three slots of the one review, in the order of their numbers
+        Assert.Equal(
+            [("r1", 1, SlotRole.Alternate), ("r1", 2, SlotRole.Primary), ("r1", 3, SlotRole.Primary)],
+            impact.OpenWork.Select(w => (w.ReviewId, w.SlotNumber, w.Role)));
+    }
+
+    /// <summary>
     ///     Test that a project administrator who is the only enabled one is reported, and that a system administrator
     ///     who is not a member does not count as a project administrator.
     /// </summary>
@@ -228,6 +261,42 @@ public class UserImpactServiceTests
         // Assert
         Assert.Equal("Apollo", Assert.Single(enabledOne.SoleAdminProjects).ProjectName);
         Assert.Empty(disabledOne.SoleAdminProjects);
+    }
+
+    /// <summary>
+    ///     Test that a plain member of the project does not count as another administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_PlainMemberOfTheProject_DoesNotCountAsAdministrator()
+    {
+        // Arrange: a plain member joins the project of the only administrator
+        var setup = await ArrangeAsync();
+        await setup.AddUserAsync("member_x", setup.World.ProjectId, ProjectRole.User);
+
+        // Act
+        var impact = await setup.ImpactOfAsync("adm_a");
+
+        // Assert
+        Assert.Equal("Apollo", Assert.Single(impact.SoleAdminProjects).ProjectName);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who is a plain member of the project does not count as another
+    ///     administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_SystemAdministratorMember_DoesNotCountAsAdministrator()
+    {
+        // Arrange: a system administrator joins the project as a plain member
+        var setup = await ArrangeAsync();
+        var sysadmin = await setup.World.Users.CreateAsync("sys_x", "sys_x", true, InboxTestWorld.Password, Ct);
+        await setup.World.Store.AddMembershipAsync(sysadmin.Id, setup.World.ProjectId, ProjectRole.User, Ct);
+
+        // Act
+        var impact = await setup.ImpactOfAsync("adm_a");
+
+        // Assert
+        Assert.Equal("Apollo", Assert.Single(impact.SoleAdminProjects).ProjectName);
     }
 
     /// <summary>
@@ -298,6 +367,23 @@ public class UserImpactServiceTests
         // Act
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => setup.Service.GetImpactAsync(actor, setup.World.Ids["bob"], Ct));
+
+        // Assert
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a member whose account is disabled is refused as not allowed like any member.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_DisabledMember_IsRefused()
+    {
+        // Arrange
+        var setup = await ArrangeAsync();
+        await setup.World.Users.SetEnabledAsync("ann", false, Ct);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => setup.ImpactOfAsync("bob", "ann"));
 
         // Assert
         Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);

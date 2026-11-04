@@ -272,28 +272,50 @@ public class NotificationPreferenceServiceTests
     }
 
     /// <summary>
+    ///     Test that a new request after the cooldown mails a second code to the address.
+    /// </summary>
+    [Fact]
+    public async Task NotificationPreferenceService_RequestConfirmation_AfterCooldown_MailsNewCode()
+    {
+        // Arrange: a first code was mailed
+        var world = await World.CreateAsync();
+        await world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token);
+        world.Clock.Advance(NotificationPreferenceService.ResendCooldown + TimeSpan.FromSeconds(1));
+
+        // Act: ask again after the cooldown
+        await world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token);
+
+        // Assert: a second mail went to the same address, and the address is still pending
+        Assert.Equal(2, world.Sender.Sent.Count);
+        Assert.All(world.Sender.Sent, message => Assert.Equal(AnnAddress, message.ToAddress));
+        Assert.Equal(AnnAddress, (await world.Service.GetStatusAsync(Ann, world.Token)).PendingAddress);
+    }
+
+    /// <summary>
     ///     Test that a new request after the cooldown replaces the code, so only the newest works.
     /// </summary>
     [Fact]
     public async Task NotificationPreferenceService_RequestConfirmation_AfterCooldown_OldCodeStopsWorking()
     {
-        // Arrange: a first code, and a second one after the cooldown
+        // Arrange: a first code, and a second one after the cooldown; a rare equal pair is replaced by a third code
         var world = await World.CreateAsync();
         await world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token);
         var first = world.Sender.LastCode();
-        world.Clock.Advance(NotificationPreferenceService.ResendCooldown + TimeSpan.FromSeconds(1));
-        await world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token);
-        var second = world.Sender.LastCode();
-
-        // Act: type the old code, unless the two codes happen to be equal
-        if (first != second)
+        var second = first;
+        for (var attempt = 0; attempt < 2 && second == first; attempt++)
         {
-            var exception = await Assert.ThrowsAsync<DomainRuleException>(
-                () => world.Service.ConfirmAsync(Ann, first, world.Token));
-            Assert.Equal(DomainRule.NotificationCodeIncorrect, exception.Rule);
+            world.Clock.Advance(NotificationPreferenceService.ResendCooldown + TimeSpan.FromSeconds(1));
+            await world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token);
+            second = world.Sender.LastCode();
         }
 
-        // Assert: the new code confirms
+        // Act: type the old code
+        Assert.NotEqual(first, second);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.ConfirmAsync(Ann, first, world.Token));
+
+        // Assert: the old code is refused, and the new code confirms
+        Assert.Equal(DomainRule.NotificationCodeIncorrect, exception.Rule);
         await world.Service.ConfirmAsync(Ann, second, world.Token);
         Assert.Equal(AnnAddress, (await world.Service.GetStatusAsync(Ann, world.Token)).ConfirmedAddress);
     }
@@ -316,10 +338,36 @@ public class NotificationPreferenceServiceTests
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => world.Service.RequestConfirmationAsync(Ann, "another@example.com", world.Token));
 
-        // Assert: refused; the day after it works again
+        // Assert: refused, and no further mail left
         Assert.Equal(DomainRule.NotificationLimitReached, exception.Rule);
+        Assert.Equal(NotificationPreferenceService.MaxConfirmationsPerUserPerDay, world.Sender.Sent.Count);
+    }
+
+    /// <summary>
+    ///     Test that a user who reached the daily limit gets a confirmation mail again after a day.
+    /// </summary>
+    [Fact]
+    public async Task NotificationPreferenceService_RequestConfirmation_AfterDayPassed_MailsAgain()
+    {
+        // Arrange: the daily limit is reached and the next request is refused
+        var world = await World.CreateAsync();
+        for (var index = 0; index < NotificationPreferenceService.MaxConfirmationsPerUserPerDay; index++)
+        {
+            await world.Service.RequestConfirmationAsync(Ann, $"ann{index}@example.com", world.Token);
+            world.Clock.Advance(NotificationPreferenceService.ResendCooldown + TimeSpan.FromSeconds(1));
+        }
+
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.RequestConfirmationAsync(Ann, "another@example.com", world.Token));
+
+        // Act: ask again after a day has passed
         world.Clock.Advance(TimeSpan.FromHours(24));
         await world.Service.RequestConfirmationAsync(Ann, "another@example.com", world.Token);
+
+        // Assert: one more mail went to the new address, which is now pending
+        Assert.Equal(NotificationPreferenceService.MaxConfirmationsPerUserPerDay + 1, world.Sender.Sent.Count);
+        Assert.Equal("another@example.com", world.Sender.Sent[^1].ToAddress);
+        Assert.Equal("another@example.com", (await world.Service.GetStatusAsync(Ann, world.Token)).PendingAddress);
     }
 
     /// <summary>
@@ -361,8 +409,9 @@ public class NotificationPreferenceServiceTests
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token));
 
-        // Assert: refused
+        // Assert: refused, and nothing mailed
         Assert.Equal(DomainRule.NotificationLimitReached, exception.Rule);
+        Assert.Empty(world.Sender.Sent);
     }
 
     /// <summary>
@@ -565,14 +614,17 @@ public class NotificationPreferenceServiceTests
         // Arrange: the feature is off
         var world = await World.CreateAsync(NotificationSettings.Off);
 
-        // Act and Assert: not available, the confirmed address is hidden, nothing is mailed or stored
+        // Act and Assert: every action is not available, the confirmed address is hidden, nothing is mailed or stored
         Assert.False(world.Service.IsAvailable);
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token));
-        Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule);
+        var refusals = await RefuseAllActionsAsync(world, Ann);
+        Assert.Equal(4, refusals.Length);
+        Assert.All(refusals, exception => Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule));
         Assert.Null(await world.Service.GetConfirmedAddressAsync(1, world.Token));
         Assert.Empty(world.Sender.Sent);
         Assert.Empty(world.Store.Log);
+        Assert.Empty(world.Store.Commits);
+        Assert.Empty(world.Store.Audits);
+        Assert.Equal(0, world.Store.Calls);
     }
 
     /// <summary>
@@ -585,11 +637,12 @@ public class NotificationPreferenceServiceTests
         var world = await World.CreateAsync();
         world.Sender.Configured = false;
 
-        // Act and Assert: not available
+        // Act and Assert: every action is not available, and nothing is mailed
         Assert.False(world.Service.IsAvailable);
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token));
-        Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule);
+        var refusals = await RefuseAllActionsAsync(world, Ann);
+        Assert.Equal(4, refusals.Length);
+        Assert.All(refusals, exception => Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule));
+        Assert.Empty(world.Sender.Sent);
     }
 
     /// <summary>
@@ -603,13 +656,14 @@ public class NotificationPreferenceServiceTests
         await world.AddUserAsync("dora");
         await world.Users.SetEnabledAsync("dora", false, Actor.CommandLine, world.Token);
 
-        // Act and Assert: refused as not allowed
-        var disabled = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Service.RequestConfirmationAsync(new Actor("dora", "Dora"), AnnAddress, world.Token));
-        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Service.RequestConfirmationAsync(new Actor("nobody", "Nobody"), AnnAddress, world.Token));
-        Assert.Equal(DomainRule.ActorNotAllowed, disabled.Rule);
-        Assert.Equal(DomainRule.ActorNotAllowed, unknown.Rule);
+        // Act and Assert: every action of either is refused as not allowed, and nothing is mailed
+        var disabled = await RefuseAllActionsAsync(world, new Actor("dora", "Dora"));
+        var unknown = await RefuseAllActionsAsync(world, new Actor("nobody", "Nobody"));
+        Assert.Equal(4, disabled.Length);
+        Assert.Equal(4, unknown.Length);
+        Assert.All(disabled, exception => Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule));
+        Assert.All(unknown, exception => Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule));
+        Assert.Empty(world.Sender.Sent);
     }
 
     /// <summary>
@@ -622,10 +676,11 @@ public class NotificationPreferenceServiceTests
         var world = await World.CreateAsync();
         await world.Users.SetPasswordAsync("ann", "another long passphrase", Actor.CommandLine, world.Token);
 
-        // Act and Assert: refused as not available until the password is replaced
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Service.RequestConfirmationAsync(Ann, AnnAddress, world.Token));
-        Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule);
+        // Act and Assert: every action is refused as not available until the password is replaced
+        var refusals = await RefuseAllActionsAsync(world, Ann);
+        Assert.Equal(4, refusals.Length);
+        Assert.All(refusals, exception => Assert.Equal(DomainRule.NotificationsNotAvailable, exception.Rule));
+        Assert.Empty(world.Sender.Sent);
     }
 
     /// <summary>
@@ -637,9 +692,34 @@ public class NotificationPreferenceServiceTests
         // Arrange: the service
         var world = await World.CreateAsync();
 
-        // Act and Assert: a null actor is not a rule violation
+        // Act and Assert: a null actor is not a rule violation, for every action
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => world.Service.RequestConfirmationAsync(null!, AnnAddress, world.Token));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => world.Service.ConfirmAsync(null!, "123456", world.Token));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => world.Service.RemoveAddressAsync(null!, world.Token));
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => world.Service.GetStatusAsync(null!, world.Token));
+    }
+
+    /// <summary>
+    ///     Runs the four notification actions (request, confirm, remove, status) for an actor that is refused.
+    /// </summary>
+    /// <param name="world">The services of the test.</param>
+    /// <param name="actor">The actor.</param>
+    /// <returns>The refusals of the four actions, in that order.</returns>
+    private static async Task<DomainRuleException[]> RefuseAllActionsAsync(World world, Actor actor)
+    {
+        var request = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.RequestConfirmationAsync(actor, AnnAddress, world.Token));
+        var confirm = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.ConfirmAsync(actor, "123456", world.Token));
+        var remove = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.RemoveAddressAsync(actor, world.Token));
+        var status = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.GetStatusAsync(actor, world.Token));
+        return [request, confirm, remove, status];
     }
 
     /// <summary>

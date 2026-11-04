@@ -11,72 +11,243 @@ sections:
     requirements:
       - id: ReviewCenter-EvidenceSettingsService-Defaults
         title: >-
-          The EvidenceSettings type shall default to evidence that is private and complete, with the anonymous index
-          and the anonymous attestations off and the five content switches (threads, reviewer names, checklist
-          wording, files, and git context) on, and the service shall give a new project these settings.
+          The EvidenceSettings type shall default to evidence that is private, with the anonymous index and the
+          anonymous attestations off.
         justification: |
-          Evidence must not be readable without signing in, and a PDF must not leave anything out, until a project
-          administrator decides so on purpose. Safe defaults mean that a project that nobody configured behaves as
-          the installation did before the settings existed.
+          Evidence must not be readable without signing in until a project administrator decides so on purpose. Safe
+          defaults mean that a project that nobody configured behaves as the installation did before the settings
+          existed.
         tests:
           - EvidenceSettings_Default_IsPrivateAndComplete
+
+      - id: ReviewCenter-EvidenceSettingsService-Defaults-Complete
+        title: >-
+          The EvidenceSettings type shall default to evidence that is complete, with the five content switches
+          (threads, reviewer names, checklist wording, files, and git context) on.
+        justification: |
+          A PDF must not leave anything out until a project administrator decides so on purpose, so that a project
+          that nobody configured attests everything that was reviewed.
+        tests:
+          - EvidenceSettings_Default_ContentSwitchesOn_IsComplete
+
+      - id: ReviewCenter-EvidenceSettingsService-Defaults-NewProject
+        title: >-
+          The EvidenceSettingsService class shall give a new project the default settings.
+        justification: |
+          A project that nobody configured must start with the safe defaults.
+        tests:
           - EvidenceSettingsService_GetAsync_NewProject_HasDefaults
 
       - id: ReviewCenter-EvidenceSettingsService-Describe
         title: >-
-          The EvidenceSettings type shall name every content switch that is off as an omitted section, in a fixed
-          order and in the words the user sees, count the anonymous switches as no reduction of the content, and list
-          the settings that differ from earlier ones, each by key with its old and new value, in the order of the
-          properties.
+          The EvidenceSettings type shall name every content switch that is off as an omitted section in the words
+          the user sees.
         justification: |
           The settings page, the content scope section of every PDF, and the audit trail must name a reduction in
-          the same words, so that the three can be compared. Listing the changed keys with both values lets one
-          audit entry say exactly what a change did.
+          the same words, so that the three can be compared.
         tests:
           - EvidenceSettings_OmittedSections_NameEachSwitchThatIsOff
+
+      - id: ReviewCenter-EvidenceSettingsService-Describe-Order
+        title: >-
+          The EvidenceSettings type shall list the omitted sections in a fixed order.
+        justification: |
+          The same settings must read the same on every page and in every PDF.
+        tests:
+          - EvidenceSettings_OmittedSections_NameEachSwitchThatIsOff
+
+      - id: ReviewCenter-EvidenceSettingsService-Describe-Anonymous
+        title: >-
+          The EvidenceSettings type shall count the anonymous switches as no reduction of the content.
+        justification: |
+          The anonymous switches change who may read the evidence and not what it contains.
+        tests:
+          - EvidenceSettings_IsReduced_OnlyAnonymousSwitchesOn_IsNotReduced
+          - EvidenceSettings_OmittedSections_NameEachSwitchThatIsOff
+
+      - id: ReviewCenter-EvidenceSettingsService-Describe-Changes
+        title: >-
+          The EvidenceSettings type shall list the settings that differ from earlier ones, each by key with its old
+          and new value.
+        justification: |
+          Listing the changed keys with both values lets one audit entry say exactly what a change did.
+        tests:
+          - EvidenceSettings_ChangesFrom_NamesChangedKeysWithOldAndNewValue
+
+      - id: ReviewCenter-EvidenceSettingsService-Describe-ChangesOrder
+        title: >-
+          The EvidenceSettings type shall list the changed settings in the order of the properties.
+        justification: |
+          The same change must read the same in every audit entry.
+        tests:
           - EvidenceSettings_ChangesFrom_NamesChangedKeysWithOldAndNewValue
 
       - id: ReviewCenter-EvidenceSettingsService-Access
         title: >-
-          The EvidenceSettingsService class shall read and change the settings of a project only for a system
-          administrator or a project administrator of that project, checked again at every call, tell a plain member
-          of the project that it may not, give every other actor, including a user outside the project, an
-          administrator of another project, a disabled user, and no actor at all, the answer for a project that does
-          not exist, and change and record nothing when it refuses.
+          The EvidenceSettingsService class shall read the settings of a project for a system administrator or a
+          project administrator of that project.
         justification: |
           The settings decide who may read the evidence of the project and what a PDF contains, so only the people
-          who administer the project may touch them. A project that the actor may not see must read like a missing
-          one, so that its existence does not leak, and a right that was revoked while a page was open must not
-          get a change through.
+          who administer the project may see them.
+        tests:
+          - EvidenceSettingsService_GetAsync_SystemAndProjectAdministrator_ReturnsSettings
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-EvidenceSettingsService-Access-Change
+        title: >-
+          The EvidenceSettingsService class shall change the settings of a project for a system administrator or a
+          project administrator of that project.
+        justification: |
+          A change opens or reduces the evidence of the project, so only the people who administer the project may
+          make it.
+        tests:
+          - EvidenceSettingsService_SetAsync_SystemAndProjectAdministrator_StoresChange
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-EvidenceSettingsService-Access-Rechecked
+        title: >-
+          The EvidenceSettingsService class shall check the right of the actor again at every call.
+        justification: |
+          A right that was revoked while a page was open must not get a change through.
+        tests:
+          - EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall
+
+      - id: ReviewCenter-EvidenceSettingsService-Access-Member
+        title: >-
+          The EvidenceSettingsService class shall tell a plain member of the project that it may not read or change
+          the settings.
+        justification: |
+          A member sees the project, so the refusal can say so without leaking anything.
         tests:
           - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
 
+      - id: ReviewCenter-EvidenceSettingsService-Access-Hidden
+        title: >-
+          The EvidenceSettingsService class shall give a user outside the project, an administrator of another
+          project, a disabled user (a member or an administrator of the project), and no actor at all the answer for
+          a project that does not exist.
+        justification: |
+          A project that the actor may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-EvidenceSettingsService-Access-StoresNothing
+        title: >-
+          The EvidenceSettingsService class shall change no settings when it refuses an actor.
+        justification: |
+          A refused request must not have any effect.
+        tests:
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall
+
+      - id: ReviewCenter-EvidenceSettingsService-Access-RecordsNothing
+        title: >-
+          The EvidenceSettingsService class shall record no audit entry when it refuses an actor.
+        justification: |
+          A refused request is not a change, and the trail must show only real changes.
+        tests:
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall
+
       - id: ReviewCenter-EvidenceSettingsService-Change
         title: >-
-          The EvidenceSettingsService class shall store a change of the settings for the project it names only,
-          leaving the settings of every other project as they are, and shall report that the settings were changed.
+          The EvidenceSettingsService class shall store a change of the settings for the project it names.
         justification: |
-          Every project has settings of its own. A change that reached another project would open or reduce the
-          evidence of a body of work whose administrators did not decide it.
+          Every project has settings of its own. A change that was not stored would leave the evidence as it was.
+        tests:
+          - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Change-OtherProjects
+        title: >-
+          The EvidenceSettingsService class shall leave the settings of every other project as they are when it
+          stores a change.
+        justification: |
+          A change that reached another project would open or reduce the evidence of a body of work whose
+          administrators did not decide it.
+        tests:
+          - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Change-Reported
+        title: >-
+          The EvidenceSettingsService class shall report that the settings were changed when it stores a change.
+        justification: |
+          The caller must be able to tell a change that was made from a save that did nothing.
         tests:
           - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
 
       - id: ReviewCenter-EvidenceSettingsService-Audit
         title: >-
           The EvidenceSettingsService class shall record a change of the settings as one audit entry,
-          project.evidence-settings-changed, that carries the project and no review, names the actor, and lists every
-          changed key with its old and new value as on or off.
+          project.evidence-settings-changed, that carries the project and no review.
         justification: |
           Opening the evidence to anyone, or leaving a section out of the PDFs, is a decision that an auditor must be
-          able to find in the history, with who made it and what it changed. The entry is saved with the change by
-          the store, so a change without its entry cannot exist.
+          able to find in the history. The entry is saved with the change by the store, so a change without its
+          entry cannot exist.
         tests:
+          - EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey
           - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Audit-Atomic
+        title: >-
+          The EvidenceSettingsService class shall give the store the audit entry of a change of the settings in the
+          same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - EvidenceSettingsService_SetAsync_Change_GivesTheStoreEntryAndChangeInOneCall
+
+      - id: ReviewCenter-EvidenceSettingsService-Audit-Actor
+        title: >-
+          The EvidenceSettingsService class shall name the actor in the audit entry of a change of the settings.
+        justification: |
+          The history must say who made the decision.
+        tests:
+          - EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey
+          - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Audit-Keys
+        title: >-
+          The EvidenceSettingsService class shall list every changed key in the audit entry of a change of the
+          settings.
+        justification: |
+          The history must say which settings the change touched.
+        tests:
+          - EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey
+          - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-EvidenceSettingsService-Audit-KeyValues
+        title: >-
+          The EvidenceSettingsService class shall give the old and new value of every changed key as on or off in the
+          audit entry of a change of the settings.
+        justification: |
+          The history must say what the change did to each setting, and whether it opened or reduced the evidence.
+        tests:
+          - EvidenceSettingsService_SetAsync_SwitchTurnedOn_AuditsOffToOn
+          - EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey
 
       - id: ReviewCenter-EvidenceSettingsService-NoChange
         title: >-
-          The EvidenceSettingsService class shall, when the new settings equal the settings the caller started from,
-          store nothing, record nothing, and report that nothing changed.
+          The EvidenceSettingsService class shall report that nothing changed when the new settings equal the
+          settings the caller started from.
+        justification: |
+          The caller must be able to tell a save that changed nothing from a change.
+        tests:
+          - EvidenceSettingsService_SetAsync_NoChange_RecordsNothing
+
+      - id: ReviewCenter-EvidenceSettingsService-NoChange-Stored
+        title: >-
+          The EvidenceSettingsService class shall leave the stored settings as they are when the new settings equal
+          the settings the caller started from.
+        justification: |
+          A save that changes nothing must not touch what is stored.
+        tests:
+          - EvidenceSettingsService_SetAsync_NoChange_RecordsNothing
+
+      - id: ReviewCenter-EvidenceSettingsService-NoChange-RecordsNothing
+        title: >-
+          The EvidenceSettingsService class shall record no audit entry when the new settings equal the settings the
+          caller started from.
         justification: |
           A save that changes nothing must not add an entry to the audit trail, or the trail would fill with
           entries that say nothing and hide the real changes.
@@ -85,26 +256,57 @@ sections:
 
       - id: ReviewCenter-EvidenceSettingsService-Conflict
         title: >-
-          The EvidenceSettingsService class shall change the settings only when the stored settings still equal the
-          settings the caller started from, and shall otherwise refuse the change with the record-changed rule
-          (which the API reports as a conflict), store nothing, and record nothing.
+          The EvidenceSettingsService class shall refuse a change with the record-changed rule when the stored
+          settings no longer equal the settings the caller started from.
         justification: |
           Two administrators can edit the settings at the same time. Without the comparison the later save would
           silently undo the earlier one, possibly opening evidence that the first administrator had just closed.
+          The API reports the rule as a conflict.
+        tests:
+          - EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged
+
+      - id: ReviewCenter-EvidenceSettingsService-Conflict-StoresNothing
+        title: >-
+          The EvidenceSettingsService class shall leave the stored settings as they are when it refuses a change as
+          record-changed.
+        justification: |
+          The earlier administrator's decision must survive.
+        tests:
+          - EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged
+
+      - id: ReviewCenter-EvidenceSettingsService-Conflict-RecordsNothing
+        title: >-
+          The EvidenceSettingsService class shall record no audit entry when it refuses a change as record-changed.
+        justification: |
+          A refused change did not happen, so the trail must not say that it did.
         tests:
           - EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged
 
       - id: ReviewCenter-EvidenceSettingsService-Effective
         title: >-
-          The EvidenceSettingsService class shall return the settings of a project to a caller that is not an actor,
-          for the services that apply them to a request, and nothing for a project that does not exist, and shall
-          refuse a change of a project that does not exist as not found.
+          The EvidenceSettingsService class shall return the settings of a project to a caller that is not an actor.
         justification: |
           The evidence services and the API must apply the settings to a request whoever makes it, including a caller
           who has not signed in. That read grants nothing by itself: it only tells what the administrators decided.
         tests:
+          - EvidenceSettingsService_GetEffectiveAsync_NoActor_ReturnsTheStoredSettings
+
+      - id: ReviewCenter-EvidenceSettingsService-Effective-UnknownProject
+        title: >-
+          The EvidenceSettingsService class shall return no settings for a project that does not exist when it reads
+          without an actor.
+        justification: |
+          A caller must be able to tell a missing project from a project with settings.
+        tests:
           - EvidenceSettingsService_UnknownProject_IsNotFound
-          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-EvidenceSettingsService-Effective-ChangeNotFound
+        title: >-
+          The EvidenceSettingsService class shall refuse a change of a project that does not exist as not found.
+        justification: |
+          There is nothing to change, and the refusal must say so.
+        tests:
+          - EvidenceSettingsService_UnknownProject_IsNotFound
 
       - id: ReviewCenter-EvidenceSettingsService-Arguments
         title: >-

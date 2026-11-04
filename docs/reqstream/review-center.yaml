@@ -382,6 +382,7 @@ sections:
           - ReviewCenter-Web-DeepLinks
           - ReviewCenter-Web-DeepLinks-AddressBar
           - ReviewCenter-Web-DeepLinks-ReturnAfterSignIn
+          - ReviewCenter-Web-DeepLinks-FirstResponse
           - ReviewCenter-Core-Threads
           - ReviewCenter-Storage-Threads
           - ReviewCenter-Storage-Threads-State

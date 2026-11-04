@@ -48,6 +48,30 @@ public class AuditEntryTableTests : BunitContext
     }
 
     /// <summary>
+    ///     Test that the time of an entry is shown in UTC, even when the entry carries another offset.
+    /// </summary>
+    [Fact]
+    public void AuditEntryTable_Render_EntryWithOffsetTime_ShowsUtcTime()
+    {
+        // Arrange: an entry at 07:06:07 in a zone two hours ahead of UTC
+        var entry = new AuditEntry
+        {
+            Sequence = 1,
+            TimestampUtc = new DateTimeOffset(2025, 3, 4, 7, 6, 7, TimeSpan.FromHours(2)),
+            ActorName = "Ann",
+            Action = "review.created",
+            Detail = "detail 1"
+        };
+        var page = new AuditEntryPage([entry], false, false);
+
+        // Act
+        var cut = Render<AuditEntryTable>(p => p.Add(c => c.Page, page).Add(c => c.BasePath, "/audit"));
+
+        // Assert: the time cell shows the UTC time
+        Assert.Equal("2025-03-04 05:06:07", cut.Find("[data-testid='audit-time']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that the Older and Newer links carry the filter and the page size, and stay plain without a filter.
     /// </summary>
     [Fact]

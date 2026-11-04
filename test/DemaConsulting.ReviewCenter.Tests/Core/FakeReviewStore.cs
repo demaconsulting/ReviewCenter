@@ -33,6 +33,15 @@ internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 }
 
 /// <summary>
+///     One call that changed a thread in <see cref="FakeReviewStore"/>.
+/// </summary>
+/// <param name="Call">The name of the store method that was called.</param>
+/// <param name="ThreadId">The identity of the thread that was changed.</param>
+/// <param name="Audit">The audit draft that came with the change in the same call.</param>
+/// <param name="Resolution">The resolution comment that came with a resolve, or <c>null</c>.</param>
+internal sealed record ThreadChangeCall(string Call, int ThreadId, AuditDraft Audit, ReviewComment? Resolution);
+
+/// <summary>
 ///     In-memory <see cref="IReviewStore"/> used to test the domain services and pages without a database.
 /// </summary>
 /// <remarks>
@@ -113,6 +122,19 @@ internal sealed class FakeReviewStore : IReviewStore
     ///     take effect adds none.
     /// </summary>
     public List<AuditDraft> Audits { get; } = [];
+
+    /// <summary>
+    ///     Gets the calls that changed a thread (started it, added a comment, resolved, reopened, changed its kind or
+    ///     the report flag of a comment) and took effect, each with the thread, the audit draft that came with the
+    ///     change and the resolution comment of a resolve; a call that changed nothing is not listed.
+    /// </summary>
+    public List<ThreadChangeCall> ThreadChangeCalls { get; } = [];
+
+    /// <summary>
+    ///     Gets the calls that asked the store to change the evidence settings of a project, whether or not they took
+    ///     effect, with the project, the new settings and the audit draft that came with the change.
+    /// </summary>
+    public List<(int ProjectId, EvidenceSettings Updated, AuditDraft Audit)> EvidenceSettingsUpdateCalls { get; } = [];
 
     /// <inheritdoc />
     public Task<Project> AddProjectAsync(
@@ -251,6 +273,8 @@ internal sealed class FakeReviewStore : IReviewStore
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
+        EvidenceSettingsUpdateCalls.Add((projectId, updated, audit));
+
         // Like the real store: compare and set in one step; a lost race or an unknown project changes nothing
         var index = _projects.FindIndex(p => p.Id == projectId);
         if (index < 0 || _projects[index].Evidence != expected)
@@ -768,7 +792,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Comments = thread.Comments.Select(comment => Copy(comment, id)).ToList()
         };
         _threads.Add(stored);
-        Audits.Add(audit(stored));
+        RecordThreadChange(nameof(AddThreadAsync), id, audit(stored));
         return Task.FromResult(stored);
     }
 
@@ -789,7 +813,7 @@ internal sealed class FakeReviewStore : IReviewStore
 
         var stored = Copy(comment, threadId);
         thread.Comments.Add(stored);
-        Audits.Add(audit(stored));
+        RecordThreadChange(nameof(AddCommentAsync), threadId, audit(stored));
         return Task.FromResult<ReviewComment?>(stored);
     }
 
@@ -807,7 +831,7 @@ internal sealed class FakeReviewStore : IReviewStore
             return Task.FromResult(false);
         }
 
-        Audits.Add(audit);
+        RecordThreadChange(nameof(ReopenThreadAsync), threadId, audit);
         // The state is init-only, so the stored thread is replaced by a copy with the new state
         ReplaceThread(index, ReviewThreadState.Open, _threads[index].Comments);
         return Task.FromResult(true);
@@ -874,7 +898,7 @@ internal sealed class FakeReviewStore : IReviewStore
         }
 
         ReplaceThread(index, ReviewThreadState.Resolved, comments);
-        Audits.Add(audit);
+        RecordThreadChange(nameof(ResolveThreadAsync), threadId, audit, resolution);
         return true;
     }
 
@@ -900,7 +924,7 @@ internal sealed class FakeReviewStore : IReviewStore
             .Select((c, i) => i == 0 || c.Kind == ReviewCommentKind.Resolution ? WithFlag(c, include) : c)
             .ToList();
         ReplaceThread(index, _threads[index].State, comments);
-        Audits.Add(audit);
+        RecordThreadChange(nameof(SetThreadKindAsync), threadId, audit);
         return true;
     }
 
@@ -934,8 +958,22 @@ internal sealed class FakeReviewStore : IReviewStore
 
         var comments = _threads[index].Comments.Select(c => c.Id == commentId ? WithFlag(c, include) : c).ToList();
         ReplaceThread(index, _threads[index].State, comments);
-        Audits.Add(audit);
+        RecordThreadChange(nameof(SetCommentReportAsync), threadId, audit);
         return true;
+    }
+
+    /// <summary>
+    ///     Keeps the audit draft that came with a thread change, both with the change in <see cref="ThreadChangeCalls"/>
+    ///     and in <see cref="Audits"/>, as the real store saves the entry and the change in one transaction.
+    /// </summary>
+    /// <param name="call">The name of the store method that was called.</param>
+    /// <param name="threadId">The identity of the thread that was changed.</param>
+    /// <param name="audit">The audit draft of the change.</param>
+    /// <param name="resolution">The resolution comment that came with the change, or <c>null</c>.</param>
+    private void RecordThreadChange(string call, int threadId, AuditDraft audit, ReviewComment? resolution = null)
+    {
+        ThreadChangeCalls.Add(new ThreadChangeCall(call, threadId, audit, resolution));
+        Audits.Add(audit);
     }
 
     /// <inheritdoc />

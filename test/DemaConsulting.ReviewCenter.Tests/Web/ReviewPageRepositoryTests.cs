@@ -129,6 +129,31 @@ public class ReviewPageRepositoryTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the Details section of an uploaded review shows no repository name, commit identifiers or
+    ///     selection.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_UploadedReview_DetailsShowNoSource()
+    {
+        // Arrange: an uploaded review next to a repository review
+        var projectId = await CreateRepositoryReviewAsync();
+        await Reviews.CreateDraftAsync(projectId, "REV-2", "Upload", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+
+        // Act: render the uploaded review
+        var cut = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, "REV-2"));
+
+        // Assert: the Details section is there, and none of the source rows is
+        var details = cut.Find("[data-testid='review-details']");
+        Assert.Equal("REV-2", details.QuerySelector("[data-testid='review-id']")?.TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-repository']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-baseline-sha']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-head-sha']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-selection']"));
+    }
+
+    /// <summary>
     ///     Test that the Details section of a review created by planning shows the review-set it belongs to.
     /// </summary>
     [Fact]

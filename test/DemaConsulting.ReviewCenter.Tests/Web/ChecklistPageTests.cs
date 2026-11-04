@@ -138,6 +138,34 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that every check of the open section offers a Pass, a Fail and an N/A button.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_NewReview_OffersPassFailAndNotApplicableForEveryCheck()
+    {
+        // Arrange: a new review with nothing answered
+        var projectId = await CreateReviewAsync();
+
+        // Act: render the page, whose first section is open
+        var cut = RenderPage(projectId);
+
+        // Assert: the 8 checks of the open section have the three buttons each, and nothing else answers
+        var itemIds = DefaultChecklist.Current.Sections.First(s => s.Id == "REQ").Items
+            .Select(item => item.Id.ToLowerInvariant()).ToList();
+        Assert.Equal(8, itemIds.Count);
+        foreach (var itemId in itemIds)
+        {
+            Assert.Equal("Pass", cut.Find($"[data-testid='check-pass-{itemId}']").TextContent);
+            Assert.Equal("Fail", cut.Find($"[data-testid='check-fail-{itemId}']").TextContent);
+            Assert.Equal("N/A", cut.Find($"[data-testid='check-na-{itemId}']").TextContent);
+        }
+
+        Assert.Equal(8, cut.FindAll("[data-testid^='check-pass-']").Count);
+        Assert.Equal(8, cut.FindAll("[data-testid^='check-fail-']").Count);
+        Assert.Equal(8, cut.FindAll("[data-testid^='check-na-']").Count);
+    }
+
+    /// <summary>
     ///     Test that an unknown review shows a not-found message.
     /// </summary>
     [Fact]
@@ -255,24 +283,7 @@ public partial class ChecklistPageTests : PageTestBase
     public async Task ChecklistPage_Render_RejectedConcludedReview_IsReadOnly()
     {
         // Arrange: a review whose only slot (rita) rejected it with a conclusion text and signed
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var projectId = await CreateReviewAsync(seatAnn: false);
-        var rita = new Actor("rita", "Rita");
-        var user = await Users.CreateAsync("rita", "Rita", UserRole.Reviewer, SigningPassword, cancellationToken);
-        await Store.AddMembershipAsync(user.Id, projectId, cancellationToken);
-        var slot = await Signing.AddSlotAsync(rita, projectId, "REV-1", user.Id, null, cancellationToken);
-        var first = true;
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await Checklists.SetAnswerAsync(
-                projectId, "REV-1", item.Id, first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass, first ? "Wrong." : null, rita, cancellationToken);
-            first = false;
-        }
-
-        await Checklists.SubmitBallotAsync(projectId, "REV-1", rita, cancellationToken);
-        await Checklists.SetReviewConclusionTextAsync(projectId, "REV-1", "Not ready.", rita, cancellationToken);
-        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
-        await Signing.SignAsync(rita, projectId, "REV-1", slot.Id, approval!.Digest, SigningPassword, cancellationToken);
+        var projectId = await CreateRejectedReviewAsync();
 
         // Act
         var cut = RenderPage(projectId);
@@ -285,6 +296,160 @@ public partial class ChecklistPageTests : PageTestBase
         {
             Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
         }
+    }
+
+    /// <summary>
+    ///     Creates a review whose only slot (rita) rejected it with a conclusion text and signed, so the review is
+    ///     concluded. The first check is answered Fail with the justification "Wrong.", every other check Pass.
+    /// </summary>
+    /// <param name="designOff"><c>true</c> to mark the design section as not applicable instead of answering it.</param>
+    /// <returns>The project identity.</returns>
+    private async Task<int> CreateRejectedReviewAsync(bool designOff = false)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync(seatAnn: false);
+        var rita = new Actor("rita", "Rita");
+        var user = await Users.CreateAsync("rita", "Rita", UserRole.Reviewer, SigningPassword, cancellationToken);
+        await Store.AddMembershipAsync(user.Id, projectId, cancellationToken);
+        var slot = await Signing.AddSlotAsync(rita, projectId, "REV-1", user.Id, null, cancellationToken);
+        var first = true;
+        foreach (var section in DefaultChecklist.Current.Sections)
+        {
+            if (designOff && section.Id == "DES")
+            {
+                await Checklists.SetSectionApplicabilityAsync(projectId, "REV-1", "DES", false, "No design files", rita, cancellationToken);
+                continue;
+            }
+
+            foreach (var item in section.Items)
+            {
+                await Checklists.SetAnswerAsync(
+                    projectId, "REV-1", item.Id, first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass, first ? "Wrong." : null, rita, cancellationToken);
+                first = false;
+            }
+        }
+
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", rita, cancellationToken);
+        await Checklists.SetReviewConclusionTextAsync(projectId, "REV-1", "Not ready.", rita, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(rita, projectId, "REV-1", slot.Id, approval!.Digest, SigningPassword, cancellationToken);
+        return projectId;
+    }
+
+    /// <summary>
+    ///     Opens a section of the page unless it is open already.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    /// <param name="sectionId">The lower-case section id, for example <c>req</c>.</param>
+    /// <returns>A task that completes when the section is open.</returns>
+    private static async Task OpenSectionAsync(IRenderedComponent<ChecklistPage> cut, string sectionId)
+    {
+        var toggle = cut.Find($"[data-testid='section-{sectionId}-toggle']");
+        if (toggle.GetAttribute("aria-expanded") != "true")
+        {
+            await toggle.ClickAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Asserts that every control that answers a check or changes a section is disabled, while the sections can
+    ///     still be opened. Expects a checklist in which the first check is answered Fail with a justification (so the
+    ///     justification field and its save button exist) and the design section is stored as not applicable with a
+    ///     reason (so the reason field and its save button exist).
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    /// <returns>A task that completes when the assertions are done.</returns>
+    private static async Task AssertEveryChangingControlDisabledAsync(IRenderedComponent<ChecklistPage> cut)
+    {
+        // The requirements section: the answer buttons, the justification field and its save button, the switch
+        await OpenSectionAsync(cut, "req");
+        foreach (var testId in new[]
+                 {
+                     "check-pass-req-01", "check-fail-req-01", "check-na-req-01", "check-justification-req-01",
+                     "check-save-req-01", "section-req-applicable"
+                 })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+
+        // The design section: the switch, the reason field and its save button
+        await OpenSectionAsync(cut, "des");
+        foreach (var testId in new[] { "section-des-applicable", "section-des-reason", "section-des-save" })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the checklist of a review concluded as rejected disables every control that would change it:
+    ///     the answer buttons, the justification field and its save button, the switch of a section, and the reason
+    ///     field and its save button.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_RejectedConcludedReview_DisablesEveryControlThatChangesTheChecklist()
+    {
+        // Arrange: a concluded review with a Fail that has a justification and a section that is not applicable
+        var projectId = await CreateRejectedReviewAsync(designOff: true);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        await AssertEveryChangingControlDisabledAsync(cut);
+    }
+
+    /// <summary>
+    ///     Answers the whole checklist as the given reviewer: the first check Fail with the justification "Wrong.",
+    ///     every other check Pass, except that the design section is marked as not applicable with a reason. The
+    ///     reviewer must hold the only slot, so the ballot is handed in by the last answer.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="actor">The reviewer.</param>
+    /// <returns>A task that completes when everything is stored.</returns>
+    private async Task AnswerWholeChecklistAsync(int projectId, Actor actor)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var first = true;
+        foreach (var section in DefaultChecklist.Current.Sections)
+        {
+            if (section.Id == "DES")
+            {
+                await Checklists.SetSectionApplicabilityAsync(projectId, "REV-1", "DES", false, "No design files", actor, cancellationToken);
+                continue;
+            }
+
+            foreach (var item in section.Items)
+            {
+                await Checklists.SetAnswerAsync(
+                    projectId, "REV-1", item.Id, first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass, first ? "Wrong." : null, actor, cancellationToken);
+                first = false;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that an auditor, who only reads, has every control disabled that would change the checklist: the
+    ///     answer buttons, the justification field and its save button, the switch of a section, and the reason field
+    ///     and its save button.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_Auditor_DisablesEveryControlThatChangesTheChecklist()
+    {
+        // Arrange: ann (the only reviewer) answered everything, with a Fail that has a justification and a section
+        // that is not applicable; aud is an auditor of the project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        await AnswerWholeChecklistAsync(projectId, TestActors.Ann);
+        var aud = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, SigningPassword, cancellationToken);
+        await Store.AddMembershipAsync(aud.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        SignInAs("aud", "Aud", false);
+
+        // Act: render the page as the auditor
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.NotEmpty(cut.FindAll("[data-testid='readonly-notice']"));
+        await AssertEveryChangingControlDisabledAsync(cut);
     }
 
     /// <summary>
@@ -744,6 +909,29 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that an N/A asks for a justification that is marked as required, and that saving it stores the N/A
+    ///     with the justification.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Answer_NotApplicable_ShowsRequiredJustificationBoxAndStoresOnSave()
+    {
+        // Arrange: a new review, with the reviewer signed in as Ann
+        var projectId = await CreateReviewAsync();
+        var cut = RenderPage(projectId);
+        Assert.Empty(cut.FindAll("[data-testid='check-justification-req-01']"));
+
+        // Act: choose N/A, type a justification and save
+        await cut.Find("[data-testid='check-na-req-01']").ClickAsync();
+        Assert.Contains("required", cut.Find("[data-testid='check-req-01'] label").TextContent, StringComparison.Ordinal);
+        await cut.Find("[data-testid='check-justification-req-01']").InputAsync("No requirements in scope");
+        await cut.Find("[data-testid='check-save-req-01']").ClickAsync();
+
+        // Assert: the N/A is stored with its justification
+        var answer = (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01")!;
+        Assert.Equal((ChecklistOutcome.NotApplicable, "No requirements in scope"), (answer.Outcome, answer.Justification));
+    }
+
+    /// <summary>
     ///     Test that the answer is recorded under the signed-in user, whatever the page is asked to show, and
     ///     that the page has no field for a name.
     /// </summary>
@@ -764,6 +952,29 @@ public partial class ChecklistPageTests : PageTestBase
         Assert.Contains("Answered by Bea", cut.Find("[data-testid='check-answered-by-req-01']").TextContent, StringComparison.Ordinal);
         var answer = (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01")!;
         Assert.Equal(("bea", "Bea"), (answer.AnsweredByUsername, answer.AnsweredBy));
+    }
+
+    /// <summary>
+    ///     Test that in a review with two reviewer slots the answer is stored in the ballot of the slot of the
+    ///     signed-in user and in no other ballot.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Answer_TwoReviewerSlots_StoresTheAnswerInTheBallotOfTheSignedInUser()
+    {
+        // Arrange: a review with the slots of ann and bea, with Bea signed in
+        var projectId = await CreateReviewAsync();
+        await SeatAsync(projectId, "REV-1", "bea");
+        SignInAs("bea", "Bea");
+        var cut = RenderPage(projectId);
+
+        // Act: pass the first check
+        await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
+
+        // Assert: the ballot of bea holds the answer, and the ballot of ann holds none
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var answerOfBea = (await Checklists.GetAsync(projectId, "REV-1", cancellationToken, "bea"))!.AnswerFor("REQ-01");
+        Assert.Equal(ChecklistOutcome.Pass, answerOfBea!.Outcome);
+        Assert.Null((await Checklists.GetAsync(projectId, "REV-1", cancellationToken, "ann"))!.AnswerFor("REQ-01"));
     }
 
     /// <summary>
@@ -798,6 +1009,31 @@ public partial class ChecklistPageTests : PageTestBase
         Assert.False(asMember.Find("[data-testid='check-pass-req-01']").HasAttribute("disabled"));
         Assert.Empty(ruleOff.FindAll("[data-testid='author-answer-blocked']"));
         Assert.False(ruleOff.Find("[data-testid='check-pass-req-01']").HasAttribute("disabled"));
+    }
+
+    /// <summary>
+    ///     Test that the author of the review, while the project does not let the author answer, has every control
+    ///     disabled that would change the checklist: the answer buttons, the justification field and its save button,
+    ///     the switch of a section, and the reason field and its save button.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist()
+    {
+        // Arrange: the author (the only reviewer) answered everything while the rule was off, then the rule is on
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync(seatAnn: false);
+        await SeatAsync(projectId, "REV-1", "author");
+        await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonAuthorChecklistAnswers, cancellationToken);
+        await AnswerWholeChecklistAsync(projectId, new Actor("author", "Author"));
+        await Projects.SetReviewRuleAsync(TestActors.Ann, projectId, ReviewRule.NonAuthorChecklistAnswers, false, true, cancellationToken);
+        SignInAs("author", "Author");
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.NotEmpty(cut.FindAll("[data-testid='author-answer-blocked']"));
+        await AssertEveryChangingControlDisabledAsync(cut);
     }
 
     /// <summary>
@@ -862,6 +1098,8 @@ public partial class ChecklistPageTests : PageTestBase
         Assert.Equal("A reason is required.", cut.Find("[data-testid='section-des-error']").TextContent);
         Assert.NotNull(cut.Find("[data-testid='section-des-reason']"));
         Assert.Equal("0 of 58 checks answered", cut.Find("[data-testid='checklist-progress']").TextContent);
+        var state = await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.True(state!.IsApplicable("DES"));
     }
 
     /// <summary>

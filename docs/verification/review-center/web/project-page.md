@@ -211,6 +211,11 @@ open the created review, and the page does not navigate until the link is follow
 is typed; the form says the date is in UTC. After submitting, the review carries the date. This scenario is tested by
 `NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, defined in `NewReviewPageRepositoryTests.cs`.
 
+**NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc**: The new-review form of a project is rendered; the optional
+due date field is a date input, is empty, and its field text says "Due date (optional)" and "A calendar day in UTC".
+This scenario is tested by `NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc`, defined in
+`NewReviewPageRepositoryTests.cs`.
+
 **NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing**: Yesterday as the due date shows an error that
 names the due date and creates nothing; with the field emptied the review is created without a date. This scenario is
 tested by `NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing`.
@@ -224,14 +229,27 @@ the form is submitted again, the review is created from the upload with the date
 link; after a repository is registered, the link goes to `/projects/{id}/plan` and the note is gone. This scenario is
 tested by `ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository`.
 
+**ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk**: A project has no repository. A plain member sees
+the note "Planning reviews needs a repository; ask a project administrator to add one."; a project administrator sees
+"Planning reviews needs a repository; add one with the Repositories button."; neither sees the link. This scenario is
+tested by `ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk`.
+
+**ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote**: The only repository of the project is
+registered and then disabled; the page shows no link and the note. This scenario is tested by
+`ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote`.
+
 **ProjectPage_Render_UnknownProject_ShowsNotFound**: The project page is rendered for an unknown project; the
 not-found message names the identity and no form is shown. This scenario is tested by
 `ProjectPage_Render_UnknownProject_ShowsNotFound`.
 
 **ProjectPage_Render_NonMember_LooksLikeAMissingProject**: A project with a review exists, and a user who is no member
 and no system administrator is signed in. The project page shows the same not-found message as for a missing project
-and neither the name of the project nor its review, and the page for a new review shows the not-found message and no
-form. This scenario is tested by `ProjectPage_Render_NonMember_LooksLikeAMissingProject`.
+and neither the name of the project nor its review. This scenario is tested by
+`ProjectPage_Render_NonMember_LooksLikeAMissingProject`.
+
+**NewReviewPage_Render_NonMember_LooksLikeAMissingProject**: The same user opens the page for a new review of the
+project; it shows the same not-found message as for a missing project and no form. This scenario is tested by
+`NewReviewPage_Render_NonMember_LooksLikeAMissingProject`.
 
 **ProjectPage_Render_Member_SeesReviewsButNoMembersSection**: A member who is no administrator opens the page of the
 project; the review is listed and the New review button is shown, but there is no members list, no add member button,
@@ -252,6 +270,10 @@ the membership is stored with that role. This scenario is tested by
 members are listed with the role and Remove buttons, the add member button and the Audit trail button are shown, and
 no other user is listed. This scenario is tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons`.
 
+**ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink**: A project administrator opens the page of the project; the
+Repositories button is shown and leads to `/projects/{id}/repositories`. This scenario is tested by
+`ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink`.
+
 **ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink**: A plain member sees the reviews, but no members
 section, no add button, and no Audit trail button. This scenario is tested by
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
@@ -264,6 +286,11 @@ gone, the row is gone, and the empty message is shown. This scenario is tested b
 **ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves**: A project administrator makes a member a project admin
 and removes a member; both changes are stored. This scenario is tested by
 `ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves`.
+
+**ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange**: A project administrator makes a member a project
+admin, and then removes the member. After the first change the status reads "'mbr' is now project admin."; after the
+removal it reads "Removed 'mbr' from the project.". This scenario is tested by
+`ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange`.
 
 **ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing**: The only project administrator
 presses Remove on the own row and, in a second run, the role button of the own row. The explanation of the last
@@ -329,6 +356,11 @@ keeps what was typed, and no membership is added. This scenario is tested by
 message is shown and the role of the membership is unchanged. This scenario is tested by
 `NewMemberPage_Submit_AlreadyMember_ShowsMessageAndKeepsTheRole`.
 
+**NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing**: The project admin box and the auditor box
+are both ticked and an existing user is submitted; the page says "Choose either project admin or auditor, not both."
+and the user is no member. This scenario is tested by
+`NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing`.
+
 **NewMemberPage_Submit_RightLostWhileOpen_AddsNothingAndDropsTheForm**: The membership is revoked, the user is demoted
 to plain member, or the session ends without the page knowing, and the form is submitted; nothing is added and the page
 shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
@@ -362,6 +394,11 @@ when the browser refuses, the page says how to go on. This scenario is tested by
 show a message next to the form, keep what was typed, and create nothing. This scenario is tested by
 `NewMemberAccountPage_Submit_TakenOrInvalidName_ShowsMessageAndCreatesNothing`.
 
+**NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing**: The project admin box and the
+auditor box are both ticked and valid names are submitted; the page says "Choose either project admin or auditor, not
+both.", shows no password, and creates neither the account nor a membership. This scenario is tested by
+`NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing`.
+
 **NewMemberAccountPage_Submit_RightLostWhileOpen_CreatesNothingAndDropsTheForm**: The membership is revoked, the user
 is demoted to plain member, or the session ends without the page knowing, and the form is submitted; nothing is
 created and the page shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
@@ -393,6 +430,11 @@ by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval`.
 signed with the right password and one review without slots; the first is listed as "Approved" and the second as
 "Setup". This scenario is tested by `ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview`.
 
+**ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain**: A review whose only slot was signed with the right
+password is listed as "Approved". An administrator reopens it, which changes the record, so the earlier signature is out
+of date. The page then lists the review as "In review" and the row says "1 signed, then the review changed". This
+scenario is tested by `ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain`.
+
 **ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary**: A project has reviews in each stage,
 with a signed slot, an out-of-date signature, open threads, an unanswered check, a Fail answer, a due date, and a past
 due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of date"), its blockers (for example "1 open
@@ -410,12 +452,22 @@ shows the Rejected badge, the summary strip shows "1 rejected" (`project-summary
 in exactly one check and nothing else blocks it. Its blockers cell reads "1 disputed" instead of a dash, and the blocked
 filter lists the review. This scenario is tested by `ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker`.
 
+**ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker**: A review has an unsigned slot and no answer to any check of
+the default checklist. Its blockers cell reads the number of checks of that checklist followed by "unanswered", and the
+blocked filter lists the review. This scenario is tested by `ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker`.
+
 **ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates**: The current culture and the current UI culture
 are set to `th-TH` (restored afterwards); the test first checks that this culture writes another year than 2025 for a
 2025 date, so it cannot pass vacuously when culture data is missing. The page of the seeded project shows the due date
 `2025-03-03`, a created date and a last activity (`yyyy-MM-dd HH:mm`) that start with `2025-`, and `datetime`
 attributes in the round-trip format with Gregorian digits. This scenario is tested by
 `ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates`.
+
+**ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity**: A review has no audit entry and was created on
+2025-02-01 at 08:30; another review, created earlier, has one audit entry stamped by the fixed clock. The column of the
+first shows `2025-02-01 08:30`, the column of the second shows the time of the entry (`2025-03-04 05:06`), and its
+`datetime` attribute is the round-trip form of that time. This scenario is tested by
+`ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity`.
 
 **ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked**: A review is stored without a
 checklist, and another has a checklist with every check answered. The first shows "No checklist" as its blockers and the
@@ -431,6 +483,11 @@ the rows are in that order, and the header of the sorted column links to the opp
 headers link to the ascending order. This scenario is tested by
 `ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle`.
 
+**ProjectPage_Render_QuerySortActivity_OrdersByLastActivity**: Two reviews without audit entries (their creation times
+count) and an old review with a new audit entry are listed with `sort=activity`. The rows are the newest activity first,
+and with `dir=asc` the oldest first. This scenario is tested by
+`ProjectPage_Render_QuerySortActivity_OrdersByLastActivity`.
+
 **ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState**: The page is opened with `sort=id&dir=desc`; the rows
 are in descending order of the identifier, and the filter form carries hidden `sort` (`id`) and `dir` (`desc`) inputs,
 so that applying a filter keeps the order. This scenario is tested by
@@ -439,6 +496,11 @@ so that applying a filter keeps the order. This scenario is tested by
 **ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters**: Thirty reviews are shown 25 to a page with the range
 and the previous and next links, which keep the filters and the sort of the query string. This scenario is tested by
 `ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`.
+
+**ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState**: Thirty reviews are filtered by stage and text and sorted
+by signatures descending, and shown 25 to a page. The next and previous links keep the stage, the text, the sort column
+and the direction. A column header link keeps the stage and the text but not the page, so it starts at the first page.
+This scenario is tested by `ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState`.
 
 **ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView**: The page is opened with an unknown stage, an
 unknown sort, an unknown direction, overdue and blocked values other than `1`, and a page that is text; each is ignored
@@ -478,9 +540,17 @@ keep the toggle and offer Auditor; each button sets exactly that role. This scen
 an Auditor and the page shows the message that lists the review; the last project administrator cannot be made an
 Auditor. This scenario is tested by `ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage`.
 
-**NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin**: The add member and create account pages offer an
-auditor box; ticking it stores the Auditor role and ticking it together with the admin box shows an error and stores
-nothing. This scenario is tested by `NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin`.
+**NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor**: The add member page offers an auditor box; ticking it and
+adding a user stores the Auditor role. This scenario is tested by
+`NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor`.
+
+**NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor**: The create account page offers an auditor
+box; ticking it and creating the account stores the Auditor role. This scenario is tested by
+`NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor`.
+
+**NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm**: An Auditor opens the new review page; it shows
+the `readonly-notice` and neither the form nor the create button. This scenario is tested by
+`NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm`.
 
 **ProjectPage_Render_EmptyProject_InvitesOnlyContributors**: A project without reviews is opened by a contributor and by
 a read-only member. The contributor sees the invitation to use New review; the read-only member sees "This project has
@@ -521,8 +591,9 @@ submitted; the error names the identifier, the entered values stay, and only the
 scenario is tested by `NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId`.
 
 **NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing**: The form is submitted with the review
-identifier `new`, in any letter case; the error says that the identifier is reserved and no review is stored. This
-scenario is tested by `NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing`.
+identifier `new`, in each of the spellings `New`, `NEW`, and `new` (a theory); the error says that the identifier is
+reserved and no review is stored. This scenario is tested by
+`NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing`.
 
 **NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError**: Two files with the same name are chosen and
 the form is submitted; the error names the file and no review is stored. This scenario is tested by
@@ -547,6 +618,13 @@ submitted; the error is still shown and nothing is stored. This scenario is test
 but streams the per-file maximum, and enough of them are delivered to the file input to pass the total limit; the
 total-size error is shown and no selection is kept. This scenario is tested by
 `NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes`.
+
+**NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream**: A theory over three selections whose declared values
+break a limit: one file more than the file-count limit ("TooManyFiles"), one file over the per-file size limit
+("FileTooLarge"), and files whose declared sizes together exceed the total limit ("TotalTooLarge"). Each file is a
+recording fake browser file that counts its `OpenReadStream` calls; after the selection the error is shown and no file
+has been opened, so the page refuses on the declared values before it reads any file. This scenario is tested by
+`NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream`, defined in `NewReviewPageRepositoryTests.cs`.
 
 **ProjectPage_AfterRender_Interactive_SetsMarker**: The project page is rendered; its root element has
 `data-interactive` equal to `true`. This scenario is tested by `ProjectPage_AfterRender_Interactive_SetsMarker`.
@@ -579,9 +657,21 @@ switch is unchanged, and nothing more is audited. This scenario is tested by
 
 **ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement**: The hints next to the two further switches say that the
 rule applies to every project and, for the author rule, that this includes projects created before it was enforced; the
-reopener hint says that a reopen is refused when nobody may sign. There is no "Not applied yet" text and there are no
+reopener hint says that a reopen is refused when nobody may sign and that this includes projects created before it was
+enforced. There is no "Not applied yet" text and there are no
 pending markers anywhere on the page. This scenario is tested by
 `ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement`.
+
+**ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule**: A project admin opens the project page; the hint inside
+the independent reviewers switch (`review-rule-independent-reviewers`) explains the rule. This scenario is tested by
+`ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule`.
+
+**ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads**: After the page was loaded, another
+administrator switches the independent reviewers rule off. The page, which still shows it on, has the independent
+switch and the author switch both turned off and saves; the error shows the message of the stale change
+(`ProjectService.IndependentReviewersChangedByOthersMessage`), the independent switch shows the stored value (off), the
+author switch is back on (the page reloaded the stored values), no success status is shown, and the audit count is
+unchanged. This scenario is tested by `ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads`.
 
 **Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
 real access rules behind the page.
@@ -591,6 +681,13 @@ real access rules behind the page.
 settings button with the address `/projects/{id}/evidence-settings`; the page of a plain member has none. These scenarios
 are tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
+
+**ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls**: The system administrator opens the
+page of a project of which they are no member; the Evidence settings button and
+the checklist link have the addresses `/projects/{id}/evidence-settings` and `/projects/{id}/checklist`, the Review
+rules card with the independent reviewers switch is shown, and the checklist summary says "default-1 (14 sections, 58
+checks), built-in default". This scenario is tested by
+`ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls`.
 
 **EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings**: A project admin and a system administrator
 open the page of a project without stored settings; the two anonymous switches are off, the five content switches are
@@ -622,7 +719,8 @@ with your quality or compliance lead.", the five warnings differ from each other
 sections. This scenario is tested by `EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll`.
 
 **EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine**: Turning the index on shows the exposure
-warning and no sentence about people; turning the anonymous PDFs on adds the sentence that names the review discussion
+warning (it says that anyone who can reach this server can read what was opened, without signing in) and no sentence
+about people; turning the anonymous PDFs on adds the sentence that names the review discussion
 and the reviewer names; turning the reviewer names off keeps only the discussion; turning the threads off removes the
 sentence and keeps the general warning; turning both anonymous switches off removes the warning. This scenario is tested
 by `EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine`.
@@ -806,6 +904,11 @@ a hint to choose a repository. This scenario is tested by
 uploaded reviews, and for a repository source the reviews of the chosen repository, each with its identifier and title,
 after the option for no follow-up. This scenario is tested by
 `NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource`.
+
+**NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt**: The earlier review has one section marked as not
+applicable; after the earlier review is chosen, the preview says "1 N/A section" (singular) and not zero. This scenario
+is tested by `NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt`, defined in
+`NewReviewPageFollowUpTests.cs`.
 
 **NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp**: An earlier review is chosen and files are
 selected; the page shows the counts that `ReviewService.PreviewFollowUpAsync` reports, suggests the title "Follow-up to"

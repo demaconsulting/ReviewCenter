@@ -83,6 +83,46 @@ public class NotificationMessageTests
         // Assert: the parameter is named and the value is not repeated
         Assert.Equal("subject", exception.ParamName);
         Assert.DoesNotContain("Bcc", exception.Message, StringComparison.Ordinal);
+        foreach (var part in subject.Split(['\r', '\n', '\t', '\0'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            Assert.DoesNotContain(part, exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that an empty subject and a subject of white space only are refused, naming the subject parameter.
+    /// </summary>
+    /// <param name="subject">The refused subject.</param>
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void NotificationMessage_Constructor_EmptyOrBlankSubject_Throws(string subject)
+    {
+        // Arrange and Act: build a message with the subject
+        var exception = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage("ann@example.com", subject, "text", "<p>html</p>"));
+
+        // Assert: the subject is named
+        Assert.Equal("subject", exception.ParamName);
+    }
+
+    /// <summary>
+    ///     Test that a subject of white space only is refused, naming the subject parameter.
+    /// </summary>
+    /// <param name="subject">The refused subject.</param>
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("   ")]
+    public void NotificationMessage_Constructor_BlankSubject_Throws(string subject)
+    {
+        // Arrange and Act: build a message with the blank subject
+        var exception = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage("ann@example.com", subject, "text", "<p>html</p>"));
+        var padded = new NotificationMessage("ann@example.com", "a" + subject + "b", "text", "<p>html</p>");
+
+        // Assert: the subject is named, and the same white space between letters is not blank
+        Assert.Equal("subject", exception.ParamName);
+        Assert.Equal("a" + subject + "b", padded.Subject);
     }
 
     /// <summary>
@@ -118,6 +158,75 @@ public class NotificationMessageTests
             () => new NotificationMessage(
                 "ann@example.com", "Hello", new string('x', NotificationMessage.MaxBodyLength + 1), "<p>h</p>"));
         Assert.Equal("textBody", tooLong.ParamName);
+        var blankHtml = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage("ann@example.com", "Hello", "text", "  "));
+        Assert.Equal("htmlBody", blankHtml.ParamName);
+        var tooLongHtml = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage(
+                "ann@example.com", "Hello", "text", new string('x', NotificationMessage.MaxBodyLength + 1)));
+        Assert.Equal("htmlBody", tooLongHtml.ParamName);
+    }
+
+    /// <summary>
+    ///     Test that a text body or an HTML body of white space only is refused, naming that body parameter.
+    /// </summary>
+    /// <param name="htmlBody">Whether the blank part is the HTML body; otherwise it is the text body.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NotificationMessage_Constructor_BlankBody_Throws(bool htmlBody)
+    {
+        // Arrange and Act: one body part of white space
+        var exception = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage(
+                "ann@example.com", "Hello", htmlBody ? "text" : "  ", htmlBody ? "  " : "<p>h</p>"));
+
+        // Assert: the blank part is named
+        Assert.Equal(htmlBody ? "htmlBody" : "textBody", exception.ParamName);
+    }
+
+    /// <summary>
+    ///     Test that a text body or an HTML body of more than the limit is refused, and a body of exactly the limit
+    ///     is accepted.
+    /// </summary>
+    /// <param name="htmlBody">Whether the long part is the HTML body; otherwise it is the text body.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NotificationMessage_Constructor_TooLongBody_Throws(bool htmlBody)
+    {
+        // Arrange: a body one character over the limit and a body at the limit
+        var tooLong = new string('x', NotificationMessage.MaxBodyLength + 1);
+        var atLimit = new string('x', NotificationMessage.MaxBodyLength);
+
+        // Act
+        var exception = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage(
+                "ann@example.com", "Hello", htmlBody ? "text" : tooLong, htmlBody ? tooLong : "<p>h</p>"));
+        var accepted = new NotificationMessage(
+            "ann@example.com", "Hello", htmlBody ? "text" : atLimit, htmlBody ? atLimit : "<p>h</p>");
+
+        // Assert: the long part is named, and the limit itself passes
+        Assert.Equal(htmlBody ? "htmlBody" : "textBody", exception.ParamName);
+        Assert.Equal(NotificationMessage.MaxBodyLength, (htmlBody ? accepted.HtmlBody : accepted.TextBody).Length);
+    }
+
+    /// <summary>
+    ///     Test that a NUL character in the plain text body or in the HTML body is refused.
+    /// </summary>
+    /// <param name="htmlBody">Whether the NUL character is in the HTML body; otherwise in the text body.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NotificationMessage_Constructor_NulInBody_Throws(bool htmlBody)
+    {
+        // Arrange and Act: one body part with a NUL character
+        var exception = Assert.Throws<ArgumentException>(
+            () => new NotificationMessage(
+                "ann@example.com", "Hello", htmlBody ? "text" : "te\0xt", htmlBody ? "<p>h\0</p>" : "<p>h</p>"));
+
+        // Assert: the part with the NUL character is named
+        Assert.Equal(htmlBody ? "htmlBody" : "textBody", exception.ParamName);
     }
 
     /// <summary>
@@ -147,8 +256,9 @@ public class NotificationMessageTests
         // Arrange and Act: a multi-line body
         var message = new NotificationMessage("ann@example.com", "Hello", "line 1\r\nline 2\n", "<p>a</p>\n<p>b</p>");
 
-        // Assert: kept as given
-        Assert.Contains("line 2", message.TextBody, StringComparison.Ordinal);
+        // Assert: both bodies kept exactly as given
+        Assert.Equal("line 1\r\nline 2\n", message.TextBody);
+        Assert.Equal("<p>a</p>\n<p>b</p>", message.HtmlBody);
     }
 
     /// <summary>

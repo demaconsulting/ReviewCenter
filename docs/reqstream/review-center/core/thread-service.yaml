@@ -9,445 +9,1933 @@ sections:
     requirements:
       - id: ReviewCenter-ThreadService-Start
         title: >-
-          The ThreadService class shall start a thread on an existing file of a review, anchored to the whole
-          file or to an inclusive range of 1-based lines, in the Open state, with the creation time and the
-          first comment.
+          The ThreadService class shall store a thread that is started on an existing file of a review in the Open
+          state.
         justification: |
-          A review discussion is a thread of comments about a file or a part of it. Starting a thread always
-          records its first comment, so a thread is never empty.
+          A review discussion is a thread of comments about a file or a part of it, and a new thread waits for an
+          answer until somebody resolves it.
         tests:
           - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
+
+      - id: ReviewCenter-ThreadService-Start-WholeFile
+        title: >-
+          The ThreadService class shall anchor a thread to the whole file when no range of lines is given.
+        justification: |
+          A reader can comment on a file as a whole, for example on a file that has no lines to point at.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
+
+      - id: ReviewCenter-ThreadService-Start-LineRange
+        title: >-
+          The ThreadService class shall anchor a thread to the inclusive range of 1-based lines that is given,
+          which may be a single line.
+        justification: |
+          A reader can point at the lines that the discussion is about, and a single line is the common case.
+        tests:
           - ThreadService_StartThreadAsync_LineRange_StoresRange
+
+      - id: ReviewCenter-ThreadService-Start-FirstComment
+        title: >-
+          The ThreadService class shall store the text given with a new thread as its first and only comment.
+        justification: |
+          Starting a thread always records its first comment, so a thread is never empty.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
+
+      - id: ReviewCenter-ThreadService-Start-Created
+        title: >-
+          The ThreadService class shall store the time of its clock as the creation time of a new thread.
+        justification: |
+          The history of a discussion needs to say when it began, and the time comes from the service so that no
+          caller can choose it.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
 
       - id: ReviewCenter-ThreadService-Anchor
         title: >-
-          The ThreadService class shall reject a thread on a review or file that does not exist, a range with
-          only one endpoint given, a start line below 1, an end line before the start line, an end line beyond the
-          last line of the file, or a range on a binary or empty file, and shall accept a thread on the whole
-          of any file and a range that ends exactly at the last line, counting lines so that Windows and Unix
-          line endings count the same and a final line ending adds no line.
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule a thread on a file that the review
+          does not have.
         justification: |
-          A thread must point at something that exists, or the reader could not find what it is about. A file
-          that has no lines to point at can only be commented as a whole. Counting lines by their separators
-          gives the same numbers whichever line endings the file uses.
+          A thread must point at something that exists, or the reader could not find what it is about.
+        tests:
+          - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-UnknownReview
+        title: >-
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule a thread on a review that does not
+          exist.
+        justification: |
+          A thread must belong to a review that exists, or the reader could not find it.
+        tests:
+          - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-HalfRange
+        title: >-
+          The ThreadService class shall reject a range of lines with only one endpoint given.
+        justification: |
+          A range needs both ends; a missing end would leave the lines that the thread is about unclear.
+        tests:
+          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-StartBelowOne
+        title: >-
+          The ThreadService class shall reject a range of lines whose start line is below 1.
+        justification: |
+          Lines are numbered from 1, so a lower number points at nothing.
+        tests:
+          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-EndBeforeStart
+        title: >-
+          The ThreadService class shall reject a range of lines whose end line is before its start line.
+        justification: |
+          A range that ends before it starts does not describe any lines.
+        tests:
+          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-EndBeyondFile
+        title: >-
+          The ThreadService class shall reject a range of lines whose end line is beyond the last line of the file.
+        justification: |
+          A line that the file does not have cannot be shown to the reader.
+        tests:
+          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator
+
+      - id: ReviewCenter-ThreadService-Anchor-BinaryOrEmptyRange
+        title: >-
+          The ThreadService class shall reject a range of lines on a binary or empty file.
+        justification: |
+          A file that has no lines to point at can only be commented as a whole.
+        tests:
+          - ThreadService_StartThreadAsync_RangeOnBinaryOrEmptyFile_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-WholeFile
+        title: >-
+          The ThreadService class shall accept a thread on the whole of any file, including a binary or empty file.
+        justification: |
+          A file that has no lines can still be the subject of a discussion.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
+          - ThreadService_StartThreadAsync_WholeFileOnBinaryFile_IsAllowed
+
+      - id: ReviewCenter-ThreadService-Anchor-LastLine
+        title: >-
+          The ThreadService class shall accept a range of lines that ends exactly at the last line of the file.
+        justification: |
+          The range of lines is inclusive, so the last line of a file can be commented.
         tests:
           - ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator
-          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
-          - ThreadService_StartThreadAsync_RangeOnBinaryOrEmptyFile_ThrowsThreadAnchorInvalid
-          - ThreadService_StartThreadAsync_WholeFileOnBinaryFile_IsAllowed
-          - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Anchor-LineEndings
+        title: >-
+          The ThreadService class shall count the lines of a file the same way whether they end with Windows or
+          Unix line endings.
+        justification: |
+          Counting lines by their separators gives the same numbers whichever line endings the file uses.
+        tests:
+          - ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator
+
+      - id: ReviewCenter-ThreadService-Anchor-FinalLineEnding
+        title: >-
+          The ThreadService class shall not count a line ending at the end of a file as a further line.
+        justification: |
+          A file that ends with a line ending has the same lines as one that does not, so the last line is the one
+          that has text.
+        tests:
+          - ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator
 
       - id: ReviewCenter-ThreadService-DeletedFile
         title: >-
           The ThreadService class shall reject a thread anchored to head lines of a file that a repository review
-          marks as Deleted, and shall accept a thread on the whole of a deleted file, a thread on baseline lines of a
-          deleted file, and a thread on lines of a modified or added file.
+          marks as Deleted.
         justification: |
-          A deleted file has no lines at the head, so a head line range would point at nothing; the reviewer can
-          comment on the deletion as a whole or on the removed baseline lines. Lines of a modified or added file
-          exist at the head.
+          A deleted file has no lines at the head, so a head line range would point at nothing.
         tests:
           - ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-DeletedFile-WholeFile
+        title: >-
+          The ThreadService class shall accept a thread on the whole of a file that a repository review marks as
+          Deleted.
+        justification: |
+          The reviewer can comment on the deletion as a whole.
+        tests:
           - ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed
+
+      - id: ReviewCenter-ThreadService-DeletedFile-BaselineLines
+        title: >-
+          The ThreadService class shall accept a thread on baseline lines of a file that a repository review marks
+          as Deleted.
+        justification: |
+          The removed lines exist in the baseline, and the reviewer can comment on them.
+        tests:
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
+
+      - id: ReviewCenter-ThreadService-DeletedFile-HeadLines
+        title: >-
+          The ThreadService class shall accept a thread on head lines of a file that a repository review marks as
+          Modified or Added.
+        justification: |
+          Lines of a modified or added file exist at the head.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
 
       - id: ReviewCenter-ThreadService-Side
         title: >-
-          The ThreadService class shall anchor a thread to the Head or the Baseline side of a file, taking Head
-          when no side is given, shall check the lines of a range against the lines of the chosen side only, shall
-          accept the Baseline side only for a modified or deleted file of a review that has a baseline commit, and
-          shall store a whole-file thread as Head and reject a whole-file anchor that names the Baseline side, and
-          shall reject a side value that is not defined with an ArgumentOutOfRangeException.
+          The ThreadService class shall anchor a thread to the Head or the Baseline side of a file as given.
         justification: |
           A diff shows removed lines that exist only in the baseline. A reviewer must be able to comment on them,
-          and the number of a line means different things on each side, so the side decides which text the range
-          is checked against and what the thread is about.
+          so a thread says which side its lines belong to.
         tests:
           - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
-          - ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid
-          - ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored
-          - ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread
           - ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount
+
+      - id: ReviewCenter-ThreadService-Side-Default
+        title: >-
+          The ThreadService class shall anchor a thread to the Head side when no side is given.
+        justification: |
+          Most comments are about the current text, so a caller that names no side gets the head.
+        tests:
+          - ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread
+
+      - id: ReviewCenter-ThreadService-Side-Lines
+        title: >-
+          The ThreadService class shall check the lines of a range against the lines of the chosen side only.
+        justification: |
+          The number of a line means different things on each side, so the side decides which text the range is
+          checked against.
+        tests:
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
+          - ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount
+
+      - id: ReviewCenter-ThreadService-Side-BaselineCommit
+        title: >-
+          The ThreadService class shall accept the Baseline side only for a review that has a baseline commit.
+        justification: |
+          A review without a baseline commit has no baseline text that a thread could be about.
+        tests:
+          - ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Side-BaselineFile
+        title: >-
+          The ThreadService class shall accept the Baseline side only for a file that is modified or deleted.
+        justification: |
+          An added file has no baseline text, so its lines exist only at the head.
+        tests:
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
+
+      - id: ReviewCenter-ThreadService-Side-WholeFile
+        title: >-
+          The ThreadService class shall store a whole-file thread as a Head thread.
+        justification: |
+          A whole-file thread is about the file, and the file exists at the head.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored
+
+      - id: ReviewCenter-ThreadService-Side-WholeFileBaseline
+        title: >-
+          The ThreadService class shall reject a whole-file anchor that names the Baseline side.
+        justification: |
+          A whole-file anchor has no lines that could be taken from the baseline text.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored
+
+      - id: ReviewCenter-ThreadService-Side-Undefined
+        title: >-
+          The ThreadService class shall reject a side value that is not defined with an ArgumentOutOfRangeException.
+        justification: |
+          A side that is neither Head nor Baseline is a programming error and must not be stored.
+        tests:
           - ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange
 
       - id: ReviewCenter-ThreadService-Comment
         title: >-
-          The ThreadService class shall take the author of a thread or reply as the signed-in actor (user name and
-          display name), store both with the comment, require a text of at most 4000 characters that is not blank
-          after trimming and store it trimmed, for a new thread and for a reply, and shall store nothing when a rule
-          is violated.
+          The ThreadService class shall take the author of a thread or reply as the signed-in actor and store the
+          user name and the display name of the actor with the comment.
         justification: |
-          A comment without text carries no information, and unbounded text would make the review record and its
-          pages unwieldy. The author comes from the signed-in user, so it needs no check and cannot be chosen by
-          the person who writes the comment; storing the user name keeps the author identifiable if the display
-          name changes later.
+          The author comes from the signed-in user, so it needs no check and cannot be chosen by the person who
+          writes the comment; storing the user name keeps the author identifiable if the display name changes later.
         tests:
           - ThreadService_StartThreadAsync_Actor_RecordsUsernameAndDisplayName
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Comment-Blank
+        title: >-
+          The ThreadService class shall reject with the CommentTextInvalid rule the text of a new thread or of a
+          reply that is blank after trimming.
+        justification: |
+          A comment without text carries no information.
+        tests:
           - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
+          - ThreadService_ReplyAsync_InvalidText_ThrowsAndStoresNothing
+
+      - id: ReviewCenter-ThreadService-Comment-TooLong
+        title: >-
+          The ThreadService class shall reject with the CommentTextInvalid rule the text of a new thread or of a
+          reply that is longer than 4000 characters.
+        justification: |
+          Unbounded text would make the review record and its pages unwieldy.
+        tests:
+          - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
+          - ThreadService_ReplyAsync_TextLength_RejectsOneOverAndAcceptsTheLongest
+
+      - id: ReviewCenter-ThreadService-Comment-LongestAccepted
+        title: >-
+          The ThreadService class shall accept the text of a new thread or of a reply that is exactly 4000
+          characters long.
+        justification: |
+          The limit is inclusive, so a text at the limit is not refused.
+        tests:
+          - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
+          - ThreadService_ReplyAsync_TextLength_RejectsOneOverAndAcceptsTheLongest
+
+      - id: ReviewCenter-ThreadService-Comment-Trimmed
+        title: >-
+          The ThreadService class shall store the text of a new thread or of a reply trimmed of white space at its
+          ends.
+        justification: |
+          Padding carries no information and would make the same text look different.
+        tests:
           - ThreadService_StartThreadAsync_PaddedText_IsTrimmed
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Comment-NothingStored
+        title: >-
+          The ThreadService class shall store nothing when the text of a new thread or of a reply is rejected.
+        justification: |
+          A refused comment must leave the review as it was, so that a corrected request starts from a clean state.
+        tests:
+          - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
           - ThreadService_ReplyAsync_InvalidText_ThrowsAndStoresNothing
 
       - id: ReviewCenter-ThreadService-Reply
         title: >-
-          The ThreadService class shall append a reply with the creation time to an existing thread of the
-          review, keeping the earlier comments unchanged and in posting order without changing the state of the
-          thread, and shall reject a thread that does not exist or belongs to another review.
+          The ThreadService class shall append a reply to an existing thread of the review.
         justification: |
-          Replies are how a discussion proceeds. Comments are immutable, so a reply only ever adds to the
-          thread, and a reply must never reach a thread of another review through a mistaken identity.
+          Replies are how a discussion proceeds. Comments are immutable, so a reply only ever adds to the thread.
         tests:
           - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Reply-Created
+        title: >-
+          The ThreadService class shall store the time of its clock as the creation time of a reply.
+        justification: |
+          The history of a discussion needs to say when each answer was given, and no caller can choose the time.
+        tests:
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Reply-EarlierUnchanged
+        title: >-
+          The ThreadService class shall keep the earlier comments of a thread unchanged when a reply is appended.
+        justification: |
+          Comments are immutable, so what was said before a reply stays as it was said.
+        tests:
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Reply-Order
+        title: >-
+          The ThreadService class shall keep the comments of a thread in posting order when a reply is appended.
+        justification: |
+          A reader follows a discussion in the order in which it took place.
+        tests:
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Reply-StateUnchanged
+        title: >-
+          The ThreadService class shall not change the state of a thread when a reply is appended.
+        justification: |
+          Whether a thread still needs attention is decided by resolving or reopening it, not by a reply.
+        tests:
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+
+      - id: ReviewCenter-ThreadService-Reply-ThreadNotFound
+        title: >-
+          The ThreadService class shall reject with the ThreadNotFound rule a reply to a thread that does not exist.
+        justification: |
+          A reply must never reach a thread through a mistaken identity.
+        tests:
+          - ThreadService_ReplyAsync_UnknownThreadOrOtherReview_ThrowsThreadNotFound
+
+      - id: ReviewCenter-ThreadService-Reply-OtherReview
+        title: >-
+          The ThreadService class shall reject with the ThreadNotFound rule a reply to a thread that belongs to
+          another review.
+        justification: |
+          A reply must never reach a thread of another review through a mistaken identity.
+        tests:
           - ThreadService_ReplyAsync_UnknownThreadOrOtherReview_ThrowsThreadNotFound
 
       - id: ReviewCenter-ThreadService-State
         title: >-
-          The ThreadService class shall resolve and reopen a thread of the review without touching its
-          comments, treating a repeated request as harmless, and shall reject a thread that does not exist or
-          belongs to another review.
+          The ThreadService class shall resolve a thread of the review.
         justification: |
-          The state of a thread tells reviewers what still needs attention. A repeated click or request must
-          leave the thread in the requested state rather than fail.
+          The state of a thread tells reviewers what still needs attention, and resolving it says that it no longer
+          does.
         tests:
           - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+
+      - id: ReviewCenter-ThreadService-State-Reopen
+        title: >-
+          The ThreadService class shall reopen a resolved thread of the review.
+        justification: |
+          A discussion that turns out not to be finished must be able to ask for attention again.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+
+      - id: ReviewCenter-ThreadService-State-CommentsKept
+        title: >-
+          The ThreadService class shall leave the comments of a thread untouched when it resolves or reopens the
+          thread.
+        justification: |
+          Comments are immutable, and a change of state must not rewrite the discussion.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+
+      - id: ReviewCenter-ThreadService-State-ResolveRepeated
+        title: >-
+          The ThreadService class shall treat resolving a thread that is already resolved as harmless.
+        justification: |
+          A repeated click or request must leave the thread resolved rather than fail.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+
+      - id: ReviewCenter-ThreadService-State-ReopenRepeated
+        title: >-
+          The ThreadService class shall treat reopening a thread that is already open as harmless.
+        justification: |
+          A repeated click or request must leave the thread open rather than fail.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+
+      - id: ReviewCenter-ThreadService-State-ThreadNotFound
+        title: >-
+          The ThreadService class shall reject with the ThreadNotFound rule resolving or reopening a thread that
+          does not exist.
+        justification: |
+          A request for a thread that is not there has nothing to change and must say so.
+        tests:
           - ThreadService_ResolveAsync_UnknownThread_ThrowsThreadNotFound
+
+      - id: ReviewCenter-ThreadService-State-OtherReview
+        title: >-
+          The ThreadService class shall reject with the ThreadNotFound rule resolving or reopening a thread that
+          belongs to another review.
+        justification: |
+          A change of state must never reach a thread of another review through a mistaken identity.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ThreadOfOtherReview_ThrowsThreadNotFound
 
       - id: ReviewCenter-ThreadService-Read
         title: >-
-          The ThreadService class shall list all threads of a review with their comments, with threads and
-          comments in creation order, and an empty list when there are none.
+          The ThreadService class shall list all threads of a review with their comments.
         justification: |
-          Pages show every thread of a review, and a stable order lets a reader follow the discussion.
+          Pages show every thread of a review.
         tests:
           - ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments
+
+      - id: ReviewCenter-ThreadService-Read-ThreadOrder
+        title: >-
+          The ThreadService class shall list the threads of a review in creation order.
+        justification: |
+          Threads in creation order let a reader meet the discussions in the order in which they began.
+        tests:
+          - ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments
+
+      - id: ReviewCenter-ThreadService-Read-CommentOrder
+        title: >-
+          The ThreadService class shall list the comments of a thread in creation order.
+        justification: |
+          Comments in creation order let a reader follow a single discussion as it was held.
+        tests:
+          - ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments
+
+      - id: ReviewCenter-ThreadService-Read-Empty
+        title: >-
+          The ThreadService class shall list no threads for a review that has none.
+        justification: |
+          A review that nobody has commented on has nothing to show, and pages must cope with that.
+        tests:
           - ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty
 
       - id: ReviewCenter-ThreadService-Index
         title: >-
-          The ThreadService class shall derive the last activity of a thread as the time of its latest comment,
-          and shall list the threads of a review, optionally only those Open or only those Resolved, newest
-          last activity first, without any change to what is stored.
+          The ThreadService class shall derive the last activity of a thread as the time of its latest comment.
         justification: |
-          Reviewers look for the discussion that needs attention, which is usually the most recently active.
           Deriving the time from the comments keeps one source of truth and needs no stored data.
         tests:
           - ThreadService_LastActivity_IsTimeOfLatestComment
+
+      - id: ReviewCenter-ThreadService-Index-All
+        title: >-
+          The ThreadService class shall list all threads of a review in the index when no state is requested.
+        justification: |
+          Reviewers need to see the whole discussion as well as the part that needs attention.
+        tests:
+          - ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst
+
+      - id: ReviewCenter-ThreadService-Index-StateFilter
+        title: >-
+          The ThreadService class shall list only the threads that are Open, or only the threads that are Resolved,
+          in the index when that state is requested.
+        justification: |
+          Reviewers look for the discussion that needs attention, which is the open one.
+        tests:
+          - ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst
+
+      - id: ReviewCenter-ThreadService-Index-Order
+        title: >-
+          The ThreadService class shall list the threads of the index newest last activity first.
+        justification: |
+          The discussion that needs attention is usually the most recently active.
+        tests:
+          - ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst
+
+      - id: ReviewCenter-ThreadService-Index-InputUnchanged
+        title: >-
+          The ThreadService class shall leave the threads that it is given for the index unchanged and in their order.
+        justification: |
+          The index is a view that is built when it is asked for, so asking must not change the threads.
+        tests:
           - ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst
 
       - id: ReviewCenter-ThreadService-NextStep
         title: >-
-          The ThreadService class shall give, for the threads of a review and optionally the progress of its
-          checklist and the number of checks answered Fail (information only, a Fail is not a blocker), one short
-          sentence naming the next action: the number
-          of unanswered checklist checks, the number of checks disputed between the ballots, the number of checks
-          answered Fail, the number of open threads to
-          resolve, all of them that apply, that the checklist is complete, or that all threads are resolved, and,
-          when there are no threads and no checklist, to start a discussion, and shall add the hint to write the
-          review conclusion when the review would be rejected and has no conclusion text, and shall, when the caller
-          gives the number of unanswered checks, use it in place of the unanswered count of the progress, so that a
-          disputed check is named once.
+          The ThreadService class shall give, for the threads of a review, one short sentence that names the number
+          of open threads to resolve.
         justification: |
-          A reader should not have to count threads or checks to know what to do next; one sentence says it. A
-          disputed check stops the signing and a rejection needs its reasons, so the sentence names them.
+          A reader should not have to count threads to know what to do next; one sentence says it.
+        tests:
+          - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction
+
+      - id: ReviewCenter-ThreadService-NextStep-StartDiscussion
+        title: >-
+          The ThreadService class shall tell a reader to start a discussion when a review has no threads and no
+          checklist.
+        justification: |
+          A review that nobody has commented on needs a first step.
+        tests:
+          - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction
+
+      - id: ReviewCenter-ThreadService-NextStep-AllResolved
+        title: >-
+          The ThreadService class shall say that all threads are resolved when the review has threads and none of
+          them is open.
+        justification: |
+          A reader who sees that nothing is open knows that no discussion waits for an answer.
         tests:
           - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction
           - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
+
+      - id: ReviewCenter-ThreadService-NextStep-Unanswered
+        title: >-
+          The ThreadService class shall name the number of unanswered checklist checks when the progress of the
+          checklist is given.
+        justification: |
+          A reader should not have to count the checks that still need an answer.
+        tests:
+          - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
+
+      - id: ReviewCenter-ThreadService-NextStep-Disputed
+        title: >-
+          The ThreadService class shall name the number of checks that are disputed between the ballots.
+        justification: |
+          A disputed check stops the signing, so the sentence names it.
+        tests:
+          - ThreadService_NextStep_DisputedAndConclusion_AreNamed
+
+      - id: ReviewCenter-ThreadService-NextStep-Failed
+        title: >-
+          The ThreadService class shall name the number of checks that are answered Fail.
+        justification: |
+          A reader should see the failed checks without counting them.
+        tests:
+          - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
+
+      - id: ReviewCenter-ThreadService-NextStep-FailNotBlocking
+        title: >-
+          The ThreadService class shall still say that the checklist is complete when checks are answered Fail.
+        justification: |
+          A Fail is information only and not a blocker, so it does not keep the checklist from being complete.
+        tests:
+          - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
+
+      - id: ReviewCenter-ThreadService-NextStep-ChecklistComplete
+        title: >-
+          The ThreadService class shall say that the checklist is complete when no check is unanswered or disputed.
+        justification: |
+          A reader who sees that the checklist is complete knows that no check needs an answer.
+        tests:
+          - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
+
+      - id: ReviewCenter-ThreadService-NextStep-Combined
+        title: >-
+          The ThreadService class shall name all parts that apply in one sentence.
+        justification: |
+          One sentence that lists every kind of work that is left tells a reader what to do next without more than
+          one look.
+        tests:
+          - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
           - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
           - ThreadService_NextStep_DisputedAndConclusion_AreNamed
+
+      - id: ReviewCenter-ThreadService-NextStep-Order
+        title: >-
+          The ThreadService class shall name the parts of the sentence in the order unanswered checks, disputed
+          checks, checks answered Fail, open threads, and the hint to write the conclusion.
+        justification: |
+          A fixed order lets a reader look for the same kind of work in the same place of the sentence every time.
+        tests:
+          - ThreadService_NextStep_AllParts_AreNamedInFixedOrder
+
+      - id: ReviewCenter-ThreadService-NextStep-Conclusion
+        title: >-
+          The ThreadService class shall add the hint to write the review conclusion when the review would be
+          rejected and has no conclusion text.
+        justification: |
+          A rejection needs its reasons, so the sentence names the conclusion that is missing.
+        tests:
+          - ThreadService_NextStep_DisputedAndConclusion_AreNamed
+
+      - id: ReviewCenter-ThreadService-NextStep-ExplicitUnanswered
+        title: >-
+          The ThreadService class shall use the number of unanswered checks that the caller gives in place of the
+          unanswered count of the progress.
+        justification: |
+          The caller may know better than the progress which checks are unanswered.
+        tests:
+          - ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount
+
+      - id: ReviewCenter-ThreadService-NextStep-DisputedOnce
+        title: >-
+          The ThreadService class shall name a disputed check once, as disputed, and not also as unanswered.
+        justification: |
+          The progress counts a disputed check as unanswered, and naming it twice would make the work look larger.
+        tests:
           - ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount
 
       - id: ReviewCenter-ThreadService-Audit
         title: >-
-          The ThreadService class shall record starting a thread, replying, resolving, and reopening in the audit
-          trail, in the same transaction as the change, naming the actor, the identifiers, the anchor (marking a
-          line anchor on the Baseline side), and a short
-          hash of the comment text but never the text itself, and shall record nothing for a thread that does not
-          exist.
+          The ThreadService class shall record starting a thread in the audit trail, naming the actor, the
+          identifiers of the thread and its first comment, the anchor, and a short hash of the comment text.
         justification: |
-          The history must show who discussed what and when without copying the comments into a record that cannot
-          be edited, and a request that changed nothing must leave no entry.
+          The history must show who started which discussion about which file or lines, and when.
         tests:
           - ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText
+
+      - id: ReviewCenter-ThreadService-Audit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of starting a thread, a reply, a resolve and a
+          reopen in the same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - ThreadService_ThreadActions_GiveTheStoreEntryAndChangeInOneCall
+
+      - id: ReviewCenter-ThreadService-Audit-Reply
+        title: >-
+          The ThreadService class shall record a reply in the audit trail, naming the actor, the identifiers of the
+          thread and the reply, and a short hash of the comment text.
+        justification: |
+          The history must show who took part in a discussion and when.
+        tests:
+          - ThreadService_ReplyAsync_Audit_RecordsActorThreadReplyAndDigest
+
+      - id: ReviewCenter-ThreadService-Audit-Resolve
+        title: >-
+          The ThreadService class shall record resolving a thread in the audit trail, naming the actor and the
+          thread.
+        justification: |
+          The history must show who closed a discussion.
+        tests:
+          - ThreadService_ResolveAsync_Audit_RecordsActorAndThread
+
+      - id: ReviewCenter-ThreadService-Audit-Reopen
+        title: >-
+          The ThreadService class shall record reopening a thread in the audit trail, naming the actor and the
+          thread.
+        justification: |
+          The history must show who asked for a closed discussion to be taken up again.
+        tests:
+          - ThreadService_ReopenAsync_Audit_RecordsActorAndThread
+
+      - id: ReviewCenter-ThreadService-Audit-BaselineSide
+        title: >-
+          The ThreadService class shall mark a line anchor on the Baseline side in the audit entry of a started
+          thread.
+        justification: |
+          A line number means different text on each side, so the entry must say which side it is about.
+        tests:
           - ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly
+
+      - id: ReviewCenter-ThreadService-Audit-NoText
+        title: >-
+          The ThreadService class shall never put the text of a comment in the audit trail.
+        justification: |
+          The history must not copy the comments into a record that cannot be edited.
+        tests:
+          - ThreadService_ThreadEvents_NeverContainTheCommentText
+
+      - id: ReviewCenter-ThreadService-Audit-MissingThread
+        title: >-
+          The ThreadService class shall record nothing in the audit trail for a request that names a thread that
+          does not exist.
+        justification: |
+          A request for a thread that is not there changed nothing, so an entry would describe a change that never
+          happened.
+        tests:
           - ThreadService_ResolveAsync_MissingThread_RecordsNothing
+          - ThreadService_ReplyAsync_ReopenAsync_MissingThread_RecordsNothing
 
       - id: ReviewCenter-ThreadService-CheckThreads
         title: >-
-          The ThreadService class shall start a thread anchored to a check of the frozen checklist of the review
-          instead of a file, stored with the identifier of the check, an empty file, no lines and the Head side,
-          shall reject an anchor that names both a file and a check, a check with lines or the Baseline side, an
-          empty check identifier, a review without a checklist and a check that the checklist does not have, shall
-          store nothing when a rule is violated, and shall let a check thread be replied to, resolved with the
-          resolution-note rule of its kind, and reopened like any other thread.
+          The ThreadService class shall store a thread that is anchored to a check of the frozen checklist of the
+          review with the identifier of the check, an empty file, no lines and the Head side.
         justification: |
           A discussion can be about the wording or the answer to a check rather than about a file, and the checklist
-          is frozen with the review, so the check must exist there. A thread has one anchor, so an anchor that names
-          two things is a mistake, and a check has no lines or baseline to point at. Once started, the thread is an
-          ordinary thread.
+          is frozen with the review, so the check is part of the anchor.
         tests:
           - ThreadService_StartThreadAsync_CheckAnchor_StoresCheckThreadWithEmptyFileAndNoLines
-          - ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound
+
+      - id: ReviewCenter-ThreadService-CheckThreads-MixedAnchor
+        title: >-
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule an anchor that names both a file
+          and a check.
+        justification: |
+          A thread has one anchor, so an anchor that names two things is a mistake.
+        tests:
+          - ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-CheckThreads-Lines
+        title: >-
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule a check anchor that has lines.
+        justification: |
+          A check has no lines to point at.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-CheckThreads-BaselineSide
+        title: >-
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule a check anchor that names the
+          Baseline side.
+        justification: |
+          A check has no baseline to point at.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorWithBaselineSide_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-CheckThreads-EmptyCheck
+        title: >-
+          The ThreadService class shall reject with the ThreadAnchorInvalid rule an anchor with an empty check
+          identifier and no file.
+        justification: |
+          An anchor that names neither a file nor a check points at nothing.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorWithoutCheckId_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-CheckThreads-NoChecklist
+        title: >-
+          The ThreadService class shall reject with the ChecklistNotFound rule a check anchor in a review that has
+          no checklist.
+        justification: |
+          A review without a checklist has no check to discuss.
+        tests:
           - ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound
+
+      - id: ReviewCenter-ThreadService-CheckThreads-UnknownCheck
+        title: >-
+          The ThreadService class shall reject with the ChecklistItemNotFound rule a check anchor that names a check
+          that the checklist of the review does not have.
+        justification: |
+          The checklist is frozen with the review, so the check must exist there.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound
+
+      - id: ReviewCenter-ThreadService-CheckThreads-NothingStored
+        title: >-
+          The ThreadService class shall store nothing when a check anchor is rejected.
+        justification: |
+          A check anchor that is refused must not leave a half-made thread behind that a page would then list.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound
+          - ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound
           - ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid
           - ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-CheckThreads-Reply
+        title: >-
+          The ThreadService class shall let a check thread be replied to like any other thread.
+        justification: |
+          Once a check thread is started, the discussion about the check continues with replies like any other.
+        tests:
           - ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work
+
+      - id: ReviewCenter-ThreadService-CheckThreads-Resolve
+        title: >-
+          The ThreadService class shall let a check thread be resolved with the resolution-note rule of its kind.
+        justification: |
+          Once started, the thread is an ordinary thread, so a Finding needs a note and a Question does not.
+        tests:
+          - ThreadService_ResolveAsync_OnCheckThread_FindingNeedsNoteQuestionDoesNot
+
+      - id: ReviewCenter-ThreadService-CheckThreads-Reopen
+        title: >-
+          The ThreadService class shall let a resolved check thread be reopened like any other thread.
+        justification: |
+          A discussion about a check that turns out not to be finished must be able to ask for attention again.
+        tests:
+          - ThreadService_ReopenAsync_OnCheckThread_ReopensResolvedThread
 
       - id: ReviewCenter-ThreadService-CheckThreadStart
         title: >-
-          The ThreadService class shall allow starting a check thread only to a system administrator, a project
-          administrator, the creator or lead of the review, and a reviewer who holds a slot of the review and has
-          handed in the own ballot or holds the only slot, shall refuse any other actor, including an auditor and a
-          plain contributor, with the ActorNotAllowed rule, shall refuse a concluded review with the ReviewLocked
-          rule, and shall require the acknowledgement of the signatures that the new open thread would make out of
-          date.
+          The ThreadService class shall allow starting a check thread to a system administrator, a project
+          administrator, and the creator or lead of the review.
         justification: |
           The ballots of the other reviewers stay hidden until they hand in their own, and a thread about a check
-          would reveal what a reviewer thinks of it. A reviewer who has submitted has nothing left to hide, and a
-          reviewer who is alone has no one to hide from. An open thread blocks signing, so starting one is a change
-          like any other that can outdate a signature.
+          would reveal what a reviewer thinks of it. The people who run the review have no ballot to hide, so they
+          may always start one.
+        tests:
+          - CheckThreadRules_CanStart_LeadCreatorProjectAdminAndSystemAdmin_AreAllowed
+          - ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-SubmittedReviewer
+        title: >-
+          The ThreadService class shall allow starting a check thread to a reviewer who holds a slot of the review
+          and has handed in the own ballot.
+        justification: |
+          A reviewer who has submitted has nothing left to hide, so a thread about a check reveals nothing.
         tests:
           - CheckThreadRules_CanStart_SubmittedSlotOwner_IsAllowed
-          - CheckThreadRules_CanStart_DraftOrNoBallotSlotOwner_IsRefusedWhenSeveralSlots
-          - CheckThreadRules_CanStart_SoleSlotOwnerWithDraft_IsAllowed
-          - CheckThreadRules_CanStart_LeadCreatorProjectAdminAndSystemAdmin_AreAllowed
-          - ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed
           - ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-SoleReviewer
+        title: >-
+          The ThreadService class shall allow starting a check thread to a reviewer who holds the only slot of the
+          review, whether or not the own ballot has been handed in.
+        justification: |
+          A reviewer who is alone has no one to hide from.
+        tests:
+          - CheckThreadRules_CanStart_SoleSlotOwnerWithDraft_IsAllowed
+          - ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-DraftReviewer
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule starting a check thread to a reviewer who
+          holds one of several slots of the review and has not handed in the own ballot.
+        justification: |
+          A thread about a check would reveal what the reviewer thinks of it to the other reviewers, whose ballots
+          stay hidden until they hand in their own.
+        tests:
+          - CheckThreadRules_CanStart_DraftOrNoBallotSlotOwner_IsRefusedWhenSeveralSlots
+          - ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-Refused
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule starting a check thread to an auditor
+          and to a plain contributor who holds no slot.
+        justification: |
+          An auditor only reads, and a contributor without a slot has no ballot to discuss.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-Locked
+        title: >-
+          The ThreadService class shall refuse with the ReviewLocked rule starting a check thread in a concluded
+          review.
+        justification: |
+          A concluded review is locked, and a check thread is no way around the lock.
+        tests:
           - ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-Acknowledgement
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule starting a check thread
+          that is included in the report when a signature is current and the caller has not acknowledged it.
+        justification: |
+          An open thread blocks signing, so starting one is a change like any other that can outdate a signature.
+        tests:
           - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgement
+        title: >-
+          The ThreadService class shall start a check thread that is not included in the report without an
+          acknowledgement.
+        justification: |
+          Chat is not part of the digest, so nobody is asked to acknowledge that a signature may go out of date.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart-ChatKeepsSignature
+        title: >-
+          The ThreadService class shall keep a current signature current when it starts a check thread that is not
+          included in the report.
+        justification: |
+          Chat is not part of the digest, so the record that was signed is unchanged and the signature stays valid.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchorChatThread_KeepsSignatureCurrent
 
       - id: ReviewCenter-ThreadService-CheckThreadAudit
         title: >-
-          The ThreadService class shall record starting a check thread in the audit trail in the same transaction,
-          naming the thread, the check and a short hash of the comment text but never the text itself.
+          The ThreadService class shall record starting a check thread in the audit trail, naming the thread, the
+          check and a short hash of the comment text.
         justification: |
           The history must show that a discussion about a check was started and by whom, with the same care as for
-          a thread on a file, and without copying the comment into a record that cannot be edited.
+          a thread on a file.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck
+
+      - id: ReviewCenter-ThreadService-CheckThreadAudit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of a started check thread in the same call that
+          stores the thread.
+        justification: |
+          A check thread that is stored without its entry, or the reverse, would leave the history wrong. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction,
+          which needs both in one call.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchor_GivesTheStoreEntryAndThreadInOneCall
+
+      - id: ReviewCenter-ThreadService-CheckThreadAudit-NoText
+        title: >-
+          The ThreadService class shall not copy the comment text of a started check thread into the audit trail.
+        justification: |
+          The audit trail cannot be edited, so the text of a comment must not be copied into it.
         tests:
           - ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck
 
       - id: ReviewCenter-ThreadService-Access
         title: >-
-          The ThreadService class shall require, for starting a thread, replying, resolving, reopening, promoting,
-          demoting, and changing whether a comment is included in the report, that the actor may see the project of
-          the review (through IProjectAccess), refusing an actor who may not with the same ProjectNotFound rule as
-          for a project that does not exist, before anything else is checked or stored.
+          The ThreadService class shall refuse with the ProjectNotFound rule, the same rule as for a project that does
+          not exist, starting a thread, replying, resolving, reopening, promoting, demoting, and changing whether a
+          comment is included in the report to an actor who may not see the project of the review (through
+          IProjectAccess).
         justification: |
           A user outside a project must not be able to read or write its discussion, nor learn that it exists. The
           service enforces this itself, whatever the page or the API checked, so that a route added later cannot
           bypass the rule.
         tests:
-          - ThreadService_Constructor_NullArguments_Throws
           - ThreadService_ReportMutations_OutsideUser_ThrowsProjectNotFound
+
+      - id: ReviewCenter-ThreadService-Access-CommandLine
+        title: >-
+          The ThreadService class shall refuse with the ProjectNotFound rule promoting a thread when the command line
+          requests it, which is no user of the project.
+        justification: |
+          The command line acts without a user, so it has no access to the project to rely on.
+        tests:
           - ThreadService_ReportActions_CommandLine_ThrowsProjectNotFound
+
+      - id: ReviewCenter-ThreadService-Access-Auditor
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule starting a thread, replying, resolving,
+          reopening, promoting, demoting, and changing whether a comment is included in the report to an auditor of
+          the project.
+        justification: |
+          An auditor may see the project but not change its discussion.
+        tests:
           - ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore
+
+      - id: ReviewCenter-ThreadService-Access-NothingStored
+        title: >-
+          The ThreadService class shall store nothing and record nothing in the audit trail when a thread action is
+          refused for a user who may not see the project or for an auditor.
+        justification: |
+          A refused actor must leave no stored thread or comment and no audit entry behind, so that nothing records
+          an action that was never allowed.
+        tests:
+          - ThreadService_ReportMutations_OutsideUser_ThrowsProjectNotFound
+          - ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore
+
+      - id: ReviewCenter-ThreadService-Access-Required
+        title: >-
+          The ThreadService class shall refuse a missing review store, project access, user store or clock when it is
+          constructed.
+        justification: |
+          Without these the service cannot enforce its rules, so the mistake must show at once and not later in a
+          request.
+        tests:
+          - ThreadService_Constructor_NullArguments_Throws
 
       - id: ReviewCenter-ThreadService-ApprovalLock
         title: >-
-          The ThreadService class shall refuse to start a thread, to reply, to resolve, to reopen, to promote, to
-          demote, and to change whether a comment is included in the report in a review that is concluded (every
-          slot signed for the current record and no thread open, and therefore locked), with the ReviewLocked rule,
-          after the access check and before the file of a new thread is looked up or anything is stored, shall not
-          refuse them in a review whose slots are all signed but that still has an open thread, and shall leave a
-          review that does not exist to the existing not-found rule.
+          The ThreadService class shall refuse with the ReviewLocked rule starting a thread, replying, resolving, and
+          reopening in a review that is concluded (every slot signed for the current record and no thread open, and
+          therefore locked).
         justification: |
           What a concluded review signed is its record, and it must not change after that, so the service refuses
-          until an administrator reopens the review. A review with an open thread is not concluded, so the open
-          thread can still be discussed and resolved.
+          until an administrator reopens the review.
         tests:
           - ThreadService_Mutations_ApprovedReview_ThrowReviewLocked
           - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ThreadService-ApprovalLock-Report
+        title: >-
+          The ThreadService class shall refuse with the ReviewLocked rule promoting, demoting, and changing whether a
+          comment is included in the report in a review that is concluded.
+        justification: |
+          Moving content into or out of the report would change what the concluded review signed.
+        tests:
+          - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ThreadService-ApprovalLock-AfterAccess
+        title: >-
+          The ThreadService class shall check that the actor may see the project before it checks whether the review
+          is concluded, so that a user who may not see the project is told ProjectNotFound for every thread action on a
+          concluded review.
+        justification: |
+          The lock must not reveal to a user outside the project that the review exists and is concluded.
+        tests:
+          - ThreadService_AllThreadActions_OutsiderOnConcludedReview_ThrowProjectNotFound
+
+      - id: ReviewCenter-ThreadService-ApprovalLock-BeforeFileLookup
+        title: >-
+          The ThreadService class shall refuse with the ReviewLocked rule starting a thread in a concluded review
+          before the file of the new thread is looked up, so that a file that is not found is not reported.
+        justification: |
+          A concluded review accepts no change, so what the request says about files is of no interest.
+        tests:
           - ThreadService_StartThreadAsync_ConcludedReviewAndInvalidAnchor_ReportsReviewLocked
+
+      - id: ReviewCenter-ThreadService-ApprovalLock-OpenThread
+        title: >-
+          The ThreadService class shall accept starting a thread, replying, resolving, reopening, promoting, demoting,
+          and changing whether a comment is included in the report in a review whose slots are all signed but that
+          still has an open thread.
+        justification: |
+          A review with an open thread is not concluded, so the open thread can still be discussed and resolved, and
+          the other changes to its threads stay possible.
+        tests:
           - ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned
+          - ThreadService_AllThreadActions_OpenThreadReview_AreAcceptedWhenAllSigned
+
+      - id: ReviewCenter-ThreadService-ApprovalLock-ReviewNotFound
+        title: >-
+          The ThreadService class shall report starting a thread in a review that does not exist with the
+          ThreadAnchorInvalid rule and not with the ReviewLocked rule.
+        justification: |
+          A review that does not exist is not locked, so the lock must not hide that it is missing.
+        tests:
+          - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
 
       - id: ReviewCenter-ThreadService-SignatureImpact
         title: >-
-          The ThreadService class shall refuse to start a thread, to reply, to resolve, to reopen, to promote, to
-          demote, and to change whether a comment is included in the report when the change would alter the record
-          digest and so make a current signature out of date and the caller has not acknowledged the affected slots,
-          with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, after the
-          validation of the request and before anything is stored, shall report a thread that does not exist with
-          the existing not-found rule, shall not refuse a resolve or reopen that leaves the state as it is, and shall
-          need no acknowledgement for chat (a thread or reply that is not included in the report), for resolving a
-          Question, or for reopening a thread, because none of them changes the digest.
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule starting a thread that is
+          included in the report when a signature is current and the caller has not acknowledged the affected slots.
         justification: |
-          Only the content of the report is part of what a signature covers. A person who changes it after somebody
+          Only the content of the report is part of what a signature covers. A person who adds to it after somebody
           has signed silently withdraws that signature, so the service says which signatures would be lost and asks
-          the caller to confirm. Chat and the open or resolved state of a thread are not part of the digest, so they
-          never invalidate a signature and need no confirmation. A request that is not valid is reported as that
-          error, and a request that changes nothing needs no confirmation.
+          the caller to confirm.
         tests:
           - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor
-          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement
-          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
-          - ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature
           - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Reply
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule replying with a comment
+          that is included in the report when a signature is current and the caller has not acknowledged the affected
+          slots.
+        justification: |
+          An included reply changes the content of the report, so it changes what the signatures cover.
+        tests:
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
           - ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Promote
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule promoting a Question to a
+          Finding when a signature is current and the caller has not acknowledged the affected slots.
+        justification: |
+          A promoted thread joins the report, so it changes what the signatures cover.
+        tests:
           - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Demote
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule demoting a Finding to a
+          Question when a signature is current and the caller has not acknowledged the affected slots.
+        justification: |
+          A demoted thread leaves the report, so it changes what the signatures cover.
+        tests:
           - ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-CommentToggle
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule changing whether a reply
+          is included in the report when a signature is current and the caller has not acknowledged the affected
+          slots.
+        justification: |
+          A reply that joins or leaves the report changes what the signatures cover.
+        tests:
           - ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Resolve
+        title: >-
+          The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule resolving a Finding with
+          a note when a signature is current and the caller has not acknowledged the affected slots.
+        justification: |
+          The resolution note of a Finding is part of the report, so it changes what the signatures cover.
+        tests:
           - ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-NamesSlots
+        title: >-
+          The ThreadService class shall name in the SignaturesWouldBecomeOutOfDate refusal the slot number and the
+          signer of each slot whose signature is current.
+        justification: |
+          The caller must be able to tell whose signatures would be lost before confirming.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-NamesSlots-OnlySigned
+        title: >-
+          The ThreadService class shall name in the SignaturesWouldBecomeOutOfDate refusal no slot that holds no
+          current signature.
+        justification: |
+          A name that does not belong to a lost signature would send the caller to ask the wrong person.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Acknowledged
+        title: >-
+          The ThreadService class shall store the change when the caller has acknowledged the affected slots.
+        justification: |
+          The caller has been told what is lost and has confirmed it, so the change may go ahead.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_StoresThread
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Acknowledged-OutOfDate
+        title: >-
+          The ThreadService class shall make the signatures of the acknowledged slots out of date when it stores the
+          change.
+        justification: |
+          The signatures covered the record as it was, so once the change is in they must no longer count as
+          approval of the new record.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_MakesSignatureOutOfDate
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-NothingStored
+        title: >-
+          The ThreadService class shall store nothing when it refuses a thread or a reply for the signatures that
+          would become out of date.
+        justification: |
+          A refusal that asks for a confirmation must not leave the thread or the reply behind, or the signatures
+          would be lost without the confirmation.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-AfterValidation
+        title: >-
+          The ThreadService class shall validate the request before it asks for an acknowledgement, so that a request
+          that is not valid is reported as that error and not as the signature impact.
+        justification: |
+          A person who cannot go ahead anyway must not be asked to confirm the loss of signatures.
+        tests:
+          - ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ThreadNotFound
+        title: >-
+          The ThreadService class shall report a reply to a thread that does not exist with the not-found rule and not
+          with the SignaturesWouldBecomeOutOfDate rule.
+        justification: |
+          There is nothing to change in a thread that does not exist, so no signature is at stake.
+        tests:
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain
+        title: >-
+          The ThreadService class shall need no acknowledgement for resolving a Finding that is already resolved.
+        justification: |
+          A request that changes nothing needs no confirmation.
+        tests:
+          - ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain-SignaturesCurrent
+        title: >-
+          The ThreadService class shall leave the signatures current when it resolves a Finding that is already
+          resolved.
+        justification: |
+          Resolving a second time does not touch the content of the report, so the signed record stays the one that
+          was signed.
+        tests:
+          - ThreadService_ResolveAsync_ResolvedFindingAfterSignature_KeepsSignature
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ChatThread
+        title: >-
+          The ThreadService class shall need no acknowledgement for starting a thread that is not included in the
+          report.
+        justification: |
+          Chat is not part of the digest, so starting it never calls for a confirmation.
+        tests:
+          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ChatThread-SignaturesCurrent
+        title: >-
+          The ThreadService class shall leave the signatures current when it starts a thread that is not included in
+          the report.
+        justification: |
+          Chat is not part of the digest, so a new chat thread never invalidates a signature.
+        tests:
+          - ThreadService_StartThreadAsync_ChatAfterSignature_KeepsSignature
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ChatReply
+        title: >-
+          The ThreadService class shall need no acknowledgement for a reply that is not included in the report.
+        justification: |
+          A chat reply is not part of the digest, so posting it never calls for a confirmation.
+        tests:
+          - ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ChatReply-SignaturesCurrent
+        title: >-
+          The ThreadService class shall leave the signatures current when it stores a reply that is not included in
+          the report.
+        justification: |
+          A chat reply does not change the record, so the signed record stays the one that was signed.
+        tests:
+          - ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-ResolveQuestion
+        title: >-
+          The ThreadService class shall need no acknowledgement for resolving a Question.
+        justification: |
+          A Question is chat, and the resolved state of a thread is not part of the digest.
+        tests:
           - ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Reopen
+        title: >-
+          The ThreadService class shall need no acknowledgement for reopening a resolved thread.
+        justification: |
+          The open or resolved state of a thread is not part of the digest, so reopening never invalidates a
+          signature.
+        tests:
           - ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement
+
+      - id: ReviewCenter-ThreadService-SignatureImpact-Restored
+        title: >-
+          The ThreadService class shall restore the original record digest when a promoted thread is demoted again.
+        justification: |
+          The digest covers only the content of the report, so undoing a change must undo its effect on the digest.
+        tests:
           - ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest
 
       - id: ReviewCenter-ThreadService-IncludedComment
         title: >-
-          The ThreadService class shall let a thread or a reply be included in the report when it is started or
-          posted, store the flag with the comment, treat a comment that is not included as chat, and derive the kind
-          of a thread from its starting comment: a Finding when that comment is included, otherwise a Question.
+          The ThreadService class shall let the starting comment of a thread be included in the report when the
+          thread is started, and store the flag with the comment.
         justification: |
-          Only what the owner chooses to include is part of the signed record. Chat stays free of consequences, so
-          the discussion is not slowed by the question whether a remark is part of the record; the flag decides, and
-          the kind of the thread follows from the starting comment, so there is no second field to keep in step.
+          Only what the owner chooses to include is part of the signed record, so the flag is stored with the
+          comment it applies to.
         tests:
           - ThreadService_StartThreadAsync_IncludeInReport_StoresFindingWithFlaggedStartingComment
-          - ThreadService_StartThreadAsync_Default_StoresQuestion
+
+      - id: ReviewCenter-ThreadService-IncludedComment-Reply
+        title: >-
+          The ThreadService class shall let a reply be included in the report when it is posted, and store the flag
+          with the reply only.
+        justification: |
+          The owner of a reply decides whether it is part of the signed record, apart from the thread it belongs to.
+        tests:
           - ThreadService_ReplyAsync_IncludeInReport_FlagsOnlyTheReply
-          - ThreadService_ListAsync_Comments_CarryFlagAndKind
+
+      - id: ReviewCenter-ThreadService-IncludedComment-Chat
+        title: >-
+          The ThreadService class shall treat a comment that is not included in the report as chat, with the flag
+          off.
+        justification: |
+          Chat stays free of consequences, so the discussion is not slowed by the question whether a remark is part
+          of the record.
+        tests:
+          - ThreadService_StartThreadAsync_Default_StoresQuestion
+
+      - id: ReviewCenter-ThreadService-IncludedComment-Finding
+        title: >-
+          The ThreadService class shall derive the kind Finding for a thread whose starting comment is included in
+          the report.
+        justification: |
+          The kind follows from the starting comment, so there is no second field to keep in step.
+        tests:
+          - ThreadService_StartThreadAsync_IncludeInReport_StoresFindingWithFlaggedStartingComment
           - ThreadKindRules_KindOf_StartingCommentIncluded_IsFinding
+
+      - id: ReviewCenter-ThreadService-IncludedComment-Question
+        title: >-
+          The ThreadService class shall derive the kind Question for a thread whose starting comment is not included
+          in the report, whether or not a reply is included.
+        justification: |
+          The kind follows from the starting comment only, so an included reply does not make a Finding.
+        tests:
+          - ThreadService_StartThreadAsync_Default_StoresQuestion
           - ThreadKindRules_KindOf_OnlyReplyIncluded_IsQuestion
+          - ThreadService_ReplyAsync_IncludeInReport_FlagsOnlyTheReply
+
+      - id: ReviewCenter-ThreadService-IncludedComment-List
+        title: >-
+          The ThreadService class shall list for every comment of a thread whether it is included in the report.
+        justification: |
+          A page must show what is in the record without working it out for itself.
+        tests:
+          - ThreadService_ListAsync_Comments_CarryFlagAndKind
+
+      - id: ReviewCenter-ThreadService-IncludedComment-List-Kind
+        title: >-
+          The ThreadService class shall list the kind of every thread, Finding or Question.
+        justification: |
+          A page that filters or labels threads by kind must read the kind from the list and not derive it again.
+        tests:
+          - ThreadService_ListAsync_FindingAndQuestion_CarryTheirKind
 
       - id: ReviewCenter-ThreadService-ResolutionNote
         title: >-
-          The ThreadService class shall require a resolution note of at most 4000 characters that is not blank after
-          trimming to resolve a Finding, refusing it otherwise with the ResolutionNoteRequired rule and storing
-          nothing, shall accept an optional note for a Question and treat a blank note as none, shall store a note as a
-          Resolution comment in the same transaction as the new state (included in the report when the thread is a
-          Finding), shall treat resolving a thread that is already resolved as harmless without a note, an audit entry
-          or an acknowledgement, and shall keep the earlier Resolution comments when a thread is reopened and resolved
-          again, and shall refuse a resolution with the RecordChanged rule, storing nothing, when the thread was
-          promoted or demoted between its check and the write.
+          The ThreadService class shall refuse with the ResolutionNoteRequired rule resolving a Finding without a
+          resolution note.
         justification: |
-          Closing a Finding is a statement in the record, so the record must say how it was closed. A Question is
-          chat, so its resolution needs no explanation. Storing the note with the state change keeps the two from
-          ever disagreeing, and keeping the earlier notes keeps the history of the thread. The note, the
-          acknowledgement and the report flag are decided for the kind that the service saw, so a kind that changed
-          meanwhile must be refused and not accepted silently.
+          Closing a Finding is a statement in the record, so the record must say how it was closed.
         tests:
           - ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing
-          - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-Blank
+        title: >-
+          The ThreadService class shall refuse with the ResolutionNoteRequired rule resolving a Finding with a note
+          that is blank after trimming.
+        justification: |
+          A note that says nothing does not say how the Finding was closed.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithBlankNote_ThrowsResolutionNoteRequired
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-NothingStored
+        title: >-
+          The ThreadService class shall store nothing when it refuses to resolve a Finding for the missing note.
+        justification: |
+          A note that is refused must not leave a half-resolved thread, so the thread stays as it was.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing
+          - ThreadService_ResolveAsync_FindingWithBlankNote_ThrowsResolutionNoteRequired
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-TooLong
+        title: >-
+          The ThreadService class shall refuse with the CommentTextInvalid rule a resolution note of more than 4000
+          characters.
+        justification: |
+          A note is a comment, so it has the length limit of a comment.
+        tests:
+          - ThreadService_ResolveAsync_NoteTooLong_ThrowsCommentTextInvalid
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-TooLong-StaysOpen
+        title: >-
+          The ThreadService class shall leave the thread open when it refuses a resolution note that is too long.
+        justification: |
+          A person whose note was refused still has the discussion to finish, so the thread must wait for a shorter
+          note.
+        tests:
+          - ThreadService_ResolveAsync_NoteTooLong_LeavesThreadOpen
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-Question
+        title: >-
+          The ThreadService class shall accept resolving a Question without a note.
+        justification: |
+          A Question is chat, so its resolution needs no explanation.
+        tests:
+          - ThreadService_ResolveAsync_QuestionWithoutNote_Resolves
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-NoteStored
+        title: >-
+          The ThreadService class shall store the resolution note of a resolved thread as a Resolution comment.
+        justification: |
+          The note is part of the discussion, so it is kept with the comments of the thread.
+        tests:
           - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
           - ThreadService_ResolveAsync_QuestionWithNote_StoresExcludedResolutionComment
-          - ThreadService_ResolveAsync_QuestionWithoutNote_Resolves
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-NoteWithState
+        title: >-
+          The ThreadService class shall give the store the resolution note and the new state of the thread in the same
+          call.
+        justification: |
+          A thread that is resolved without its note, or a note without the resolved thread, would leave the record
+          wrong. The store requirement ReviewCenter-ReviewStore-Audit states and verifies that the saving is one
+          transaction, which needs both in one call.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithNote_GivesTheStoreNoteAndNewStateInOneCall
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-NoteTrimmed
+        title: >-
+          The ThreadService class shall store the resolution note without the white space around it.
+        justification: |
+          White space around a note carries no meaning, and must not make two equal notes differ.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-FindingNoteIncluded
+        title: >-
+          The ThreadService class shall include in the report the Resolution comment of a Finding.
+        justification: |
+          A note on a Finding is part of the record.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-QuestionNoteExcluded
+        title: >-
+          The ThreadService class shall not include in the report the Resolution comment of a Question.
+        justification: |
+          A note on a Question is chat.
+        tests:
+          - ThreadService_ResolveAsync_QuestionWithNote_StoresExcludedResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-BlankNoteIgnored
+        title: >-
+          The ThreadService class shall treat a note that is blank after trimming as no note when it resolves a
+          Question, and store no Resolution comment.
+        justification: |
+          A blank note adds nothing to the thread.
+        tests:
           - ThreadService_ResolveAsync_BlankNoteOnQuestion_IsNoNote
-          - ThreadService_ResolveAsync_NoteTooLong_ThrowsCommentTextInvalid
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-AlreadyResolved
+        title: >-
+          The ThreadService class shall treat resolving a thread that is already resolved as harmless, adding no
+          comment.
+        justification: |
+          A second note on a thread that is closed would add text to the discussion for a closing that never
+          happened again.
+        tests:
           - ThreadService_ResolveAsync_AlreadyResolved_IsNoOpWithoutNoteOrAudit
-          - ThreadService_ReopenThenResolveFinding_AddsSecondResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-AlreadyResolved-NoAudit
+        title: >-
+          The ThreadService class shall record nothing in the audit trail when it resolves a thread that is already
+          resolved.
+        justification: |
+          The audit trail must show each closing of a thread once, and not once more for every repeated click.
+        tests:
+          - ThreadService_ResolveAsync_AlreadyResolved_RecordsNothingInTheAuditTrail
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-ReopenKeepsNotes
+        title: >-
+          The ThreadService class shall keep the earlier Resolution comments when a thread is reopened.
+        justification: |
+          The earlier notes are the history of the thread.
+        tests:
           - ThreadService_ReopenAsync_Finding_KeepsEarlierResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-ResolveAgain
+        title: >-
+          The ThreadService class shall add a second Resolution comment when a reopened Finding is resolved again.
+        justification: |
+          Each closing of the Finding is a statement in the record, so each keeps its own note.
+        tests:
+          - ThreadService_ReopenThenResolveFinding_AddsSecondResolutionComment
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-RecordChanged
+        title: >-
+          The ThreadService class shall refuse with the RecordChanged rule resolving a thread that was promoted or
+          demoted between its check and the write.
+        justification: |
+          The note, the acknowledgement and the report flag are decided for the kind that the service saw, so a kind
+          that changed meanwhile must be refused and not accepted silently.
+        tests:
+          - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing
+
+      - id: ReviewCenter-ThreadService-ResolutionNote-RecordChangedNothingStored
+        title: >-
+          The ThreadService class shall store nothing when it refuses to resolve a thread for the RecordChanged rule.
+        justification: |
+          A resolution that lost the race against a change of kind must leave no note and no state change behind.
+        tests:
+          - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing
 
       - id: ReviewCenter-ThreadService-Promote
         title: >-
           The ThreadService class shall promote a Question to a Finding for the starter of the thread, the owner of
-          any reviewer slot (primary or alternate), and a lead (the creator of the review who may contribute, a
-          project administrator, or a system administrator; never an actor authenticated with an API token), shall
-          demote a Finding to a Question for the starter and
-          a lead only, shall refuse everybody else with the ActorNotAllowed rule, shall include or exclude the
-          Resolution comments of the thread together with its starting comment while keeping the flags of the
-          replies, shall treat promoting a Finding or demoting a Question as harmless, and shall never let an Auditor
-          promote or demote.
+          any reviewer slot, and a lead.
         justification: |
-          Moving a thread into or out of the record changes what the signatures cover, so only the people who are
-          responsible for the content of the thread or the review may do it. The Resolution comments follow the kind,
-          because a note on a Question is chat and a note on a Finding is part of the record.
+          Moving a thread into the record changes what the signatures cover, so only the people who are responsible
+          for the content of the thread or the review may do it.
         tests:
           - ThreadService_PromoteAsync_StarterSlotOwnerAndLead_Allowed
-          - ThreadService_PromoteAsync_OtherMember_ThrowsActorNotAllowed
-          - ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments
-          - ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired
-          - ThreadService_PromoteAsync_AlreadyFinding_IsNoOp
+          - ThreadKindRules_CanPromote_Roles_StarterSlotOwnerLeadOnly
+
+      - id: ReviewCenter-ThreadService-Promote-AlternateSlotOwner
+        title: >-
+          The ThreadService class shall treat the primary and the alternate owner of a reviewer slot alike as the owner
+          of the slot when it promotes.
+        justification: |
+          The alternate takes the place of the primary reviewer, so the alternate is as responsible for the content.
+        tests:
           - ThreadService_PromoteAsync_AlternateOfSlot_Allowed
+          - ReviewActorRoles_IsSlotOwnerAsync_PrimaryAndAlternate_AreSlotOwners
+
+      - id: ReviewCenter-ThreadService-Promote-SlotOwnerApiToken
+        title: >-
+          The ThreadService class shall let the owner of a reviewer slot who is authenticated with an API token
+          promote a Question.
+        justification: |
+          An API token acts for its user, so a slot owner keeps the right of the slot when using a token.
+        tests:
+          - ThreadService_PromoteAsync_AlternateOfSlot_Allowed
+
+      - id: ReviewCenter-ThreadService-Promote-NotSlotOwner
+        title: >-
+          The ThreadService class shall not treat the command line, a missing actor, or a user without a slot as the
+          owner of a reviewer slot.
+        justification: |
+          Only a user who holds a slot is responsible for the content of the review as a reviewer.
+        tests:
+          - ReviewActorRoles_IsSlotOwnerAsync_NoSlotCommandLineOrNoActor_IsNotSlotOwner
+
+      - id: ReviewCenter-ThreadService-Promote-Refused
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule promoting a thread to a member who is
+          neither the starter, the owner of a reviewer slot, nor a lead.
+        justification: |
+          Moving a thread into the record changes what the signatures cover, so everybody else is refused.
+        tests:
+          - ThreadService_PromoteAsync_OtherMember_ThrowsActorNotAllowed
+          - ThreadKindRules_CanPromote_Roles_StarterSlotOwnerLeadOnly
+
+      - id: ReviewCenter-ThreadService-Promote-Lead
+        title: >-
+          The ThreadService class shall treat the creator of the review who may contribute, a project administrator,
+          and a system administrator as a lead who may promote and demote a thread.
+        justification: |
+          The people who run the review are responsible for its content, whether or not they started the thread.
+        tests:
           - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed
-          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
-          - ThreadService_ReportActions_CreatorDowngradedToAuditor_ThrowsActorNotAllowed
-          - ReviewActorRoles_IsLeadAsync_Creator_IsLeadWithoutRegardToCase
           - ReviewActorRoles_IsLeadAsync_ProjectAdminWhoIsNotCreator_IsLead
           - ReviewActorRoles_IsLeadAsync_SystemAdminWhoIsNotMember_IsLead
-          - ReviewActorRoles_IsLeadAsync_CreatorDowngradedToAuditor_IsNotLead
-          - ReviewActorRoles_IsLeadAsync_PlainMemberAndOutsider_AreNotLead
+
+      - id: ReviewCenter-ThreadService-Promote-LeadCreatorCase
+        title: >-
+          The ThreadService class shall recognize the creator of the review as lead without regard to the case of the
+          user name.
+        justification: |
+          User names are not case sensitive, so the same person must not lose the lead by typing the name differently.
+        tests:
+          - ReviewActorRoles_IsLeadAsync_Creator_IsLeadWithoutRegardToCase
+
+      - id: ReviewCenter-ThreadService-Promote-LeadNotApiToken
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule promoting and demoting a thread that the
+          actor did not start, when the actor is an administrator or the creator of the review authenticated with an
+          API token.
+        justification: |
+          A token must not carry the authority to move a thread into or out of the record on behalf of the people
+          who run the review.
+        tests:
+          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
           - ReviewActorRoles_IsLeadAsync_ApiTokenCommandLineOrNoActor_IsNotLead
+
+      - id: ReviewCenter-ThreadService-Promote-CreatorMadeAuditor
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule promoting a thread by the creator of the
+          review who was made an auditor, even for a thread that the creator started.
+        justification: |
+          An auditor may not change the record, so the creator no longer leads the review.
+        tests:
+          - ThreadService_ReportActions_CreatorDowngradedToAuditor_ThrowsActorNotAllowed
+          - ReviewActorRoles_IsLeadAsync_CreatorDowngradedToAuditor_IsNotLead
+
+      - id: ReviewCenter-ThreadService-Promote-NotLead
+        title: >-
+          The ThreadService class shall not treat a plain member and a user outside the project as a lead.
+        justification: |
+          Only the people who run the review lead it.
+        tests:
+          - ReviewActorRoles_IsLeadAsync_PlainMemberAndOutsider_AreNotLead
+
+      - id: ReviewCenter-ThreadService-Promote-NoCreatorLead
+        title: >-
+          The ThreadService class shall treat only a project administrator and a system administrator as lead of a
+          review that has no creator.
+        justification: |
+          Without a creator there is no one else who leads the review.
+        tests:
           - ReviewActorRoles_IsLeadAsync_ReviewWithoutCreator_OnlyAdministratorsLead
-          - ReviewActorRoles_IsSlotOwnerAsync_PrimaryAndAlternate_AreSlotOwners
-          - ReviewActorRoles_IsSlotOwnerAsync_NoSlotCommandLineOrNoActor_IsNotSlotOwner
+
+      - id: ReviewCenter-ThreadService-Promote-Auditor
+        title: >-
+          The ThreadService class shall never let an auditor promote or demote a thread.
+        justification: |
+          An auditor may see the project but not change what the review signs.
+        tests:
+          - ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore
+
+      - id: ReviewCenter-ThreadService-Promote-ResolutionIncluded
+        title: >-
+          The ThreadService class shall include in the report the Resolution comments of a thread together with its
+          starting comment when the thread is promoted.
+        justification: |
+          A note on a Question is chat and a note on a Finding is part of the record, so the notes follow the kind.
+        tests:
+          - ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments
+
+      - id: ReviewCenter-ThreadService-Promote-ResolvedNeedsNote
+        title: >-
+          The ThreadService class shall refuse with the ResolutionNoteRequired rule promoting a resolved Question that
+          has no resolution note.
+        justification: |
+          A resolved Finding must say how it was closed, so a resolved Question without a note cannot become one.
+        tests:
+          - ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired
+
+      - id: ReviewCenter-ThreadService-Promote-AlreadyFinding
+        title: >-
+          The ThreadService class shall treat promoting a Finding as harmless.
+        justification: |
+          A thread that already is a Finding is in the record, so a second promotion has nothing to add.
+        tests:
+          - ThreadService_PromoteAsync_AlreadyFinding_IsNoOp
+
+      - id: ReviewCenter-ThreadService-Promote-Demote
+        title: >-
+          The ThreadService class shall demote a Finding to a Question for the starter of the thread and a lead only.
+        justification: |
+          Moving a thread out of the record changes what the signatures cover, so only the people who are responsible
+          for the thread or the review may do it. A slot owner who did not start the thread has no such right.
+        tests:
           - ThreadService_DemoteAsync_StarterAndLead_Allowed
-          - ThreadService_DemoteAsync_SlotOwnerWhoIsNotStarter_ThrowsActorNotAllowed
-          - ThreadService_DemoteAsync_ExcludesResolutionButKeepsReplyFlags
-          - ThreadService_DemoteAsync_AlreadyQuestion_IsNoOp
-          - ThreadKindRules_CanPromote_Roles_StarterSlotOwnerLeadOnly
           - ThreadKindRules_CanDemote_Roles_StarterAndLeadOnly
+
+      - id: ReviewCenter-ThreadService-Promote-DemoteSlotOwnerRefused
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule demoting a thread to the owner of a
+          reviewer slot who did not start it.
+        justification: |
+          A reviewer may add content to the record but may not take away what another person put there.
+        tests:
+          - ThreadService_DemoteAsync_SlotOwnerWhoIsNotStarter_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-ThreadService-Promote-DemoteResolutionExcluded
+        title: >-
+          The ThreadService class shall exclude from the report the Resolution comments of a thread together with its
+          starting comment when the thread is demoted.
+        justification: |
+          A note on a Question is chat, so the notes follow the kind out of the record.
+        tests:
+          - ThreadService_DemoteAsync_ExcludesResolutionButKeepsReplyFlags
+
+      - id: ReviewCenter-ThreadService-Promote-DemoteReplyFlagsKept
+        title: >-
+          The ThreadService class shall keep the flags of the replies of a thread when the thread is demoted.
+        justification: |
+          The author of a reply decided whether it is in the report, and the kind of the thread does not change that.
+        tests:
+          - ThreadService_DemoteAsync_ExcludesResolutionButKeepsReplyFlags
+
+      - id: ReviewCenter-ThreadService-Promote-AlreadyQuestion
+        title: >-
+          The ThreadService class shall treat demoting a Question as harmless.
+        justification: |
+          A thread that already is a Question has nothing to give up, so the request must end quietly.
+        tests:
+          - ThreadService_DemoteAsync_AlreadyQuestion_IsNoOp
 
       - id: ReviewCenter-ThreadService-CommentToggle
         title: >-
           The ThreadService class shall include a reply in the report or take it out again for the author of that
-          reply and a lead, shall refuse everybody else with the ActorNotAllowed rule, shall refuse the starting
-          comment and a Resolution comment with the CommentNotTogglable rule, shall report a comment that is not in
-          the thread as a missing thread, and shall treat setting the value a comment already has as harmless.
+          reply.
         justification: |
-          A reply is the author's own words, so the author decides whether they are part of the record, and a lead
-          can correct it. The starting comment and the resolution follow the kind of the thread instead, so they are
-          changed by promoting or demoting.
+          A reply is the author's own words, so the author decides whether they are part of the record.
         tests:
           - ThreadService_SetCommentIncludedAsync_ReplyByAuthorOrLead_Toggles
-          - ThreadService_SetCommentIncludedAsync_OtherMember_ThrowsActorNotAllowed
-          - ThreadService_SetCommentIncludedAsync_StartingOrResolutionComment_ThrowsCommentNotTogglable
-          - ThreadService_SetCommentIncludedAsync_UnknownComment_ThrowsThreadNotFound
-          - ThreadService_SetCommentIncludedAsync_SameValue_IsNoOp
-          - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed
-          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
           - ThreadKindRules_CanToggleReply_Roles_AuthorAndLeadOnly
+
+      - id: ReviewCenter-ThreadService-CommentToggle-Lead
+        title: >-
+          The ThreadService class shall include a reply in the report or take it out again for a lead who is not its
+          author.
+        justification: |
+          A lead can correct what the author chose for the record.
+        tests:
+          - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed
+
+      - id: ReviewCenter-ThreadService-CommentToggle-Refused
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule changing whether a reply is included in
+          the report to a member who is neither its author nor a lead, including the starter of the thread.
+        justification: |
+          A reply is the author's own words, so nobody else may move it into or out of the record.
+        tests:
+          - ThreadService_SetCommentIncludedAsync_OtherMember_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-ThreadService-CommentToggle-LeadNotApiToken
+        title: >-
+          The ThreadService class shall refuse with the ActorNotAllowed rule changing whether a reply is included in
+          the report to an administrator or the creator of the review who is authenticated with an API token and is
+          not the author.
+        justification: |
+          A token must not carry the authority to override the choice of a reply author on behalf of the people who
+          run the review.
+        tests:
+          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-ThreadService-CommentToggle-StartingOrResolution
+        title: >-
+          The ThreadService class shall refuse with the CommentNotTogglable rule changing whether the starting comment
+          or a Resolution comment is included in the report.
+        justification: |
+          The starting comment and the resolution follow the kind of the thread, so they are changed by promoting or
+          demoting.
+        tests:
+          - ThreadService_SetCommentIncludedAsync_StartingOrResolutionComment_ThrowsCommentNotTogglable
           - ThreadKindRules_IsToggleable_StartingAndResolutionComments_AreNot
+
+      - id: ReviewCenter-ThreadService-CommentToggle-UnknownComment
+        title: >-
+          The ThreadService class shall report a comment that is not in the thread with the ThreadNotFound rule.
+        justification: |
+          A comment that does not exist cannot be changed.
+        tests:
+          - ThreadService_SetCommentIncludedAsync_UnknownComment_ThrowsThreadNotFound
+
+      - id: ReviewCenter-ThreadService-CommentToggle-SameValue
+        title: >-
+          The ThreadService class shall treat setting the value a comment already has as harmless.
+        justification: |
+          A setting that is already as asked needs no change, so the request must end quietly.
+        tests:
+          - ThreadService_SetCommentIncludedAsync_SameValue_IsNoOp
 
       - id: ReviewCenter-ThreadService-ConcludedRefusal
         title: >-
           The ThreadService class shall refuse every thread action (start, reply, resolve, reopen, promote, demote,
           and the inclusion of a comment) on a concluded review with the ReviewLocked rule.
         justification: |
-          A concluded review is locked, and no thread action may be a way around the lock, so all seven actions are
-          covered by one test over every one of them.
+          A concluded review is locked, and no thread action may be a way around the lock.
+        tests:
+          - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ThreadService-ConcludedRefusal-NothingChanged
+        title: >-
+          The ThreadService class shall leave the threads, the comments and the audit trail of a concluded review as
+          they were when it refuses a thread action.
+        justification: |
+          A refusal because of the lock must not leave half of the action behind in a record that was signed.
         tests:
           - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
           - ThreadService_StartThreadAsync_ConcludedReviewAndInvalidAnchor_ReportsReviewLocked
+          - ThreadService_Mutations_ApprovedReview_ThrowReviewLocked
 
       - id: ReviewCenter-ThreadService-ReportAudit
         title: >-
-          The ThreadService class shall record in the audit trail, in the same transaction as the change, a change of
-          the kind of a thread (thread.kind-changed, naming the old and the new kind), a change of whether a comment is
-          included in the report (thread.comment-report-changed, naming the thread and the comment), the hash but never
-          the text of a resolution note on thread.resolved, and the marker that a started thread or reply is in the
-          report, and shall record nothing for a request that changes nothing.
+          The ThreadService class shall record in the audit trail a change of the kind of a thread
+          (thread.kind-changed), naming the old and the new kind.
         justification: |
-          Moving content into or out of the record is a decision that must be traceable. Hashing the note keeps the
-          text out of a record that cannot be edited, and a request that changed nothing must leave no entry.
+          Moving content into or out of the record is a decision that must be traceable.
         tests:
           - ThreadService_PromoteAndDemoteAsync_Audit_NamesKindChange
+
+      - id: ReviewCenter-ThreadService-ReportAudit-Atomic
+        title: >-
+          The ThreadService class shall give the store the audit entry of promoting, demoting and changing whether a
+          comment is included in the report in the same call that stores the change.
+        justification: |
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
+        tests:
+          - ThreadService_ReportMutations_GiveTheStoreEntryAndChangeInOneCall
+
+      - id: ReviewCenter-ThreadService-ReportAudit-CommentToggle
+        title: >-
+          The ThreadService class shall record in the audit trail a change of whether a comment is included in the
+          report (thread.comment-report-changed), naming the thread and the comment.
+        justification: |
+          Moving a reply into or out of the record is a decision that must be traceable.
+        tests:
           - ThreadService_SetCommentIncludedAsync_Audit_NamesCommentAndChange
+
+      - id: ReviewCenter-ThreadService-ReportAudit-ResolutionNoteHash
+        title: >-
+          The ThreadService class shall record the hash of the resolution note in the audit entry thread.resolved.
+        justification: |
+          The hash shows which note closed the thread without copying it.
+        tests:
           - ThreadService_ResolveAsync_WithNote_Audit_HasNoteHashButNotText
+
+      - id: ReviewCenter-ThreadService-ReportAudit-ResolutionNoteNoText
+        title: >-
+          The ThreadService class shall not record the text of the resolution note in the audit entry thread.resolved.
+        justification: |
+          The audit trail cannot be edited, so the text of a note must not be copied into it.
+        tests:
+          - ThreadService_ResolveAsync_WithNote_Audit_HasNoteHashButNotText
+
+      - id: ReviewCenter-ThreadService-ReportAudit-StartedInReport
+        title: >-
+          The ThreadService class shall mark in the audit entry of a started thread that its starting comment is in
+          the report.
+        justification: |
+          The history must show whether a new thread went into the record.
+        tests:
           - ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport
+
+      - id: ReviewCenter-ThreadService-ReportAudit-ReplyInReport
+        title: >-
+          The ThreadService class shall mark in the audit entry of a reply that the reply is in the report.
+        justification: |
+          The history must show whether a reply went into the record.
+        tests:
+          - ThreadService_ReplyAsync_IncludeInReport_Audit_MarksInReport
+
+      - id: ReviewCenter-ThreadService-ReportAudit-ReplyInReport-ChatNotMarked
+        title: >-
+          The ThreadService class shall not mark in the audit entry of a reply that the reply is in the report when
+          the reply is not.
+        justification: |
+          A mark on a chat reply would tell a reader of the history that the record changed when it did not.
+        tests:
+          - ThreadService_ReplyAsync_ChatReply_Audit_IsNotMarkedInReport
+
+      - id: ReviewCenter-ThreadService-ReportAudit-NoOp
+        title: >-
+          The ThreadService class shall record nothing in the audit trail for a request that changes nothing.
+        justification: |
+          A trail that lists requests that did nothing would bury the real decisions in noise.
+        tests:
           - ThreadService_NoOpReportMutations_RecordNothing
 
       - id: ReviewCenter-ThreadService-Capabilities
         title: >-
-          The ThreadService class shall tell a viewer, with the same rules that the thread actions enforce, whether
-          each thread may be made a Finding (by the starter of the thread, any reviewer of a slot, or the lead),
-          made a Question again (by the starter or the lead only), or resolved, and which comments may be added to or
-          taken out of the report (by the author of the reply or the lead), and shall tell an auditor and any viewer of
-          a concluded review that nothing is allowed (an API token gets what its user gets, except the rights of the
-          lead), so that a page offers exactly the actions that would be accepted, and shall count the threads by kind
-          and state for every page that shows a count.
+          The ThreadService class shall tell a viewer, with the same rules that the thread actions enforce, that a
+          Question may be made a Finding by the starter of the thread, any reviewer of a slot, or the lead.
         justification: |
           A button that the rules refuse is a trap, and a page that works the rules out for itself would drift from
-          the service. One answer from one place keeps both the same, and one count keeps the summary strip, the
-          progress, and the inbox in step.
+          the service. One answer from one place keeps both the same.
         tests:
           - ThreadCapabilities_Promote_StarterSlotOwnerAndLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-Demote
+        title: >-
+          The ThreadService class shall tell a viewer that a Finding may be made a Question again by the starter of
+          the thread or the lead only.
+        justification: |
+          A page that offered the demotion to anybody else would show a button that the service refuses.
+        tests:
           - ThreadCapabilities_Demote_StarterAndLeadOnly
+
+      - id: ReviewCenter-ThreadService-Capabilities-ResolvedQuestion
+        title: >-
+          The ThreadService class shall tell a viewer that promoting a resolved Question needs a resolution note.
+        justification: |
+          The service refuses to promote a resolved Question without a note, so the page must say so.
+        tests:
           - ThreadCapabilities_ResolvedQuestion_PromoteNeedsResolutionNote
-          - ThreadCapabilities_Auditor_NothingAllowed
-          - ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead
-          - ThreadCapabilities_Concluded_NothingAllowed
-          - ThreadCapabilities_ToggleReply_AuthorOrLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-Resolve
+        title: >-
+          The ThreadService class shall tell a viewer that any contributor may resolve a thread that exists.
+        justification: |
+          Every contributor may resolve a thread, so the page offers the resolution wherever the thread exists.
+        tests:
           - ThreadCapabilities_Resolve_AnyContributor_UnknownThreadNothing
+
+      - id: ReviewCenter-ThreadService-Capabilities-UnknownThread
+        title: >-
+          The ThreadService class shall tell a viewer that nothing is allowed for a thread that does not exist.
+        justification: |
+          There is nothing to act on, so the page must offer nothing.
+        tests:
+          - ThreadCapabilities_Resolve_AnyContributor_UnknownThreadNothing
+
+      - id: ReviewCenter-ThreadService-Capabilities-ToggleReply
+        title: >-
+          The ThreadService class shall tell a viewer that a reply may be added to or taken out of the report by the
+          author of the reply or the lead.
+        justification: |
+          The service lets only the author of a reply and the lead change its flag, so the page offers the
+          change to nobody else.
+        tests:
+          - ThreadCapabilities_ToggleReply_AuthorOrLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-StartingComment
+        title: >-
+          The ThreadService class shall tell a viewer that the starting comment of a thread may not be added to or taken
+          out of the report, not even by the lead.
+        justification: |
+          The starting comment follows the kind of the thread, so the page must not offer to change it.
+        tests:
+          - ThreadCapabilities_ToggleReply_AuthorOrLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-Auditor
+        title: >-
+          The ThreadService class shall tell an auditor, a user outside the project, and a viewer without an actor
+          that nothing is allowed.
+        justification: |
+          These viewers may not change the discussion, so the page must offer nothing.
+        tests:
+          - ThreadCapabilities_Auditor_NothingAllowed
+
+      - id: ReviewCenter-ThreadService-Capabilities-Concluded
+        title: >-
+          The ThreadService class shall tell a viewer who could contribute before that nothing is allowed once the
+          review is concluded.
+        justification: |
+          A concluded review is locked, so the page must offer nothing.
+        tests:
+          - ThreadCapabilities_Concluded_NothingAllowed
+
+      - id: ReviewCenter-ThreadService-Capabilities-ApiToken
+        title: >-
+          The ThreadService class shall tell the owner of a reviewer slot who is authenticated with an API token that
+          promoting a Question is allowed, as it tells the same owner signed in with a password.
+        justification: |
+          A token acts for its user, so the page must not hide what the token may do.
+        tests:
+          - ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-ApiTokenNotLead
+        title: >-
+          The ThreadService class shall tell a lead who is authenticated with an API token that promoting and demoting
+          a thread is not allowed.
+        justification: |
+          The service refuses a token the rights of the lead, so the page must not offer them.
+        tests:
+          - ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead
+
+      - id: ReviewCenter-ThreadService-Capabilities-Equality
+        title: >-
+          The ThreadService class shall compare the capabilities of a viewer for the threads of a review by value.
+        justification: |
+          A page that redraws only when the capabilities differ needs equal answers to compare as equal.
+        tests:
           - ThreadCapabilities_Equality_ComparesPerThreadActionsByValue
+
+      - id: ReviewCenter-ThreadService-Capabilities-Counts
+        title: >-
+          The ThreadService class shall count the threads of a review by kind and by state.
+        justification: |
+          One count keeps the summary strip, the progress, and the inbox in step.
+        tests:
           - ThreadCounts_SplitByKindAndState
+
+      - id: ReviewCenter-ThreadService-Capabilities-CountsPhrase
+        title: >-
+          The ThreadService class shall describe the open threads by naming the count of each kind.
+        justification: |
+          Every page that shows a count must say the same words.
+        tests:
           - ThreadCounts_OpenPhrase_NamesTheKinds
+
+      - id: ReviewCenter-ThreadService-Capabilities-CountsPhrase-ZeroOneMany
+        title: >-
+          The ThreadService class shall name a count of zero, one, and many open threads of a single kind, in the
+          singular for one and in the plural otherwise.
+        justification: |
+          The summary strip shows one kind at a time and must say "0 open questions" and not leave the kind out.
+        tests:
           - ThreadCounts_KindPhrases_NameZeroOneAndMany
+
+      - id: ReviewCenter-ThreadService-Capabilities-CountsArguments
+        title: >-
+          The ThreadService class shall refuse a missing list of threads when it counts them.
+        justification: |
+          A count of nothing is a mistake of the caller that must show at once.
+        tests:
           - ThreadCounts_From_NullThreads_Throws

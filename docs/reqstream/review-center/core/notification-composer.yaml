@@ -14,7 +14,8 @@ sections:
           The NotificationComposer class shall use a fixed subject text, with the name of the installation, for a mail
           about new items.
         justification: |
-          A subject made of fixed text can not carry text of a user into the header of the mail.
+          The subject of a mail about new items is read in the mail list first, and fixed text keeps text of a user
+          out of the header of the mail.
         tests:
           - NotificationComposer_Compose_Every_SubjectIsFixedText
 
@@ -23,7 +24,8 @@ sections:
           The NotificationComposer class shall use a fixed subject text, with the name of the installation, for a daily
           summary.
         justification: |
-          A subject made of fixed text can not carry text of a user into the header of the mail.
+          A daily summary is sent every day to every user who chose it, so its subject must be the same fixed text
+          and must not carry text of a user into the header of the mail.
         tests:
           - NotificationComposer_Compose_Daily_SubjectIsFixedText
 
@@ -224,6 +226,7 @@ sections:
           The count of waiting replies changes without a change of the kind, so the count is no part of the kind.
         tests:
           - NotificationComposer_KindOf_StateWithCount_WithoutCount
+          - NotificationComposer_KindOf_StateWithTwoColons_PartBeforeFirstColon
 
       - id: ReviewCenter-NotificationComposer-KindOfPlainState
         title: >-
@@ -270,8 +273,8 @@ sections:
         title: >-
           The NotificationComposer class shall write no number for a disputed item.
         justification: |
-          The count of disputed answers is derived from the ballots of the other reviewers, which must not leave the
-          server in a mail.
+          A number written in the body of the mail would tell the reader how many of the other reviewers answered
+          differently, and the body must not carry what is derived from the ballots of the other reviewers.
         tests:
           - NotificationComposer_Compose_Disputed_NoCountInBody
 
@@ -369,6 +372,7 @@ sections:
         tests:
           - NotificationComposer_Compose_TitleWithLineBreak_TextPartSingleLine
           - NotificationComposer_Compose_TitleWithUnicodeLineSeparators_BecomeSpaces
+          - NotificationComposer_Compose_ProjectNameAndReviewIdWithLineBreak_TextPartSingleLine
 
       - id: ReviewCenter-NotificationComposer-HtmlEncodeText
         title: >-
