@@ -94,6 +94,11 @@ tested by `AuditPage_Render_MarkupInEntries_IsEscaped`.
 administrator rights are required." is shown, and no entry. This scenario is tested by
 `AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries`.
 
+**AuditPage_Render_NonAdmin_ReadsNothingFromTheTrail**: An ordinary user opens the page component over a trail that
+counts every read; the store records no read at all. As a control, the system administrator then opens the page over
+the same counting store and the reads are counted. This scenario is tested by
+`AuditPage_Render_NonAdmin_ReadsNothingFromTheTrail`.
+
 **AuditPage_Render_ClaimsAdminButStoreSaysNot_IsRefused**: The authentication state claims the system administrator
 role, but
 the stored user is not a system administrator; the page refuses. This scenario is tested by
@@ -177,12 +182,21 @@ and an unknown action in the query are dropped or shown as text, and the page re
 `AuditPage_Render_HostileQueryValues_AreHandledAndEncoded`, `AuditPage_Render_HugeActorText_IsCutAndPageRenders`,
 and `AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates`.
 
+**AuditPage_Render_DateRangeQuery_LimitsTheEntries**: Three entries are recorded on three consecutive days; a query
+with the same day as from and to shows only the entry of that day, and a query from the second to the third day
+shows the entries of both days, the newest first. This scenario is tested by
+`AuditPage_Render_DateRangeQuery_LimitsTheEntries`.
+
 **AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter**: A filter with more matches than a page shows the page
 size asked for, and the Older and Newer links carry the filter and the page size. This scenario is tested by
 `AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter`,
 `ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter`, and the component alone by
 `AuditEntryTable_Render_WithFilter_LinksCarryTheFilter` and
 `AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded`.
+
+**AuditEntryTable_Render_EntryWithOffsetTime_ShowsUtcTime**: An entry recorded at 07:06:07 in a zone two hours ahead of
+UTC is rendered; its time cell shows `2025-03-04 05:06:07`, the same instant in UTC. This scenario is tested by
+`AuditEntryTable_Render_EntryWithOffsetTime_ShowsUtcTime`.
 
 **ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries**: The audit page of a project is opened with query
 values; only the matching entries of the project are shown and the form has no project selector. This scenario is

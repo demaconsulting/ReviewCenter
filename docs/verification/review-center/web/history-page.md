@@ -33,6 +33,15 @@ N/A - standard test environment.
 slots; the answer entries of the other reviewer show the hidden note and the actor, and the other entries are as
 stored. This scenario is tested by `HistoryPage_HiddenViewer_HidesAnswerDetailsOnly`.
 
+**HistoryPage_Render_NobodySignedIn_ShowsNoEntries**: A review with an entry is opened by the page component while
+nobody is signed in; the session-ended notice of the session gate is shown, and no table, row, project name, review
+title, or entry. This scenario is tested by `HistoryPage_Render_NobodySignedIn_ShowsNoEntries`.
+
+**HistoryPage_HiddenViewer_KeepsActionActorAndTimeOfHiddenEntries**: A reviewer with a draft opens the history of a
+review with several slots; the row of an answer entry of another reviewer shows the actor, the action, and the time
+as stored, and only the detail is replaced by the hidden note. This scenario is tested by
+`HistoryPage_HiddenViewer_KeepsActionActorAndTimeOfHiddenEntries`.
+
 **HistoryPage_Administrator_SeesFullAnswerDetails**: An administrator sees the full detail of the same entries. This
 scenario is tested by `HistoryPage_Administrator_SeesFullAnswerDetails`.
 

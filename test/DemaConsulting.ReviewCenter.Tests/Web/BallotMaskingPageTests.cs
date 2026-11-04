@@ -172,6 +172,31 @@ public class BallotMaskingPageTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that the history of a viewer without a handed-in ballot still shows the action, the actor, and the
+    ///     time of an entry whose detail is hidden.
+    /// </summary>
+    [Fact]
+    public async Task HistoryPage_HiddenViewer_KeepsActionActorAndTimeOfHiddenEntries()
+    {
+        // Arrange: an answer entry by an actor of its own, so that its row can be told from the others
+        var projectId = await ArrangeDisputedReviewWithDraftViewerAsync();
+        await Audit.RecordAsync(
+            AuditDraft.By(new Actor("zed", "Zed"), "checklist.answered", "item REQ-01: Fail", projectId, ReviewKey),
+            TestContext.Current.CancellationToken);
+
+        // Act
+        var cut = RenderHistory(projectId);
+
+        // Assert: the row of that entry shows who, what, and when, and only the detail is replaced
+        var row = Assert.Single(
+            cut.FindAll("[data-testid='history-row']"),
+            r => r.QuerySelector("[data-testid='history-actor']")!.TextContent == "Zed (zed)");
+        Assert.Equal("checklist.answered", row.QuerySelector("[data-testid='history-action']")!.TextContent);
+        Assert.Equal("2025-03-04 05:06:07", row.QuerySelector("[data-testid='history-time']")!.TextContent);
+        Assert.Equal(AuditMasking.HiddenAnswerDetail, row.QuerySelector("[data-testid='history-detail']")!.TextContent);
+    }
+
+    /// <summary>
     ///     Test that the administrator sees the full details of the answers in the history.
     /// </summary>
     [Fact]

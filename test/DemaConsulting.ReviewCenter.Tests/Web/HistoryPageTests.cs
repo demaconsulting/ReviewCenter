@@ -250,6 +250,31 @@ public class HistoryPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the page itself, rendered for a visitor who is not signed in, shows no entry of the review and
+    ///     nothing of its project, only the session-ended notice of the session gate.
+    /// </summary>
+    [Fact]
+    public async Task HistoryPage_Render_NobodySignedIn_ShowsNoEntries()
+    {
+        // Arrange: a review with an entry, and nobody signed in
+        var projectId = await CreateReviewAsync();
+        await RecordAsync(projectId, "REV-1", "review.created", "confidential entry");
+        SignOut();
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']"));
+        Assert.Empty(cut.FindAll("[data-testid='history-table']"));
+        Assert.Empty(cut.FindAll("[data-testid='history-row']"));
+        foreach (var secret in new[] { "Apollo", "First review", "confidential entry", "Ann (ann)" })
+        {
+            Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     ///     Asserts that the page shows only the not-found message and nothing of the project, the review or its audit
     ///     entries.
     /// </summary>

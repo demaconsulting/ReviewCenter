@@ -9,146 +9,698 @@ sections:
     requirements:
       - id: ReviewCenter-PlanPage-Form
         title: >-
-          The PlanPage unit shall show the name of the project and a form with the enabled repositories of the
-          project by name only, never a location, user name, or token, a head revision, and a choice of baseline of
-          None, Explicit revision, or Last reviewed (labeled "Changes since the last approved review of each set"), with
-          Last reviewed as the default and the text box for the
-          baseline revision shown only for Explicit revision, and shall show a not-found message for a project that
-          does not exist or that the user may not see, and a plain message that names whom to ask when the project
-          has no repository.
+          The PlanPage unit shall show a form with the enabled repositories of the project by name.
         justification: |
-          Planning needs three answers: where, which revision, and compared with what. The form asks for exactly
-          these and nothing else, and hides the one field that does not apply. A project the user may not see looks
-          like a missing one, so the page does not reveal it.
+          Planning needs three answers: where, which revision, and compared with what.
+        tests:
+          - PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
+
+      - id: ReviewCenter-PlanPage-Form-ProjectName
+        title: >-
+          The PlanPage unit shall show the name of the project.
+        justification: |
+          The user must see for which project the plan is made.
         tests:
           - PlanPage_Render_OneRepository_ShowsFormWithDefaults
-          - PlanPage_Render_UnknownProject_ShowsNotFound
-          - PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm
+
+      - id: ReviewCenter-PlanPage-Form-EnabledOnly
+        title: >-
+          The PlanPage unit shall offer only the enabled repositories of the project.
+        justification: |
+          A disabled repository cannot be read.
+        tests:
           - PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets
+
+      - id: ReviewCenter-PlanPage-Form-NoSecrets
+        title: >-
+          The PlanPage unit shall show no repository location, user name, or token.
+        justification: |
+          The form asks for exactly the answers it needs, and the credentials stay with the server.
+        tests:
+          - PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets
+          - PlanPage_Render_RepositoryWithCredentials_ShowsNoLocationUserNameOrToken
+
+      - id: ReviewCenter-PlanPage-Form-Head
+        title: >-
+          The PlanPage unit shall offer a head revision field, empty by default.
+        justification: |
+          The user says at which revision the plan is made.
+        tests:
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
+
+      - id: ReviewCenter-PlanPage-Form-Baseline
+        title: >-
+          The PlanPage unit shall offer the baseline choices None, Explicit revision, and Last reviewed.
+        justification: |
+          The user says compared with what.
+        tests:
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
           - PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput
+
+      - id: ReviewCenter-PlanPage-Form-BaselineDefault
+        title: >-
+          The PlanPage unit shall preselect Last reviewed, labeled "Changes since the last approved review of each
+          set", as the baseline choice.
+        justification: |
+          Most plans compare with the last approved review.
+        tests:
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
+
+      - id: ReviewCenter-PlanPage-Form-BaselineInput
+        title: >-
+          The PlanPage unit shall show the text box for the baseline revision only for the baseline choice Explicit
+          revision.
+        justification: |
+          The form hides the one field that does not apply.
+        tests:
+          - PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
+
+      - id: ReviewCenter-PlanPage-Form-NotFound
+        title: >-
+          The PlanPage unit shall show a not-found message that names the project, and no form, for a project that
+          does not exist.
+        justification: |
+          A wrong address must be told from an empty page.
+        tests:
+          - PlanPage_Render_UnknownProject_ShowsNotFound
+
+      - id: ReviewCenter-PlanPage-Form-NoRepository
+        title: >-
+          The PlanPage unit shall show a plain message that names whom to ask, instead of the form, when the project
+          has no repository.
+        justification: |
+          A form without a repository to choose would be a dead end.
+        tests:
+          - PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm
+
+      - id: ReviewCenter-PlanPage-Form-MissingRepository
+        title: >-
+          The PlanPage unit shall say "Choose a repository." when a plan is requested without a repository.
+        justification: |
+          The user must learn what is missing.
+        tests:
+          - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
+
+      - id: ReviewCenter-PlanPage-Form-MissingHead
+        title: >-
+          The PlanPage unit shall say to enter the head revision when a plan is requested without one.
+        justification: |
+          The user must learn what is missing.
+        tests:
+          - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
+
+      - id: ReviewCenter-PlanPage-Form-MissingBaseline
+        title: >-
+          The PlanPage unit shall say to enter the baseline revision when a plan is requested with the baseline choice
+          Explicit revision and no revision.
+        justification: |
+          The user must learn what is missing.
+        tests:
+          - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
+
+      - id: ReviewCenter-PlanPage-Form-NoGitRead
+        title: >-
+          The PlanPage unit shall read nothing from the repository when the form is incomplete.
+        justification: |
+          An incomplete request must cost nothing.
+        tests:
           - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
 
       - id: ReviewCenter-PlanPage-Access
         title: >-
-          The PlanPage unit shall show a user who may not see the project the page for a project that does not
-          exist and nothing of the project, its repositories or a plan, and shall check the view access again at
-          the start of every action of the open page, so that a user whose membership was removed meanwhile gets
-          that page, no plan is read, and no review is created.
+          The PlanPage unit shall show a user who may not see the project the page for a project that does not exist.
         justification: |
-          A page that stays open does not load again, so without a new check a removed member would keep reading
-          plans from the repository and could keep creating reviews. A hidden project looks like a missing one, so
-          the page does not reveal it either.
+          A hidden project looks like a missing one, so the page does not reveal it.
         tests:
           - PlanPage_Render_NonMember_LooksLikeAMissingProject
+
+      - id: ReviewCenter-PlanPage-Access-NothingShown
+        title: >-
+          The PlanPage unit shall show nothing of the project, its repositories, or a plan to a user who may not see
+          the project.
+        justification: |
+          The names of projects and repositories are not for outsiders.
+        tests:
+          - PlanPage_Render_NonMember_LooksLikeAMissingProject
+
+      - id: ReviewCenter-PlanPage-Access-RevokedPlan
+        title: >-
+          The PlanPage unit shall show the not-found page, and no plan, when a user whose membership was removed while
+          the page was open asks for a plan.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          plans.
+        tests:
           - PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan
+
+      - id: ReviewCenter-PlanPage-Access-RevokedPlanNoRead
+        title: >-
+          The PlanPage unit shall read nothing from the repository when a user whose membership was removed asks for
+          a plan.
+        justification: |
+          A plan that was read and then hidden is still a read.
+        tests:
+          - PlanPage_ShowPlan_MembershipRevoked_ReadsNothingFromGit
+
+      - id: ReviewCenter-PlanPage-Access-RevokedCreate
+        title: >-
+          The PlanPage unit shall show the not-found page, and nothing of the plan, when a user whose membership was
+          removed while the page was open asks to create the reviews.
+        justification: |
+          Without a new check a removed member could keep creating reviews.
+        tests:
+          - PlanPage_CreateReviews_MembershipRevoked_CreatesNothing
+
+      - id: ReviewCenter-PlanPage-Access-RevokedCreateNothing
+        title: >-
+          The PlanPage unit shall create no review when a user whose membership was removed asks to create the
+          reviews.
+        justification: |
+          Creating reviews is a write that only members may do.
+        tests:
           - PlanPage_CreateReviews_MembershipRevoked_CreatesNothing
 
       - id: ReviewCenter-PlanPage-ReadOnly
         title: >-
-          The PlanPage unit shall show a member whose role is auditor a read-only notice instead of the plan form, and
-          shall not read the repositories of the project for that member.
+          The PlanPage unit shall show a member whose role is auditor a read-only notice instead of the plan form.
         justification: |
-          Planning creates reviews, which an auditor may not do, and the repositories are for those who manage the
-          project, so the page offers neither and says why.
+          Planning creates reviews, which an auditor may not do.
+        tests:
+          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+
+      - id: ReviewCenter-PlanPage-ReadOnly-NoRepositoryRead
+        title: >-
+          The PlanPage unit shall not read the repositories of the project for a member whose role is auditor.
+        justification: |
+          The repositories are for those who manage the project.
         tests:
           - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
 
       - id: ReviewCenter-PlanPage-Summary
         title: >-
-          The PlanPage unit shall show a plan as one plain summary sentence first, such as "3 sets need review, 1
-          already filed, 9 have nothing to review.", then a line stating the repository, the head, and the baseline
-          used, and then a sentence that says what to do next.
+          The PlanPage unit shall show a plan as one plain summary sentence that counts the sets by kind, such as "3
+          sets need review, 1 already filed, 9 have nothing to review.".
         justification: |
-          A user opening a plan wants the answer in one glance and the next step without reading a table.
+          A user opening a plan wants the answer in one glance.
         tests:
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateButton
+          - PlanPage_ShowPlan_SetCannotBePlanned_ShowsReasonInOwnGroup
+
+      - id: ReviewCenter-PlanPage-Summary-Facts
+        title: >-
+          The PlanPage unit shall show a line that states the repository, the head, and the baseline used.
+        justification: |
+          The user must see what the plan is based on.
+        tests:
           - PlanPage_ShowPlan_ExplicitBaseline_CountsChangesSinceTheBaseline
           - PlanPage_ShowPlan_NoBaseline_SaysAllFiles
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-PlanPage-Summary-NextStep
+        title: >-
+          The PlanPage unit shall show a sentence that says what to do next.
+        justification: |
+          The user needs the next step without reading a table.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateButton
 
       - id: ReviewCenter-PlanPage-Rows
         title: >-
-          The PlanPage unit shall list the sets that need a review first, each ticked by default with its title,
-          where its baseline comes from, and the counts of added, modified, and deleted files, shall offer select
-          all and select none only for more than three such rows, shall keep the sets with nothing to review in a
-          collapsed list with a count, shall show the sets that are already filed with a link to their review, and
-          the sets that cannot be planned with the reason, each in its own group that is shown only when it is not
-          empty, and shall show set titles and reasons as text.
+          The PlanPage unit shall list the sets that need a review, each ticked by default.
         justification: |
-          What a user can act on must come first and stand out, and the long tail of sets with nothing to do must
-          not hide it. A set that cannot be planned must not vanish silently.
+          What a user can act on must stand out.
         tests:
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-PlanPage-Rows-First
+        title: >-
+          The PlanPage unit shall list the sets that need a review before the other groups of sets.
+        justification: |
+          What a user can act on must come first.
+        tests:
+          - PlanPage_ShowPlan_SetsOfEveryKind_ListsSetsNeedingReviewFirst
+
+      - id: ReviewCenter-PlanPage-Rows-Details
+        title: >-
+          The PlanPage unit shall show for each set that needs a review its title and where its baseline comes from.
+        justification: |
+          The user must see what is reviewed and against what.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_ExplicitBaseline_CountsChangesSinceTheBaseline
+
+      - id: ReviewCenter-PlanPage-Rows-Counts
+        title: >-
+          The PlanPage unit shall show for each set that needs a review the counts of added, modified, and deleted
+          files.
+        justification: |
+          The counts show how big the review is.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_ExplicitBaseline_CountsChangesSinceTheBaseline
+          - PlanPage_ShowPlan_ExplicitBaselineWithDeletedFile_CountsDeletedFiles
+
+      - id: ReviewCenter-PlanPage-Rows-BulkSelection
+        title: >-
+          The PlanPage unit shall offer select all and select none only for more than three rows that need a review.
+        justification: |
+          With few rows the buttons only add noise.
+        tests:
           - PlanPage_Ticks_ManyRows_OffersSelectAllAndNone
+          - PlanPage_Ticks_ThreeRows_OffersNoSelectAllAndNone
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-PlanPage-Rows-EmptySets
+        title: >-
+          The PlanPage unit shall keep the sets with nothing to review in a collapsed list with a count.
+        justification: |
+          The long tail of sets with nothing to do must not hide what can be acted on.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-PlanPage-Rows-FiledSets
+        title: >-
+          The PlanPage unit shall show the sets that are already filed with a link to their review.
+        justification: |
+          The user can open the review that already exists.
+        tests:
           - PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateButton
+          - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
+
+      - id: ReviewCenter-PlanPage-Rows-ProblemSets
+        title: >-
+          The PlanPage unit shall show the sets that cannot be planned with the reason, and without a checkbox.
+        justification: |
+          A set that cannot be planned must not vanish silently.
+        tests:
           - PlanPage_ShowPlan_SetCannotBePlanned_ShowsReasonInOwnGroup
+
+      - id: ReviewCenter-PlanPage-Rows-HiddenGroups
+        title: >-
+          The PlanPage unit shall show each group of sets only when it is not empty.
+        justification: |
+          An empty heading is noise.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateButton
+          - PlanPage_ShowPlan_NoEmptySets_HidesTheNothingToReviewGroup
+
+      - id: ReviewCenter-PlanPage-Rows-PlainTitle
+        title: >-
+          The PlanPage unit shall show set titles as plain text.
+        justification: |
+          Titles come from the configuration of the repository.
+        tests:
           - PlanPage_ShowPlan_MarkupInSetTitle_IsEscaped
+
+      - id: ReviewCenter-PlanPage-Rows-PlainReason
+        title: >-
+          The PlanPage unit shall show the reason a set cannot be planned as plain text.
+        justification: |
+          The reason can echo text from the configuration of the repository.
+        tests:
+          - PlanPage_ShowPlan_MarkupInProblemReason_IsEscaped
 
       - id: ReviewCenter-PlanPage-Create
         title: >-
-          The PlanPage unit shall show a create button that states the number of ticked rows and is disabled when
-          none is ticked, shall create only the ticked rows from the commit the plan was made from, and then shall
-          replace the plan with one result per review: created with a link to the review, or failed with the
-          reason (never showing text printed by git), with a button to plan again and a link back to the project,
-          and a failed row shall not stop or undo the others.
+          The PlanPage unit shall show a create button that states the number of ticked rows.
         justification: |
-          Ticking never reads the repository again, so what the user saw is what is created. The user must learn
-          the outcome of every review, because each one is stored on its own.
+          What the user sees is what is created. Ticking never reads the repository again.
         tests:
           - PlanPage_Ticks_Clear_UpdatesCreateButtonAndDisablesAtZero
-          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+          - PlanPage_Ticks_ManyRows_OffersSelectAllAndNone
+
+      - id: ReviewCenter-PlanPage-Create-Disabled
+        title: >-
+          The PlanPage unit shall disable the create button, with a hint, when no row is ticked.
+        justification: |
+          Nothing can be created from no rows.
+        tests:
+          - PlanPage_Ticks_Clear_UpdatesCreateButtonAndDisablesAtZero
+
+      - id: ReviewCenter-PlanPage-Create-TickedOnly
+        title: >-
+          The PlanPage unit shall create only the ticked rows.
+        justification: |
+          The user chose these rows.
+        tests:
           - PlanPage_Create_OneRowNotTicked_CreatesOnlyTheTickedRow
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-PlanPage-Create-FromPlanCommit
+        title: >-
+          The PlanPage unit shall create each review from the commit the plan was made from.
+        justification: |
+          Ticking never reads the repository again, so what the user saw is what is created.
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-PlanPage-Create-Results
+        title: >-
+          The PlanPage unit shall replace the plan with one result per ticked review after creating.
+        justification: |
+          The user must learn the outcome of every review.
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+          - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
+
+      - id: ReviewCenter-PlanPage-Create-ResultCreated
+        title: >-
+          The PlanPage unit shall show a created review as created, with a link to the review.
+        justification: |
+          The user can open what was created.
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-PlanPage-Create-ResultFailed
+        title: >-
+          The PlanPage unit shall show a review that could not be created as failed, with the reason.
+        justification: |
+          Each review is stored on its own, so each outcome is shown.
+        tests:
+          - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
+          - PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow
+          - PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText
+
+      - id: ReviewCenter-PlanPage-Create-NoGitText
+        title: >-
+          The PlanPage unit shall never show text printed by git in a result.
+        justification: |
+          Raw git output can leak how the server reaches the repository.
+        tests:
+          - PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText
+
+      - id: ReviewCenter-PlanPage-Create-PlanAgain
+        title: >-
+          The PlanPage unit shall show a button to plan again after creating.
+        justification: |
+          The user may plan the next batch.
+        tests:
+          - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-PlanPage-Create-BackLink
+        title: >-
+          The PlanPage unit shall show a link back to the project after creating.
+        justification: |
+          The user can go on to the project.
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-PlanPage-Create-FailedKeepsOthers
+        title: >-
+          The PlanPage unit shall continue with the other ticked rows when one row fails.
+        justification: |
+          A failed row shall not stop the others.
+        tests:
           - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
           - PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText
+
+      - id: ReviewCenter-PlanPage-Create-FailedKeepsEarlier
+        title: >-
+          The PlanPage unit shall keep the reviews already created when a later row fails.
+        justification: |
+          A failed row shall not undo the others.
+        tests:
+          - PlanPage_Create_LaterRowFails_KeepsTheEarlierReview
+
+      - id: ReviewCenter-PlanPage-Create-Refused
+        title: >-
+          The PlanPage unit shall show the error next to the create button when the whole batch is refused.
+        justification: |
+          The user must see why nothing was created.
+        tests:
+          - PlanPage_Create_WholeBatchRefused_ShowsErrorNextToButtonAndKeepsPlan
+
+      - id: ReviewCenter-PlanPage-Create-RefusedKeepsPlan
+        title: >-
+          The PlanPage unit shall keep the plan and its ticks when the whole batch is refused.
+        justification: |
+          The user can correct the problem and try again.
+        tests:
+          - PlanPage_Create_WholeBatchRefused_ShowsErrorNextToButtonAndKeepsPlan
+
+      - id: ReviewCenter-PlanPage-Create-RefusedCreatesNothing
+        title: >-
+          The PlanPage unit shall create no review when the whole batch is refused.
+        justification: |
+          A refusal must be all or nothing.
+        tests:
           - PlanPage_Create_WholeBatchRefused_ShowsErrorNextToButtonAndKeepsPlan
 
       - id: ReviewCenter-PlanPage-DueDate
         title: >-
-          The PlanPage unit shall offer an optional due date, stated as a calendar day in UTC, for all the reviews
-          of the plan and one for each planned review, shall create each ticked review with the date of its row or,
-          when the row has none, the date for all, and shall show a refused date as the failure of that review only.
+          The PlanPage unit shall offer an optional due date for all the reviews of the plan.
         justification: |
-          A lead plans many reviews at once and normally wants one date for them, but one review may need another.
-          A wrong date on one row must not stop the others.
+          A lead plans many reviews at once and normally wants one date for them.
+        tests:
+          - PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow
+          - PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow
+
+      - id: ReviewCenter-PlanPage-DueDate-Row
+        title: >-
+          The PlanPage unit shall offer an optional due date for each planned review.
+        justification: |
+          One review may need another date.
+        tests:
+          - PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow
+
+      - id: ReviewCenter-PlanPage-DueDate-Utc
+        title: >-
+          The PlanPage unit shall state that a due date is a calendar day in UTC.
+        justification: |
+          A day without a zone is ambiguous.
+        tests:
+          - PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow
+
+      - id: ReviewCenter-PlanPage-DueDate-Default
+        title: >-
+          The PlanPage unit shall create a ticked review without a date of its row with the date for all.
+        justification: |
+          One date for many reviews is the normal case.
         tests:
           - PlanPage_Create_DueDates_DefaultAndRowDate
+
+      - id: ReviewCenter-PlanPage-DueDate-RowDate
+        title: >-
+          The PlanPage unit shall create a ticked review with the date of its row when it has one.
+        justification: |
+          The date of the row is the more specific one.
+        tests:
+          - PlanPage_Create_DueDates_DefaultAndRowDate
+
+      - id: ReviewCenter-PlanPage-DueDate-Refused
+        title: >-
+          The PlanPage unit shall show a refused due date as the failure of that review only.
+        justification: |
+          A wrong date on one row must not stop the others.
+        tests:
           - PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow
 
       - id: ReviewCenter-PlanPage-Error
         title: >-
-          The PlanPage unit shall show a failed plan as a plain-English message that says what to do next, for a
-          revision that does not exist, a head without a ReviewMark configuration file (with a link to the project
-          page, where a review can be made by hand), an invalid configuration, a disabled repository, an
-          unreadable repository, and any unexpected fault, shall show for an unreadable repository and an unexpected
-          fault only a fixed sentence, never the text git printed, a repository location, a credential, or a stack
-          trace, and shall create nothing.
+          The PlanPage unit shall show a plain-English message that names the revision, with the hint to check its
+          spelling, when the revision of a plan does not exist.
         justification: |
-          A user can fix a wrong revision or file, or ask the right person, only when told which. Raw git output
-          and exception text confuse users and can leak how the server reaches the repository.
+          A user can fix a wrong revision only when told which.
         tests:
           - PlanPage_Error_UnknownRevision_ExplainsAndSuggestsChecking
+
+      - id: ReviewCenter-PlanPage-Error-NoConfig
+        title: >-
+          The PlanPage unit shall show a plain-English message, with the hint that a review can be made by hand, when
+          the head has no ReviewMark configuration file.
+        justification: |
+          The user can fix the file or make the review by hand.
+        tests:
           - PlanPage_Error_NoConfiguration_ExplainsAndLinksToProject
+
+      - id: ReviewCenter-PlanPage-Error-NoConfigLink
+        title: >-
+          The PlanPage unit shall link to the project page in the message for a head without a ReviewMark
+          configuration file.
+        justification: |
+          The review can be made by hand on the project page.
+        tests:
+          - PlanPage_Error_NoConfiguration_ExplainsAndLinksToProject
+
+      - id: ReviewCenter-PlanPage-Error-InvalidConfig
+        title: >-
+          The PlanPage unit shall show a plain-English message with a hint when the configuration is invalid.
+        justification: |
+          The user must learn that the file is the problem.
+        tests:
           - PlanPage_Error_InvalidConfiguration_ShowsMessageAndHint
+
+      - id: ReviewCenter-PlanPage-Error-Disabled
+        title: >-
+          The PlanPage unit shall show a plain-English message with a hint when the repository was disabled
+          meanwhile.
+        justification: |
+          The user must learn whom to ask.
+        tests:
           - PlanPage_Error_RepositoryDisabledMeanwhile_ExplainsWithoutSecrets
+
+      - id: ReviewCenter-PlanPage-Error-DisabledNoSecrets
+        title: >-
+          The PlanPage unit shall show no repository location and no credential in the message for a disabled
+          repository.
+        justification: |
+          Raw details can leak how the server reaches the repository.
+        tests:
+          - PlanPage_Error_RepositoryDisabledMeanwhile_ExplainsWithoutSecrets
+
+      - id: ReviewCenter-PlanPage-Error-Unreadable
+        title: >-
+          The PlanPage unit shall show only the fixed sentence "The repository could not be read." with a hint to ask
+          an administrator when the repository is unreadable.
+        justification: |
+          Raw git output confuses users.
+        tests:
           - PlanPage_Error_GitAccessFailed_ShowsFixedSentenceWithoutGitText
+
+      - id: ReviewCenter-PlanPage-Error-UnreadableNoGitText
+        title: >-
+          The PlanPage unit shall never show the text git printed, a repository location, or a credential for an
+          unreadable repository.
+        justification: |
+          The text can leak how the server reaches the repository.
+        tests:
+          - PlanPage_Error_GitAccessFailed_ShowsFixedSentenceWithoutGitText
+
+      - id: ReviewCenter-PlanPage-Error-Unexpected
+        title: >-
+          The PlanPage unit shall show only a fixed generic sentence when an unexpected fault occurs.
+        justification: |
+          A user cannot act on an exception text.
+        tests:
           - PlanPage_Error_UnexpectedFault_ShowsGenericMessage
+
+      - id: ReviewCenter-PlanPage-Error-UnexpectedNoDetail
+        title: >-
+          The PlanPage unit shall never show the text of the fault or a stack trace for an unexpected fault.
+        justification: |
+          Exception text can leak internals.
+        tests:
+          - PlanPage_Error_UnexpectedFault_ShowsGenericMessage
+
+      - id: ReviewCenter-PlanPage-Error-NoPlan
+        title: >-
+          The PlanPage unit shall show no plan, and offer the button to show the plan again, after a failed plan.
+        justification: |
+          A failed plan must not leave an old plan on the page.
+        tests:
+          - PlanPage_Error_UnknownRevision_ExplainsAndSuggestsChecking
 
       - id: ReviewCenter-PlanPage-State
         title: >-
-          The PlanPage unit shall discard the plan, the results, and any error when the repository, the head, the
-          baseline choice, or the baseline revision changes, and when the page is reused for another project, shall
-          show while the repository is being read that it is being read, and shall disable every form control, tick,
-          and bulk selection button while it reads or creates.
+          The PlanPage unit shall discard the plan when the head revision changes.
         justification: |
-          A plan that disagrees with the form would create reviews the user did not ask for. A visible waiting
-          state prevents a second press while a slow repository is read, and inputs that cannot change while a
-          request runs prevent a late answer from replacing the plan or results of other inputs.
+          A plan that disagrees with the form would create reviews the user did not ask for.
         tests:
           - PlanPage_FormChange_DiscardsPlan
+
+      - id: ReviewCenter-PlanPage-State-Mode
+        title: >-
+          The PlanPage unit shall discard the plan when the baseline choice changes.
+        justification: |
+          A plan made against another baseline would mislead.
+        tests:
+          - PlanPage_FormChange_DiscardsPlan
+
+      - id: ReviewCenter-PlanPage-State-Repository
+        title: >-
+          The PlanPage unit shall discard the plan when the repository changes.
+        justification: |
+          A plan of another repository would mislead.
+        tests:
+          - PlanPage_FormChange_Repository_DiscardsPlan
+
+      - id: ReviewCenter-PlanPage-State-BaselineRevision
+        title: >-
+          The PlanPage unit shall discard the plan when the baseline revision changes.
+        justification: |
+          A plan made against another baseline would mislead.
+        tests:
+          - PlanPage_FormChange_BaselineRevision_DiscardsPlan
+
+      - id: ReviewCenter-PlanPage-State-Error
+        title: >-
+          The PlanPage unit shall discard a shown error when the form changes.
+        justification: |
+          An old error must not stay beside a new input.
+        tests:
+          - PlanPage_FormChange_AfterError_DiscardsError
+
+      - id: ReviewCenter-PlanPage-State-Project
+        title: >-
+          The PlanPage unit shall clear the form and the plan when the page is reused for another project.
+        justification: |
+          A plan of another project must not be created in this one.
+        tests:
           - PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan
+
+      - id: ReviewCenter-PlanPage-State-ProjectResults
+        title: >-
+          The PlanPage unit shall clear the results of created reviews when the page is reused for another project.
+        justification: |
+          Results of another project must not stay on the page.
+        tests:
+          - PlanPage_ParametersChange_ResultsShown_ClearsResults
+
+      - id: ReviewCenter-PlanPage-State-StaleRead
+        title: >-
+          The PlanPage unit shall ignore a plan that arrives after the page was reused for another project.
+        justification: |
+          A late answer must not replace the plan of other inputs.
+        tests:
+          - PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm
+
+      - id: ReviewCenter-PlanPage-State-StaleCreate
+        title: >-
+          The PlanPage unit shall ignore results of creating that arrive after the page was reused for another
+          project.
+        justification: |
+          A late answer must not replace the results of other inputs.
+        tests:
+          - PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults
+
+      - id: ReviewCenter-PlanPage-State-FreeForm
+        title: >-
+          The PlanPage unit shall leave the form of the new project usable after a stale answer.
+        justification: |
+          The user must not be locked out by a request of the previous project.
+        tests:
           - PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm
           - PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults
+
+      - id: ReviewCenter-PlanPage-State-Loading
+        title: >-
+          The PlanPage unit shall show while the repository is read that it is being read, with the button saying so.
+        justification: |
+          A visible waiting state prevents a second press while a slow repository is read.
+        tests:
           - PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton
+
+      - id: ReviewCenter-PlanPage-State-ReadDisabled
+        title: >-
+          The PlanPage unit shall disable every form control while the repository is read.
+        justification: |
+          Inputs that cannot change while a request runs prevent a late answer from replacing the plan.
+        tests:
           - PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl
+
+      - id: ReviewCenter-PlanPage-State-CreateDisabled
+        title: >-
+          The PlanPage unit shall disable the form, every tick, and the bulk selection buttons while the reviews are
+          created.
+        justification: |
+          Inputs must not change while a request runs.
+        tests:
           - PlanPage_Create_WhileCreating_DisablesFormAndRowControls
 
       - id: ReviewCenter-PlanPage-Interactive

@@ -11,146 +11,611 @@ sections:
     requirements:
       - id: ReviewCenter-AuditPage-Display
         title: >-
-          The AuditPage component shall show the whole audit trail newest first, 50 entries to a page by default, with
-          the sequence, time, actor, action, review, and detail of each, with links to the older and newer page, a
-          message when the trail is empty, and all text rendered as plain text.
+          The AuditPage unit shall show the whole audit trail to a system administrator.
         justification: |
-          System administrators review what happened in the system, and the text comes from users.
+          System administrators review what happened in the system.
         tests:
           - AuditPage_Render_Admin_ShowsEntriesNewestFirst
-          - AuditPage_Render_EmptyTrail_ShowsEmptyMessage
+
+      - id: ReviewCenter-AuditPage-Display-Newest
+        title: >-
+          The AuditPage unit shall show the entries of the audit trail newest first.
+        justification: |
+          The newest events matter most when something just went wrong.
+        tests:
+          - AuditPage_Render_Admin_ShowsEntriesNewestFirst
+
+      - id: ReviewCenter-AuditPage-Display-Columns
+        title: >-
+          The AuditPage unit shall show for each entry its sequence, its time in UTC, its actor, its action, its
+          review, and its detail.
+        justification: |
+          An auditor needs to know who did what to which review and when.
+        tests:
+          - AuditPage_Render_Admin_ShowsEntriesNewestFirst
+          - AuditEntryTable_Render_EntryWithOffsetTime_ShowsUtcTime
+
+      - id: ReviewCenter-AuditPage-Display-PageSize
+        title: >-
+          The AuditPage unit shall show 50 entries to a page by default.
+        justification: |
+          A long trail must stay readable and bounded.
+        tests:
           - AuditPage_Render_LongTrail_PagesByFifty
+
+      - id: ReviewCenter-AuditPage-Display-Paging
+        title: >-
+          The AuditPage unit shall show links to the older and the newer page of the audit trail only when entries
+          exist behind them.
+        justification: |
+          Readers move through a long trail page by page.
+        tests:
+          - AuditPage_Render_LongTrail_PagesByFifty
+
+      - id: ReviewCenter-AuditPage-Display-Empty
+        title: >-
+          The AuditPage unit shall show a message that nothing has been recorded when the audit trail is empty.
+        justification: |
+          An empty page without a word would look like a failure.
+        tests:
+          - AuditPage_Render_EmptyTrail_ShowsEmptyMessage
+          - AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded
+
+      - id: ReviewCenter-AuditPage-Display-PlainText
+        title: >-
+          The AuditPage unit shall render all text of the audit trail as plain text.
+        justification: |
+          The text comes from users and must not inject markup.
+        tests:
           - AuditPage_Render_MarkupInEntries_IsEscaped
 
       - id: ReviewCenter-AuditPage-ShortHash
         title: >-
-          The AuditPage component shall show a long hexadecimal value (a hash or fingerprint) in the detail of an entry
-          shortened to its first 12 characters, with the full value available as the tooltip of the shortened value.
+          The AuditPage unit shall show a long hexadecimal value (a hash or fingerprint) in the detail of an entry
+          shortened to its first 12 characters followed by an ellipsis.
         justification: |
-          Hashes and fingerprints make the table too wide to read, yet a system administrator who needs the exact
-          value must still be able to get it. The head hash of a verification is not shortened, because it is what is
-          recorded
-          outside the database.
+          Hashes and fingerprints make the table too wide to read.
+        tests:
+          - AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip
+
+      - id: ReviewCenter-AuditPage-ShortHash-Tooltip
+        title: >-
+          The AuditPage unit shall make the full value of a shortened hexadecimal value available as the tooltip of
+          the shortened value.
+        justification: |
+          A system administrator who needs the exact value must still be able to get it.
         tests:
           - AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip
 
       - id: ReviewCenter-AuditPage-Verify
         title: >-
-          The AuditPage component shall let a system administrator verify the hash chain and shall show the entry count
-          and the full head hash of an intact chain, or the first broken entry with the head hash of the last entry
-          that verified.
+          The AuditPage unit shall show the number of entries of an intact hash chain when a system administrator
+          verifies the chain.
         justification: |
-          The head hash is what a system administrator records outside the database to detect later removal of the
-          newest entries.
+          The count shows how much of the trail was checked.
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
-          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
           - AuditPage_Verify_EmptyTrail_ReportsIntactWithZeroEntries
+
+      - id: ReviewCenter-AuditPage-Verify-HeadHash
+        title: >-
+          The AuditPage unit shall show the full head hash of an intact hash chain, not shortened.
+        justification: |
+          The head hash is what a system administrator records outside the database to detect later removal of the
+          newest entries, so it is not shortened.
+        tests:
+          - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
+
+      - id: ReviewCenter-AuditPage-Verify-Broken
+        title: >-
+          The AuditPage unit shall show the first broken entry when the hash chain is broken.
+        justification: |
+          The first broken entry is where the tampering started.
+        tests:
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+
+      - id: ReviewCenter-AuditPage-Verify-BrokenHeadHash
+        title: >-
+          The AuditPage unit shall show the head hash of the last entry that verified when the hash chain is broken.
+        justification: |
+          That hash is the last point that can still be trusted.
+        tests:
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
 
       - id: ReviewCenter-AuditPage-Admin
         title: >-
-          The AuditPage component shall show entries and verify only for a user who is an enabled system administrator
-          in the user store, on load and on every verification, and shall show an error and read nothing otherwise.
+          The AuditPage unit shall show the audit trail to a user who is an enabled system administrator in the user
+          store.
         justification: |
-          The audit trail names every user and action, and an open page keeps its state for a while after a user is
-          demoted or disabled.
+          The audit trail names every user and action of the installation.
+        tests:
+          - AuditPage_Render_Admin_ShowsEntriesNewestFirst
+
+      - id: ReviewCenter-AuditPage-Admin-Refused
+        title: >-
+          The AuditPage unit shall show an error instead of the audit trail to a user who is not an enabled system
+          administrator.
+        justification: |
+          The audit trail names every user and action of the installation.
+        tests:
+          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
+
+      - id: ReviewCenter-AuditPage-Admin-Role
+        title: >-
+          The AuditPage unit shall decide from the role in the user store, not from the claims of the session, whether
+          a user is a system administrator.
+        justification: |
+          An open page keeps its claims for a while after a user is demoted.
+        tests:
+          - AuditPage_Render_ClaimsAdminButStoreSaysNot_IsRefused
+
+      - id: ReviewCenter-AuditPage-Admin-Enabled
+        title: >-
+          The AuditPage unit shall refuse a system administrator who is disabled in the user store.
+        justification: |
+          A disabled user must lose access at once.
+        tests:
+          - AuditPage_Render_ClaimsAdminButStoreSaysNot_IsRefused
+
+      - id: ReviewCenter-AuditPage-Admin-NoEntries
+        title: >-
+          The AuditPage unit shall show no entry of the audit trail to a user who is refused.
+        justification: |
+          A refusal that still printed entries would leak the trail.
         tests:
           - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
           - AuditPage_Render_ClaimsAdminButStoreSaysNot_IsRefused
+
+      - id: ReviewCenter-AuditPage-Admin-NoRead
+        title: >-
+          The AuditPage unit shall read nothing from the audit trail for a user who is refused.
+        justification: |
+          Reading and then hiding is not a refusal.
+        tests:
+          - AuditPage_Render_NonAdmin_ReadsNothingFromTheTrail
+
+      - id: ReviewCenter-AuditPage-Admin-Verify
+        title: >-
+          The AuditPage unit shall refuse a verification with an error when the user who presses it is no longer an
+          enabled system administrator.
+        justification: |
+          An open page keeps its state after a user is demoted or disabled.
+        tests:
           - AuditPage_Verify_UserDemotedAfterOpening_IsRefusedWithoutReadingTrail
-          - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
-          - Routes_Render_AdminOpensAuditRoute_ShowsAuditPage
+
+      - id: ReviewCenter-AuditPage-Admin-VerifyNoEntries
+        title: >-
+          The AuditPage unit shall show no entry and no verification result after a refused verification.
+        justification: |
+          The state of the open page must not outlive the right to see it.
+        tests:
+          - AuditPage_Verify_UserDemotedAfterOpening_IsRefusedWithoutReadingTrail
+
+      - id: ReviewCenter-AuditPage-Admin-VerifyNoRead
+        title: >-
+          The AuditPage unit shall read nothing from the audit trail for a refused verification.
+        justification: |
+          Reading and then hiding is not a refusal.
+        tests:
+          - AuditPage_Verify_UserDemotedAfterOpening_IsRefusedWithoutReadingTrail
 
       - id: ReviewCenter-AuditPage-Filter
         title: >-
-          The AuditPage unit shall show, on the whole audit trail and on the audit trail of a project, a form that
-          narrows the entries by actor text, action (any, a group, or one exact action from the list of the known
-          actions), review, a range of UTC days, and page size (25, 50 or 100), and on the whole audit trail also by
-          project, shall keep the choice in the address so that the filter form and a link to a view are the same, shall
-          fall back to no condition, or for the page size to 50, for every filter value of the address that cannot be
-          used instead of failing, shall ignore a range that ends before it starts and say so, shall cut a text to the
-          width of the field it is compared with, shall render every value as encoded text, shall show a link that
-          clears the filters while one is set, and shall say that no entry matches when a filter shows nothing.
+          The AuditPage unit shall show on the whole audit trail a form with fields for actor text, action (any, a
+          group, or one exact action from the list of the known actions), review, a range of UTC days, page size (25,
+          50 or 100), and project.
         justification: |
           An auditor must find the entries of one person, one kind of action or one review without reading the trail
-          page by page, and must be able to send the link of that view to a colleague. The address is written by
-          anybody, so no value of it may break the page, reach the store in a form that is not valid, or become
-          markup.
+          page by page.
         tests:
           - AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector
-          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
-          - AuditPage_Render_ProjectQuery_ShowsOnlyThatProjectsEntries
-          - AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink
-          - AuditPage_Render_HostileQueryValues_AreHandledAndEncoded
-          - AuditPage_Render_HugeActorText_IsCutAndPageRenders
-          - AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates
+
+      - id: ReviewCenter-AuditPage-Filter-ProjectPage
+        title: >-
+          The AuditPage unit shall show on the audit trail of a project the same form without a project field.
+        justification: |
+          The project trail already names its project.
+        tests:
           - ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries
-          - ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe
-          - ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries
-          - AuditFilterState_FromQuery_NoValues_IsTheDefaultState
-          - AuditFilterState_FromQuery_GoodValues_AreReadAndWrittenBack
+
+      - id: ReviewCenter-AuditPage-Filter-Actor
+        title: >-
+          The AuditPage unit shall narrow the entries to those of an actor that matches the actor text.
+        justification: |
+          An auditor wants the entries of one person.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+          - ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries
+
+      - id: ReviewCenter-AuditPage-Filter-Action
+        title: >-
+          The AuditPage unit shall narrow the entries to those of one exact action.
+        justification: |
+          An auditor wants one kind of event.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+
+      - id: ReviewCenter-AuditPage-Filter-Group
+        title: >-
+          The AuditPage unit shall narrow the entries to those of a group of actions.
+        justification: |
+          An auditor wants all events of one area, such as all review actions.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+
+      - id: ReviewCenter-AuditPage-Filter-Review
+        title: >-
+          The AuditPage unit shall narrow the entries to those of one review.
+        justification: |
+          An auditor wants the story of one review.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+
+      - id: ReviewCenter-AuditPage-Filter-Project
+        title: >-
+          The AuditPage unit shall narrow the entries of the whole audit trail to those of one project, and to none
+          that belong to no project.
+        justification: |
+          An auditor wants one project out of the whole trail.
+        tests:
+          - AuditPage_Render_ProjectQuery_ShowsOnlyThatProjectsEntries
+
+      - id: ReviewCenter-AuditPage-Filter-ProjectScope
+        title: >-
+          The AuditPage unit shall show on the audit trail of a project only the entries of that project, whatever
+          project the address names.
+        justification: |
+          A project administrator must never see the entries of another project.
+        tests:
           - AuditFilterState_ToFilter_ProjectPageProject_WinsOverTheQueryProject
+          - ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries
+          - ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries
+
+      - id: ReviewCenter-AuditPage-Filter-Dates
+        title: >-
+          The AuditPage unit shall narrow the entries to a range of UTC days, both days included.
+        justification: |
+          An auditor wants what happened during a period.
+        tests:
+          - AuditPage_Render_DateRangeQuery_LimitsTheEntries
+
+      - id: ReviewCenter-AuditPage-Filter-PageSize
+        title: >-
+          The AuditPage unit shall limit the entries on a page to the chosen page size of 25, 50 or 100.
+        justification: |
+          The reader chooses how much to read at once.
+        tests:
+          - AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+          - ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+
+      - id: ReviewCenter-AuditPage-Filter-Address
+        title: >-
+          The AuditPage unit shall read the choice of the filter from the address and show it in the filter form, so
+          that the form and a link to a view are the same.
+        justification: |
+          The auditor must be able to send the link of a view to a colleague.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+          - AuditFilterState_FromQuery_GoodValues_AreReadAndWrittenBack
+          - AuditFilterState_FromQuery_NoValues_IsTheDefaultState
+
+      - id: ReviewCenter-AuditPage-Filter-Fallback
+        title: >-
+          The AuditPage unit shall treat a filter value of the address that cannot be used as no condition instead of
+          failing.
+        justification: |
+          The address is written by anybody, so no value of it may break the page.
+        tests:
           - AuditFilterState_FromQuery_BadValues_FallBackToDefaults
-          - AuditFilterState_FromQuery_HugeTexts_AreBoundedAndTheFilterIsValid
+          - AuditPage_Render_HostileQueryValues_AreHandledAndEncoded
+          - ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe
+
+      - id: ReviewCenter-AuditPage-Filter-FallbackSize
+        title: >-
+          The AuditPage unit shall use a page size of 50 when the page size of the address cannot be used.
+        justification: |
+          A page size must always be one of the offered sizes.
+        tests:
+          - AuditFilterState_FromQuery_BadValues_FallBackToDefaults
+
+      - id: ReviewCenter-AuditPage-Filter-Reversed
+        title: >-
+          The AuditPage unit shall ignore a range of days that ends before it starts.
+        justification: |
+          A reversed range would show nothing and look like an empty trail.
+        tests:
+          - AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates
           - AuditFilterState_FromQuery_ReversedDatesAndSize_DropDatesAndSizeIsNotNarrowing
+
+      - id: ReviewCenter-AuditPage-Filter-ReversedMessage
+        title: >-
+          The AuditPage unit shall say that a range of days that ends before it starts is ignored.
+        justification: |
+          The reader must know why the dates had no effect.
+        tests:
+          - AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates
+
+      - id: ReviewCenter-AuditPage-Filter-Cut
+        title: >-
+          The AuditPage unit shall cut a filter text to the width of the field it is compared with.
+        justification: |
+          No value may reach the store in a form that is not valid.
+        tests:
+          - AuditPage_Render_HugeActorText_IsCutAndPageRenders
+          - AuditFilterState_FromQuery_HugeTexts_AreBoundedAndTheFilterIsValid
+
+      - id: ReviewCenter-AuditPage-Filter-Encoded
+        title: >-
+          The AuditPage unit shall render every filter value as encoded text.
+        justification: |
+          No value of the address may become markup.
+        tests:
+          - AuditPage_Render_HostileQueryValues_AreHandledAndEncoded
+
+      - id: ReviewCenter-AuditPage-Filter-Clear
+        title: >-
+          The AuditPage unit shall show a link that clears the filters while a filter is set.
+        justification: |
+          The reader needs a way back to the whole trail.
+        tests:
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+          - AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink
+          - ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries
+          - AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector
+
+      - id: ReviewCenter-AuditPage-Filter-NoMatch
+        title: >-
+          The AuditPage unit shall say that no entry matches when a filter shows nothing.
+        justification: |
+          An empty table without a word cannot be told from a failure.
+        tests:
+          - AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink
+          - AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded
+          - ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe
 
       - id: ReviewCenter-AuditPage-Paging
         title: >-
-          The AuditPage unit shall page the entries with links to the older and the newer page that carry the filter
-          and the page size, so that paging stays inside the filtered entries, shall write the values of the filter
-          into those links as escaped query values, and shall tell a filter that matches nothing from a trail that
-          is empty.
+          The AuditPage unit shall carry the filter in the links to the older and the newer page, so that paging stays
+          inside the filtered entries.
         justification: |
-          A link that lost the filter would drop the reader out of the view that was chosen, and a value that is not
-          escaped could add parameters or markup to the link.
+          A link that lost the filter would drop the reader out of the view that was chosen.
         tests:
           - AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
           - ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
           - AuditEntryTable_Render_WithFilter_LinksCarryTheFilter
-          - AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded
+
+      - id: ReviewCenter-AuditPage-Paging-Size
+        title: >-
+          The AuditPage unit shall carry the page size in the links to the older and the newer page.
+        justification: |
+          A link that lost the page size would change the page the reader chose.
+        tests:
+          - AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+          - ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+          - AuditEntryTable_Render_WithFilter_LinksCarryTheFilter
+
+      - id: ReviewCenter-AuditPage-Paging-Escaped
+        title: >-
+          The AuditPage unit shall write the values of the filter into those links as escaped query values.
+        justification: |
+          A value that is not escaped could add parameters or markup to the link.
+        tests:
           - AuditFilterState_ToQuery_TextWithSpecialCharacters_IsEscaped
+          - AuditEntryTable_Render_WithFilter_LinksCarryTheFilter
 
       - id: ReviewCenter-AuditPage-Export
         title: >-
-          The AuditPage unit shall show, on the whole audit trail and on the audit trail of a project, to whoever sees
-          the page, a CSV and a JSON export link (data-testid audit-export-csv and audit-export-json) that go to the
-          export of the same scope (/audit/export or /projects/{project}/audit/export) and carry the current filter
-          (and on the whole audit trail the project) as escaped query values, never the page size or the paging
-          cursors, and a note that the export covers everything that matches the filter, not only the page shown, and
-          states whether the chain is intact.
+          The AuditPage unit shall show a CSV export link on the whole audit trail and on the audit trail of a project.
         justification: |
-          An auditor who has narrowed the trail to a view wants a copy of exactly that view, and a link that carried
-          the paging cursors would export one page only. Values written by anybody must not add parameters or markup
-          to the link.
+          An auditor who has narrowed the trail to a view wants a copy of exactly that view.
+        tests:
+          - AuditExportLinks_NoFilter_AreBareExportLinks
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-Json
+        title: >-
+          The AuditPage unit shall show a JSON export link on the whole audit trail and on the audit trail of a
+          project.
+        justification: |
+          Some auditors process the copy by machine.
+        tests:
+          - AuditExportLinks_NoFilter_AreBareExportLinks
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-GlobalTarget
+        title: >-
+          The AuditPage unit shall point the export links of the whole audit trail to /audit/export.
+        justification: |
+          The copy must be of the scope that is shown.
+        tests:
+          - AuditExportLinks_NoFilter_AreBareExportLinks
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-ProjectTarget
+        title: >-
+          The AuditPage unit shall point the export links of the audit trail of a project to
+          /projects/{project}/audit/export of that project.
+        justification: |
+          The copy must be of the scope that is shown.
+        tests:
+          - AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter
+          - AuditExportLinks_NoFilter_AreBareExportLinks
+
+      - id: ReviewCenter-AuditPage-Export-Filter
+        title: >-
+          The AuditPage unit shall carry the current filter in the export links.
+        justification: |
+          An auditor wants a copy of exactly the narrowed view.
         tests:
           - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
           - AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter
-          - AuditExportLinks_NoFilter_AreBareExportLinks
+          - AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-Project
+        title: >-
+          The AuditPage unit shall carry the chosen project in the export links of the whole audit trail.
+        justification: |
+          The copy must be of the project that is shown.
+        tests:
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+          - AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-Escaped
+        title: >-
+          The AuditPage unit shall write the values in the export links as escaped query values.
+        justification: |
+          Values written by anybody must not add parameters or markup to the link.
+        tests:
           - AuditExportLinks_HostileValues_AreEncoded
           - AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues
 
+      - id: ReviewCenter-AuditPage-Export-NoPaging
+        title: >-
+          The AuditPage unit shall never carry the page size or the paging cursors in the export links.
+        justification: |
+          A link that carried the paging cursors would export one page only.
+        tests:
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+          - AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter
+          - AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-Note
+        title: >-
+          The AuditPage unit shall state next to the export links that the export covers every entry that matches the
+          filter, not only the page shown.
+        justification: |
+          The reader must not think the copy is just the page.
+        tests:
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+
+      - id: ReviewCenter-AuditPage-Export-Chain
+        title: >-
+          The AuditPage unit shall state next to the export links that the export states whether the audit chain is
+          intact.
+        justification: |
+          A copy is only evidence when its chain can be checked.
+        tests:
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+
       - id: ReviewCenter-AuditPage-ProjectView
         title: >-
-          The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever may read the audit
-          trail of the project (a system administrator or a project admin of it, and an Auditor of it, all through the
-          audit-read access of the project) the audit trail of that project only,
-          newest first, with the filter and the paging of the whole audit trail, links to the older and newer page
-          and a message when nothing was recorded, using the same table as the whole audit trail, and shall show the
-          not-found message and no entries to a plain member, a user who is no member, and for a missing project,
-          and, when the right is lost while the page is open, drop the entries.
+          The AuditPage unit shall provide the page /projects/{project}/audit, which shows the audit trail of that
+          project, and of no other project, to a project admin of it.
         justification: |
-          Project admins are accountable for who joined their project and what was done in it, so they need the trail
-          of their project, but the whole trail names every user and action of the installation and stays for system
-          administrators. The right is checked on every load, because an open page keeps its state after a membership
-          is revoked or a user is demoted. The page asks the audit-read access instead of the administration right, so
-          that a read-only auditor can be given the page without being given anything else.
+          Project admins are accountable for what was done in their project, but the whole trail names every user and
+          action of the installation.
         tests:
           - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
+
+      - id: ReviewCenter-AuditPage-ProjectView-SystemAdmin
+        title: >-
+          The AuditPage unit shall show the audit trail of any project on that page to a system administrator.
+        justification: |
+          System administrators oversee every project.
+        tests:
           - ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents
+
+      - id: ReviewCenter-AuditPage-ProjectView-Auditor
+        title: >-
+          The AuditPage unit shall show the audit trail of a project on that page to an Auditor of that project, and
+          not that of a project the Auditor does not belong to.
+        justification: |
+          The page asks the audit-read access, so that a read-only auditor can be given the page without being given
+          anything else.
+        tests:
           - ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly
-          - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-Newest
+        title: >-
+          The AuditPage unit shall show the audit trail of a project newest first.
+        justification: |
+          The newest events matter most.
+        tests:
           - ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst
+
+      - id: ReviewCenter-AuditPage-ProjectView-PageSize
+        title: >-
+          The AuditPage unit shall show 50 entries to a page on the audit trail of a project.
+        justification: |
+          A long trail must stay readable and bounded.
+        tests:
+          - ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst
+
+      - id: ReviewCenter-AuditPage-ProjectView-Paging
+        title: >-
+          The AuditPage unit shall show links to the older and the newer page on the audit trail of a project only
+          when entries exist behind them.
+        justification: |
+          Readers move through a long trail page by page.
+        tests:
+          - ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst
+
+      - id: ReviewCenter-AuditPage-ProjectView-Empty
+        title: >-
+          The AuditPage unit shall show a message that nothing has been recorded for the project when its trail is
+          empty.
+        justification: |
+          An empty page without a word would look like a failure.
+        tests:
           - ProjectAuditPage_Render_ProjectWithoutEvents_SaysNothingWasRecorded
+
+      - id: ReviewCenter-AuditPage-ProjectView-NotFoundMember
+        title: >-
+          The AuditPage unit shall show the not-found message and no entries to a plain member of the project.
+        justification: |
+          A plain member may not read the trail, and the page must not reveal more.
+        tests:
+          - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-NotFoundOutsider
+        title: >-
+          The AuditPage unit shall show the not-found message and no entries to a user who is no member of the
+          project.
+        justification: |
+          A hidden project looks like a missing one.
+        tests:
+          - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-NotFoundMissing
+        title: >-
+          The AuditPage unit shall show the not-found message and no entries for a project that does not exist.
+        justification: |
+          The page must answer for any address.
+        tests:
+          - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-Revoked
+        title: >-
+          The AuditPage unit shall drop the entries and show the not-found message when the membership of a project
+          admin is revoked while the page is open and the page loads again.
+        justification: |
+          The right is checked on every load, because an open page keeps its state after a membership is revoked.
+        tests:
           - ProjectAuditPage_Load_MembershipRevokedWhileOpen_DropsTheEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-Demoted
+        title: >-
+          The AuditPage unit shall drop the entries and show the not-found message when a project admin is demoted to
+          a plain member while the page is open and the page loads again.
+        justification: |
+          An open page keeps its state after a user is demoted.
+        tests:
           - ProjectAuditPage_Load_DemotedOrSessionEndedWhileOpen_DropsTheEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-SessionEnded
+        title: >-
+          The AuditPage unit shall drop the entries and show the not-found message when the session ends while the
+          page is open and the page loads again.
+        justification: |
+          A session that ended without the page knowing must not keep the trail visible.
+        tests:
+          - ProjectAuditPage_Load_DemotedOrSessionEndedWhileOpen_DropsTheEntries
+
+      - id: ReviewCenter-AuditPage-ProjectView-Interactive
+        title: >-
+          The AuditPage unit shall report that the project audit page is interactive, through a marker on its root
+          element, once it has rendered on a live connection.
+        justification: |
+          Users, tests, and tooling need a signal that the page now responds.
+        tests:
           - ProjectAuditPage_AfterRender_Interactive_SetsMarker

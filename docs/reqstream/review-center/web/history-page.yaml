@@ -8,52 +8,153 @@ sections:
     requirements:
       - id: ReviewCenter-HistoryPage-Display
         title: >-
-          The HistoryPage component shall show the audit entries of one review, and of no other, newest first, with
-          the time, actor, action, and detail of each, a message when there are none, and a message when the review
-          does not exist.
+          The HistoryPage component shall show the audit entries of one review.
         justification: |
-          Participants need to see who did what to a review and when, and the page must not leak entries of other
-          reviews.
+          Participants need to see who did what to a review and when.
         tests:
           - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-HistoryPage-Display-OnlyReview
+        title: >-
+          The HistoryPage component shall show no audit entry of another review.
+        justification: |
+          The page must not leak entries of other reviews.
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-HistoryPage-Display-Newest
+        title: >-
+          The HistoryPage component shall show the entries newest first.
+        justification: |
+          The newest events matter most.
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-HistoryPage-Display-Columns
+        title: >-
+          The HistoryPage component shall show for each entry its time in UTC, its actor, its action, and its detail.
+        justification: |
+          Participants need to know who did what and when.
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-HistoryPage-Display-Empty
+        title: >-
+          The HistoryPage component shall show a message when the review has no entries.
+        justification: |
+          An empty page without a word would look like a failure.
+        tests:
           - HistoryPage_Render_NoEntries_ShowsEmptyMessage
+
+      - id: ReviewCenter-HistoryPage-Display-NotFound
+        title: >-
+          The HistoryPage component shall show a message naming the review, and no entries, when the review does not
+          exist.
+        justification: |
+          A wrong address must be told from an empty history.
+        tests:
           - HistoryPage_Render_UnknownReview_ShowsNotFound
+
+      - id: ReviewCenter-HistoryPage-Display-BackLink
+        title: >-
+          The HistoryPage component shall link back to the review and name the project in the breadcrumb.
+        justification: |
+          A reader of the history wants to return to the review.
+        tests:
           - HistoryPage_Render_ExistingReview_LinksBackToTheReview
-          - ReviewPage_Render_ExistingReview_ShowsHistoryLink
 
       - id: ReviewCenter-HistoryPage-Paging
         title: >-
-          The HistoryPage component shall show 50 entries to a page and offer links to the older and the newer page
-          only when entries exist behind them.
+          The HistoryPage component shall show 50 entries to a page.
         justification: |
           A long history must stay readable and bounded.
         tests:
           - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
 
+      - id: ReviewCenter-HistoryPage-Paging-Older
+        title: >-
+          The HistoryPage component shall offer a link to the older page only when older entries exist.
+        justification: |
+          A link to nothing would mislead.
+        tests:
+          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-HistoryPage-Paging-Newer
+        title: >-
+          The HistoryPage component shall offer a link to the newer page only when newer entries exist.
+        justification: |
+          A link to nothing would mislead.
+        tests:
+          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
       - id: ReviewCenter-HistoryPage-Access
         title: >-
-          The HistoryPage component shall render all trail text as plain text, and shall show no entries to a visitor
-          who is not signed in, nor for a project that the user may not see, including a user whose membership was
+          The HistoryPage component shall show no entries for a project that the user may not see.
+        justification: |
+          The history is for signed-in users who may see the project.
+        tests:
+          - HistoryPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-HistoryPage-Access-Hidden
+        title: >-
+          The HistoryPage component shall show for a project that the user may not see the same message as for a
+          review that does not exist.
+        justification: |
+          A hidden project looks like a missing one.
+        tests:
+          - HistoryPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-HistoryPage-Access-SignedOut
+        title: >-
+          The HistoryPage component shall show no entries to a visitor who is not signed in.
+        justification: |
+          The trail names users and actions of the project.
+        tests:
+          - HistoryPage_Render_NobodySignedIn_ShowsNoEntries
+
+      - id: ReviewCenter-HistoryPage-Access-Revoked
+        title: >-
+          The HistoryPage component shall show the not-found message and no entries to a user whose membership was
           removed while the page was open, once the page is given new parameters.
         justification: |
-          Names and details come from users and must not inject markup, and the history is for signed-in users who
-          may see the project; a hidden project looks like a missing one. The page has no action of its own, so the
-          check it makes whenever its parameters are set is the only one an open page needs.
+          The page has no action of its own, so the check it makes whenever its parameters are set is the only one an
+          open page needs.
+        tests:
+          - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-HistoryPage-Access-PlainText
+        title: >-
+          The HistoryPage component shall render all trail text as plain text.
+        justification: |
+          Names and details come from users and must not inject markup.
         tests:
           - HistoryPage_Render_MarkupInEntries_IsEscaped
-          - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries
-          - HistoryPage_Render_NonMember_LooksLikeAMissingReview
-          - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
 
       - id: ReviewCenter-HistoryPage-BallotMasking
         title: >-
-          The HistoryPage component shall replace the details of the entries that name an answer for a viewer who has
-          not handed in their own ballot in a review with several slots by a note that they are hidden, with the
-          action, the actor, and the time still shown, and shall show the details in full to a viewer who may see the
-          others.
+          The HistoryPage component shall replace the details of the entries that name an answer by a note that they
+          are hidden for a viewer who has not handed in their own ballot in a review with several slots.
         justification: |
           The history is open to every member of the project, so it would otherwise give away the answers that the
-          checklist hides. The page asks the service, so the stored trail stays as it was written.
+          checklist hides.
         tests:
           - HistoryPage_HiddenViewer_HidesAnswerDetailsOnly
+
+      - id: ReviewCenter-HistoryPage-BallotMasking-Metadata
+        title: >-
+          The HistoryPage component shall still show the action, the actor, and the time of an entry whose detail is
+          hidden.
+        justification: |
+          The reader still sees that something happened, only not what the answer was.
+        tests:
+          - HistoryPage_HiddenViewer_KeepsActionActorAndTimeOfHiddenEntries
+
+      - id: ReviewCenter-HistoryPage-BallotMasking-Visible
+        title: >-
+          The HistoryPage component shall show the details in full to a viewer who may see the other ballots.
+        justification: |
+          The page asks the service, so the stored trail stays as it was written.
+        tests:
           - HistoryPage_Administrator_SeesFullAnswerDetails
