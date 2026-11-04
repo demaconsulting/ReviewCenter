@@ -119,4 +119,31 @@ public class ReviewPageFollowUpTests : PageTestBase
         // Assert: a follow-up that nothing follows has no list
         Assert.Empty(RenderPage(projectId, "REV-3").FindAll("[data-testid='review-followed-by']"));
     }
+
+    /// <summary>
+    ///     Test that a review that follows nothing and is followed by nothing shows no follow-up information, and that
+    ///     its threads carry no mark.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_StandaloneReview_ShowsNoFollowUpInformation()
+    {
+        // Arrange: one review with a thread, no follow-ups
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        var thread = await Threads.StartThreadAsync(
+            project.Id, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look", cancellationToken);
+
+        // Act
+        var cut = RenderPage(project.Id, "REV-1");
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: no follows line, no carried counts, no followed-by list, no carried mark
+        Assert.Empty(cut.FindAll("[data-testid='review-follows']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-carried-counts']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-followed-by']"));
+        Assert.Empty(cut.FindAll($"[data-testid='thread-carried-{thread.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='thread-carried-link-{thread.Id}']"));
+    }
 }
