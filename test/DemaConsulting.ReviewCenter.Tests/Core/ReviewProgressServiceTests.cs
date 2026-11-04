@@ -872,6 +872,73 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that a slot whose signature went out of date is waited on again: its reviewer is named once more.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_WaitingOn_OutOfDateSlot_IsNamed()
+    {
+        // Arrange: two slots, the first signed by reviewer1
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AnswerAllAsync(world, "rev-1");
+        var first = await AddSlotAsync(world, "rev-1", "reviewer1");
+        await AddSlotAsync(world, "rev-1", "reviewer2");
+        await SignAsync(world, "rev-1", first, _reviewerOne);
+        var before = await ProgressOfAsync(world, "rev-1");
+
+        // Act: somebody comments, acknowledging the signature this withdraws, which changes the record
+        await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            "rev-1",
+            new ThreadAnchor("a.txt"),
+            _member,
+            "Look",
+            cancellationToken,
+            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "rev-1"),
+            true);
+        var after = await ProgressOfAsync(world, "rev-1");
+
+        // Assert: the signed slot is left out before; afterwards its reviewer is named again, in slot order
+        Assert.Equal(["reviewer2"], before.WaitingOn);
+        Assert.Equal(1, after.SlotsOutOfDate);
+        Assert.Equal(["reviewer1", "reviewer2"], after.WaitingOn);
+    }
+
+    /// <summary>
+    ///     Test that a person who is named by several stored slots, as the alternate of one and the primary of another
+    ///     (which the slot rules of the signing service do not allow to add), is listed once.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_WaitingOn_SamePersonTwice_IsNamedOnce()
+    {
+        // Arrange: stored slots, slot 1 with reviewer1 as primary and reviewer2 as alternate, slot 2 with reviewer2
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot
+            {
+                ProjectId = world.ProjectId,
+                ReviewId = "rev-1",
+                PrimaryUserId = world.Ids["reviewer1"],
+                AlternateUserId = world.Ids["reviewer2"]
+            },
+            _ => AuditTestExtensions.Draft(),
+            cancellationToken);
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "rev-1", PrimaryUserId = world.Ids["reviewer2"] },
+            _ => AuditTestExtensions.Draft(),
+            cancellationToken);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert: reviewer2 appears once, at the place of the first slot that names the person
+        Assert.Equal(["reviewer1", "reviewer2"], progress.WaitingOn);
+    }
+
+    /// <summary>
     ///     Test that a review is overdue from the day after its due date and not on the day itself, and that an
     ///     approved review is never overdue.
     /// </summary>
@@ -982,6 +1049,27 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that a user whose account is disabled is refused like a user outside the project.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound()
+    {
+        // Arrange: a project member whose account is disabled
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await world.Users.SetEnabledAsync("member", false, cancellationToken);
+
+        // Act
+        var exception = await Record.ExceptionAsync(
+            () => world.Progress.GetProgressAsync(_member, world.ProjectId, cancellationToken));
+
+        // Assert: the same refusal as for a missing project
+        var refusal = Assert.IsType<DomainRuleException>(exception);
+        Assert.Equal(DomainRule.ProjectNotFound, refusal.Rule);
+    }
+
+    /// <summary>
     ///     Test that the progress of a project with many reviews reads the audit trail once and finishes in a loose
     ///     time bound, so the overview does not grow into one query per review.
     /// </summary>
@@ -1011,6 +1099,37 @@ public partial class ReviewProgressServiceTests
         Assert.Equal(100, all.Count(p => p.Stage == ReviewStage.InReview));
         Assert.Equal(1, counting!.LastActivityCalls);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"Took {watch.Elapsed}");
+    }
+
+    /// <summary>
+    ///     Test that the approvals of all reviews of a project are read in one batch read and not with one read per
+    ///     review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch()
+    {
+        // Arrange: 30 reviews, a third with a slot
+        var world = await WorldAsync();
+        for (var i = 0; i < 30; i++)
+        {
+            var id = $"rev-{i:D2}";
+            await CreateReviewAsync(world, id);
+            if (i % 3 == 0)
+            {
+                await AddSlotAsync(world, id, "reviewer1");
+            }
+        }
+
+        var singleReadsBefore = world.Store.SnapshotReads;
+        var batchReadsBefore = world.Store.SnapshotBatchReads;
+
+        // Act
+        var all = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, TestContext.Current.CancellationToken);
+
+        // Assert: every review is there, read with one batch read and no single snapshot read
+        Assert.Equal(30, all.Count);
+        Assert.Equal(1, world.Store.SnapshotBatchReads - batchReadsBefore);
+        Assert.Equal(0, world.Store.SnapshotReads - singleReadsBefore);
     }
 
     /// <summary>

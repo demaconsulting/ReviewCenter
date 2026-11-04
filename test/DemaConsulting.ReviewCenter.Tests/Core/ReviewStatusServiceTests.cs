@@ -979,6 +979,120 @@ public class ReviewStatusServiceTests
     }
 
     /// <summary>
+    ///     Test that the list of reviewers shows who handed in a ballot and never what the ballot says.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_Reviewers_ListNoBallotContent()
+    {
+        // Arrange: two handed-in ballots that differ on the first check, one with a justification
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var itemText = DefaultChecklist.Current.Sections[0].Items[0].Text;
+
+        // Act: the lead may see everything
+        var status = await StatusAsync(world, "lead");
+        var text = System.Text.Json.JsonSerializer.Serialize(status.Reviewers);
+
+        // Assert
+        Assert.Equal(2, status.Reviewers.Count);
+        Assert.DoesNotContain("A reason", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(itemText, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(BallotMaskingWorld.FirstItemId, text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an open thread that goes in the report counts as a finding and not as a question.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_OpenFindings_CountedApartFromQuestions()
+    {
+        // Arrange: one reviewer, and a thread that goes in the report
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            BallotMaskingWorld.ReviewId,
+            new ThreadAnchor("a.txt"),
+            BallotMaskingWorld.ActorOf("ann"),
+            "Fix this",
+            Token,
+            includeInReport: true);
+
+        // Act
+        var status = await StatusAsync(world, "ann");
+
+        // Assert
+        Assert.Equal(1, status.OpenFindings);
+        Assert.Equal(0, status.OpenQuestions);
+    }
+
+    /// <summary>
+    ///     Test that a ballot that was given to another reviewer is listed with its own reason.
+    /// </summary>
+    [Fact]
+    public void ReviewStatus_ChangeRules_BallotReassigned_IsListed()
+    {
+        // Arrange: a ballot is given to another reviewer after the signature
+        var at = new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var entries = new List<AuditEntry> { Entry(1, at.AddMinutes(1), "ballot.reassigned", "slot 1") };
+
+        // Act
+        var changes = ReviewChangeRules.Derive(entries, entries, at);
+
+        // Assert
+        var change = Assert.Single(changes);
+        Assert.Equal("Gave a ballot to another reviewer", change.Reason);
+    }
+
+    /// <summary>
+    ///     Test that the service cannot be created without one of the services and stores that it reads.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_Constructor_NullCollaborator_Throws()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+
+        // Act / Assert
+        Assert.Equal("store", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            null!, world.UserStore, world.Access, world.Signing, world.Checklists, world.Threads, world.AuditStore)).ParamName);
+        Assert.Equal("users", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, null!, world.Access, world.Signing, world.Checklists, world.Threads, world.AuditStore)).ParamName);
+        Assert.Equal("access", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, world.UserStore, null!, world.Signing, world.Checklists, world.Threads, world.AuditStore)).ParamName);
+        Assert.Equal("signing", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, world.UserStore, world.Access, null!, world.Checklists, world.Threads, world.AuditStore)).ParamName);
+        Assert.Equal("checklists", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, world.UserStore, world.Access, world.Signing, null!, world.Threads, world.AuditStore)).ParamName);
+        Assert.Equal("threads", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, world.UserStore, world.Access, world.Signing, world.Checklists, null!, world.AuditStore)).ParamName);
+        Assert.Equal("audit", Assert.Throws<ArgumentNullException>(() => new ReviewStatusService(
+            world.Store, world.UserStore, world.Access, world.Signing, world.Checklists, world.Threads, null!)).ParamName);
+    }
+
+    /// <summary>
+    ///     Test that a status from passed-in values is refused when the approval or the threads are missing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_GetStatusAsync_NullPassedInValues_Throws()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        var lead = BallotMaskingWorld.ActorOf("lead");
+        var approval = await world.Signing.GetApprovalAsync(lead, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Act
+        var noApproval = await Assert.ThrowsAsync<ArgumentNullException>(() => world.Status.GetStatusAsync(
+            lead, world.ProjectId, BallotMaskingWorld.ReviewId, null!, [], ThreadCapabilities.None, Token));
+        var noThreads = await Assert.ThrowsAsync<ArgumentNullException>(() => world.Status.GetStatusAsync(
+            lead, world.ProjectId, BallotMaskingWorld.ReviewId, approval!, null!, ThreadCapabilities.None, Token));
+
+        // Assert
+        Assert.Equal("approval", noApproval.ParamName);
+        Assert.Equal("threads", noThreads.ParamName);
+    }
+
+    /// <summary>
     ///     Builds a thread that was carried over from a followed review.
     /// </summary>
     /// <param name="id">The identity of the thread.</param>

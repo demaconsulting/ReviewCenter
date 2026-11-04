@@ -22,7 +22,7 @@ N/A - standard test environment.
   the disagreements, the findings, the questions, the conclusion, and the signature.
 - The status lists the reviewers in slot order with the ballot state and the signature state and never the content of a
   ballot, lists the disputed checks with whether a discussion can be started, and counts the open questions and findings.
-- A review with one slot is not masked and asks the reviewer to answer; a review with no slot asks the lead to add the
+- A review with one slot is not masked and asks the reviewer to sign; a review with no slot asks the lead to add the
   reviewers; a viewer who may not see the project is refused; a missing review gives nothing.
 - A viewer who may not see the others yet gets no disputed check, no answer, no failed check, no outcome note, no early
   signing caution, no count of discussions about checks, and no answer in the changes since a signature.
@@ -77,8 +77,46 @@ older rule, and findings still come first. This scenario is tested by
 reviewer whose signature no longer counts, and who cannot sign yet, is told so without a button. This scenario is tested
 by `ReviewNextAction_AfterSigning_NamesWhoIsMissing`.
 
+**ReviewNextAction_NoSlotViewer_Disputes_Discuss**: A viewer who may take part but holds no slot, in a review with slots
+and a disputed check, is asked to discuss the disputed checks. This scenario is tested by
+`ReviewNextAction_NoSlotViewer_Disputes_Discuss`.
+
+**ReviewNextAction_NoSlotViewer_OpenFindings_Resolve**: A viewer who may take part but holds no slot, in a review with
+slots and an open finding, is asked to resolve the findings in the threads. This scenario is tested by
+`ReviewNextAction_NoSlotViewer_OpenFindings_Resolve`.
+
+**ReviewNextAction_NoSlotViewer_OpenQuestions_Answer**: A viewer who may take part but holds no slot, in a review with
+slots and an open question, is asked to answer the questions in the threads. This scenario is tested by
+`ReviewNextAction_NoSlotViewer_OpenQuestions_Answer`.
+
+**ReviewNextAction_NoSlotViewer_ConclusionNeeded_WriteConclusion**: A viewer who may take part but holds no slot, in a
+review that needs a conclusion, is asked to write the conclusion. This scenario is tested by
+`ReviewNextAction_NoSlotViewer_ConclusionNeeded_WriteConclusion`.
+
+**ReviewNextAction_OwnQuestion_TwoOtherReviewers_AreNamedTogether**: A reviewer who asked the only open question, with
+two other reviewers in the review, waits for both of them by name. This scenario is tested by
+`ReviewNextAction_OwnQuestion_TwoOtherReviewers_AreNamedTogether`.
+
+**ReviewNextAction_Decide_NullFacts_Throws**: Deciding the action for missing facts is refused with an argument
+exception that names the parameter. This scenario is tested by `ReviewNextAction_Decide_NullFacts_Throws`.
+
 **ReviewStatus_Reviewers_ShowBallotAndSignatureState**: The reviewers are listed in slot order with the state of the
 ballot and of the signature. This scenario is tested by `ReviewStatus_Reviewers_ShowBallotAndSignatureState`.
+
+**ReviewStatus_Reviewers_ListNoBallotContent**: With two handed-in ballots that differ on a check and one justification,
+the serialized list of reviewers has neither the justification, nor the text of the check, nor its id. This scenario is
+tested by `ReviewStatus_Reviewers_ListNoBallotContent`.
+
+**ReviewStatus_OpenFindings_CountedApartFromQuestions**: An open thread that goes in the report is counted as a finding
+and not as a question. This scenario is tested by `ReviewStatus_OpenFindings_CountedApartFromQuestions`.
+
+**ReviewStatus_Constructor_NullCollaborator_Throws**: Creating the service without any one of its seven collaborators is
+refused with an argument exception that names it. This scenario is tested by
+`ReviewStatus_Constructor_NullCollaborator_Throws`.
+
+**ReviewStatus_GetStatusAsync_NullPassedInValues_Throws**: A status from passed-in values is refused with an argument
+exception when the approval is missing and when the threads are missing. This scenario is tested by
+`ReviewStatus_GetStatusAsync_NullPassedInValues_Throws`.
 
 **ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen**: A disputed check is listed with Discuss until a
 discussion about it is open. This scenario is tested by
@@ -126,8 +164,8 @@ gives nothing. This scenario is tested by `ReviewStatus_Outsider_IsRefusedAndMis
 **ReviewStatus_NoSlots_LeadIsAskedToAddReviewers**: A review with no slot gives the lead the action to add reviewers.
 This scenario is tested by `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`.
 
-**ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer**: A review with one slot is never masked. This scenario is
-tested by `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`.
+**ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer**: A review with one slot is never masked, and its reviewer is
+asked to sign. This scenario is tested by `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`.
 
 **ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly**: After a signature, the entries that can alter the
 report are listed with plain reasons, and an answer, a reply that is not in the report, and an entry before the
@@ -147,6 +185,10 @@ This scenario is tested by `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThou
 **ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries**: A resolution note counts only for a Finding, which the
 rule learns from the entries that start a thread or change its kind, also those before the signature. This scenario is
 tested by `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`.
+
+**ReviewStatus_ChangeRules_BallotReassigned_IsListed**: A ballot given to another reviewer after the signature is listed
+with the reason "Gave a ballot to another reviewer". This scenario is tested by
+`ReviewStatus_ChangeRules_BallotReassigned_IsListed`.
 
 **ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed**: A Finding that was carried over from the followed
 review has no starting entry in this review; with the carried thread passed in, a resolution note after the signature is
@@ -186,32 +228,161 @@ project and gives nothing for a missing review. This scenario is tested by
 
 #### Requirements Coverage
 
-- **ReviewCenter-ReviewStatusService-NextAction**: `ReviewNextAction_NoSlot_AssignMe`,
-  `ReviewNextAction_DraftBallot_Submit`, `ReviewNextAction_SubmittedWithDispute_Discuss`,
-  `ReviewNextAction_OpenFindings_Resolve`, `ReviewNextAction_ReadyToSign_Sign`,
-  `ReviewNextAction_SignedWaiting_WaitForOthers`, `ReviewNextAction_Concluded_Done`,
-  `ReviewNextAction_OneActionPerViewer`, `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`,
+- **ReviewCenter-ReviewStatusService-NextAction**: `ReviewNextAction_OneActionPerViewer`
+- **ReviewCenter-ReviewStatusService-NextAction-Words**: `ReviewNextAction_OneActionPerViewer`,
+  `ReviewNextAction_ReadyToSign_Sign`
+- **ReviewCenter-ReviewStatusService-NextAction-Place**: `ReviewNextAction_OneActionPerViewer`
+- **ReviewCenter-ReviewStatusService-NextAction-Concluded**: `ReviewNextAction_Concluded_Done`
+- **ReviewCenter-ReviewStatusService-NextAction-ReadOnly**: `ReviewNextAction_Concluded_Done`,
+  `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`
+- **ReviewCenter-ReviewStatusService-NextAction-AddReviewers**: `ReviewNextAction_NoSlot_AssignMe`,
+  `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`
+- **ReviewCenter-ReviewStatusService-NextAction-AddSelf**: `ReviewNextAction_NoSlot_AssignMe`
+- **ReviewCenter-ReviewStatusService-NextAction-AnswerChecks**: `ReviewNextAction_DraftBallot_Submit`
+- **ReviewCenter-ReviewStatusService-NextAction-SubmitBallot**: `ReviewNextAction_DraftBallot_Submit`
+- **ReviewCenter-ReviewStatusService-NextAction-SubmitAndSign**: `ReviewNextAction_DraftBallot_Submit`
+- **ReviewCenter-ReviewStatusService-NextAction-Discuss**: `ReviewNextAction_SubmittedWithDispute_Discuss`,
+  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`
+- **ReviewCenter-ReviewStatusService-NextAction-ResolveFindings**: `ReviewNextAction_OpenFindings_Resolve`,
+  `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`
+- **ReviewCenter-ReviewStatusService-NextAction-AnswerQuestions**: `ReviewNextAction_OpenFindings_Resolve`,
+  `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`, `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`
+- **ReviewCenter-ReviewStatusService-NextAction-Conclusion**: `ReviewNextAction_ReadyToSign_Sign`
+- **ReviewCenter-ReviewStatusService-NextAction-Sign**: `ReviewNextAction_ReadyToSign_Sign`
+- **ReviewCenter-ReviewStatusService-NextAction-SignAgain**: `ReviewNextAction_ReadyToSign_Sign`,
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`
+- **ReviewCenter-ReviewStatusService-NextAction-SignatureBlocked**: `ReviewNextAction_AfterSigning_NamesWhoIsMissing`
+- **ReviewCenter-ReviewStatusService-NextAction-SignedWaits**: `ReviewNextAction_SignedWaiting_WaitForOthers`,
   `ReviewNextAction_AfterSigning_NamesWhoIsMissing`
-- **ReviewCenter-ReviewStatusService-Status**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`,
-  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`, `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`,
-  `ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull`, `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`,
-  `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`, `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`,
-  `ReviewStatus_PassedInValues_OutsiderIsStillRefused`,
-  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`,
-  `ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`
-- **ReviewCenter-ReviewStatusService-MaskedViewer**: `ReviewStatus_MaskedViewer_NoDisputedChecks`,
-  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`,
-  `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`
-- **ReviewCenter-ReviewStatusService-Guidance**: `ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification`,
-  `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`,
-  `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`, `ReviewStatus_SingleSlot_NoCaution`,
-  `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`, `ReviewStatus_AfterSigning_NamesWhoSignsNext`
-- **ReviewCenter-ReviewStatusService-ChangesSinceSigning**:
+- **ReviewCenter-ReviewStatusService-NextAction-SignedNames**: `ReviewNextAction_AfterSigning_NamesWhoIsMissing`,
+  `ReviewStatus_AfterSigning_NamesWhoSignsNext`
+- **ReviewCenter-ReviewStatusService-NextAction-Waits**: `ReviewNextAction_SignedWaiting_WaitForOthers`
+- **ReviewCenter-ReviewStatusService-NextAction-OwnQuestion**: `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`,
+  `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`
+- **ReviewCenter-ReviewStatusService-NextAction-OwnQuestionNames**:
+  `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`,
+  `ReviewNextAction_OwnQuestion_TwoOtherReviewers_AreNamedTogether`
+- **ReviewCenter-ReviewStatusService-NextAction-OwnQuestionUnnamed**:
+  `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`
+- **ReviewCenter-ReviewStatusService-NextAction-OthersDiscuss**: `ReviewNextAction_NoSlotViewer_Disputes_Discuss`
+- **ReviewCenter-ReviewStatusService-NextAction-OthersFindings**: `ReviewNextAction_NoSlotViewer_OpenFindings_Resolve`
+- **ReviewCenter-ReviewStatusService-NextAction-OthersQuestions**: `ReviewNextAction_NoSlotViewer_OpenQuestions_Answer`
+- **ReviewCenter-ReviewStatusService-NextAction-OthersConclusion**:
+  `ReviewNextAction_NoSlotViewer_ConclusionNeeded_WriteConclusion`
+- **ReviewCenter-ReviewStatusService-NextAction-Arguments**: `ReviewNextAction_Decide_NullFacts_Throws`
+- **ReviewCenter-ReviewStatusService-Status**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`
+- **ReviewCenter-ReviewStatusService-Status-Reviewers**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`
+- **ReviewCenter-ReviewStatusService-Status-BallotState**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`
+- **ReviewCenter-ReviewStatusService-Status-SignatureState**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`,
   `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
   `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`,
-  `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`,
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`
+- **ReviewCenter-ReviewStatusService-Status-NoBallotContent**: `ReviewStatus_Reviewers_ListNoBallotContent`
+- **ReviewCenter-ReviewStatusService-Status-DisputedChecks**:
+  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`, `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`
+- **ReviewCenter-ReviewStatusService-Status-DisputeDiscuss**:
+  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`,
+  `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`
+- **ReviewCenter-ReviewStatusService-Status-DisputeReadOnly**: `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`
+- **ReviewCenter-ReviewStatusService-Status-DisputeThread**:
+  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`
+- **ReviewCenter-ReviewStatusService-Status-OpenQuestions**:
+  `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`, `ReviewStatus_MaskedViewer_NoDisputedChecks`
+- **ReviewCenter-ReviewStatusService-Status-OpenFindings**: `ReviewStatus_OpenFindings_CountedApartFromQuestions`
+- **ReviewCenter-ReviewStatusService-Status-NextAction**: `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`,
+  `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`
+- **ReviewCenter-ReviewStatusService-Status-SingleSlot**: `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`
+- **ReviewCenter-ReviewStatusService-Status-SingleSlotDisputes**:
+  `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`
+- **ReviewCenter-ReviewStatusService-Status-NoSlots**: `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`
+- **ReviewCenter-ReviewStatusService-Status-Missing**: `ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull`,
+  `ReviewStatus_PassedInValues_OutsiderIsStillRefused`
+- **ReviewCenter-ReviewStatusService-Status-Refused**: `ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull`,
+  `ReviewStatus_PassedInValues_OutsiderIsStillRefused`
+- **ReviewCenter-ReviewStatusService-Status-PassedIn**: `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`
+- **ReviewCenter-ReviewStatusService-Status-PassedInUsed**: `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`
+- **ReviewCenter-ReviewStatusService-Status-PassedInRefused**: `ReviewStatus_PassedInValues_OutsiderIsStillRefused`
+- **ReviewCenter-ReviewStatusService-Status-PassedInMissing**: `ReviewStatus_PassedInValues_OutsiderIsStillRefused`
+- **ReviewCenter-ReviewStatusService-Status-ReopenerWaits**:
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`,
+  `ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`
+- **ReviewCenter-ReviewStatusService-Status-ReopenerSigns**:
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`,
+  `ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`
+- **ReviewCenter-ReviewStatusService-Status-NonReopenerSigns**:
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`
+- **ReviewCenter-ReviewStatusService-Status-Arguments**: `ReviewStatus_Constructor_NullCollaborator_Throws`
+- **ReviewCenter-ReviewStatusService-Status-PassedInArguments**:
+  `ReviewStatus_GetStatusAsync_NullPassedInValues_Throws`
+- **ReviewCenter-ReviewStatusService-MaskedViewer**: `ReviewStatus_MaskedViewer_NoDisputedChecks`,
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Counts**: `ReviewStatus_MaskedViewer_NoDisputedChecks`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Outcome**:
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`,
+  `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Caution**:
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Details**:
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Action**: `ReviewStatus_MaskedViewer_NoDisputedChecks`
+- **ReviewCenter-ReviewStatusService-MaskedViewer-Waiting**:
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`
+- **ReviewCenter-ReviewStatusService-Guidance**: `ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification`
+- **ReviewCenter-ReviewStatusService-Guidance-Outcome**: `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`
+- **ReviewCenter-ReviewStatusService-Guidance-Caution**: `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`
+- **ReviewCenter-ReviewStatusService-Guidance-CautionNone**:
+  `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`
+- **ReviewCenter-ReviewStatusService-Guidance-CautionNotSigning**:
+  `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`
+- **ReviewCenter-ReviewStatusService-Guidance-SingleReviewer**: `ReviewStatus_SingleSlot_NoCaution`
+- **ReviewCenter-ReviewStatusService-Guidance-AskerWaits**: `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`
+- **ReviewCenter-ReviewStatusService-Guidance-OtherAnswers**: `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`
+- **ReviewCenter-ReviewStatusService-Guidance-SignedNames**: `ReviewStatus_AfterSigning_NamesWhoSignsNext`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-AfterSignature**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
+  `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-Ballots**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-BallotReopened**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-Reassigned**:
+  `ReviewStatus_ChangeRules_BallotReassigned_IsListed`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-Conclusion**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
   `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`,
+  `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadStarted**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadReply**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKind**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKindBack**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReport**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReportOut**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-FindingNote**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
+  `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFinding**:
   `ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed`,
-  `ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`,
-  `ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed`,
   `ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFindingKind**:
+  `ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-QuestionNote**:
+  `ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed`,
+  `ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-NotInReport**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-OtherEntries**:
+  `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-StillMatches**:
+  `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-WholeTrail**:
+  `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`
+- **ReviewCenter-ReviewStatusService-ChangesSinceSigning-Masking**:
+  `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`

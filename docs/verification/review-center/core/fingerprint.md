@@ -49,3 +49,6 @@ two-file answer, which differs from the answer for one file. This scenario is te
 **Fingerprint_Compute_FromFileHashes_EqualsFromContents**: The fingerprint calculated from the per-file hashes
 equals the fingerprint calculated from the contents. This scenario is tested by
 `Fingerprint_Compute_FromFileHashes_EqualsFromContents`.
+
+**Fingerprint_Compute_NullSet_Throws**: A missing set of hashes and a missing set of contents are both refused
+with ArgumentNullException. This scenario is tested by `Fingerprint_Compute_NullSet_Throws`.

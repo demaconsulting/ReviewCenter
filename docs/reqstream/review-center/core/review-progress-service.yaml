@@ -8,140 +8,486 @@
 # ReviewProgress and ReviewStage types that carry the answer are verified with it. The blocker counts themselves are
 # produced by the SigningService unit and the last activity by the audit store; their requirements are in their own
 # files.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ReviewProgressService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Stage: where a review stands, derived from its approval status
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-Stage
         title: >-
           The ReviewProgressService class shall derive the stage of every review from its approval status and not
-          from the stored state of the review: Setup while it has no reviewer slot, Approved when the review is
-          concluded as approved (every slot has a valid signature of the approval and nothing blocks it), Rejected
-          when it is concluded as rejected (every slot has a valid signature of the rejection, nothing blocks it, and
-          the conclusion text is present), and In review otherwise (an open thread is a blocker, so a review whose
-          slots are all signed but that has an open thread is In review), including a review that was
-          reopened after a conclusion, which it shall flag as reopened.
+          from the stored state of the review.
         justification: |
-          A lead wants to know whether a review has not started, is under way, or is done, and how it ended. The
-          stored state only says whether a review is open or closed, and a review that was reopened is open again
-          whatever it was before, so
-          the stage is computed from the same approval status that the review page shows and cannot disagree with it.
+          A lead wants to know whether a review has not started, is under way, or is done. The stored state only says
+          whether a review is open or closed, so the stage is computed from the same approval status that the review
+          page shows and cannot disagree with it.
         tests:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
-          - ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty
-          - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
           - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
+
+      - id: ReviewCenter-ReviewProgressService-Stage-Empty
+        title: >-
+          The ReviewProgressService class shall give an empty answer for a project without reviews.
+        justification: |
+          A project that has no reviews has nothing to show, and the page must not fail on it.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty
+
+      - id: ReviewCenter-ReviewProgressService-Stage-Setup
+        title: >-
+          The ReviewProgressService class shall give the stage Setup to a review that has no reviewer slot.
+        justification: |
+          A review that nobody is named for has not started, and the lead sees that it still needs reviewers.
+        tests:
+          - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
+
+      - id: ReviewCenter-ReviewProgressService-Stage-Approved
+        title: >-
+          The ReviewProgressService class shall give the stage Approved to a review that is concluded as approved.
+        justification: |
+          A lead must see at once which reviews are done and approved.
+        tests:
+          - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
+          - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
+
+      - id: ReviewCenter-ReviewProgressService-Stage-Rejected
+        title: >-
+          The ReviewProgressService class shall give the stage Rejected to a review that is concluded as rejected.
+        justification: |
+          A review that ended in a rejection is done, but not approved, and the overview must say so.
+        tests:
           - ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked
 
+      - id: ReviewCenter-ReviewProgressService-Stage-InReview
+        title: >-
+          The ReviewProgressService class shall give the stage In review to a review that has a reviewer slot and is
+          not concluded.
+        justification: |
+          A review that has reviewers and no conclusion is under way, whatever is still missing for its conclusion.
+        tests:
+          - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
+          - ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired
+          - ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked
+          - ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate
+
+      - id: ReviewCenter-ReviewProgressService-Stage-OpenThread
+        title: >-
+          The ReviewProgressService class shall keep a review whose slots are all signed in the stage In review while
+          a thread is open.
+        justification: |
+          An open thread is a blocker, so a review with an open thread is not concluded even when everybody signed.
+        tests:
+          - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
+
+      - id: ReviewCenter-ReviewProgressService-Stage-Reopened
+        title: >-
+          The ReviewProgressService class shall keep a review that was reopened after its conclusion in the stage In
+          review and not approved.
+        justification: |
+          A reopened review is open again whatever it was before, so it must not still read as approved.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
+
+      - id: ReviewCenter-ReviewProgressService-Stage-ReopenedFlag
+        title: >-
+          The ReviewProgressService class shall flag a review as reopened only when it was reopened after its
+          conclusion.
+        justification: |
+          A lead must be able to tell a review that is open again from one that was never concluded.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # SlotProgress: how many signatures a review has and needs
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-SlotProgress
         title: >-
-          The ReviewProgressService class shall report, for every review, the number of reviewer slots, the number
-          that have a valid signature, and the number whose signature is out of date because the review changed
-          after it was given.
+          The ReviewProgressService class shall count for every review the reviewer slots it needs and the slots that
+          have a valid signature.
         justification: |
-          "2 of 3 signed" and "one signature no longer counts" are the first things a lead looks for. An out-of-date
-          signature is not progress, and a count that hid it would make a review look nearer to approval than it is.
+          "2 of 3 signed" is the first thing a lead looks for, so a lead sees how far a review is without opening it.
         tests:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
           - ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate
 
+      - id: ReviewCenter-ReviewProgressService-SlotProgress-OutOfDate
+        title: >-
+          The ReviewProgressService class shall count the slots whose signature is out of date because the review
+          changed after it was given.
+        justification: |
+          An out-of-date signature is not progress, and a count that hid it would make a review look nearer to
+          approval than it is.
+        tests:
+          - ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate
+          - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # WaitingOn: the people a review waits on
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-WaitingOn
         title: >-
-          The ReviewProgressService class shall name, for a review that is not concluded, the primary reviewer and,
-          when that is another person, the alternate reviewer of every slot that is not signed or is out of date,
-          each person once and in slot order, show a person whose account is disabled with the suffix "(disabled)",
-          and name nobody for a concluded review, approved or rejected.
+          The ReviewProgressService class shall name the primary reviewer of every slot that is not signed, in slot
+          order, for a review that is not concluded.
         justification: |
-          A lead who has to chase a review needs the names of the people to ask. A primary reviewer who can no
-          longer sign must be recognizable, so the lead knows the slot has to be reassigned and not waited for.
+          A lead who has to chase a review needs the names of the people to ask.
         tests:
           - ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots
 
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-OutOfDate
+        title: >-
+          The ReviewProgressService class shall also name the reviewer of a slot whose signature is out of date.
+        justification: |
+          A signature that no longer counts must be given again, so the lead has to chase that reviewer once more.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOn_OutOfDateSlot_IsNamed
+
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-Alternate
+        title: >-
+          The ReviewProgressService class shall name the alternate reviewer of a slot that is not signed when the
+          alternate is another person than the primary reviewer.
+        justification: |
+          The alternate may sign in place of the primary reviewer, so the lead may ask either of them.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots
+
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-Signed
+        title: >-
+          The ReviewProgressService class shall leave out the reviewers of a slot that has a valid signature.
+        justification: |
+          Nobody has to be chased for a slot that is already signed.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots
+
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-Once
+        title: >-
+          The ReviewProgressService class shall name a person once when several slots name that person.
+        justification: |
+          A lead needs a list of people to ask, and a person who is named twice is still one person.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOn_SamePersonTwice_IsNamedOnce
+
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-Disabled
+        title: >-
+          The ReviewProgressService class shall mark a person whose account is disabled with the suffix "(disabled)".
+        justification: |
+          A reviewer who can no longer sign must be recognizable, so the lead knows the slot has to be reassigned and
+          not waited for.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots
+
+      - id: ReviewCenter-ReviewProgressService-WaitingOn-Concluded
+        title: >-
+          The ReviewProgressService class shall name nobody for a review that is concluded, approved or rejected.
+        justification: |
+          A concluded review waits for nobody.
+        tests:
+          - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
+          - ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Blockers: what stops a review from being concluded
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-Blockers
         title: >-
-          The ReviewProgressService class shall report for every review the number of open threads, of unanswered
-          checks (the pending checks of the consolidated checklist of the submitted ballots), of checks that the ballots
-          agree are Fail (information only, never a blocker), and of checks on which the ballots disagree, whether the
-          review has no checklist, and whether a rejection still needs its conclusion text, taken from the same blocker
-          counts and flags of the approval status that the blocker sentences of the review page come from, and shall
-          mark a review that is not concluded with any blocker as blocked, and a review with only Fail answers as not
-          blocked.
+          The ReviewProgressService class shall count for every review its open threads.
         justification: |
-          What blocks a review is a different question from who has not signed. The counts and the sentences are
-          produced in one place, so the overview and the review page cannot disagree about why a review is not
-          concluded. A draft ballot is not handed in and so changes none of the counts (the one exception is the sole
-          ballot of a review with a single slot, which counts before its hand-in), and a disputed check blocks the
-          review although it is neither unanswered nor a Fail.
+          What blocks a review is a different question from who has not signed, and an open thread is one of the
+          things that blocks it.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Unanswered
+        title: >-
+          The ReviewProgressService class shall count for every review the checks that no reviewer has answered.
+        justification: |
+          A check that nobody answered blocks the review, and the lead has to see how many there are.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Failed
+        title: >-
+          The ReviewProgressService class shall count for every review the checks that the ballots agree are Fail, as
+          information and not as a blocker.
+        justification: |
+          A Fail that every reviewer agrees on needs no discussion, but the lead still wants to know how many there
+          are.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+          - ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired
+          - ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Disputed
+        title: >-
+          The ReviewProgressService class shall count for every review the checks on which the ballots disagree, for a
+          viewer who may see the ballots.
+        justification: |
+          A disputed check blocks the review although it is neither unanswered nor a Fail.
+        tests:
+          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-NoChecklist
+        title: >-
+          The ReviewProgressService class shall report whether a review has no checklist.
+        justification: |
+          A review without a checklist cannot be answered, and the lead must see that this is why it stands still.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-ConclusionRequired
+        title: >-
+          The ReviewProgressService class shall report that a review rejected by its ballots still needs its
+          conclusion text exactly while the text is missing.
+        justification: |
+          A rejection without a conclusion text cannot be concluded, and the lead must see that the text is what is
+          missing.
+        tests:
+          - ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired
+          - ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Consistent
+        title: >-
+          The ReviewProgressService class shall give blocker counts and flags that equal those of the approval status
+          of the review.
+        justification: |
+          The counts and the sentences are produced in one place, so the overview and the review page cannot disagree
+          about why a review is not concluded.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Blocked
+        title: >-
+          The ReviewProgressService class shall mark a review that is not concluded as blocked while any blocker
+          exists.
+        justification: |
+          A lead wants to find the reviews that cannot move on, without reading every one of them.
         tests:
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
           - ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked
           - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
           - ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-Concluded
+        title: >-
+          The ReviewProgressService class shall not mark a review that is concluded as blocked.
+        justification: |
+          A concluded review has nothing left to unblock.
+        tests:
+          - ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+
+      - id: ReviewCenter-ReviewProgressService-Blockers-FailAgreed
+        title: >-
+          The ReviewProgressService class shall not mark a review as blocked because of a check that the ballots agree
+          is Fail.
+        justification: |
+          An agreed Fail is a verdict, not an obstacle, so a review with only Fail answers is not held up by them.
+        tests:
           - ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Overdue and last activity: whether a review is late and when it last changed
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-Overdue
         title: >-
-          The ReviewProgressService class shall report for every review its due date and whether it is overdue by the
-          rule of the ReviewService class: overdue from the day after the due date until the review is concluded
-          (approved or rejected), not
-          on the due date itself, never for a review without a due date, and never for a concluded review.
+          The ReviewProgressService class shall mark a review that is not concluded as overdue from the day after its
+          due date.
         justification: |
-          The overview and the review page must agree on which reviews are late, so the overview asks the rule that
-          the page uses and does not repeat it.
+          A lead must see which reviews are late, and a review is not late on the day it is due.
+        tests:
+          - ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter
+
+      - id: ReviewCenter-ReviewProgressService-Overdue-DueDay
+        title: >-
+          The ReviewProgressService class shall not mark a review as overdue on its due date.
+        justification: |
+          The due date is the last day on which the review is in time.
+        tests:
+          - ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter
+
+      - id: ReviewCenter-ReviewProgressService-Overdue-NoDate
+        title: >-
+          The ReviewProgressService class shall not mark a review without a due date as overdue.
+        justification: |
+          A review that has no due date cannot be late.
+        tests:
+          - ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter
+
+      - id: ReviewCenter-ReviewProgressService-Overdue-Concluded
+        title: >-
+          The ReviewProgressService class shall not mark a review that is approved as overdue.
+        justification: |
+          A review that is done is no longer late, whatever its due date was.
+        tests:
+          - ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter
+
+      - id: ReviewCenter-ReviewProgressService-Overdue-DueDate
+        title: >-
+          The ReviewProgressService class shall give for every review its due date.
+        justification: |
+          The lead sees the date next to the overdue mark and can tell how late a review is.
         tests:
           - ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter
 
       - id: ReviewCenter-ReviewProgressService-LastActivity
         title: >-
-          The ReviewProgressService class shall report for every review the time of its newest entry in the audit
-          trail, which is the creation time of the review when the trail has no entry for it, and shall read the
-          activity of all reviews of the project with one query of the audit trail.
+          The ReviewProgressService class shall give for every review the time of the newest audit entry of that review
+          as its last activity.
         justification: |
           "Nothing has happened for three weeks" is what a lead needs to see. The audit trail records every change of
           a review and is already tamper evident, so the time is taken from it and not kept in a column that could
           drift from it.
         tests:
           - ReviewProgressService_GetProgressAsync_LastActivity_ComesFromTheAuditTrail
+
+      - id: ReviewCenter-ReviewProgressService-LastActivity-Created
+        title: >-
+          The ReviewProgressService class shall give the creation time of a review as its last activity when the audit
+          trail has no entry for it.
+        justification: |
+          A review that was just created and has no entry yet was still active when it was created.
+        tests:
+          - ReviewProgressService_GetProgressAsync_LastActivity_ComesFromTheAuditTrail
+
+      - id: ReviewCenter-ReviewProgressService-LastActivity-OneRead
+        title: >-
+          The ReviewProgressService class shall read the last activity of all reviews of a project with one read of
+          the audit trail.
+        justification: |
+          A read per review would make the overview slow exactly for the projects that most need one.
+        tests:
           - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # ViewerRights: who may see the progress of a project, and in what standing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-ViewerRights
         title: >-
-          The ReviewProgressService class shall return the progress of a project to every actor who may see the
-          project, a read-only auditor included, and give every other
-          actor, including a user outside the project, a disabled user, and no actor at all, the answer for a project
-          that does not exist, and shall reduce the standing of a review for an actor that came through an API token
-          exactly as for any viewer, with no exception for the token.
+          The ReviewProgressService class shall give the progress of a project to every user who may see the project,
+          a read-only auditor included.
         justification: |
-          The overview only shows what the review pages show to the same people. A project that the actor may not see
-          must read like a missing one, so that its existence does not leak. A token is never the lead, an
-          administrator or an auditor, so it never sees what a masked viewer does not.
+          The overview only shows what the review pages show to the same people.
         tests:
           - ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound
-          - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
+
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-NotFound
+        title: >-
+          The ReviewProgressService class shall refuse a user outside the project and a missing actor with the
+          ProjectNotFound rule.
+        justification: |
+          A project that the caller may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound
+
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-Disabled
+        title: >-
+          The ReviewProgressService class shall refuse a user whose account is disabled with the ProjectNotFound rule.
+        justification: |
+          A disabled account has lost its access, and the existence of the project must not leak to it.
+        tests:
+          - ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound
+
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-TokenMasked
+        title: >-
+          The ReviewProgressService class shall give a personal access token the same masked standing as any other
+          viewer who may not see the ballots.
+        justification: |
+          A token is never the lead, an administrator or an auditor, so it never sees what a masked viewer does not.
+        tests:
           - ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer
+
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-TokenSubmitted
+        title: >-
+          The ReviewProgressService class shall give the token of the owner of a slot whose ballot is handed in the
+          consolidated standing.
+        justification: |
+          A token acts as its owner, who has already seen the ballots by handing in the own one.
+        tests:
           - ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding
+
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-TokenDraft
+        title: >-
+          The ReviewProgressService class shall give the token of the owner of a slot whose ballot is not handed in the
+          masked standing.
+        justification: |
+          A reviewer who has not handed in a ballot must not learn what the others answered, through a token either.
+        tests:
           - ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked
 
+      - id: ReviewCenter-ReviewProgressService-ViewerRights-GivenList
+        title: >-
+          The ReviewProgressService class shall check the access of the caller also when the caller gives the list of
+          reviews.
+        justification: |
+          A caller that passes in the list must not be able to read the progress of a project that it may not see.
+        tests:
+          - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Performance: the reads do not grow with the number of reviews
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-Performance
         title: >-
-          The ReviewProgressService class shall need a number of reads that does not grow with the number of reviews
-          of the project: one read of the reviews (none when the caller already has the list and passes it in), one
-          batch read of the approval statuses (itself one set-based read of the snapshots of all the reviews, given
-          the reviews that are already in hand so that it reads no list of them), and
-          one read of the last
-          activity, so that a project with 300 reviews is answered within a loose time bound on a test database.
+          The ReviewProgressService class shall read the approval statuses of all reviews of a project with one batch
+          read and not with one read per review.
         justification: |
           The overview is the page that every user opens first. A read per review would make it slow exactly for the
-          projects that most need an overview. A caller that needs the list itself, such as the API list, passes it
-          in so that the reviews are still read once, and the batch read of the approvals finds the creator of a
-          review in that same list instead of listing the reviews again.
+          projects that most need an overview.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch
+
+      - id: ReviewCenter-ReviewProgressService-Performance-Bound
+        title: >-
+          The ReviewProgressService class shall answer for a project with 300 reviews within a loose time bound.
+        justification: |
+          The bound guards against one query per review and is not a benchmark.
         tests:
           - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+
+      - id: ReviewCenter-ReviewProgressService-Performance-ReviewList
+        title: >-
+          The ReviewProgressService class shall read the list of reviews of a project once when the caller does not
+          give it.
+        justification: |
+          The list is the same for every review, so it is read once and not once per review.
+        tests:
+          - ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList
+
+      - id: ReviewCenter-ReviewProgressService-Performance-ListGiven
+        title: >-
+          The ReviewProgressService class shall not read the list of reviews again when the caller gives it, also for a
+          viewer who may not see the ballots.
+        justification: |
+          A caller that needs the list itself, such as the API list, passes it in so that the reviews are still read
+          once.
+        tests:
           - ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList
           - ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList
+
+      - id: ReviewCenter-ReviewProgressService-Performance-ListSubset
+        title: >-
+          The ReviewProgressService class shall answer only for the reviews of a given list, in the order of the list.
+        justification: |
+          A caller that shows only some of the reviews, in an order of its own, needs the progress of exactly those.
+        tests:
           - ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder
+
+      - id: ReviewCenter-ReviewProgressService-Performance-ListEmpty
+        title: >-
+          The ReviewProgressService class shall answer an empty given list with an empty answer and without reading the
+          last activity.
+        justification: |
+          There is nothing to answer for, so no read is needed.
+        tests:
           - ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Arguments: missing collaborators and a missing list
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-Arguments
         title: >-
           The ReviewProgressService class shall refuse a null review service, signing service, audit store, or access
@@ -152,38 +498,139 @@ sections:
         tests:
           - ReviewProgressService_Constructor_NullArgument_Throws
 
+      - id: ReviewCenter-ReviewProgressService-Arguments-ReviewList
+        title: >-
+          The ReviewProgressService class shall refuse a null list of reviews that the caller gives.
+        justification: |
+          A wrong call must fail loudly and not be taken for an empty list.
+        tests:
+          - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # KindCounts: open questions and open findings
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-KindCounts
         title: >-
-          The ReviewProgressService class shall report the open threads split into open questions and open findings
-          (their sum being the open threads), shall word the progress, blocker and next-step texts by kind (for
-          example 2 open findings, 1 open question), and shall not count the discussions about checks for a viewer who
-          may not see them.
+          The ReviewProgressService class shall count the open questions and the open findings of every review apart.
         justification: |
-          A reviewer decides what to do next by the kind of work that is open, and a count of discussions about checks
-          would give away what the others answered.
+          A reviewer decides what to do next by the kind of work that is open, and a question and a finding ask for
+          different work.
         tests:
           - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+
+      - id: ReviewCenter-ReviewProgressService-KindCounts-Sum
+        title: >-
+          The ReviewProgressService class shall give open threads that equal the sum of the open questions and the open
+          findings.
+        justification: |
+          The total and the split must agree, or the overview would contradict itself.
+        tests:
+          - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
+
+      - id: ReviewCenter-ReviewProgressService-KindCounts-Words
+        title: >-
+          The ReviewProgressService class shall word the open threads of a review by kind, for example "2 open
+          findings, 1 open question".
+        justification: |
+          The text tells the reviewer in one line which kind of work is open.
+        tests:
+          - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
+
+      - id: ReviewCenter-ReviewProgressService-KindCounts-Fallback
+        title: >-
+          The ReviewProgressService class shall word the open threads as "3 open threads" when the kind counts are not
+          known.
+        justification: |
+          A progress record that carries only the total must still read correctly.
+        tests:
           - ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads
+
+      - id: ReviewCenter-ReviewProgressService-KindCounts-MaskedChecks
+        title: >-
+          The ReviewProgressService class shall not count the discussions about checks for a viewer who may not see the
+          ballots.
+        justification: |
+          A count of discussions about checks would give away what the others answered.
+        tests:
           - ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # BallotProgress: the ballots that are handed in, shown to every viewer
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewProgressService-BallotProgress
         title: >-
-          The ReviewProgressService class shall report for every review that has a checklist the number of ballots that
-          were handed in and the number of ballots the review needs (one for every reviewer slot), shall name, for a
-          review that is not concluded, the people whose ballot is not in, each once and in slot order and with the
-          suffix "(disabled)" for a disabled account, shall report no ballots for a review without a checklist or for
-          a concluded review (no names), and shall give the same counts and names to every viewer, together with a flag
-          that tells that the other details of the review are hidden from this viewer until the ballot is handed in.
+          The ReviewProgressService class shall count for every review that has a checklist the ballots that were
+          handed in and the ballots the review needs, one for every reviewer slot.
         justification: |
-          A lead who has to chase a review needs to know how many ballots are still missing and whose they are, and a
-          reviewer needs to know that the review waits for them. That a ballot is in is progress and not a verdict, so
-          it is shown to everybody, and the flag lets a page say that the dispute counts are hidden instead of showing
-          a zero that could be taken for agreement.
+          A lead who has to chase a review needs to know how many ballots are still missing. That a ballot is in is
+          progress and not a verdict.
         tests:
           - ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal
-          - ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix
-          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
-          - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
           - ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-Names
+        title: >-
+          The ReviewProgressService class shall name the reviewers whose ballot is missing, in slot order, for a review
+          that is not concluded.
+        justification: |
+          A lead needs to know whose ballot a review waits for, and a reviewer needs to know that the review waits for
+          the reviewer.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-Disabled
+        title: >-
+          The ReviewProgressService class shall mark a missing reviewer whose account is disabled with the suffix
+          "(disabled)".
+        justification: |
+          A reviewer who can no longer hand in a ballot must be recognizable, so the slot gets reassigned.
+        tests:
+          - ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-NoChecklist
+        title: >-
+          The ReviewProgressService class shall require no ballot for a review without a checklist.
+        justification: |
+          Without a checklist there is nothing to answer, so no ballot can be missing.
+        tests:
           - ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-Concluded
+        title: >-
+          The ReviewProgressService class shall name no missing reviewer for a review that is concluded, while its
+          ballot counts stay.
+        justification: |
+          A concluded review waits for nobody, and the counts still show how many ballots it had.
+        tests:
+          - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-MaskedCounts
+        title: >-
+          The ReviewProgressService class shall give a viewer who may not see the ballots the same ballot counts as
+          every other viewer.
+        justification: |
+          That a ballot is in is progress and not a verdict, so it is shown to everybody.
+        tests:
+          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
+          - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-MaskedFlag
+        title: >-
+          The ReviewProgressService class shall mark the progress of a review as masked for a viewer who may not see
+          the ballots.
+        justification: |
+          The flag lets a page say that the other details are hidden until the ballot is handed in.
+        tests:
+          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
+          - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress-MaskedBlockers
+        title: >-
+          The ReviewProgressService class shall give a viewer who may not see the ballots zero disputed and zero failed
+          checks.
+        justification: |
+          A page shows the masked flag and not a zero that could be taken for agreement, and the answers stay private.
+        tests:
+          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
           - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked

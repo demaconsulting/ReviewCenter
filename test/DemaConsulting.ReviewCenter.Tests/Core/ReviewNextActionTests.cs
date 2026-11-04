@@ -306,4 +306,100 @@ public class ReviewNextActionTests
             Assert.DoesNotContain("out of date", action.Label, StringComparison.OrdinalIgnoreCase);
         });
     }
+
+    /// <summary>
+    ///     Test that a viewer who may take part but holds no slot is asked to discuss the disputed checks.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_NoSlotViewer_Disputes_Discuss()
+    {
+        // Arrange: the review has slots, and a check is disputed
+        var facts = Outsider(f => f with { DisputesToDiscuss = 1 });
+
+        // Act
+        var action = ReviewNextAction.Decide(facts);
+
+        // Assert
+        Assert.Equal(NextActionKind.DiscussDisputes, action.Kind);
+        Assert.Equal(NextActionTarget.DisputedChecks, action.Target);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who may take part but holds no slot is asked to resolve the open findings.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_NoSlotViewer_OpenFindings_Resolve()
+    {
+        // Arrange: the review has slots and an open finding, and no dispute
+        var facts = Outsider(f => f with { OpenFindings = 1 });
+
+        // Act
+        var action = ReviewNextAction.Decide(facts);
+
+        // Assert
+        Assert.Equal(NextActionKind.ResolveFindings, action.Kind);
+        Assert.Equal(NextActionTarget.Threads, action.Target);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who may take part but holds no slot is asked to answer the open questions.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_NoSlotViewer_OpenQuestions_Answer()
+    {
+        // Arrange: the review has slots and an open question, and nothing else is open
+        var facts = Outsider(f => f with { OpenQuestions = 1 });
+
+        // Act
+        var action = ReviewNextAction.Decide(facts);
+
+        // Assert
+        Assert.Equal(NextActionKind.AnswerQuestions, action.Kind);
+        Assert.Equal(NextActionTarget.Threads, action.Target);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who may take part but holds no slot is asked to write a needed conclusion.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_NoSlotViewer_ConclusionNeeded_WriteConclusion()
+    {
+        // Arrange: the review has slots and needs a conclusion, and nothing else is open
+        var facts = Outsider(f => f with { ConclusionNeeded = true });
+
+        // Act
+        var action = ReviewNextAction.Decide(facts);
+
+        // Assert
+        Assert.Equal(NextActionKind.WriteConclusion, action.Kind);
+        Assert.Equal(NextActionTarget.Conclusion, action.Target);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who asked the open question waits for two other reviewers by name.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_OwnQuestion_TwoOtherReviewers_AreNamedTogether()
+    {
+        // Arrange: the viewer asked the only open question, and two other reviewers hold slots
+        var facts = Reviewer(f => f with { OpenQuestions = 1, OpenQuestionsAwaitingYou = 0, OtherReviewers = ["Bob", "Cyd"] });
+
+        // Act
+        var action = ReviewNextAction.Decide(facts);
+
+        // Assert
+        Assert.Equal(NextActionKind.WaitForOthers, action.Kind);
+        Assert.Equal("Waiting for Bob and Cyd to answer your question.", action.Label);
+    }
+
+    /// <summary>
+    ///     Test that a missing set of facts is refused.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_Decide_NullFacts_Throws()
+    {
+        // Arrange / Act / Assert
+        var exception = Assert.Throws<ArgumentNullException>(() => ReviewNextAction.Decide(null!));
+        Assert.Equal("facts", exception.ParamName);
+    }
 }
