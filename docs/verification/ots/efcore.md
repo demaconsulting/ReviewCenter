@@ -15,7 +15,7 @@ function correctly.
 Entity Framework Core has no self-validation mode and is verified by the project's own tests, which run the real
 library against real SQLite database files in a private temporary folder; no in-memory substitute is used, because
 the behavior of the real provider is what is verified. Each scenario names a specific test method that depends on
-the library under verification. A passing pipeline run for all scenarios constitutes evidence that both
+the library under verification. A passing pipeline run for all scenarios constitutes evidence that all six
 requirements are satisfied.
 
 ### Test Scenarios
@@ -34,7 +34,7 @@ requirements are satisfied.
 
 **Expected**: Every byte array is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-EfCore-Mapping`.
+**Requirement coverage**: `ReviewCenter-OTS-EfCore-Mapping-BinaryColumns`.
 
 #### ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
 
@@ -42,7 +42,7 @@ requirements are satisfied.
 
 **Expected**: The composite key allows both and each is read back from its own project.
 
-**Requirement coverage**: `ReviewCenter-OTS-EfCore-Mapping`.
+**Requirement coverage**: `ReviewCenter-OTS-EfCore-Mapping-CompositeKeys`.
 
 #### DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
 
@@ -58,7 +58,7 @@ requirements are satisfied.
 
 **Expected**: The database refuses it with a unique-key error, which the store reports as a duplicate.
 
-**Requirement coverage**: `ReviewCenter-OTS-EfCore-Sqlite`.
+**Requirement coverage**: `ReviewCenter-OTS-EfCore-Sqlite-KeyUniqueness`.
 
 #### ReviewStore_AddReviewAsync_UnknownProject_IsNotStored
 
@@ -66,4 +66,4 @@ requirements are satisfied.
 
 **Expected**: The database refuses it because of the relationship to the project and nothing is stored.
 
-**Requirement coverage**: `ReviewCenter-OTS-EfCore-Sqlite`.
+**Requirement coverage**: `ReviewCenter-OTS-EfCore-Sqlite-Relationship`.

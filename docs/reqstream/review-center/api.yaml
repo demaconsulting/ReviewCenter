@@ -265,6 +265,8 @@ sections:
           - ReviewCenter-ApiDocument-Snapshot
           - ReviewCenter-ApiDocument-Snapshot-Committed
           - ReviewCenter-OTS-OpenApi-Document
+          - ReviewCenter-OTS-OpenApi-Document-SecurityScheme
+          - ReviewCenter-OTS-OpenApi-Document-Stable
         tests:
           - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
           - ApiDocument_Get_MatchesCommittedSnapshot

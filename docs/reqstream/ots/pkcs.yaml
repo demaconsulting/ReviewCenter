@@ -12,20 +12,61 @@ sections:
           - id: ReviewCenter-OTS-Pkcs-DetachedSignature
             title: >-
               System.Security.Cryptography.Pkcs shall create a detached CMS signature with the SHA-256 digest
-              algorithm over a given byte sequence with an RSA or an ECDSA private key, including a key whose
-              private part cannot be exported, shall embed the signer certificate and any given intermediate
-              certificates, and shall produce a signature that the library itself verifies against the signed bytes
-              and that no longer verifies when a byte of the signed content is changed.
+              algorithm over a given byte sequence with an RSA private key, so that the library itself verifies it
+              against the signed bytes.
             justification: |
-              The signature of the attestation PDF is a CMS signature over the byte ranges of the document, made with
-              a key that can be held in a certificate store, a smart card, or a hardware module and so must never be
-              exported. Passing tests that sign with RSA and ECDSA keys, with a key that cannot be exported, and with
-              a certificate chain, verify the result, and change the signed content confirm that the library gives
-              the Evidence subsystem exactly what a PDF reader needs.
+              The signature of the attestation PDF is a CMS signature over the byte ranges of the document. A passing
+              test that signs with an RSA key and verifies the result confirms that the library gives the Evidence
+              subsystem exactly what a PDF reader needs.
             tags: [ots]
             tests:
               - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Ecdsa
+            title: >-
+              System.Security.Cryptography.Pkcs shall create the detached CMS signature with an ECDSA private key, so
+              that the library itself verifies it against the signed bytes.
+            justification: |
+              Organizations may hold an ECDSA key instead of an RSA key. A passing test that signs with an ECDSA key and
+              verifies the result confirms that the library supports it.
+            tags: [ots]
+            tests:
               - AttestationSigner_Sign_EcdsaKey_ProducesVerifiableDetachedSignature
-              - AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey
+            title: >-
+              System.Security.Cryptography.Pkcs shall create the detached CMS signature with a private key whose
+              private part cannot be exported.
+            justification: |
+              A key that is held in a certificate store, a smart card, or a hardware module must never be exported. A
+              passing test confirms that the library signs through the key handle and that the signature verifies.
+            tags: [ots]
+            tests:
+              - windows@AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Chain
+            title: >-
+              System.Security.Cryptography.Pkcs shall embed the signer certificate in the CMS signature.
+            justification: |
+              A PDF reader identifies the signer from the certificate inside the signature. A passing test that signs
+              with a key and a certificate chain confirms that the signature holds the certificate of the signer.
+            tags: [ots]
+            tests:
               - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Chain-Intermediates
+            title: >-
+              System.Security.Cryptography.Pkcs shall embed any given intermediate certificates in the CMS signature.
+            justification: |
+              A PDF reader builds the chain of trust from the intermediate certificates inside the signature. A
+              passing test that signs with a key and a certificate chain confirms that the signature holds the
+              intermediate certificates.
+            tags: [ots]
+            tests:
+              - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Tamper
+            title: >-
+              System.Security.Cryptography.Pkcs shall report that the signature no longer verifies when a byte of the
+              signed content is changed.
+            justification: |
+              A signature that still verifies after a change would protect nothing. A passing test that changes a byte
+              of the signed content confirms that the library reports a mismatch.
+            tags: [ots]
+            tests:
               - AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies

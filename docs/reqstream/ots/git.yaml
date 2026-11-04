@@ -9,35 +9,126 @@ sections:
       - title: git Requirements
         requirements:
           - id: ReviewCenter-OTS-Git-Access
-            title: >-
-              git shall mirror a repository, resolve a revision to a commit, list the files of a commit and the
-              files that changed between two commits, and give the content of a file, when it is run as a child
-              process without a shell.
+            title: git shall mirror a repository into a bare repository folder.
             justification: |
               The ContentSources subsystem reads source code through the git program installed on the server, so
               that it behaves like the git the developers use and needs no git library. The service depends on git
-              to fetch into a bare mirror, to resolve branch, tag, and commit names, to compare commits (a rename
-              is reported as a deletion plus an addition, because renames are not detected), and to return the
-              exact bytes of a file. Passing tests that run the real program against
-              real repositories confirm that it does so. The program is not distributed with the service; the
+              to fetch the repository into a bare mirror. A passing test that runs the real program against a real
+              repository confirms that the mirror is created. The program is not distributed with the service; the
               operator installs it.
             tags: [ots]
             tests:
+              - GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository
+          - id: ReviewCenter-OTS-Git-Access-ChildProcess
+            title: git shall be started directly by the service, with its arguments as a list and no shell.
+            justification: |
+              The service starts git directly, so that no shell interprets the arguments and no argument can inject a
+              command. A passing test that builds the process description of a git call confirms that the shell is
+              not used, that the command line is empty, and that the arguments are given as a list.
+            tags: [ots]
+            tests:
+              - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+          - id: ReviewCenter-OTS-Git-Access-Output
+            title: git shall write its result to the standard output of the child process.
+            justification: |
+              The service reads the result of every git call from the output of the process. A passing test that runs
+              the real program with a call that succeeds confirms that the output is returned.
+            tags: [ots]
+            tests:
               - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-ExitCode
+            title: git shall end a call that fails with a nonzero exit code.
+            justification: |
+              The service decides that a git call failed from its exit code. A passing test that runs the real
+              program with a call that fails confirms that the exit code is nonzero.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-ErrorText
+            title: git shall write an error text to the error output of a call that fails.
+            justification: |
+              The service reports why a git call failed from the error text, which must not be empty. A passing test
+              that runs the real program with a call that fails confirms that an error text is returned.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-ResolveRevision
+            title: git shall resolve a branch, a tag, or a commit name to the identity of a commit.
+            justification: |
+              Users name the content to review by branch, tag, or commit. A passing test that runs the real program
+              confirms that each form resolves to the identity of the commit.
+            tags: [ots]
+            tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
-              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
+            title: git shall refuse a revision that is unknown or unsafe.
+            justification: |
+              A revision that does not exist, or that git could read as an option, must never select content. A
+              passing test that runs the real program confirms that an unknown and an unsafe revision are refused.
+            tags: [ots]
+            tests:
+              - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+          - id: ReviewCenter-OTS-Git-Access-ListFiles
+            title: git shall list the files of a commit.
+            justification: |
+              A review without an earlier revision covers every file of the commit. A passing test confirms that
+              git lists every file of a commit.
+            tags: [ots]
+            tests:
               - GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
+          - id: ReviewCenter-OTS-Git-Access-ListChanges
+            title: git shall list the files that changed between two commits.
+            justification: |
+              A review of a change covers the files that differ between a baseline and a head. A passing test that
+              runs the real program confirms the changes, with modified, added, and deleted files.
+            tags: [ots]
+            tests:
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ListChanges-Renames
+            title: git shall list a rename as one deleted file and one added file when rename detection is off.
+            justification: |
+              The service compares commits without rename detection, so that every change is one deletion or one
+              addition. A passing test that runs the real program with a renamed file confirms the two entries.
+            tags: [ots]
+            tests:
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ListChanges-EntryModes
+            title: git shall give the mode of every changed entry.
+            justification: |
+              The service reviews only the content of regular files, so it skips symbolic links and submodules by
+              their mode. A passing test with a symbolic link, a submodule, and a change of the file mode only
+              confirms that the service can tell them apart from the mode that git gives.
+            tags: [ots]
+            tests:
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ReadFile
+            title: git shall give the exact bytes of a file of a commit.
+            justification: |
+              The review shows and compares the exact content of a file, so binary content and carriage returns must
+              come back unchanged. A passing test confirms the bytes of a file that holds both.
+            tags: [ots]
+            tests:
               - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
           - id: ReviewCenter-OTS-Git-Credentials
             title: >-
-              git shall send credentials that it is given in its process environment as an HTTP header to an https
-              server, without storing them in the repository or its configuration.
+              git shall send credentials that it is given in its process environment as a Basic authorization header
+              to the server.
             justification: |
-              Tokens must reach the server without appearing in a command line, a URL, or the mirror on disk. The
-              service depends on git reading its configuration from the environment of the process, so a token
-              exists only for the lifetime of the git process. Passing tests confirm that a server receives the
-              header and that the mirror never holds the token.
+              Tokens must reach the server without appearing in a command line or a URL. The service depends on git
+              reading its configuration from the environment of the process, so a token exists only for the lifetime
+              of the git process. A passing test that runs the real program against a local HTTP server that
+              refuses the credentials confirms that the server receives the Basic authorization header.
             tags: [ots]
             tests:
               - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+          - id: ReviewCenter-OTS-Git-Credentials-NotStored
+            title: >-
+              git shall not write the credentials that it is given into the top-level files of the mirror, including
+              its configuration.
+            justification: |
+              A token that stays in the mirror on disk would outlive the git process. A passing test that mirrors a
+              local origin twice, by clone and by fetch, with credentials given confirms that no top-level file of
+              the mirror holds the token or its encoded form.
+            tags: [ots]
+            tests:
               - GitSource_Mirror_NeverStoresTheToken

@@ -30,7 +30,8 @@ produced by the CI pipeline.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Context_Create_VersionFlag_SetsVersionTrue
 
@@ -39,7 +40,8 @@ sets the Version property to true.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Context_Create_SilentFlag_SetsSilentTrue
 
@@ -48,7 +50,8 @@ sets the Silent property to true.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Context_Create_LogFlag_OpensLogFile
 
@@ -57,7 +60,8 @@ opens a log file.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Context_Create_UnknownArgument_ThrowsArgumentException
 
@@ -66,7 +70,8 @@ raises an exception.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### PathHelpers_SafePathCombine_ValidPaths_CombinesCorrectly
 
@@ -75,7 +80,8 @@ joins valid path segments.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Program_Run_WithVersionFlag_DisplaysVersionOnly
 
@@ -84,7 +90,8 @@ version information when invoked with the --version flag.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### Validation_Run_WithSilentContext_PrintsSummary
 
@@ -93,7 +100,8 @@ summary even when the context is configured for silent operation.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.
 
 #### SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
 
@@ -102,4 +110,5 @@ selector name and the prefixed selector forms are converted to Playwright select
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 
-**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
+**Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Execute-Discovery`,
+`ReviewCenter-OTS-xUnit-Report`.

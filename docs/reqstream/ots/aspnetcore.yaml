@@ -21,57 +21,150 @@ sections:
               - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
               - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
           - id: ReviewCenter-OTS-AspNetCore-Components
-            title: ASP.NET Core shall render Razor components and handle their interactive events.
+            title: ASP.NET Core shall render a routed Razor component to HTML.
             justification: |
               The ReviewCenter user interface is built from Razor components rendered by Blazor Server.
-              The service depends on the framework to render the routed page to HTML, to open the live
-              connection of a page, and to handle user events such as button clicks and form submissions over it.
-              Passing tests confirm components render and respond correctly, including in a real browser.
+              The service depends on the framework to render the routed page to HTML before the live
+              connection of the page opens. Passing tests confirm that components render correctly,
+              in memory and in a real server process.
             tags: [ots]
             tests:
               - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
               - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
               - WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
+          - id: ReviewCenter-OTS-AspNetCore-Components-Events
+            title: ASP.NET Core shall handle user events of a Razor component.
+            justification: |
+              The pages react to button clicks and form submissions, and the service depends on the framework to
+              deliver these events to the component. A passing component test confirms that a form submission
+              reaches the component in memory, and the real-browser test confirms that clicks and form
+              submissions reach it over the live connection of the page.
+            tags: [ots]
+            tests:
               - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
               - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
               - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - id: ReviewCenter-OTS-AspNetCore-Authentication
-            title: >-
-              ASP.NET Core shall provide cookie sign-in and sign-out with a redirect for requests without a signed-in
-              user, antiforgery protection of form posts, and a salted password hasher that accepts a right password
-              and rejects a wrong one.
+            title: ASP.NET Core shall issue a session cookie when a user signs in with the cookie authentication.
             justification: |
-              Signing in with a local account and a session cookie is built on the cookie authentication, the
-              authorization, the antiforgery, and the password hasher of the framework, which is part of the same
-              shared framework as the web platform. The service depends on them to issue a safe session cookie, to
-              send anonymous users to the login page, to refuse forged form posts, and to store passwords only as
-              hashes. Passing tests of the sign-in code confirm that the framework does so.
+              Signing in with a local account is built on the cookie authentication of the framework, which is part
+              of the same shared framework as the web platform. The service depends on it to issue a safe session
+              cookie. A passing test of the sign-in code confirms that the framework does so.
             tags: [ots]
             tests:
               - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+          - id: ReviewCenter-OTS-AspNetCore-Authentication-SignOut
+            title: ASP.NET Core shall end the session of a user when the user signs out with the cookie authentication.
+            justification: |
+              A user who signs out must not keep access to the protected pages. The service depends on the cookie
+              authentication of the framework to remove the session. A passing test confirms that a signed-out user
+              is sent away from a protected page.
+            tags: [ots]
+            tests:
+              - SignIn_Logout_SignedInUser_EndsTheSession
+          - id: ReviewCenter-OTS-AspNetCore-Authentication-Redirect
+            title: >-
+              ASP.NET Core shall redirect a request for a protected page without a signed-in user to the login page.
+            justification: |
+              Anonymous users must reach the protected pages only after they signed in. The service depends on the
+              authorization of the framework to refuse the request and to send the user to the login page. A passing
+              test confirms the redirect for each protected page.
+            tags: [ots]
+            tests:
               - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
+          - id: ReviewCenter-OTS-AspNetCore-Authentication-Antiforgery
+            title: ASP.NET Core shall refuse a form post that carries no antiforgery token.
+            justification: |
+              A forged form post from another site must not sign anybody in or out. The service depends on the
+              antiforgery protection of the framework to refuse such a post. A passing test confirms that the post is
+              refused and that nobody is signed in.
+            tags: [ots]
+            tests:
               - SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
+          - id: ReviewCenter-OTS-AspNetCore-Authentication-PasswordAccept
+            title: The password hasher of ASP.NET Core shall accept the right password against its hash.
+            justification: |
+              Passwords are stored only as hashes, so the sign-in works only when the hasher of the framework accepts
+              the right password. A passing test confirms that the right password verifies.
+            tags: [ots]
+            tests:
+              - PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds
+          - id: ReviewCenter-OTS-AspNetCore-Authentication-PasswordReject
+            title: The password hasher of ASP.NET Core shall reject a wrong password against a hash.
+            justification: |
+              A wrong password must never sign a user in. A passing test confirms that a password that differs from
+              the hashed one does not verify.
+            tags: [ots]
+            tests:
               - PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds
           - id: ReviewCenter-OTS-AspNetCore-DataProtection
-            title: >-
-              ASP.NET Core shall encrypt and decrypt text with keys kept in a key ring in a folder, so that text
-              protected with a purpose can be read again after a restart with the same key ring, and cannot be read
-              with another purpose or another key ring, and shall encrypt the key files of the ring with a
-              certificate or, on Windows, with DPAPI, so that a key file holds an encrypted secret and not the key.
+            title: ASP.NET Core shall encrypt text and decrypt the encrypted text back to the original text.
             justification: |
               The access tokens of git repositories are stored only encrypted. The service depends on the Data
               Protection of the framework, which is part of the same shared framework as the web platform, to encrypt
-              them, to keep its keys in a folder that survives restarts, and to keep text protected for one purpose
-              unreadable for another. The service also depends on the key encryptors of the framework to protect the
-              key files at rest: the certificate encryptor with a certificate that the operator supplies, and the
-              DPAPI encryptor on Windows. Passing tests of the credential code and of the key ring confirm that the
-              framework does so; the DPAPI test runs only on Windows, where DPAPI exists.
+              them. A passing test of the credential code confirms that a token reads back unchanged and that the
+              protected text does not contain the token.
             tags: [ots]
             tests:
               - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-KeyRing
+            title: >-
+              ASP.NET Core shall keep its keys in a key ring in a folder, so that protected text can be read again after
+              a restart with the same key ring.
+            justification: |
+              The stored tokens must stay readable after the service restarts, so the keys must survive in a folder. A
+              passing test confirms that a new protector over the same folder reads text that an earlier one
+              protected.
+            tags: [ots]
+            tests:
               - CredentialProtector_PersistedKeyRing_SurvivesRestart
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-OtherKeyRing
+            title: ASP.NET Core shall refuse to decrypt text that was protected with another key ring.
+            justification: |
+              A copy of the database is useless without the key ring that protected it. A passing test confirms that
+              text protected under one key ring cannot be read under another.
+            tags: [ots]
+            tests:
               - CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-Purpose
+            title: ASP.NET Core shall refuse to decrypt text that was protected for another purpose.
+            justification: |
+              Text protected for one use must not be readable by another use of the same key ring. A passing test
+              confirms that text protected for the token purpose cannot be unprotected with another purpose.
+            tags: [ots]
+            tests:
               - CredentialProtector_Purpose_IsolatesTokensFromOtherUses
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-Certificate
+            title: >-
+              ASP.NET Core shall encrypt the key files of the key ring with a certificate, so that a key file holds an
+              encrypted secret and not the key.
+            justification: |
+              The key files are protected at rest with a certificate that the operator supplies, through the
+              certificate encryptor of the framework. Passing tests confirm that the key file holds an encrypted
+              secret and not the key, and that a restart reads the ring again.
+            tags: [ots]
+            tests:
               - KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
               - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous
+            title: >-
+              ASP.NET Core shall decrypt the key files of the key ring with a previous certificate when the current
+              certificate did not encrypt them.
+            justification: |
+              The operator replaces the certificate from time to time, and the ring that the earlier certificate
+              protected must stay readable. A passing test confirms that a second certificate that lists the first as
+              a previous certificate reads the ring.
+            tags: [ots]
+            tests:
+              - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi
+            title: >-
+              ASP.NET Core shall encrypt the key files of the key ring with DPAPI on Windows, so that a key file holds
+              an encrypted secret and not the key.
+            justification: |
+              On Windows the key files can be protected at rest with the DPAPI encryptor of the framework. The test
+              runs only on Windows, where DPAPI exists, and confirms that the key file is encrypted and that a restart
+              reads the ring again.
+            tags: [ots]
+            tests:
               - windows@KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt

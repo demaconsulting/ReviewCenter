@@ -14,7 +14,7 @@ tests confirm both libraries are functioning correctly.
 
 bUnit and the test host are verified by the project's own test suite; neither has a self-validation mode. Each
 scenario names a specific test method that depends on the library under verification. A passing pipeline run for all
-scenarios constitutes evidence that both requirements are satisfied.
+scenarios constitutes evidence that all four requirements are satisfied.
 
 ### Test Scenarios
 
@@ -34,7 +34,7 @@ form.
 **Expected**: The form submission is processed, the project is created, and the navigation manager of the test
 context is sent to the project page.
 
-**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
+**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component-FormSubmission`.
 
 #### NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
 
@@ -42,7 +42,7 @@ context is sent to the project page.
 
 **Expected**: The file selection is processed and the rendered markup lists the names and sizes of the files.
 
-**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
+**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component-FileSelection`.
 
 #### NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
 
@@ -51,7 +51,7 @@ context is sent to the project page.
 **Expected**: The submission is processed and the navigation manager of the test context is sent to the review
 page.
 
-**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
+**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component-FormSubmission`.
 
 #### ServerHost_CreateApplication_HealthRoute_Returns200Healthy
 

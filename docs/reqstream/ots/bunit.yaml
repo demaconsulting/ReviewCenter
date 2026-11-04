@@ -9,20 +9,32 @@ sections:
       - title: bUnit Requirements
         requirements:
           - id: ReviewCenter-OTS-bUnit-Component
-            title: >-
-              bUnit shall render Razor components in a test context and simulate user interaction, including
-              form submission and file selection.
+            title: bUnit shall render a Razor component in a test context.
             justification: |
               bUnit is the component testing library used to verify the Razor components of the
-              ReviewCenter web interface without a browser. Passing tests that render components,
-              click buttons, submit forms, select files, and assert on the resulting markup confirm the library
-              functions correctly.
+              ReviewCenter web interface without a browser. A passing test that renders the router
+              and asserts on the resulting component confirms that the library renders components.
             tags: [ots]
             tests:
               - Routes_Render_RootUrl_RendersHomePage
+          - id: ReviewCenter-OTS-bUnit-Component-FormSubmission
+            title: bUnit shall simulate the submission of a form of a rendered Razor component.
+            justification: |
+              The forms of the web interface are verified without a browser, so the library must enter values in
+              the inputs and submit the form. Passing tests confirm that the submission is processed and that the
+              navigation manager of the test context is sent to the next page.
+            tags: [ots]
+            tests:
               - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
-              - NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
               - NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+          - id: ReviewCenter-OTS-bUnit-Component-FileSelection
+            title: bUnit shall simulate the selection of files in a file input of a rendered Razor component.
+            justification: |
+              The review pages accept files, and a file input cannot be filled in as a text input is. A passing test
+              confirms that the library selects files and that the rendered markup lists their names and sizes.
+            tags: [ots]
+            tests:
+              - NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
           - id: ReviewCenter-OTS-bUnit-TestHost
             title: The ASP.NET Core test host shall serve the application in memory for request tests.
             justification: |

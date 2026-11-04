@@ -17,7 +17,7 @@ ASP.NET Core is verified by integration evidence from the project's own test sui
 self-validation mode. Each scenario names a specific test method. Some scenarios run the application in memory
 through the test host, some render a component, the system-level scenarios start a real server process with the
 `serve` verb and call it over HTTP, which exercises Kestrel, and one scenario drives the live Blazor connection from a
-real browser. A passing pipeline run for all scenarios constitutes evidence that all four requirements are
+real browser. A passing pipeline run for all scenarios constitutes evidence that all sixteen requirements are
 satisfied.
 
 ### Test Scenarios
@@ -72,7 +72,7 @@ the page first and opens the live connection afterwards.
 
 **Expected**: The component model handles the event, the project is created, and the browser is sent to the project.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components-Events`.
 
 #### PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
@@ -83,7 +83,7 @@ and submits it. The test runs on Windows and Linux in CI.
 **Expected**: The click and the form submission are handled by the live Blazor connection, so the project page
 appears, which proves the round trip between the browser and the component model.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components-Events`.
 
 #### SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
 
@@ -94,6 +94,16 @@ appears, which proves the round trip between the browser and the component model
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication`.
 
+#### SignIn_Logout_SignedInUser_EndsTheSession
+
+**Scenario**: A signed-in user of the in-memory test host requests the projects page, posts to the logout endpoint,
+and requests the projects page again.
+
+**Expected**: The logout redirects to the home page, and the page is then protected again, so the session of the
+cookie authentication of the framework has ended.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication-SignOut`.
+
 #### SignIn_ProtectedPage_Anonymous_RedirectsToLogin
 
 **Scenario**: Each protected page is requested by an anonymous client of the in-memory test host.
@@ -101,7 +111,7 @@ appears, which proves the round trip between the browser and the component model
 **Expected**: The authorization of the framework refuses the request and redirects it to the login page with the
 requested address as the return URL.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication-Redirect`.
 
 #### SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
 
@@ -109,7 +119,7 @@ requested address as the return URL.
 
 **Expected**: The antiforgery protection of the framework answers status 400 and issues no cookie.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication-Antiforgery`.
 
 #### PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds
 
@@ -118,7 +128,8 @@ right and a wrong password.
 
 **Expected**: Only the right password is accepted.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication-PasswordAccept`,
+`ReviewCenter-OTS-AspNetCore-Authentication-PasswordReject`.
 
 #### CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
 
@@ -135,7 +146,7 @@ after a restart, unprotects it.
 
 **Expected**: The token is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-KeyRing`.
 
 #### CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable
 
@@ -143,7 +154,7 @@ after a restart, unprotects it.
 
 **Expected**: The framework cannot decrypt it, and it is reported as unreadable without the text in the message.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-OtherKeyRing`.
 
 #### CredentialProtector_Purpose_IsolatesTokensFromOtherUses
 
@@ -151,7 +162,7 @@ after a restart, unprotects it.
 
 **Expected**: The framework cannot decrypt it.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Purpose`.
 
 #### KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
 
@@ -161,7 +172,7 @@ restart, unprotects it.
 
 **Expected**: The key file holds an encrypted secret and not the key, and the value is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Certificate`.
 
 #### KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
 
@@ -170,7 +181,8 @@ a previous certificate.
 
 **Expected**: The framework decrypts the key file with the previous certificate and the value is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Certificate`,
+`ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous`.
 
 #### KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt
 
@@ -179,4 +191,4 @@ DPAPI encryptor of the framework, a value is protected, and a new provider over 
 
 **Expected**: The key file holds an encrypted secret and not the key, and the value is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi`.
