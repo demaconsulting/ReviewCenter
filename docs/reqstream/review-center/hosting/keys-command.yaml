@@ -142,7 +142,8 @@ sections:
           The KeysCommand class shall not write a secret value, plain or protected, in the error that it reports when
           writing a table fails.
         justification: |
-          The output is kept in terminals and job logs, which must not hold what the key ring protects.
+          The failure message is printed after a partial run, when plain and protected values are in memory; it must not
+          leak them to the terminal or the job log.
         tests:
           - KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable
 
@@ -188,7 +189,7 @@ sections:
           The KeysCommand class shall not write a secret value, plain or protected, in the refusal that it reports
           when a secret cannot be read.
         justification: |
-          The output is kept in terminals and job logs, which must not hold what the key ring protects.
+          The refusal names the unreadable rows, and an operator pastes it into tickets; it must not repeat the values.
         tests:
           - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
 
@@ -249,7 +250,7 @@ sections:
         title: >-
           The KeysCommand class shall throw an ArgumentNullException when it is run without a context.
         justification: |
-          A missing context is a programming error that must fail at once, not later with an unrelated exception.
+          The keys verb must fail at once on a missing context, before it opens the database or creates a key.
         tests:
           - KeysCommand_Run_NullContext_ThrowsArgumentNullException
 
@@ -294,9 +295,18 @@ sections:
       - id: ReviewCenter-KeysCommand-Report-PayloadHeaders
         title: >-
           The KeysCommand class shall read the key identifier of a stored secret from the header of its protected
-          payload, and shall read no key identifier from text that is not a protected payload.
+          payload.
         justification: |
-          The report of the referenced keys depends on it, and a value that is no payload must not be counted as one.
+          The report of the referenced keys depends on it.
+        tests:
+          - KeysCommand_ReadKeyId_Payload_GivesKeyIdOrNull
+
+      - id: ReviewCenter-KeysCommand-Report-PayloadHeaders-NotPayload
+        title: >-
+          The KeysCommand class shall read no key identifier from text that is not a protected payload.
+        justification: |
+          A value that is no payload (empty, null, not encoded, too short) must not be counted as a secret that the new
+          key protects, which would hide a secret that cannot be read.
         tests:
           - KeysCommand_ReadKeyId_Payload_GivesKeyIdOrNull
 
@@ -312,6 +322,6 @@ sections:
         title: >-
           The KeysCommand class shall not write a secret value, plain or protected, in its report.
         justification: |
-          The output is kept in terminals and job logs, which must not hold what the key ring protects.
+          The success report is kept in job logs for years; it may hold counts only.
         tests:
           - KeysCommand_Run_Report_HoldsNoSecretValue

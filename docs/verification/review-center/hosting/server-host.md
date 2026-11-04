@@ -254,7 +254,8 @@ is started with `DataProtection:RequireEncryptedKeys` true; the build fails with
 This scenario is tested by `ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError`.
 
 **ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing**: A new database without secrets and an empty
-key folder are started; the build succeeds and the ring now holds a key. This scenario is tested by
+key folder are started; the build succeeds, the ring now holds exactly one key, and the log holds no error entry and no
+mention of `AllowNewKeyRing`. This scenario is tested by
 `ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing`.
 
 **ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey**: A database holds a repository token and a
@@ -284,7 +285,8 @@ with the same single key and logs a warning that the database could not be read.
 `ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning`.
 
 **ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint**: A server is started, its secrets are
-stored, and a second start over the same database and ring succeeds without a warning or an error about the secrets.
+stored, and a second start over the same database and ring succeeds without a warning or an error about the secrets,
+and the key folder still holds exactly one key file.
 This scenario is tested by `ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint`.
 
 **ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts**: The database holds secrets that another
@@ -402,7 +404,8 @@ twice, and each pair is the same instance. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons`.
 
 **ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse**: The audit store is replaced by one whose
-append always fails, and `TryRecordAsync` of the audit service is called; it returns false and a warning that says "An
+append always fails, and `TryRecordAsync` of the audit service is called; it throws nothing and returns false, and a
+warning that says "An
 audit entry could not be recorded" is logged by the `ServerHost` category. This scenario is tested by
 `ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse`.
 

@@ -280,7 +280,8 @@ sections:
         title: >-
           The GitSource class shall report a cache path that is malformed or too long as git unavailable.
         justification: |
-          An unhandled exception would fail the page instead of telling the administrator what to fix.
+          A reader of the source must get the same clear "git unavailable" for a bad cache path, not an exception that
+          is thrown while the mirror folder is chosen.
         tests:
           - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable
 
@@ -289,7 +290,8 @@ sections:
           The GitSource class shall name the Git:CachePath setting, and neither the path nor the exception of the file
           system, in the error for a cache folder that cannot be used.
         justification: |
-          The path of the cache folder must not reach ordinary users.
+          The source creates the mirror folders in the cache, so a failure there reaches the user through its own
+          error and must not show the path or the exception of the file system either.
         tests:
           - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
           - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable

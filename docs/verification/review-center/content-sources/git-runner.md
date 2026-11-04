@@ -119,7 +119,8 @@ exit code and error text. This scenario is tested by `GitRunner_RunAsync_RealGit
 `GitAccessFailed`. This scenario is tested by `GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed`.
 
 **GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit**: A call to a server that never answers is
-stopped at the time limit with `GitTimeout`, and git is no longer running. This scenario is tested by
+stopped at the time limit of one second with `GitTimeout`, and the call returns in less than 30 seconds. This scenario
+is tested by
 `GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit`.
 
 **GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret**: Git sends the token as a basic authorization

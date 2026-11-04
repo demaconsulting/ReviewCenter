@@ -153,6 +153,7 @@ sections:
           - ReviewCenter-UserCommand-Errors-PasswordNotPrinted
           - ReviewCenter-UserCommand-Errors-NothingCreated
           - ReviewCenter-UserCommand-Errors-InvalidUserName
+          - ReviewCenter-UserCommand-Errors-InvalidUserName-NoUser
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
@@ -231,6 +232,7 @@ sections:
           - ReviewCenter-AuditCommand-Errors-Arguments
           - ReviewCenter-ServerHost-AuditServices
           - ReviewCenter-ServerHost-AuditServices-FailureWarning
+          - ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
@@ -277,6 +279,7 @@ sections:
           - ReviewCenter-KeysCommand-Report-ReferencedKeys
           - ReviewCenter-KeysCommand-Report-UnreferencedKeys
           - ReviewCenter-KeysCommand-Report-PayloadHeaders
+          - ReviewCenter-KeysCommand-Report-PayloadHeaders-NotPayload
           - ReviewCenter-KeysCommand-Report-NextSteps
           - ReviewCenter-KeysCommand-Report-NoSecret
         tests:
@@ -370,7 +373,9 @@ sections:
           - ReviewCenter-KeyRingProtection-Certificate-Log
           - ReviewCenter-KeyRingProtection-PermissionsOnly
           - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles-StillReadable
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
           - ReviewCenter-KeyRingProtection-PermissionsOnly-UnixFolder
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsInherit
@@ -393,6 +398,7 @@ sections:
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-KeyFileCounts
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder-NothingCreated
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-ReadOnly
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-Unreadable
           - ReviewCenter-KeyRingProtection-Validation
@@ -412,6 +418,7 @@ sections:
           - ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
           - ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
           - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
           - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
@@ -477,7 +484,9 @@ sections:
           - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadable
           - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadableStarts
           - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation
+          - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation-NoError
           - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet
+          - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet-NoSecondKey
           - ReviewCenter-ServerHost-LostKeyRing-UnreadableDatabase
           - ReviewCenter-ServerHost-LostKeyRing-UnreadableSanitized
           - ReviewCenter-ServerHost-LostKeyRing-UnreadableNoKey
@@ -547,6 +556,7 @@ sections:
         children:
           - ReviewCenter-ServerHost-ApiRegistration
           - ReviewCenter-ServerHost-ApiRegistration-Routes
+          - ReviewCenter-ServerHost-ApiRegistration-Routes-Unauthorized
           - ReviewCenter-ServerHost-ApiRegistration-OpenApi
           - ReviewCenter-ServerHost-ApiRegistration-UnknownAddress
         tests:

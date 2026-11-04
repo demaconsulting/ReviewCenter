@@ -5,12 +5,12 @@
 `AuditCommand` is verified with unit tests defined in `AuditCommandTests.cs`. The tests run the real command, which
 builds the same services as the server through `ServerHost.AddServices`, over a temporary SQLite database selected
 through the `configure` hook (created by the test before the command runs, because the command never creates one),
-with a real `Context` created from the `audit verify` arguments. The trail is written
-through the real stores, and for the broken cases a row is edited or deleted over a second database connection. Everything
-the command writes is read back from the log file of the context, and the exit code from the context. The dispatch
-from `Program` to the command and the run of the verb in a separate process are not covered by this unit: the system-level
-test `ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne` of `ReviewCenter`
-starts `reviewcenter audit verify` and covers them. The flag handling of the verb is verified by the `Context` unit.
+with a real `Context` created from the `audit verify` arguments. The trail is written through the real stores, and for
+the broken cases a row is edited or deleted over a second database connection. Everything the command writes is read
+back from the log file of the context, and the exit code from the context. The dispatch from `Program` to the command
+and the run of the verb in a separate process are not covered by this unit: the system-level test
+`ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne` of `ReviewCenter` starts
+`reviewcenter audit verify` and covers them. The flag handling of the verb is verified by the `Context` unit.
 
 #### Test Environment
 

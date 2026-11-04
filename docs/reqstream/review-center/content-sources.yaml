@@ -282,11 +282,19 @@ sections:
 
       - id: ReviewCenter-ContentSources-ReviewSets-Ancestry
         title: >-
-          The ContentSources subsystem shall tell that a commit is in the history of a later commit and that the later
-          commit is not in the history of the earlier one.
+          The ContentSources subsystem shall tell that a commit is in the history of a later commit.
         justification: |
           The head of an earlier review may serve as the baseline of a new one only when it is in the history of the
-          new head, so the answer must be right in both directions.
+          new head.
+        tests:
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+
+      - id: ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
+        title: >-
+          The ContentSources subsystem shall tell that a later commit is not in the history of an earlier commit.
+        justification: |
+          A baseline from another line of history would give a wrong list of changes, so the negative answer has to be
+          right as well.
         tests:
           - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
 

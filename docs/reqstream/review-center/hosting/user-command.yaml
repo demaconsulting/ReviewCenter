@@ -76,7 +76,7 @@ sections:
         title: >-
           The UserCommand class shall throw an ArgumentNullException when it is run without a context.
         justification: |
-          A missing context is a programming error that must fail at once, not later with an unrelated exception.
+          The user verb must fail at once on a missing context, before it reads a password or writes to the database.
         tests:
           - UserCommand_Run_NullContext_ThrowsArgumentNullException
 
@@ -153,7 +153,15 @@ sections:
       - id: ReviewCenter-UserCommand-Errors-InvalidUserName
         title: >-
           The UserCommand class shall report an error and return exit code 1 when the user name breaks the user name
-          rules, and shall create no user.
+          rules.
+        justification: |
+          The operator must learn at once that the name was refused, and a script must see the failure in the exit code.
+        tests:
+          - UserCommand_Run_InvalidUserName_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UserCommand-Errors-InvalidUserName-NoUser
+        title: >-
+          The UserCommand class shall create no user when the user name breaks the user name rules.
         justification: |
           A user name that the rules refuse must not get into the database by way of the command line.
         tests:

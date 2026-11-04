@@ -99,7 +99,7 @@ sections:
         title: >-
           The ReviewSetParser class shall refuse a review-set whose identifier is longer than 100 characters.
         justification: |
-          The length bounds the text that the server stores and shows.
+          The identifier is stored, used in file names and shown in lists, so its length is bounded.
         tests:
           - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
 
@@ -107,7 +107,8 @@ sections:
         title: >-
           The ReviewSetParser class shall refuse a review-set whose title is longer than 200 characters.
         justification: |
-          The length bounds the text that the server stores and shows.
+          The title is shown in headings and mail, where an unbounded text would break the layout and bloat the stored
+          data.
         tests:
           - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
 
@@ -115,7 +116,7 @@ sections:
         title: >-
           The ReviewSetParser class shall refuse a review-set whose identifier contains a control character.
         justification: |
-          A control character could forge lines in logs and messages.
+          A control character in an identifier could forge lines in logs and in the keys of stored data.
         tests:
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
 
@@ -123,7 +124,7 @@ sections:
         title: >-
           The ReviewSetParser class shall refuse a review-set whose title contains a control character.
         justification: |
-          A control character could forge lines in logs and messages.
+          A control character in a title could forge lines in messages and pages that show the title.
         tests:
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
 
@@ -179,7 +180,8 @@ sections:
           The ReviewSetParser class shall refuse a review-set without an identifier with a message that names its
           position.
         justification: |
-          A position tells the user which entry to correct.
+          Without an identifier the entry cannot be referred to by later reviews; the position tells the user which
+          entry lacks it.
         tests:
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
 
@@ -187,7 +189,7 @@ sections:
         title: >-
           The ReviewSetParser class shall refuse a review-set without a title with a message that names its position.
         justification: |
-          A position tells the user which entry to correct.
+          Without a title the entry cannot be shown in lists; the position tells the user which entry lacks it.
         tests:
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
 

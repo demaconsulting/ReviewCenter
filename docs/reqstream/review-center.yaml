@@ -128,6 +128,7 @@ sections:
           - ReviewCenter-ContentSources-ReviewSets
           - ReviewCenter-ContentSources-ReviewSets-Read
           - ReviewCenter-ContentSources-ReviewSets-Ancestry
+          - ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
           - ReviewCenter-Hosting-PlannerServices
           - ReviewCenter-Web-PlanReviews
           - ReviewCenter-Web-PlanReviews-Summary

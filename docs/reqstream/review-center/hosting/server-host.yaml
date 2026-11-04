@@ -154,7 +154,7 @@ sections:
           The ServerHost class shall build the application with the default sign-in throttle settings and with valid
           explicit throttle settings.
         justification: |
-          Valid settings must not stop the start.
+          The defaults and the largest allowed window have to work, or an administrator cannot keep the throttle at all.
         tests:
           - ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication
 
@@ -297,11 +297,17 @@ sections:
 
       - id: ReviewCenter-ServerHost-AuditServices-FailureWarning
         title: >-
-          The ServerHost class shall write a warning to the log, and not fail the caller, when an audit entry cannot
-          be stored.
+          The ServerHost class shall write a warning to the log when an audit entry cannot be stored.
         justification: |
-          The operator must learn from the log when the trail could not be written, while the user whose action
-          triggered the entry is not disturbed.
+          The operator must learn from the log when the trail could not be written.
+        tests:
+          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
+
+      - id: ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
+        title: >-
+          The ServerHost class shall not fail the caller when an audit entry cannot be stored.
+        justification: |
+          The user whose action triggered the entry must not be disturbed by a failure of the trail.
         tests:
           - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
 
@@ -484,7 +490,8 @@ sections:
           The ServerHost class shall not show the certificate password or the password that was tried in the error
           that stops the start because the certificate cannot be opened.
         justification: |
-          A start-up error reaches logs and terminals, and a password that is written there is leaked.
+          The error names the certificate file and is read by the administrator who fixes it, so it must not repeat the
+          password that opened the certificate or the one that failed.
         tests:
           - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
 
@@ -519,11 +526,21 @@ sections:
 
       - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
         title: >-
-          The ServerHost class shall start with the key folder owner-only (mode 0700) and the key files readable and
-          writable by the owner only (mode 0600) on Linux and macOS when the key ring is protected by permissions only.
+          The ServerHost class shall start with the key folder owner-only (mode 0700) on Linux and macOS when the key
+          ring is protected by permissions only.
         justification: |
-          Without encryption the access rights of the folder and of the files are all that protect the keys, so they
-          must admit the account of the server only.
+          Without encryption the access rights of the folder are all that protect the keys, so they must admit the
+          account of the server only.
+        tests:
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+
+      - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
+        title: >-
+          The ServerHost class shall start with every key file readable and writable by the owner only (mode 0600) on
+          Linux and macOS when the key ring is protected by permissions only.
+        justification: |
+          Without encryption the access rights of the files are what protect each key, so a file that others can read
+          would give the key away.
         tests:
           - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
 
@@ -607,20 +624,36 @@ sections:
 
       - id: ReviewCenter-ServerHost-LostKeyRing-FreshInstallation
         title: >-
-          The ServerHost class shall start with a new key ring, without an error entry, when the key folder and the
-          database hold no protected secrets.
+          The ServerHost class shall start with a new key ring when the key folder and the database hold no protected
+          secrets.
         justification: |
-          A new installation must work without configuration and without a warning that would train operators to
-          ignore warnings.
+          A new installation must work without configuration.
+        tests:
+          - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-FreshInstallation-NoError
+        title: >-
+          The ServerHost class shall write no error entry to the log when it starts with a new key ring because the key
+          folder and the database hold no protected secrets.
+        justification: |
+          A new installation must not show a warning that would train operators to ignore warnings.
         tests:
           - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing
 
       - id: ReviewCenter-ServerHost-LostKeyRing-RestartQuiet
         title: >-
-          The ServerHost class shall start without complaint and without a second key when the key folder holds the key
-          ring of the database.
+          The ServerHost class shall start without complaint when the key folder holds the key ring of the database.
         justification: |
           A normal restart must be silent, or the real problem is lost among false alarms.
+        tests:
+          - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
+
+      - id: ReviewCenter-ServerHost-LostKeyRing-RestartQuiet-NoSecondKey
+        title: >-
+          The ServerHost class shall create no second key when it starts with the key folder that holds the key ring of
+          the database.
+        justification: |
+          A second key at every restart would grow the ring without reason and outdate the protected secrets.
         tests:
           - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
 
@@ -839,11 +872,17 @@ sections:
 
       - id: ReviewCenter-ServerHost-ApiRegistration-Routes
         title: >-
-          The ServerHost class shall map the API routes under /api and answer a request without a token with status
-          401.
+          The ServerHost class shall map the API routes under /api.
         justification: |
-          The API can only be used when the server connects its routes to the pipeline, and it must be closed to a
-          caller who has no token.
+          The API can only be used when the server connects its routes to the pipeline.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-ApiRegistration-Routes-Unauthorized
+        title: >-
+          The ServerHost class shall answer a request without a token to a protected API route with status 401.
+        justification: |
+          The API must be closed to a caller who has no token.
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
 
@@ -898,7 +937,8 @@ sections:
         title: >-
           The ServerHost class shall not check the OpenID Connect settings while sign-in with a provider is turned off.
         justification: |
-          A server that does not use the feature must start as it did before, whatever the unused settings say.
+          A server that does not use sign-in with a provider must start as it did before, whatever the unused OpenID
+          Connect settings say.
         tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
 
@@ -907,7 +947,8 @@ sections:
           The ServerHost class shall build the application when the OpenID Connect settings are valid, with https or
           with http on a loopback host.
         justification: |
-          Valid settings must not stop the start.
+          The settings that an identity provider needs (https, or http on a loopback host for development) must not be
+          refused by their own validation.
         tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
 

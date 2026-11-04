@@ -120,6 +120,6 @@ sections:
         title: >-
           The AuditCommand class shall throw an ArgumentNullException when it is run without a context.
         justification: |
-          A missing context is a programming error that must fail at once, not later with an unrelated exception.
+          The audit verb is started by Program; a missing context there is a programming error and must fail at once.
         tests:
           - AuditCommand_Run_NullContext_ThrowsArgumentNullException

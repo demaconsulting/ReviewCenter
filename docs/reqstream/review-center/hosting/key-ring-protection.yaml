@@ -285,7 +285,7 @@ sections:
       - id: ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles
         title: >-
           The KeyRingProtection class shall restrict a key file that Data Protection stores while the server runs to
-          its owner (mode 0600) on Linux and macOS as it is stored, and shall still return what was stored.
+          its owner (mode 0600) on Linux and macOS as it is stored.
         justification: |
           The ring rolls to a new key from time to time, and a file that was restricted only at the next start would be
           exposed until then.
@@ -293,12 +293,30 @@ sections:
           - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile
           - ubuntu@KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly
 
+      - id: ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles-StillReadable
+        title: >-
+          The KeyRingProtection class shall return what was stored through the repository that restricts the key file.
+        justification: |
+          Restricting the file must not break the ring; a key that is stored but cannot be read back would lock the
+          server out at the next start.
+        tests:
+          - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile
+
       - id: ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles
         title: >-
-          The KeyRingProtection class shall leave the mode of a key file that it stores on Windows unchanged and shall
-          still return what was stored.
+          The KeyRingProtection class shall leave the mode of a key file that it stores on Windows unchanged.
         justification: |
           Windows has no such mode; the access rules of the folder apply there.
+        tests:
+          - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes
+
+      - id: ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
+        title: >-
+          The KeyRingProtection class shall still store the key file and return what was stored when it runs on
+          Windows.
+        justification: |
+          On Windows the decorator must act as a plain pass-through; a mode that is skipped by mistake must not skip
+          the storage.
         tests:
           - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes
 
@@ -513,8 +531,16 @@ sections:
 
       - id: ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder
         title: >-
-          The KeyRingProtection class shall describe a key folder that does not exist as a key ring with no key files,
-          and shall not create the folder.
+          The KeyRingProtection class shall describe a key folder that does not exist as a key ring with no key files.
+        justification: |
+          The count of a missing folder is zero, so that a new installation reads as a ring that is empty.
+        tests:
+          - KeyRingProtection_InspectKeyFiles_MixedFolder_CountsByKindAndChangesNothing
+
+      - id: ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder-NothingCreated
+        title: >-
+          The KeyRingProtection class shall not create the key folder when it describes a key folder that does not
+          exist.
         justification: |
           A new installation has no key folder, and describing it must leave no trace.
         tests:

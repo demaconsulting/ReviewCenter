@@ -216,10 +216,11 @@ sections:
 
       - id: ReviewCenter-GitRunner-Timeout-Ends
         title: >-
-          The GitRunner class shall end a git call that never answers shortly after the configured time limit.
+          The GitRunner class shall return from a git call that never answers within 30 seconds when the configured time
+          limit is one second.
         justification: |
-          Git is stopped together with every process it started, and a helper that survived would keep the output
-          pipes open and the call would not return.
+          A run that does not return would hold the page and the lock on the repository for ever, even after the limit
+          has passed.
         tests:
           - GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit
 
@@ -312,7 +313,7 @@ sections:
           The GitRunner class shall not show any part of the local path of a repository in the message of a failed
           call.
         justification: |
-          The location of a repository is information for administrators only.
+          A local path shows the layout of the disk of the server, which only an administrator may see.
         tests:
           - GitRunner_FailureFor_NeverContainsLocation
           - GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath
@@ -322,7 +323,8 @@ sections:
           The GitRunner class shall not show any part of the web address or the host name of a repository in the
           message of a failed call.
         justification: |
-          The location of a repository is information for administrators only.
+          A web address or a host name can name an internal server or carry a project name, which only an
+          administrator may see.
         tests:
           - GitRunner_FailureFor_NeverContainsLocation
           - GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress
@@ -340,7 +342,8 @@ sections:
         title: >-
           The GitRunner class shall report a cache path that is malformed or too long as git unavailable.
         justification: |
-          An unhandled exception would fail the page instead of telling the administrator what to fix.
+          An exception from a malformed or too long cache path would fail the page of the call; the runner must report
+          git as unavailable instead.
         tests:
           - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable
 
@@ -349,7 +352,8 @@ sections:
           The GitRunner class shall name the Git:CachePath setting, and neither the path nor the exception of the file
           system, in the error for a cache folder that cannot be used.
         justification: |
-          The path of the cache folder must not reach ordinary users.
+          The error of the runner is shown on pages of ordinary users, so it must name the setting to fix and nothing
+          of the disk.
         tests:
           - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable
           - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable
