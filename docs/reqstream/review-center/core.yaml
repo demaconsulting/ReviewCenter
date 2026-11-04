@@ -142,6 +142,8 @@ sections:
           - ReviewCenter-ProjectChecklistService-Validation-CheckValid
           - ReviewCenter-ProjectChecklistService-Validation-CheckNothingStored
           - ReviewCenter-ProjectChecklistService-Access
+          - ReviewCenter-ProjectChecklistService-Access-HiddenReplace
+          - ReviewCenter-ProjectChecklistService-Access-HiddenReset
           - ReviewCenter-ProjectChecklistService-Access-ReadToken
           - ReviewCenter-ProjectChecklistService-Access-Change
           - ReviewCenter-ProjectChecklistService-Access-Reset
@@ -168,6 +170,7 @@ sections:
           - ReviewCenter-ProjectChecklistService-Reset-Reported
           - ReviewCenter-ProjectChecklistService-Reset-ExistingReviews
           - ReviewCenter-ProjectChecklistService-Audit
+          - ReviewCenter-ProjectChecklistService-Audit-ResetActor
           - ReviewCenter-ProjectChecklistService-Audit-Reset
           - ReviewCenter-ProjectChecklistService-Audit-Project
           - ReviewCenter-ProjectChecklistService-Audit-Actor
@@ -183,6 +186,13 @@ sections:
           - ReviewCenter-ProjectChecklistService-Arguments-Actor
           - ReviewCenter-ProjectChecklistService-Arguments-ExpectedHash
           - ReviewCenter-ChecklistService-Validation
+          - ReviewCenter-ChecklistService-Validation-Size-AtLimit
+          - ReviewCenter-ChecklistService-Validation-SectionCount-AtLimit
+          - ReviewCenter-ChecklistService-Validation-ItemCount-AtLimit
+          - ReviewCenter-ChecklistService-Validation-IdUnique-CaseInsensitive
+          - ReviewCenter-ChecklistService-Validation-IdUnique-LaterUse
+          - ReviewCenter-ChecklistService-Validation-Hint-Length
+          - ReviewCenter-ChecklistService-Validation-Hint-TooLong
           - ReviewCenter-ChecklistService-Validation-EmptyText
           - ReviewCenter-ChecklistService-Validation-NotJson
           - ReviewCenter-ChecklistService-Validation-Size
@@ -219,6 +229,8 @@ sections:
           submitted, including binary files and files with Windows line endings.
         children:
           - ReviewCenter-ReviewService-Draft
+          - ReviewCenter-ReviewService-Draft-CreatedAt
+          - ReviewCenter-ReviewService-Draft-Title
           - ReviewCenter-ReviewService-Draft-Content
           - ReviewCenter-ReviewService-Read
           - ReviewCenter-ReviewService-Read-List
@@ -273,6 +285,7 @@ sections:
           - ReviewCenter-ReviewService-Files-DuplicatePath
           - ReviewCenter-ReviewService-Files-PathCase
           - ReviewCenter-ReviewService-Limits
+          - ReviewCenter-ReviewService-Limits-AtLimit
           - ReviewCenter-ReviewService-Limits-FileCount
           - ReviewCenter-ReviewService-Limits-TotalSize
           - ReviewCenter-ThreadService-Anchor
@@ -346,6 +359,9 @@ sections:
           - ReviewCenter-LineDiff-Bounds-EditLimitAccepted
           - ReviewCenter-LineDiff-Bounds-EmptySide
           - ReviewCenter-LineDiff-Segments
+          - ReviewCenter-LineDiff-Segments-NoChangesSingleRow
+          - ReviewCenter-LineDiff-Segments-NoRows
+          - ReviewCenter-LineDiff-Segments-ArgumentsContext
           - ReviewCenter-LineDiff-Segments-Merge
           - ReviewCenter-LineDiff-Segments-OneRowGap
           - ReviewCenter-LineDiff-Segments-Collapse
@@ -395,6 +411,10 @@ sections:
           what is still open. Freezing it at creation keeps the questions fixed for the life of the review.
         children:
           - ReviewCenter-ChecklistService-Default
+          - ReviewCenter-ChecklistService-Default-Checks
+          - ReviewCenter-ChecklistService-Default-Version
+          - ReviewCenter-ChecklistService-Default-FirstLast
+          - ReviewCenter-ChecklistService-Default-Wording
           - ReviewCenter-ChecklistService-Default-Identifiers
           - ReviewCenter-ChecklistService-Default-Valid
           - ReviewCenter-ChecklistService-Default-Json
@@ -408,11 +428,16 @@ sections:
           - ReviewCenter-ReviewService-ProjectChecklist-Later
           - ReviewCenter-ReviewService-ProjectChecklist-LaterApproved
           - ReviewCenter-ChecklistService-Applicability
+          - ReviewCenter-ChecklistService-Applicability-ReasonLimit-AtLimit
+          - ReviewCenter-ChecklistService-Applicability-ReasonLimit-KeepsEarlier
           - ReviewCenter-ChecklistService-Applicability-Reason
           - ReviewCenter-ChecklistService-Applicability-ReasonLimit
           - ReviewCenter-ChecklistService-Applicability-Applies
           - ReviewCenter-ChecklistService-Applicability-UnknownSection
           - ReviewCenter-ChecklistService-Answer
+          - ReviewCenter-ChecklistService-Answer-PassNoJustification-BlankStoredAsNone
+          - ReviewCenter-ChecklistService-Answer-JustificationLimit-AtLimit
+          - ReviewCenter-ChecklistService-Answer-JustificationLimit-StoresNothing
           - ReviewCenter-ChecklistService-Answer-PassNoJustification
           - ReviewCenter-ChecklistService-Answer-Replace
           - ReviewCenter-ChecklistService-Answer-Justification
@@ -426,6 +451,7 @@ sections:
           - ReviewCenter-ChecklistService-AnsweredBy-NullActor
           - ReviewCenter-ChecklistService-AnsweredBy-Digest
           - ReviewCenter-ChecklistService-Progress
+          - ReviewCenter-ChecklistService-Progress-NothingLeft-NextCheck
           - ReviewCenter-ChecklistService-Progress-Failed
           - ReviewCenter-ChecklistService-Progress-NotApplicable
           - ReviewCenter-ChecklistService-Progress-IgnoredAnswers
@@ -435,6 +461,8 @@ sections:
           - ReviewCenter-ChecklistService-Progress-NextCheck
           - ReviewCenter-ChecklistService-Progress-SingleSlotDraft
           - ReviewCenter-ChecklistService-ReviewConclusionText
+          - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgement
+          - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Signature
           - ReviewCenter-ChecklistService-ReviewConclusionText-Lead
           - ReviewCenter-ChecklistService-ReviewConclusionText-NonMember
           - ReviewCenter-ChecklistService-ReviewConclusionText-OtherMember
@@ -538,6 +566,8 @@ sections:
           - ReviewCenter-RecordDigest-NullRecord
           - ReviewCenter-RecordDigest-NullRecord-Compute
           - ReviewCenter-RecordDigest-Coverage
+          - ReviewCenter-RecordDigest-Coverage-CheckAnswered
+          - ReviewCenter-RecordDigest-Coverage-PromotionRoundTrip
           - ReviewCenter-RecordDigest-Coverage-CheckAnswer
           - ReviewCenter-RecordDigest-Coverage-SectionNa
           - ReviewCenter-RecordDigest-Coverage-ThreadAdded
@@ -552,6 +582,7 @@ sections:
           - ReviewCenter-RecordDigest-Coverage-ConclusionLine
           - ReviewCenter-RecordDigest-Coverage-ConclusionNone
           - ReviewCenter-RecordDigest-Checklist
+          - ReviewCenter-RecordDigest-Checklist-Removal
           - ReviewCenter-RecordDigest-Checklist-Change
           - ReviewCenter-RecordDigest-Checklist-Order
           - ReviewCenter-RecordDigest-Checklist-None
@@ -571,6 +602,8 @@ sections:
           - ReviewCenter-RecordDigest-Unambiguous-EmptyValues
           - ReviewCenter-RecordDigest-Unambiguous-Absent
           - ReviewCenter-RecordDigest-Report
+          - ReviewCenter-RecordDigest-Report-CommentExcluded
+          - ReviewCenter-RecordDigest-Report-ResolutionExcluded
           - ReviewCenter-RecordDigest-Report-Block
           - ReviewCenter-RecordDigest-Report-Claim
           - ReviewCenter-RecordDigest-Report-Comment
@@ -686,6 +719,8 @@ sections:
           - ReviewCenter-SigningService-SignatureImpact-NoSignature
           - ReviewCenter-SigningService-SignatureImpact-OwnSlotExcluded
           - ReviewCenter-ChecklistService-SignatureImpact
+          - ReviewCenter-ChecklistService-SignatureImpact-Names-Unsigned
+          - ReviewCenter-ChecklistService-SignatureImpact-Remaining-Unrelated
           - ReviewCenter-ChecklistService-SignatureImpact-Names
           - ReviewCenter-ChecklistService-SignatureImpact-Remaining
           - ReviewCenter-ChecklistService-SignatureImpact-Acknowledged
@@ -861,6 +896,8 @@ sections:
           can switch off, with a record, leaves a project that has to let one person do everything able to do so.
         children:
           - ReviewCenter-ChecklistService-AuthorRule
+          - ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-OtherViewers
+          - ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-RuleOff
           - ReviewCenter-ChecklistService-AuthorRule-Section
           - ReviewCenter-ChecklistService-AuthorRule-Message
           - ReviewCenter-ChecklistService-AuthorRule-OtherActors
@@ -919,6 +956,7 @@ sections:
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-EvidenceSettingsService-Audit
           - ReviewCenter-ProjectChecklistService-Audit
+          - ReviewCenter-ProjectChecklistService-Audit-ResetActor
           - ReviewCenter-ProjectChecklistService-Audit-Reset
           - ReviewCenter-ProjectChecklistService-Audit-Project
           - ReviewCenter-ProjectChecklistService-Audit-Actor
@@ -1002,6 +1040,7 @@ sections:
           - ReviewCenter-RevisionValidator-Refuse-Characters
           - ReviewCenter-RevisionValidator-Refuse-Malformed
           - ReviewCenter-SelectionMatcher-Match
+          - ReviewCenter-SelectionMatcher-Match-StarSeparator
           - ReviewCenter-SelectionMatcher-Match-Exclusion
           - ReviewCenter-SelectionMatcher-Match-Star
           - ReviewCenter-SelectionMatcher-Match-Question
@@ -1043,6 +1082,7 @@ sections:
           later commit nor a different selection can leave a signature looking current.
         children:
           - ReviewCenter-ReviewService-FromRepository
+          - ReviewCenter-ReviewService-FromRepository-Source
           - ReviewCenter-ReviewService-FromRepository-Selection
           - ReviewCenter-ReviewService-FromRepository-AllFiles
           - ReviewCenter-ReviewService-FromRepository-DeletedFiles
@@ -1199,6 +1239,8 @@ sections:
           so it must not make a signature look out of date.
         children:
           - ReviewCenter-ReviewService-DueDate
+          - ReviewCenter-ReviewService-DueDate-Repository-Audit
+          - ReviewCenter-ReviewService-DueDate-Repository-Range
           - ReviewCenter-ReviewService-DueDate-None
           - ReviewCenter-ReviewService-DueDate-Range
           - ReviewCenter-ReviewService-DueDate-Audit
@@ -1303,6 +1345,7 @@ sections:
           - ReviewCenter-ReviewProgressService-KindCounts-Fallback
           - ReviewCenter-ReviewProgressService-KindCounts-MaskedChecks
           - ReviewCenter-ReviewProgressService-BallotProgress
+          - ReviewCenter-ReviewProgressService-BallotProgress-ConcludedCounts
           - ReviewCenter-ReviewProgressService-BallotProgress-Names
           - ReviewCenter-ReviewProgressService-BallotProgress-Disabled
           - ReviewCenter-ReviewProgressService-BallotProgress-NoChecklist
@@ -1616,6 +1659,7 @@ sections:
           for other reviews keeps every existing signature valid.
         children:
           - ReviewCenter-ReviewService-FollowUp
+          - ReviewCenter-ReviewService-FollowUp-AuditCarried
           - ReviewCenter-ReviewService-FollowUp-Optional
           - ReviewCenter-ReviewService-FollowUp-Source
           - ReviewCenter-ReviewService-FollowUp-Chain
@@ -1631,6 +1675,11 @@ sections:
           - ReviewCenter-ReviewService-FollowUp-DuplicateId
           - ReviewCenter-ReviewService-FollowUp-InputValidation
           - ReviewCenter-ReviewService-FollowUpCarry
+          - ReviewCenter-ReviewService-FollowUpCarry-Wording-Missing
+          - ReviewCenter-ReviewService-FollowUpCarry-Baseline-BallotWins
+          - ReviewCenter-ReviewService-FollowUpCarry-ThreadKind-ReportFlag
+          - ReviewCenter-ReviewService-FollowUpCarry-Resolved-Counted
+          - ReviewCenter-ReviewService-FollowUpCarry-Resolved-DroppedListed
           - ReviewCenter-ReviewService-FollowUpCarry-Disputed
           - ReviewCenter-ReviewService-FollowUpCarry-Draft
           - ReviewCenter-ReviewService-FollowUpCarry-Fail
@@ -1655,10 +1704,12 @@ sections:
           - ReviewCenter-ReviewService-FollowUpPreview-Hidden
           - ReviewCenter-ReviewService-FollowUpPreview-Auditor
           - ReviewCenter-ReviewService-FollowUpCheckThreads
+          - ReviewCenter-ReviewService-FollowUpCheckThreads-Counted-Preview
           - ReviewCenter-ReviewService-FollowUpCheckThreads-Counted
           - ReviewCenter-ReviewService-FollowUpCheckThreads-NotDropped
           - ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgement
           - ReviewCenter-ChecklistService-CarriedMarking
+          - ReviewCenter-ChecklistService-CarriedMarking-Progress-NotApplicableSection
           - ReviewCenter-ChecklistService-CarriedMarking-Section
           - ReviewCenter-ChecklistService-CarriedMarking-Progress
           - ReviewCenter-SigningService-CarriedRecord
