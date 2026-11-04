@@ -17,7 +17,7 @@ ASP.NET Core is verified by integration evidence from the project's own test sui
 self-validation mode. Each scenario names a specific test method. Some scenarios run the application in memory
 through the test host, some render a component, the system-level scenarios start a real server process with the
 `serve` verb and call it over HTTP, which exercises Kestrel, and one scenario drives the live Blazor connection from a
-real browser. A passing pipeline run for all scenarios constitutes evidence that all fifteen requirements are
+real browser. A passing pipeline run for all scenarios constitutes evidence that all sixteen requirements are
 satisfied.
 
 ### Test Scenarios
@@ -181,7 +181,8 @@ a previous certificate.
 
 **Expected**: The framework decrypts the key file with the previous certificate and the value is returned unchanged.
 
-**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Certificate`.
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection-Certificate`,
+`ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous`.
 
 #### KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt
 

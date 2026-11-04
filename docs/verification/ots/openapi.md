@@ -15,7 +15,7 @@ that the `ApiDocument` unit gets all of this from the package.
 Microsoft.AspNetCore.OpenApi has no self-validation mode and is verified by the project's own tests, which start the real
 application in memory, fetch the document through HTTP, and compare it with the snapshot that is kept in the
 documentation. Each scenario names a specific test method that depends on the package under verification. A passing
-pipeline run for the scenario constitutes evidence that the requirement is satisfied.
+pipeline run for all scenarios constitutes evidence that all three requirements are satisfied.
 
 ### Test Scenarios
 

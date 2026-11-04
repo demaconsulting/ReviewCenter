@@ -13,8 +13,8 @@ passing test confirms that the signer of the attestation gets all of this from t
 
 System.Security.Cryptography.Pkcs has no self-validation mode and is verified by the project's own tests, which run the
 real library in memory with temporary keys and certificates. Each scenario names a specific test method that depends on
-the library under verification. A passing pipeline run for the scenario constitutes evidence that the requirement is
-satisfied.
+the library under verification. A passing pipeline run for all scenarios constitutes evidence that all five
+requirements are satisfied.
 
 ### Test Scenarios
 

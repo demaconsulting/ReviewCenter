@@ -11,17 +11,54 @@ sections:
         requirements:
           - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow
             title: >-
-              Microsoft.AspNetCore.Authentication.OpenIdConnect shall perform the authorization code flow with a proof
-              key, a state, and a nonce against the provider.
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall perform the authorization code flow against the
+              provider.
             justification: |
               The sign-in with a provider and the confirmation of identity for a signature rely on this package to
               speak the protocol. Passing tests that run the whole flow against a test provider that signs real
-              tokens confirm that the request asks for a code with a proof key challenge, a state, and a nonce, and
-              that a valid answer signs the user in.
+              tokens confirm that the request asks for a code and that a valid answer signs the user in.
             tags: [ots]
             tests:
               - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
               - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Pkce
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall send a proof key challenge with the S256 method
+              in the authorization request.
+            justification: |
+              The proof key stops another party from exchanging a stolen code. A passing test inspects the
+              authorization request that the handler sent and confirms the S256 code challenge method.
+            tags: [ots]
+            tests:
+              - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestState
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall send a state value in the authorization request.
+            justification: |
+              The state binds the answer of the provider to the request that the handler sent. A passing test inspects
+              the authorization request and confirms that it carries a state.
+            tags: [ots]
+            tests:
+              - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestNonce
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall send a nonce in the authorization request.
+            justification: |
+              The nonce binds the identity token to the request that the handler sent. A passing test inspects the
+              authorization request and confirms that it carries a nonce.
+            tags: [ots]
+            tests:
+              - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Nonce
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an identity token whose nonce is not the
+              one that it sent.
+            justification: |
+              A token that was issued for another request could be replayed. A passing test confirms that a validly
+              signed token with a wrong nonce creates no session and no account.
+            tags: [ots]
+            tests:
+              - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
           - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-State
             title: >-
               Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an answer of the provider whose state is

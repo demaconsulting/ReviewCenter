@@ -15,8 +15,8 @@ functions work correctly.
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all
-eight requirements are satisfied.
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all twelve
+requirements are satisfied.
 
 ### Test Scenarios
 
@@ -36,7 +36,8 @@ program and an empty cache folder.
 **Expected**: The program runs without a shell, the output of the first call is returned, and the failing call returns
 its exit code and error text.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`, `ReviewCenter-OTS-Git-Access-Output`,
+`ReviewCenter-OTS-Git-Access-ExitCode`.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
@@ -45,7 +46,8 @@ unsafe revision are resolved too.
 
 **Expected**: The first three give the commit identity, and the others are refused.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`,
+`ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`.
 
 #### GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 
@@ -55,7 +57,8 @@ link, a submodule, and a change of the file mode only.
 **Expected**: git is run with `--no-renames`, so renames are not detected and the source lists a rename as one deleted
 file and one added file; it also skips the link and the submodule.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ListChanges`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ListChanges`, `ReviewCenter-OTS-Git-Access-ListChanges-Renames`,
+`ReviewCenter-OTS-Git-Access-ListChanges-EntryModes`.
 
 #### GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
 

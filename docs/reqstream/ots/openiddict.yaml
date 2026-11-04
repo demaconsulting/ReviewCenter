@@ -10,13 +10,20 @@ sections:
       - title: OpenIddict Requirements
         requirements:
           - id: ReviewCenter-OTS-OpenIddict-TestProvider
-            title: >-
-              OpenIddict shall serve the discovery document and the signing keys of a provider, so that the sign-in code
-              can find them in the tests.
+            title: OpenIddict shall serve the discovery document of a provider, so that the sign-in code can find it.
             justification: |
               The tests of the sign-in need a provider that speaks the protocol, so that they test the product and
               not a mock. A passing test that runs the full flow against it confirms that the application finds the
-              discovery document and the keys.
+              discovery document.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - id: ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys
+            title: OpenIddict shall serve the signing keys of a provider, so that the sign-in code can find them.
+            justification: |
+              The sign-in code must validate the signature of the identity token with a key of the provider. A
+              passing test that runs the full flow confirms that the application finds the keys that the discovery
+              document names.
             tags: [ots]
             tests:
               - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn

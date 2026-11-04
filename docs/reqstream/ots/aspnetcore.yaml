@@ -139,11 +139,22 @@ sections:
               encrypted secret and not the key.
             justification: |
               The key files are protected at rest with a certificate that the operator supplies, through the
-              certificate encryptor of the framework. Passing tests confirm that the key file is encrypted, that a
-              restart reads the ring again, and that a previous certificate still reads the ring.
+              certificate encryptor of the framework. Passing tests confirm that the key file holds an encrypted
+              secret and not the key, and that a restart reads the ring again.
             tags: [ots]
             tests:
               - KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
+              - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous
+            title: >-
+              ASP.NET Core shall decrypt the key files of the key ring with a previous certificate when the current
+              certificate did not encrypt them.
+            justification: |
+              The operator replaces the certificate from time to time, and the ring that the earlier certificate
+              protected must stay readable. A passing test confirms that a second certificate that lists the first as
+              a previous certificate reads the ring.
+            tags: [ots]
+            tests:
               - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
           - id: ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi
             title: >-

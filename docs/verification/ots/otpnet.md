@@ -18,8 +18,8 @@ published vectors of RFC 6238 and with an independent reference (`TotpOracle` in
 HOTP and TOTP from RFC 4226 and RFC 6238 with only the HMAC-SHA-1 of the runtime and has its own Base32 reader and
 writer. The reference is itself checked against the published values of RFC 4226. The self-validation check
 `ReviewCenter_Totp` repeats the published vectors on the installed platform. Each scenario names a specific test method
-that depends on the package under verification. A passing pipeline run for the scenario constitutes evidence that the
-requirement is satisfied.
+that depends on the package under verification. A passing pipeline run for all scenarios constitutes evidence that all
+three requirements are satisfied.
 
 ### Test Scenarios
 

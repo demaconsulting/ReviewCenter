@@ -20,11 +20,26 @@ sections:
             tests:
               - GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository
           - id: ReviewCenter-OTS-Git-Access-ChildProcess
-            title: >-
-              git shall run as a child process without a shell and return its output and its exit code.
+            title: git shall run as a child process without a shell.
             justification: |
               The service starts git directly, so that no shell interprets the arguments. A passing test that runs the
-              real program with a call that succeeds and with a call that fails confirms the output and the exit code.
+              real program confirms that git runs as a child process that the service controls.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-Output
+            title: git shall write its result to the standard output of the child process.
+            justification: |
+              The service reads the result of every git call from the output of the process. A passing test that runs
+              the real program with a call that succeeds confirms that the output is returned.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-ExitCode
+            title: git shall end a call that fails with a nonzero exit code and an error text.
+            justification: |
+              The service reports a failing git call from the exit code and the error text. A passing test that runs
+              the real program with a call that fails confirms the exit code and the error text.
             tags: [ots]
             tests:
               - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
@@ -32,7 +47,15 @@ sections:
             title: git shall resolve a branch, a tag, or a commit name to the identity of a commit.
             justification: |
               Users name the content to review by branch, tag, or commit. A passing test that runs the real program
-              confirms that each form resolves, and that an unknown and an unsafe revision are refused.
+              confirms that each form resolves to the identity of the commit.
+            tags: [ots]
+            tests:
+              - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+          - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
+            title: git shall refuse a revision that is unknown or unsafe.
+            justification: |
+              A revision that does not exist, or that git could read as an option, must never select content. A
+              passing test that runs the real program confirms that an unknown and an unsafe revision are refused.
             tags: [ots]
             tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
@@ -47,9 +70,25 @@ sections:
           - id: ReviewCenter-OTS-Git-Access-ListChanges
             title: git shall list the files that changed between two commits.
             justification: |
-              A review of a change covers the files that differ between a baseline and a head. The service compares
-              commits without rename detection, so a rename is reported as a deletion plus an addition. A passing
-              test that runs the real program confirms the changes, with modified, added, deleted, and renamed files.
+              A review of a change covers the files that differ between a baseline and a head. A passing test that
+              runs the real program confirms the changes, with modified, added, and deleted files.
+            tags: [ots]
+            tests:
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ListChanges-Renames
+            title: git shall list a rename as one deleted file and one added file when rename detection is off.
+            justification: |
+              The service compares commits without rename detection, so that every change is one deletion or one
+              addition. A passing test that runs the real program with a renamed file confirms the two entries.
+            tags: [ots]
+            tests:
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - id: ReviewCenter-OTS-Git-Access-ListChanges-EntryModes
+            title: git shall give the mode of every changed entry.
+            justification: |
+              The service reviews only the content of regular files, so it skips symbolic links and submodules by
+              their mode. A passing test with a symbolic link, a submodule, and a change of the file mode only
+              confirms that the service can tell them apart from the mode that git gives.
             tags: [ots]
             tests:
               - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries

@@ -14,8 +14,8 @@ a real provider and not against a mock.
 
 OpenIddict has no self-validation mode and is verified by the project's own tests, which run the full sign-in flow
 against it and read the time of the login from the tokens it issues. Each scenario names a specific test method that
-depends on the package under verification. A passing pipeline run for the scenario constitutes evidence that the
-requirement is satisfied.
+depends on the package under verification. A passing pipeline run for all scenarios constitutes evidence that all four
+requirements are satisfied.
 
 ### Test Scenarios
 
@@ -27,7 +27,7 @@ requirement is satisfied.
 signed with the keys that the provider serves.
 
 **Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`,
-`ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken`.
+`ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys`, `ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken`.
 
 #### OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 

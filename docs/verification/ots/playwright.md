@@ -1,6 +1,6 @@
 ## Playwright Verification
 
-This document provides the verification evidence for the Playwright OTS software item. Its requirement belongs to
+This document provides the verification evidence for the Playwright OTS software item. Its requirements belong to
 the ReviewCenterPuppet system.
 
 ### Required Functionality

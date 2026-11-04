@@ -13,7 +13,7 @@ the parser of the review-set file gets all of this from the library.
 
 YamlDotNet has no self-validation mode and is verified by the project's own tests, which run the real library in memory.
 Each scenario names a specific test method that depends on the library under verification. A passing pipeline run for
-the scenario constitutes evidence that the requirement is satisfied.
+all scenarios constitutes evidence that all four requirements are satisfied.
 
 ### Test Scenarios
 
