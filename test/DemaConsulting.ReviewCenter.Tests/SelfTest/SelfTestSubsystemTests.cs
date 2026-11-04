@@ -48,11 +48,11 @@ public partial class SelfTestSubsystemTests
         // Act: read the outcome of the real run
         var run = RealValidationRun.Result;
 
-        // Assert: validation completes successfully, all nine checks pass and each line shows its elapsed time
+        // Assert: validation completes successfully, all ten checks pass and each line shows its elapsed time
         Assert.True(run.Validate, "Context should have validate flag set");
         Assert.Equal(0, run.ExitCode);
-        Assert.Contains("Total Tests: 9", run.Log);
-        Assert.Contains("Passed: 9", run.Log);
+        Assert.Contains("Total Tests: 10", run.Log);
+        Assert.Contains("Passed: 10", run.Log);
         Assert.Contains("Skipped: 0", run.Log);
         Assert.Contains("Failed: 0", run.Log);
         foreach (var name in RealValidationRun.CheckNames)
@@ -72,10 +72,10 @@ public partial class SelfTestSubsystemTests
         // Act: read the TRX text of the real run
         var run = RealValidationRun.Result;
 
-        // Assert: the TRX has the standard format and each of the nine checks, passed, with a duration
+        // Assert: the TRX has the standard format and each of the ten checks, passed, with a duration
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("<TestRun", run.Trx);
-        Assert.Equal(9, PassedOutcome().Count(run.Trx));
+        Assert.Equal(10, PassedOutcome().Count(run.Trx));
         Assert.DoesNotContain("Failed", run.Trx);
         Assert.DoesNotContain("NotExecuted", run.Trx);
         foreach (var name in RealValidationRun.CheckNames)

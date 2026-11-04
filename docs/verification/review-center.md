@@ -38,9 +38,9 @@ the same job must run with the normal environment and must fail under the isolat
 the executable is larger than 20 MiB, which a
 framework-dependent publish is not. The commands run are: `--version`, `--help`,
 `--validate --results validation-<os>-net10.0-<rid>.trx`, and a `serve` smoke test that checks `/health`, the home
-page, and the Blazor script. The self-validation results (the nine `ReviewCenter_` tests:
+page, and the Blazor script. The self-validation results (the ten `ReviewCenter_` tests:
 `GitAvailable`, `GitRoundTrip`, `ReviewWorkflow`, `Fingerprint`, `PasswordHash`, `Totp`, `AuditChain`,
-`AttestationPdf`, and `HostStart`) in those TRX files are the evidence for the platform
+`AttestationPdf`, `NotificationMail`, and `HostStart`) in those TRX files are the evidence for the platform
 requirements; the platform
 (`windows`, `ubuntu`) and runtime (`net10.0`) in the file name are the source filters.
 
@@ -171,12 +171,12 @@ with code 0. This scenario is tested by
 
 **ReviewCenter_ValidateFlag_Provided_RunsValidation**: The `--validate` flag is passed together
 with `--depth 3` and `--result <path>.xml`, as one shared real process run of the whole default
-self-validation; the combined output contains "Total Tests: 9", "Passed: 9" and "Failed: 0" and
+self-validation; the combined output contains "Total Tests: 10", "Passed: 10" and "Failed: 0" and
 the tool exits with code 0, confirming the self-validation suite runs and completes successfully.
 This scenario is tested by `ReviewCenter_ValidateFlag_Provided_RunsValidation`.
 
 **ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile**: The shared real process run
-wrote a JUnit XML file containing a `<testsuites` XML element and nine test cases and the tool
+wrote a JUnit XML file containing a `<testsuites` XML element and ten test cases and the tool
 exited with code 0. The TRX format is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults`. This scenario is tested by
 `ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile`.
@@ -601,8 +601,20 @@ is confirmed by the code that was mailed to it, which is tested by
 `AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. The limits on confirmation mails, the refusal of an API token,
 the audit entries, and the refusal of a header injection are verified in the `Core` and `Storage` subsystems, the
 delivery through an SMTP server and into a folder in the `Messaging` subsystem, the card on the account page in the
-`Web` subsystem, and the check of the settings in the `Hosting` and `SelfTest` subsystems. The hermetic self-test and
-the Puppet end-to-end test were not extended for this slice.
+`Web` subsystem, and the check of the settings in the `Hosting` and `SelfTest` subsystems. The self-validation proves
+that a mail is composed from a fixture without ballot content and written as one file, which is tested by
+`ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile`; the help topic and the link of the card to
+it are tested by `HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever` and
+`AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic`.
+
+**Notifications in the browser**: On the running host with the file transport, a signed-in user opens the Account
+page, sees the card with the address form, a disabled mode selector, and the link to the help topic, enters an
+address, and asks for a code. The server writes one `.eml` file into a private folder before the card shows the field
+for the code; the test reads the 6-digit code from that file, types it, and sees the confirmed address, the enabled
+selector, and the remove button. It then chooses "Every change", saves, opens the page again, and finds the mode still
+chosen, with no second mail written. The test waits on visible states and on the file, never on a fixed time, and it is
+skipped without a browser like the other Puppet scenarios. This scenario is tested by
+`ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates`.
 
 **API under /api**: With a token, a script creates a draft review from files, reads it back (it is flagged as created
 through the API and is not approved), finds that the attestation of a draft is refused with 409, and downloads the

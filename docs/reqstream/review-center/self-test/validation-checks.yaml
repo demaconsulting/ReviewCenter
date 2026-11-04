@@ -3,7 +3,8 @@
 #
 # The checks are the tests that `--validate` runs: each one exercises a real part of ReviewCenter (git, a
 # complete review workflow, the content fingerprint, password hashing, the audit chain, the signed attestation
-# PDF and the web host) against throw-away data in a temporary folder. The tenth to twelfth checks, opt-in through
+# PDF and the web host) against throw-away data in a temporary folder. The notification mail check composes a mail from
+# a fixture and writes it as a file. The eleventh to thirteenth checks, opt-in through
 # `--check-config`, compare the configured database with the schema of this build, the configured key ring with the
 # database, and examine the e-mail notification settings, all read-only.
 
@@ -779,6 +780,65 @@ sections:
           network, and would send the password to a machine on the strength of a mere check.
         tests:
           - ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail
+        title: >-
+          The NotificationMail check shall compose a notification mail for a fixture item with the production composer.
+        justification: |
+          A check that used its own text would prove nothing about the mails of a real server. The fixture needs no
+          database, so the check stays hermetic.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-FileWritten
+        title: >-
+          The NotificationMail check shall show that the production file sender writes exactly one .eml file.
+        justification: |
+          The file sender is the one transport that needs no mail server, so it proves the delivery path on every
+          machine. A second file, or a leftover temporary file, would be a defect.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-ProjectNamed
+        title: >-
+          The NotificationMail check shall show that the mail names the project of the fixture item.
+        justification: |
+          A reader of the mail must see which project has news.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-ReviewLinked
+        title: >-
+          The NotificationMail check shall show that the mail links to the review page of the fixture item.
+        justification: |
+          A reader of the mail must reach the news in one step, after the sign-in.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-NoBallotContent
+        title: >-
+          The NotificationMail check shall show that the mail holds none of the text of the fixture item.
+        justification: |
+          Reviews of regulated projects can be confidential, so the mail must leave out the titles, the details and the
+          outcome words of the items.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-NoAddressInReport
+        title: >-
+          The NotificationMail check shall report no e-mail address.
+        justification: |
+          The report is archived and must not hold personal data, even the address of the fixture.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ReportsNoAddressOrPath
+
+      - id: ReviewCenter-ValidationChecks-NotificationMail-NoPathInReport
+        title: >-
+          The NotificationMail check shall report no folder path.
+        justification: |
+          The report is archived and must not tell where the temporary folder of the machine is.
+        tests:
+          - ValidationChecks_NotificationMail_Run_ReportsNoAddressOrPath
 
       - id: ReviewCenter-ValidationChecks-Hermetic
         title: >-

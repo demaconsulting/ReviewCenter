@@ -22,7 +22,7 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- While e-mail notifications are not set up the notification card shows one sentence and no field, button, or
+- While e-mail notifications are not set up the notification card shows one sentence and no field, button, link, or
   explanation, and the page reads nothing from the notification store; with them on, the card offers the address form,
   the code form, and the confirmed address with a remove button in turn, never shows the code, is absent for a
   temporary password, and is shown to a user of an identity provider.
@@ -243,3 +243,9 @@ explanation says what a mail contains, what is never mailed, and what the three 
 `AccountPage_Render_Card_ExplainsWhatIsMailed`, `AccountPage_Render_Card_ExplainsProjectAndReview`,
 `AccountPage_Render_Card_ExplainsLinkToReview`, `AccountPage_Render_Card_ExplainsWhatIsNotMailed`, and
 `AccountPage_Render_Card_ExplainsModes`.
+
+**AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic**: With notifications set up, the page is
+rendered; the card contains a link with the text "About e-mail notifications" that points to
+`/help/email-notifications`. While notifications are not set up the card has no such link, which is tested together
+with its single sentence by `AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore`. This scenario
+is tested by `AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic`.

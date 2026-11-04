@@ -156,3 +156,5 @@ chapter). See Concluding a Review as Rejected in the Reviewing chapter for the d
 - The Review Practices chapter suggests how a team can work with ReviewCenter: who reviews what, and when to sign.
 - The Administration chapter covers users, projects, members, checklists, and the review rules.
 - The Automation and API Tokens chapter shows how to create reviews from a script.
+- If your administrator has set up mail, the Help topic **E-mail notifications** (`/help/email-notifications`)
+  explains how to get news by e-mail.

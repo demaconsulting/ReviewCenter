@@ -432,7 +432,7 @@ deployment itself, all **read-only**:
   **fails**, naming the setting, for a setting that cannot be used. It never connects to a mail server and never
   prints a password, a path, or an address.
 
-With a database and a key ring in place, the run ends with `Passed: 12` (`Passed: 11` and `Skipped: 1` while
+With a database and a key ring in place, the run ends with `Passed: 13` (`Passed: 12` and `Skipped: 1` while
 notifications are off) and exit code 0, and the last lines read like
 `ReviewCenter_ConfiguredDatabase - Passed (...): provider Sqlite; opened read-only; schema matches (18 tables, 148
 columns)` and `ReviewCenter_ConfiguredKeys - Passed (...): protection Dpapi; key files 1 (0 not encrypted); protected

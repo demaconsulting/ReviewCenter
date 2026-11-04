@@ -985,3 +985,12 @@ sections:
           A person chooses a mode only when the effect of each is clear.
         tests:
           - AccountPage_Render_Card_ExplainsModes
+
+      - id: ReviewCenter-AccountPage-NotificationHelpLink
+        title: >-
+          The AccountPage unit shall show a link to the E-mail notifications topic in the notification card when
+          notifications are set up.
+        justification: |
+          A person who reads the card must reach the full explanation in one step.
+        tests:
+          - AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic

@@ -15,8 +15,8 @@ source file:
 - `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
 - The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
   `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, `HelpAttestationPage`,
-  `HelpMembersPage`, `HelpApiTokensPage`, `HelpTwoFactorPage`, `HelpEvidenceSettingsPage`, and
-  `HelpChecklistTemplatePage`: the text of one topic
+  `HelpMembersPage`, `HelpApiTokensPage`, `HelpTwoFactorPage`, `HelpEvidenceSettingsPage`,
+  `HelpChecklistTemplatePage`, and `HelpNotificationsPage`: the text of one topic
   each.
 - `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
 - `HelpTopics` (`HelpTopics.cs`): the list of topics.
@@ -211,7 +211,7 @@ showing the warnings and the summary). The Signed attestation, Automation and AP
 topics link to it.
 
 **Checklist template topic** (`HelpChecklistTemplatePage`, slug `checklist-template`, title "Checklist template"): The
-last topic, after Evidence settings. It explains, in static text, that a project admin or a system administrator can
+topic after Evidence settings. It explains, in static text, that a project admin or a system administrator can
 change the checklist that new reviews of the project start with, from the Checklist button of the project page, that
 a project uses the built-in default until it is replaced, and that only the reviews created afterwards use the new
 checklist while existing reviews keep exactly the checklist they were created with. It describes the steps (Export
@@ -220,6 +220,17 @@ the differences, Replace checklist with its confirmation, and Reset to built-in 
 definition needs another version label, that every change is recorded as `project.checklist-changed`, and the sample
 that follows the lifecycle activities of IEC 62304, with the note that a template does not make a record compliant. It
 has no screenshot.
+
+**E-mail notifications topic** (`HelpNotificationsPage`, slug `email-notifications`, title "E-mail notifications"): The
+last topic, after Checklist template. It is written in plain, friendly language for a person who reads about the mail
+before turning it on. It explains, in static text, that the mail is optional, is off until the person turns it on, and
+is available only when the administrator has set up mail. It says what a mail names (that there is news, the project,
+the review, and a link to the review page, which opens only after sign-in), what a mail never holds (comments, answers,
+verdicts and outcomes of a review, the contents of files, and any password), how an address is confirmed with a code
+that arrives by mail, the three choices (No e-mail, Daily summary, Every change), how to stop the mail (choose No
+e-mail, or remove the address), and what it means when the card on the Account page says that mail is not set up. A
+short note says that the choices are recorded in the audit trail. The page says nothing that implies that hidden content
+is mailed. It has no screenshot. The Account page links to it from the notifications card.
 
 **HelpNotFoundPage component**: It routes `/help/{*Slug}`, a catch-all with a parameter. The router prefers the fixed
 routes of the topic pages, so only an address that is not a topic reaches it. It shows a message that there is no help

@@ -130,10 +130,10 @@ public partial class IntegrationTests
         // Act: read the outcome of the process run
         var run = RealValidationRun.Process;
 
-        // Assert: validation summary is present for all nine checks; exit code is success
+        // Assert: validation summary is present for all ten checks; exit code is success
         Assert.Equal(0, run.ExitCode);
-        Assert.Contains("Total Tests: 9", run.Output);
-        Assert.Contains("Passed: 9", run.Output);
+        Assert.Contains("Total Tests: 10", run.Output);
+        Assert.Contains("Passed: 10", run.Output);
         Assert.Contains("Failed: 0", run.Output);
     }
 
@@ -224,7 +224,7 @@ public partial class IntegrationTests
         // Assert: results file is created with valid JUnit structure and one test case per check
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("<testsuites", run.ResultsContent);
-        Assert.Equal(9, TestCaseElement().Count(run.ResultsContent));
+        Assert.Equal(10, TestCaseElement().Count(run.ResultsContent));
     }
 
     /// <summary>

@@ -763,3 +763,52 @@ sections:
           The pages say that a signature no longer counts, and the help must not use another word for the same thing.
         tests:
           - HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic
+        title: >-
+          The HelpPage unit shall list the E-mail notifications topic in the index of the help.
+        justification: |
+          A person finds the explanation of the mail only when the index names it.
+        tests:
+          - HelpPage_Render_ListsEmailNotificationsTopicAfterChecklistTemplate
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic-WhatIsMailed
+        title: >-
+          The HelpPage unit shall explain in the E-mail notifications topic what a notification mail names.
+        justification: |
+          A person turns mail on only when they know what will be sent.
+        tests:
+          - HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic-NeverMailed
+        title: >-
+          The HelpPage unit shall state in the E-mail notifications topic that a mail never holds review content.
+        justification: |
+          Reviews of regulated projects can be confidential, so the person must be told what stays in the system. The
+          review content is the comments, the answers, the verdicts, the outcomes and the contents of the files.
+        tests:
+          - HelpNotificationsPage_Render_ExplainsWhatIsMailedAndWhatIsNever
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic-Confirmation
+        title: >-
+          The HelpPage unit shall explain in the E-mail notifications topic the confirmation of the address with a code.
+        justification: |
+          A person who has entered an address must know that a code arrives and that the address counts only after it.
+        tests:
+          - HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic-Modes
+        title: >-
+          The HelpPage unit shall explain in the E-mail notifications topic the three modes.
+        justification: |
+          A person chooses a mode only when the effect of each is clear.
+        tests:
+          - HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop
+
+      - id: ReviewCenter-HelpPage-NotificationsTopic-HowToStop
+        title: >-
+          The HelpPage unit shall explain in the E-mail notifications topic how to stop the mail.
+        justification: |
+          A mail that is hard to stop would be marked as spam.
+        tests:
+          - HelpNotificationsPage_Render_ExplainsConfirmationModesAndHowToStop

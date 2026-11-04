@@ -102,6 +102,41 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the notification mail check composes a masked mail and writes it as one .eml file.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_NotificationMail_Run_ComposesMaskedMailAndWritesEmlFile()
+    {
+        // Arrange: nothing; the check builds its own fixture rows, options and temporary folder
+
+        // Act: run the check, which throws when the mail is wrong, not written once, or holds text of a row
+        var detail = await NotificationMailCheck.RunAsync(CancellationToken.None);
+
+        // Assert: the check reports what it verified and the name is the documented one
+        Assert.Equal("ReviewCenter_NotificationMail", NotificationMailCheck.Name);
+        Assert.Contains("1 .eml file written", detail);
+        Assert.Contains("no ballot content", detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification mail check reports neither an e-mail address nor a folder path.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_NotificationMail_Run_ReportsNoAddressOrPath()
+    {
+        // Arrange: nothing; the check uses a fixed sender address, a recipient address and a temporary folder
+
+        // Act: run the check
+        var detail = await NotificationMailCheck.RunAsync(CancellationToken.None);
+
+        // Assert: no at sign, no example domain, no path separator and not the temporary folder in the report
+        Assert.DoesNotContain("@", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("example.com", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.DirectorySeparatorChar, detail);
+        Assert.DoesNotContain(Path.GetTempPath(), detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Test that the audit chain check detects a tampered entry.
     /// </summary>
     [Fact]
@@ -269,7 +304,7 @@ public partial class ValidationChecksTests
         // Assert: every check passed, including the host check, which listened on one loopback port that is not the
         // poisoned one
         Assert.Equal(0, run.ExitCode);
-        Assert.Contains("Passed: 9", run.Output);
+        Assert.Contains("Passed: 10", run.Output);
         var match = HostListeningLine().Match(run.Output);
         Assert.True(match.Success, "The host check should report a loopback address:" + Environment.NewLine + run.Output);
         Assert.NotEqual(run.PoisonedPort, int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture));

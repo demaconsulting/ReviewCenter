@@ -222,16 +222,16 @@ sections:
 
       - id: ReviewCenter-Validation-DefaultChecks
         title: >-
-          The Validation class shall run exactly the nine hermetic checks when `--check-config` was not given.
+          The Validation class shall run exactly the ten hermetic checks when `--check-config` was not given.
         justification: |
           The default run must give the same answer on every machine and must never read or touch the deployment's
           configuration.
         tests:
-          - Validation_CreateChecks_Default_ListsNineHermeticChecks
+          - Validation_CreateChecks_Default_ListsTenHermeticChecks
 
       - id: ReviewCenter-Validation-CheckConfig
         title: >-
-          The Validation class shall run twelve checks when `--check-config` was given.
+          The Validation class shall run thirteen checks when `--check-config` was given.
         justification: |
           The checks of the configured database, key ring and notification settings are for the operator who asks for
           them.
@@ -241,9 +241,9 @@ sections:
       - id: ReviewCenter-Validation-CheckConfigAfterHermetic
         title: >-
           When `--check-config` was given, the Validation class shall run each check that the option adds after the
-          nine hermetic checks.
+          ten hermetic checks.
         justification: |
-          The checks that the option adds follow the hermetic checks, so that a result file lists the same nine checks
+          The checks that the option adds follow the hermetic checks, so that a result file lists the same ten checks
           first in every run.
         tests:
           - Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast
