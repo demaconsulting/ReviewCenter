@@ -455,8 +455,28 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
-    ///     Test that a check whose wording changed in the project's checklist, and a check that the new checklist
-    ///     does not have, are not carried at the create path of an upload.
+    ///     Test that the person who creates a follow-up does not become the answerer of the answers that it carries.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_FollowUp_CarriedAnswers_AreNotAnsweredByTheCreator()
+    {
+        // Arrange: everything passed in the earlier review, by Bob
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+        await AnswerAllAsync(w, "rev-1");
+
+        // Act: Ann creates the follow-up
+        await UploadAsync(w, "rev-2", follows: "rev-1", creator: TestActors.Ann);
+
+        // Assert: answers are carried, and none of them names Ann
+        var carried = await CarriedAnswersAsync(w, "rev-2");
+        Assert.NotEmpty(carried);
+        Assert.All(carried, a => Assert.NotEqual("ann", a.AnsweredByUsername));
+    }
+
+    /// <summary>
+    ///     Test that a check whose wording changed in the project's checklist is not carried at the create path of an
+    ///     upload.
     /// </summary>
     [Fact]
     public async Task ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried()

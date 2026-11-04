@@ -10,10 +10,25 @@ sections:
     requirements:
       - id: ReviewCenter-ReviewService-Draft
         title: >-
-          The ReviewService class shall create a review in the Draft state with the creation time taken from the clock
-          and the title without surrounding white space.
+          The ReviewService class shall create a review in the Draft state.
         justification: |
-          A review starts as a draft, dated at its creation, and a title with stray white space would be hard to find.
+          A review starts as a draft.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+
+      - id: ReviewCenter-ReviewService-Draft-CreatedAt
+        title: >-
+          The ReviewService class shall take the creation time of a review from the clock.
+        justification: |
+          A review is dated at its creation, and the clock makes the time testable.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+
+      - id: ReviewCenter-ReviewService-Draft-Title
+        title: >-
+          The ReviewService class shall store the title of a review without surrounding white space.
+        justification: |
+          A title with stray white space would be hard to find.
         tests:
           - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
 
@@ -150,10 +165,17 @@ sections:
 
       - id: ReviewCenter-ReviewService-Limits
         title: >-
-          The ReviewService class shall refuse a review with a file larger than 2 MiB and accept a file of exactly 2
-          MiB.
+          The ReviewService class shall refuse a review with a file larger than 2 MiB.
         justification: |
           Content is held in memory and in the database, so the size of a file must be bounded.
+        tests:
+          - ReviewService_CreateDraftAsync_FileSize_LimitIsInclusive
+
+      - id: ReviewCenter-ReviewService-Limits-AtLimit
+        title: >-
+          The ReviewService class shall accept a review with a file of exactly 2 MiB.
+        justification: |
+          The limit is inclusive, so a file of exactly the maximum size is still a valid review.
         tests:
           - ReviewService_CreateDraftAsync_FileSize_LimitIsInclusive
 
@@ -229,10 +251,18 @@ sections:
         title: >-
           The ReviewService class shall create a review from the files changed between an optional baseline revision
           and a head revision of a registered, enabled git repository of the same project, freezing for each file its
-          path, change kind (Added, Modified, or Deleted), and baseline and head content, together with the
-          repository, the two resolved commit identifiers, and the selection text.
+          path, change kind (Added, Modified, or Deleted), and baseline and head content.
         justification: |
           A review of a change must keep exactly what was reviewed.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
+
+      - id: ReviewCenter-ReviewService-FromRepository-Source
+        title: >-
+          The ReviewService class shall keep with a review created from a repository the repository, the two resolved
+          commit identifiers, and the selection text.
+        justification: |
+          A review of a change must say which change it covers, so that it can be found and understood later.
         tests:
           - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
 
@@ -339,7 +369,7 @@ sections:
         justification: |
           A review needs a head to be reviewed, and a request without one must fail fast without a fetch.
         tests:
-          - ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn
+          - ReviewService_CreateFromRepositoryAsync_BlankHeadRevision_IsRefusedBeforeOpening
 
       - id: ReviewCenter-ReviewService-FromRepository-SelectionInvalid
         title: >-
@@ -348,7 +378,7 @@ sections:
           Typed-in empty text is a mistake, not a request for all files.
         tests:
           - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
-          - ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile
+          - ReviewService_CreateFromRepositoryAsync_BlankSelection_ThrowsSelectionInvalid
 
       - id: ReviewCenter-ReviewService-FromRepository-SelectionLength
         title: >-
@@ -504,8 +534,8 @@ sections:
 
       - id: ReviewCenter-ReviewService-NothingToReview-Message
         title: >-
-          The ReviewService class shall name the baseline and the head revision in the refusal "Nothing to review: false
-          files matching the selection changed between".
+          The ReviewService class shall name the baseline and the head revision in the refusal "Nothing to review:
+          no files matching the selection changed between {baseline} and {head}".
         justification: |
           The creator must learn that the selection or the revisions are wrong.
         tests:
@@ -770,13 +800,30 @@ sections:
 
       - id: ReviewCenter-ReviewService-DueDate-Repository
         title: >-
-          The ReviewService class shall apply the same due-date rules to a review created from a repository: store and
-          audit a valid date, and refuse a date in the past with the DueDateInvalid rule before it opens the
-          repository.
+          The ReviewService class shall store a valid due date on a review created from a repository.
         justification: |
           The due date must work in the same way however the review is created.
         tests:
-          - ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange
+          - ReviewService_CreateFromRepositoryAsync_DueDate_IsStored
+
+      - id: ReviewCenter-ReviewService-DueDate-Repository-Audit
+        title: >-
+          The ReviewService class shall name a valid due date in the audit entry of a review created from a
+          repository.
+        justification: |
+          The audit entry of the creation must show the due date, as it does for an upload.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_DueDate_IsAudited
+
+      - id: ReviewCenter-ReviewService-DueDate-Repository-Range
+        title: >-
+          The ReviewService class shall refuse a due date in the past for a review created from a repository with the
+          DueDateInvalid rule before it opens the repository.
+        justification: |
+          The same due-date rules apply however the review is created, and a bad request must fail fast without a
+          fetch.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_DueDateInThePast_IsRefusedBeforeOpening
 
       - id: ReviewCenter-ReviewService-DueDate-OutsideDigest
         title: >-
@@ -1040,13 +1087,22 @@ sections:
 
       - id: ReviewCenter-ReviewService-FollowUp-Audit
         title: >-
-          The ReviewService class shall name the followed review, by its whole identifier, and what was carried in the
-          audit entry of the creation.
+          The ReviewService class shall name the followed review, by its whole identifier, in the audit entry of the
+          creation.
         justification: |
-          The history must show on which earlier review a review builds and what it took over.
+          The history must show on which earlier review a review builds.
         tests:
           - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
           - ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId
+
+      - id: ReviewCenter-ReviewService-FollowUp-AuditCarried
+        title: >-
+          The ReviewService class shall state in the audit entry of the creation of a follow-up how many answers and
+          open threads were carried and how many resolved threads were not.
+        justification: |
+          The history must show what a review took over.
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
 
       - id: ReviewCenter-ReviewService-FollowUp-AuditNone
         title: >-
@@ -1112,13 +1168,21 @@ sections:
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-Wording
         title: >-
-          The ReviewService class shall, for a follow-up review, not carry an answer to a check whose wording changed
-          or that is missing from the checklist of the new review.
+          The ReviewService class shall, for a follow-up review, not carry an answer to a check whose wording changed.
         justification: |
           An answer is about a check as it was worded, so it must not be applied to another one.
         tests:
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
           - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Wording-Missing
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry an answer to a check that is missing from
+          the checklist of the new review.
+        justification: |
+          An answer to a check that the new review does not ask has nothing to apply to.
+        tests:
+          - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-NoChecklist
         title: >-
@@ -1142,14 +1206,21 @@ sections:
       - id: ReviewCenter-ReviewService-FollowUpCarry-Baseline
         title: >-
           The ReviewService class shall, for a follow-up review, pass on the answers and sections that the earlier
-          review itself carried for a check or section that no submitted ballot answered, and prefer a submitted
-          ballot over them.
+          review itself carried for a check or section that no submitted ballot answered.
         justification: |
           A chain of follow-ups must not lose the work of the earlier reviews.
         tests:
           - FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward
-          - FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline
           - ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Baseline-BallotWins
+        title: >-
+          The ReviewService class shall, for a follow-up review, prefer a submitted ballot over the rows that the
+          earlier review carried.
+        justification: |
+          A decision that was made in the earlier review is newer than what that review took over.
+        tests:
+          - FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-Threads
         title: >-
@@ -1163,10 +1234,20 @@ sections:
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-ThreadKind
         title: >-
-          The ReviewService class shall, for a follow-up review, keep the kind of a carried thread and the report flag
-          of its comments, so that a carried finding stays a finding and carried chat stays chat.
+          The ReviewService class shall, for a follow-up review, keep the kind of a carried thread, so that a carried
+          finding stays a finding and carried chat stays chat.
         justification: |
           What a discussion means for the report must not change by carrying it.
+        tests:
+          - FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments
+          - FollowUpCarry_CarryThreads_CarriedChat_StaysChat
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-ThreadKind-ReportFlag
+        title: >-
+          The ReviewService class shall, for a follow-up review, keep the report flag of the comments of a carried
+          thread.
+        justification: |
+          A comment that was in the report must stay in it, and chat must stay out.
         tests:
           - FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments
           - FollowUpCarry_CarryThreads_CarriedChat_StaysChat
@@ -1196,10 +1277,26 @@ sections:
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-Resolved
         title: >-
-          The ReviewService class shall, for a follow-up review, not carry resolved threads, but count them and the
-          dropped ones.
+          The ReviewService class shall, for a follow-up review, not carry resolved threads.
         justification: |
-          A resolved discussion is finished, yet the creator should know how many there were.
+          A resolved discussion is finished.
+        tests:
+          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Resolved-Counted
+        title: >-
+          The ReviewService class shall, for a follow-up review, count the resolved threads that it does not carry.
+        justification: |
+          The creator should know how many resolved discussions stay behind.
+        tests:
+          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Resolved-DroppedListed
+        title: >-
+          The ReviewService class shall, for a follow-up review, list in order, each once, the files of the open threads
+          that it drops because the new review does not have the file.
+        justification: |
+          The creator must see which discussions would be lost.
         tests:
           - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
 
@@ -1226,6 +1323,7 @@ sections:
         justification: |
           The creator of a follow-up must not become the author of answers that others gave.
         tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswers_AreNotAnsweredByTheCreator
           - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
 
       - id: ReviewCenter-ReviewService-FollowUpCarry-Marked
@@ -1258,10 +1356,18 @@ sections:
 
       - id: ReviewCenter-ReviewService-FollowUpCheckThreads-Counted
         title: >-
-          The ReviewService class shall count the threads about checks that it leaves out and tell that count in the
-          preview of the follow-up.
+          The ReviewService class shall count the threads about checks that it leaves out of a follow-up.
         justification: |
           The creator learns how many discussions stay behind.
+        tests:
+          - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
+
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-Counted-Preview
+        title: >-
+          The ReviewService class shall tell the count of the threads about checks that it leaves out in the preview
+          of the follow-up.
+        justification: |
+          The creator sees how many discussions stay behind before the review exists.
         tests:
           - ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut
 

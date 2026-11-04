@@ -239,6 +239,16 @@ refused before the repository is opened
 (`ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening`), and a service built
 without repositories throws (`ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws`).
 
+**ReviewService_CreateFromRepositoryAsync_BlankHeadRevision_IsRefusedBeforeOpening**: Arrange a repository; act by
+creating a review with a head revision of white space only; assert the creation is refused with `RevisionInvalid`,
+nothing is stored, and the repository is not opened. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_BlankHeadRevision_IsRefusedBeforeOpening`.
+
+**ReviewService_CreateFromRepositoryAsync_BlankSelection_ThrowsSelectionInvalid**: Arrange a repository; act by creating
+a review with an empty selection and with a selection of white space only (the two cases of a theory); assert each
+creation is refused with `SelectionInvalid`, nothing is stored, and the repository is not opened. This scenario is
+tested by `ReviewService_CreateFromRepositoryAsync_BlankSelection_ThrowsSelectionInvalid`.
+
 **ReviewService_CreateFromRepositoryAsync_RepositoryOfOtherProject_IsRefusedAsNotFound**: Arrange a repository of
 another project; act by creating a review from it; assert the creation is refused with `RepositoryNotFound`, nothing is
 stored, and the repository is not opened. This scenario is tested by
@@ -249,11 +259,18 @@ not know the head revision; act by creating a review with that head; assert the 
 `RevisionNotFound` and nothing is stored. This scenario is tested by
 `ReviewService_CreateFromRepositoryAsync_UnknownHeadRevision_ThrowsRevisionNotFound`.
 
-**ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange**: Arrange a repository; act
-by creating a review with a due date ten days ahead and again with yesterday; assert the first stores the date and
-its audit entry ends with `, due yyyy-MM-dd`, and the second is refused with `DueDateInvalid`, stores nothing, and
-does not open the repository. This scenario is tested by
-`ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange`.
+**ReviewService_CreateFromRepositoryAsync_DueDate_IsStored**: Arrange a repository; act by creating a review with a due
+date ten days ahead; assert the returned and the stored review carry the date. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_DueDate_IsStored`.
+
+**ReviewService_CreateFromRepositoryAsync_DueDate_IsAudited**: Arrange a repository; act by creating a review with a
+due date ten days ahead; assert the one creation entry ends with `, due yyyy-MM-dd`. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_DueDate_IsAudited`.
+
+**ReviewService_CreateFromRepositoryAsync_DueDateInThePast_IsRefusedBeforeOpening**: Arrange a repository; act by
+creating a review with yesterday as the due date; assert the creation is refused with `DueDateInvalid`, nothing is
+stored or audited, and the repository is not opened. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_DueDateInThePast_IsRefusedBeforeOpening`.
 
 **ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest**: Two reviews with the same head files
 but another selection text, head commit, or repository have different record digests. This scenario is tested by
@@ -316,10 +333,6 @@ This scenario is tested by `ReviewService_ProjectChecklistChangedLater_ExistingR
 the project then replaces its checklist. The record digest, the checklist version, and the answers are unchanged, and
 the review is still locked. This scenario is tested by
 `ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected`.
-
-**ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A review that the planner creates for a review-set
-carries the checklist of the project. This scenario is tested by
-`ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`, which is defined in `ReviewPlannerTests.cs`.
 
 **The due date** is verified in `ReviewServiceDueDateTests.cs` with the real service, a fake store, and a fixed clock.
 
@@ -481,6 +494,11 @@ the carried answers and not-applicable sections, marked with the earlier review,
 passed. Once one reviewer takes the only slot of the follow-up, the checklist of that reviewer's own ballot is
 complete and every carried answer keeps its original answerer (the review-level baseline rows). This scenario is tested
 by `ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
+
+**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswers_AreNotAnsweredByTheCreator**: Every check of the earlier review
+was passed by Bob; Ann creates the follow-up. The carried answers are not empty and none of them names Ann as the
+answerer. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriedAnswers_AreNotAnsweredByTheCreator`.
 
 **ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried**: After the checklist of the project
 changed the wording of a check, the answer to that check is not carried and the check is unanswered. This scenario is
