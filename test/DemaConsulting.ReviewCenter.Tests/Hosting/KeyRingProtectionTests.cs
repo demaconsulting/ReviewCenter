@@ -231,6 +231,22 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that an explicit mode is honored when the setting has spaces around the name.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_ResolveMode_ExplicitChoiceWithSurroundingSpaces_IsHonored()
+    {
+        // Arrange: a setting with leading and trailing spaces, on Windows, where the choice is possible
+        var settings = new KeyRingSettings { Protection = "  Dpapi  " };
+
+        // Act
+        var mode = KeyRingProtection.ResolveMode(settings, WindowsPlatform);
+
+        // Assert
+        Assert.Equal(KeyRingProtectionMode.Dpapi, mode);
+    }
+
+    /// <summary>
     ///     Test that DPAPI off Windows is refused with a message that names the setting.
     /// </summary>
     [Fact]
@@ -535,6 +551,90 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that a PFX file (with the password that opens it) loads as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey()
+    {
+        // Arrange: a PFX file with a password
+        using var folder = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(folder, "pfx", Password);
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(pfx), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM file that holds the private key itself loads as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM file that holds the certificate and its key, and no password
+        using var folder = new TemporaryDirectory();
+        var (inside, _) = KeyRingTestCertificates.WritePem(folder, "inside", null, separateKey: false);
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(inside, null), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM certificate with its key in the separate file of DataProtection:CertificateKeyPath loads
+    ///     as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM certificate file and a separate key file, and no password
+        using var folder = new TemporaryDirectory();
+        var (separate, separateKey) = KeyRingTestCertificates.WritePem(folder, "separate", null, separateKey: true);
+        var settings = new KeyRingSettings
+        {
+            Protection = "Certificate",
+            CertificatePath = separate,
+            CertificateKeyPath = separateKey
+        };
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(settings, UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM file whose private key is encrypted loads with the password as a certificate with a
+    ///     private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithEncryptedKey_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM file that holds the certificate and a key that the password encrypts
+        using var folder = new TemporaryDirectory();
+        var (encrypted, _) = KeyRingTestCertificates.WritePem(folder, "encrypted", Password, separateKey: false);
+
+        // Act: prepare the ring with the password
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(encrypted), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
     ///     Test that an earlier certificate loads with the password of the current one, or without a password, and
     ///     that an earlier certificate that cannot be loaded is reported with its position.
     /// </summary>
@@ -593,6 +693,99 @@ public class KeyRingProtectionTests
         Assert.True(plan.RequireEncryptedKeys);
         Assert.Single(plan.Previous);
         Assert.StartsWith("Invalid key ring settings: ", invalidPlan.Problem, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an earlier certificate that has no password, which the password of the current certificate
+    ///     does not open, loads without a password.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PreviousCertificateWithoutPassword_LoadsWithoutIt()
+    {
+        // Arrange: the current certificate with a password and an earlier one that has none
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var plain = KeyRingTestCertificates.WritePfx(folder, "plain", null);
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(current, Password, plain), UnixPlatform);
+
+        // Assert: no problem and the earlier certificate is loaded
+        Assert.Null(plan.Problem);
+        Assert.Single(plan.Previous);
+    }
+
+    /// <summary>
+    ///     Test that the list of earlier certificates is read from the configuration section.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_PreviousCertificatePaths_AreRead()
+    {
+        // Arrange: a configuration with two earlier certificates
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var first = KeyRingTestCertificates.WritePfx(folder, "first", Password);
+        var second = KeyRingTestCertificates.WritePfx(folder, "second", Password);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DataProtection:CertificatePath"] = current,
+            ["DataProtection:CertificatePassword"] = Password,
+            ["DataProtection:PreviousCertificatePaths:0"] = first,
+            ["DataProtection:PreviousCertificatePaths:1"] = second
+        }).Build();
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(configuration, UnixPlatform);
+
+        // Assert: both earlier certificates were read and loaded
+        Assert.Null(plan.Problem);
+        Assert.Equal(2, plan.Previous.Count);
+    }
+
+    /// <summary>
+    ///     Test that DataProtection:RequireEncryptedKeys is read from the configuration section.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_RequireEncryptedKeys_IsRead()
+    {
+        // Arrange: a configuration that requires encrypted keys, with a certificate so that there is no problem
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DataProtection:CertificatePath"] = current,
+            ["DataProtection:CertificatePassword"] = Password,
+            ["DataProtection:RequireEncryptedKeys"] = "true"
+        }).Build();
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(configuration, UnixPlatform);
+
+        // Assert
+        Assert.Null(plan.Problem);
+        Assert.True(plan.RequireEncryptedKeys);
+    }
+
+    /// <summary>
+    ///     Test that the section and the setting names are read in any letter case.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_NamesInAnyLetterCase_AreRead()
+    {
+        // Arrange: a configuration whose section and names are in other letter cases
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DATAPROTECTION:PROTECTION"] = "dpapi",
+            ["dataprotection:dpapiscope"] = "localmachine"
+        }).Build();
+
+        // Act: on a Windows platform, where DPAPI is possible
+        using var plan = KeyRingProtection.Prepare(configuration, WindowsPlatform);
+
+        // Assert: the choices that the differently cased names give are in force
+        Assert.Null(plan.Problem);
+        Assert.Equal(KeyRingProtectionMode.Dpapi, plan.Mode);
+        Assert.True(plan.LocalMachine);
     }
 
     /// <summary>
@@ -1099,6 +1292,37 @@ public class KeyRingProtectionTests
 
         // Assert
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+    }
+
+    /// <summary>
+    ///     Test that the key folder is restricted to its owner on Unix, whether it exists with the mode of a shared
+    ///     folder or does not exist yet.
+    /// </summary>
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void KeyRingProtection_PrepareKeyFolder_UnixFolder_IsOwnerOnly()
+    {
+        // Arrange: a key folder that the group and others may read, a folder that does not exist yet, and a plan
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
+        using var folder = new TemporaryDirectory();
+        var shared = folder.GetFilePath("shared");
+        Directory.CreateDirectory(shared);
+        File.SetUnixFileMode(
+            shared,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        var created = folder.GetFilePath("created");
+        using var plan = KeyRingProtection.Prepare(new KeyRingSettings { Protection = "PermissionsOnly" }, UnixPlatform);
+
+        // Act
+        KeyRingProtection.PrepareKeyFolder(plan, shared);
+        KeyRingProtection.PrepareKeyFolder(plan, created);
+
+        // Assert: both folders are readable, writable, and searchable by their owner only
+        var ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        Assert.Equal(ownerOnly, File.GetUnixFileMode(shared));
+        Assert.Equal(ownerOnly, File.GetUnixFileMode(created));
     }
 
     /// <summary>

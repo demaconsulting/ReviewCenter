@@ -3,59 +3,177 @@
 #
 # The GitSource class reads a registered git repository through a local bare mirror: it keeps the mirror current,
 # resolves revisions to commits, lists the files that changed between two commits, and reads files as raw bytes.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: GitSource Unit Requirements
     requirements:
       - id: ReviewCenter-GitSource-Mirror
         title: >-
-          The GitSource class shall keep one bare mirror of each registered repository, clone it on first use and
-          again when the registered location changes, fetch the current state and drop deleted branches each time the
-          repository is opened, leave nothing behind when the first clone fails, and never store the token in the
-          mirror.
+          The GitSource class shall keep one bare mirror of each registered repository, cloned on first use.
         justification: |
-          A review reads the repository as it is now, so the mirror must follow the remote. A mirror that kept the
-          token in its configuration would leak it to everyone who can read the cache folder.
+          Reading from a local mirror is fast and the same for every kind of location.
+        tests:
+          - GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository
+
+      - id: ReviewCenter-GitSource-Mirror-Refresh
+        title: >-
+          The GitSource class shall fetch the new commits of the remote into the mirror each time the repository is
+          opened.
+        justification: |
+          A review reads the repository as it is now, so the mirror must follow the remote.
         tests:
           - GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches
+
+      - id: ReviewCenter-GitSource-Mirror-Prune
+        title: >-
+          The GitSource class shall drop from the mirror the branches that were deleted in the remote each time the
+          repository is opened.
+        justification: |
+          A branch that was deleted must not stay resolvable.
+        tests:
+          - GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches
+
+      - id: ReviewCenter-GitSource-Mirror-LocationChange
+        title: >-
+          The GitSource class shall clone the mirror again when the registered location of the repository changes.
+        justification: |
+          The history of two repositories must never be mixed in one mirror.
+        tests:
           - GitSource_LocationChanged_ClonesAgain
+
+      - id: ReviewCenter-GitSource-Mirror-FailedClone
+        title: >-
+          The GitSource class shall leave no mirror folder behind when the first clone fails.
+        justification: |
+          A half-made mirror would be fetched into later and show a repository that is not complete.
+        tests:
           - GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp
+
+      - id: ReviewCenter-GitSource-Mirror-CloneError
+        title: >-
+          The GitSource class shall report a location that cannot be cloned as an access failure (rule GitAccessFailed)
+          that names the repository.
+        justification: |
+          The user must learn which repository failed.
+        tests:
+          - GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp
+
+      - id: ReviewCenter-GitSource-Mirror-NoToken
+        title: >-
+          The GitSource class shall never store the access token in the mirror.
+        justification: |
+          A mirror that kept the token in its configuration would leak it to everyone who can read the cache folder.
+        tests:
           - GitSource_Mirror_NeverStoresTheToken
 
       - id: ReviewCenter-GitSource-Serialization
         title: >-
-          The GitSource class shall let only one session at a time use the mirror of a repository, making a second
-          session wait until the first ends, while sessions on different repositories run at the same time.
+          The GitSource class shall make a second session on a repository wait until the first session on that
+          repository ends.
         justification: |
-          Fetching into a mirror while another request reads it could show a half-updated repository, and two
-          fetches into the same folder can corrupt it. Different repositories share nothing, so they need not wait.
+          Fetching into a mirror while another request reads it could show a half-updated repository, and two fetches
+          into the same folder can corrupt it.
         tests:
           - GitSource_SecondSessionOnSameRepository_WaitsForTheFirst
+
+      - id: ReviewCenter-GitSource-Serialization-Parallel
+        title: >-
+          The GitSource class shall let sessions on different repositories run at the same time.
+        justification: |
+          Different repositories share nothing, so they need not wait for each other.
+        tests:
           - GitSource_DifferentRepositories_OpenTogether
 
       - id: ReviewCenter-GitSource-Revision
         title: >-
-          The GitSource class shall resolve a branch, a tag, or a commit identifier to the identifier of the commit,
-          and refuse a revision that does not exist in the repository.
+          The GitSource class shall resolve a branch, a tag, or a commit identifier to the identifier of the commit.
         justification: |
-          A review is made of one exact commit, so a name that can move must be turned into the commit that it
-          names at that time, and a name that does not exist must be reported to the user.
+          A review is made of one exact commit, so a name that can move must be turned into the commit that it names at
+          that time.
+        tests:
+          - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+
+      - id: ReviewCenter-GitSource-Revision-Unknown
+        title: >-
+          The GitSource class shall refuse a revision that does not exist in the repository with the rule
+          RevisionNotFound.
+        justification: |
+          A name that does not exist must be reported to the user.
+        tests:
+          - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+
+      - id: ReviewCenter-GitSource-Revision-Unsafe
+        title: >-
+          The GitSource class shall refuse a revision that could be read as a git option with the rule
+          RevisionInvalid.
+        justification: |
+          Text of a user must never act as an option of git.
         tests:
           - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
       - id: ReviewCenter-GitSource-Changes
         title: >-
           The GitSource class shall list the files that were added, modified, or deleted between a baseline commit and a
-          head commit, without rename detection, so that a rename is a deletion of the old path plus an addition of the
-          new path, and shall list every file of the head commit as added when there is no baseline.
+          head commit.
         justification: |
-          A review shows what changed since the baseline. Renames are not detected (git runs with
-          `--no-renames`): detecting one would need a similarity guess that can differ between runs, so a rename is
-          reported as the two plain facts. A review without a baseline covers
-          the whole head.
+          A review shows what changed since the baseline.
         tests:
           - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-Rename
+        title: >-
+          The GitSource class shall report a renamed file as a deletion of the old path and an addition of the new
+          path.
+        justification: |
+          Renames are not detected (git runs with `--no-renames`): detecting one would need a similarity guess that can
+          differ between runs, so a rename is reported as the two plain facts.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-NoBaseline
+        title: >-
+          The GitSource class shall list every file of the head commit as added when there is no baseline.
+        justification: |
+          A review without a baseline covers the whole head.
+        tests:
           - GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
+
+      - id: ReviewCenter-GitSource-Changes-ModeOnly
+        title: >-
+          The GitSource class shall not list a file whose only change is its file mode.
+        justification: |
+          The content of the file did not change, so there is nothing to review.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-Order
+        title: >-
+          The GitSource class shall list the changes in the ordinal order of their paths.
+        justification: |
+          The planner and the fingerprint need a stable order.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-Blobs
+        title: >-
+          The GitSource class shall give with each change the blob identifiers of the baseline version and the head
+          version.
+        justification: |
+          The content of a file is read by its blob identifier.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-Blobs-MissingSide
+        title: >-
+          The GitSource class shall give no blob identifier for a side of a change on which the file does not exist.
+        justification: |
+          An added file has no baseline version and a deleted file has no head version, and a made-up identifier would
+          read the wrong content.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 
       - id: ReviewCenter-GitSource-SpecialEntries
         title: >-
@@ -65,43 +183,144 @@ sections:
           point outside the repository.
         tests:
           - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
+
+      - id: ReviewCenter-GitSource-SpecialEntries-Reported
+        title: >-
+          The GitSource class shall report each entry that it left out of a listing, with its path and a reason.
+        justification: |
+          The planner can tell the user what was not reviewed.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+          - GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
 
       - id: ReviewCenter-GitSource-Content
         title: >-
           The GitSource class shall read a file as exactly the bytes the repository stores, without any conversion of
-          line endings or other filtering, shall refuse a file larger than the limit given for the read, and shall
-          accept only commit and blob identifiers in their exact hexadecimal form.
+          line endings or other filtering.
         justification: |
-          The fingerprint of a review is calculated over the bytes, so any conversion would change it. The size limit
-          protects the server, and refusing anything that is not an identifier keeps text of a user out of the git
-          command line.
+          The fingerprint of a review is calculated over the bytes, so any conversion would change it.
         tests:
           - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
+
+      - id: ReviewCenter-GitSource-Content-Limit
+        title: >-
+          The GitSource class shall refuse a file larger than the limit given for the read with an access failure
+          (rule GitAccessFailed).
+        justification: |
+          The size limit protects the server, and a file that is too large is refused and never truncated.
+        tests:
+          - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
+
+      - id: ReviewCenter-GitSource-Content-ObjectIds
+        title: >-
+          The GitSource class shall refuse a commit or blob identifier that is not a lowercase hexadecimal object
+          identifier with an argument error.
+        justification: |
+          Refusing anything that is not an identifier keeps text of a user out of the git command line.
+        tests:
           - GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException
+
+      - id: ReviewCenter-GitSource-Content-Size
+        title: >-
+          The GitSource class shall report the size of a file in bytes.
+        justification: |
+          The check of the size limit and the callers need the size of a file.
+        tests:
+          - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
 
       - id: ReviewCenter-GitSource-Ancestry
         title: >-
-          The GitSource class shall tell whether one commit is an ancestor of another (a commit being an ancestor of
-          itself), and shall report a commit that the repository does not have as an error that shows no path.
+          The GitSource class shall tell that a commit is an ancestor of another commit when it is in the history of the
+          other commit.
         justification: |
           The planner may use the head of the last approved review as the baseline of a new review only when that commit
-          is in the history of the new head. A rewritten history makes it unrelated, and the planner then has to fall
-          back to a full review instead of listing changes against a commit that is not part of the history.
+          is in the history of the new head.
         tests:
           - GitSource_IsAncestor_History_AnswersYesAndNo
+
+      - id: ReviewCenter-GitSource-Ancestry-NotAncestor
+        title: >-
+          The GitSource class shall tell that a commit is not an ancestor of another commit when it is later than the
+          other commit.
+        justification: |
+          A rewritten history makes the commits unrelated, and the planner then has to fall back to a full review
+          instead of listing changes against a commit that is not part of the history.
+        tests:
+          - GitSource_IsAncestor_History_AnswersYesAndNo
+
+      - id: ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
+        title: >-
+          The GitSource class shall tell that a commit is not an ancestor of another commit when it lies on a diverged
+          branch.
+        justification: |
+          A commit on another branch is not part of the history of the new head, so it cannot be the baseline of a
+          review.
+        tests:
+          - GitSource_IsAncestor_DivergedBranch_AnswersNo
+
+      - id: ReviewCenter-GitSource-Ancestry-Itself
+        title: >-
+          The GitSource class shall tell that a commit is an ancestor of itself.
+        justification: |
+          The head of the last approved review may be the same commit as the new head.
+        tests:
+          - GitSource_IsAncestor_History_AnswersYesAndNo
+
+      - id: ReviewCenter-GitSource-Ancestry-UnknownCommit
+        title: >-
+          The GitSource class shall report a commit that the repository does not have as an access failure (rule
+          GitAccessFailed).
+        justification: |
+          An unknown commit is a real failure and must not be answered with "no".
+        tests:
+          - GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths
+
+      - id: ReviewCenter-GitSource-Ancestry-NoPaths
+        title: >-
+          The GitSource class shall not show a path of the server in the error for a commit that the repository does
+          not have.
+        justification: |
+          Paths of the server are information for administrators only.
+        tests:
           - GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths
 
       - id: ReviewCenter-GitSource-CacheFolder
         title: >-
-          The GitSource class shall report a cache folder that cannot be written, or whose path is malformed or too
-          long, as an administrator-level `GitUnavailable` error that names the setting but not the path, and shall
-          release the repository lock.
+          The GitSource class shall report a cache folder that cannot be written as git unavailable (rule
+          GitUnavailable).
         justification: |
-          A cache folder that is missing or read-only is a server problem that only an administrator can fix. The
-          user must get a clear message instead of a failed page, the path must not reach ordinary users, and a
-          lock that stayed held would block every later review of the repository.
+          A cache folder that is missing or read-only is a server problem that only an administrator can fix. The user
+          must get a clear message instead of a failed page.
+        tests:
+          - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitSource-CacheFolder-Malformed
+        title: >-
+          The GitSource class shall report a cache path that is malformed or too long as git unavailable.
+        justification: |
+          A reader of the source must get the same clear "git unavailable" for a bad cache path, not an exception that
+          is thrown while the mirror folder is chosen.
+        tests:
+          - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitSource-CacheFolder-Message
+        title: >-
+          The GitSource class shall name the Git:CachePath setting, and neither the path nor the exception of the file
+          system, in the error for a cache folder that cannot be used.
+        justification: |
+          The source creates the mirror folders in the cache, so a failure there reaches the user through its own
+          error and must not show the path or the exception of the file system either.
         tests:
           - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
           - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable
-          - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable
-          - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitSource-CacheFolder-Lock
+        title: >-
+          The GitSource class shall release the lock on the repository when the cache folder cannot be used, so that
+          the next open does not wait.
+        justification: |
+          A lock that stayed held would block every later review of the repository.
+        tests:
+          - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
+          - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable

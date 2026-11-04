@@ -59,6 +59,10 @@ over the limit is `GitAccessFailed`, not a truncated result. This scenario is te
 later commit and of itself, a later commit is not an ancestor of an earlier one, and a commit on another branch is not
 an ancestor of the main branch. This scenario is tested by `GitSource_IsAncestor_History_AnswersYesAndNo`.
 
+**GitSource_IsAncestor_DivergedBranch_AnswersNo**: In a repository with a side branch from the first commit, the side
+commit is not an ancestor of the second commit on the main branch, and the second commit is not an ancestor of the side
+commit. This scenario is tested by `GitSource_IsAncestor_DivergedBranch_AnswersNo`.
+
 **GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths**: A well-formed commit id that does not exist in
 the repository gives `GitAccessFailed`, and the message shows neither the location nor the folder of the mirror. This
 scenario is tested by `GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths`.
@@ -67,6 +71,10 @@ scenario is tested by `GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedW
 to `IsAncestorAsync`, that are not object ids
 (an option, a revision name, a wrong length, or uppercase) are refused with an `ArgumentException` before git runs. This
 scenario is tested by `GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException`.
+
+**GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository**: Opening two registered repositories for the first time
+makes one bare mirror folder for each, named for the repository, with no working tree, and leaves no temporary folder.
+This scenario is tested by `GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository`.
 
 **GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches**: After a commit is added and a branch is deleted in the
 origin, opening again makes the new commit resolvable and the deleted branch unknown. This scenario is tested by

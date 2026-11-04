@@ -23,6 +23,7 @@ words:
   - selftest
   - unpooled
   - unsubmitted
+  - unwritable
   - onclick
   - onsubmit
   - pyhanko
@@ -33,6 +34,8 @@ words:
   - toggleable
   - offadm
   - dpapi
+  - dpapiscope
+  - dataprotection
   - encryptor
   - encryptors
   - decryptor

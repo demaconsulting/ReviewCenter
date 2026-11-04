@@ -80,6 +80,77 @@ public class UserCommandTests
     }
 
     /// <summary>
+    ///     Test that the report of a user that is not a system administrator names the user and carries no
+    ///     administrator mark.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Run_NoSwitch_ReportsUserWithoutAdministratorMark()
+    {
+        // Arrange: a new database
+        var connectionString = TestDatabase.NewConnectionString();
+
+        // Act: add a user without the switch
+        var (exitCode, output) = Run(connectionString, () => Password, "--username", "ann", "--display-name", "Ann");
+
+        // Assert: success, the report names the user, and it does not say that the user is a system administrator
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Created user 'ann'.", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("system administrator", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the password is taken from the environment variable when no password source is supplied.
+    /// </summary>
+    [Fact]
+    public async Task UserCommand_Run_PasswordInEnvironment_CreatesUserWithThatPassword()
+    {
+        // Arrange: a new database and a password in the environment variable (a process-wide setting that is put
+        // back afterwards; no other test of this class reads it, because they all supply a password source)
+        const string environmentPassword = "staple environment battery";
+        var connectionString = TestDatabase.NewConnectionString();
+        var previous = Environment.GetEnvironmentVariable(UserCommand.PasswordVariable);
+        int exitCode;
+        try
+        {
+            Environment.SetEnvironmentVariable(UserCommand.PasswordVariable, environmentPassword);
+
+            // Act: add a user without a password source, so that the command reads the real sources
+            (exitCode, _) = Run(connectionString, (string?)null, (Func<string?>?)null, "--username", "ann", "--display-name", "Ann");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(UserCommand.PasswordVariable, previous);
+        }
+
+        // Assert: success, and the user signs in with the password of the environment variable
+        Assert.Equal(0, exitCode);
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
+        var user = await app.Services.GetRequiredService<UserService>()
+            .AuthenticateAsync("ann", environmentPassword, TestContext.Current.CancellationToken);
+        Assert.Equal("Ann", user?.DisplayName);
+    }
+
+    /// <summary>
+    ///     Test that a user name that breaks the user name rules is reported as an error with exit code 1 and that no
+    ///     user is created.
+    /// </summary>
+    [Fact]
+    public async Task UserCommand_Run_InvalidUserName_ReportsErrorAndCreatesNothing()
+    {
+        // Arrange: a new database
+        var connectionString = TestDatabase.NewConnectionString();
+
+        // Act: add a user whose name has a space, which the user name rules do not allow
+        var (exitCode, output) = Run(connectionString, () => Password, "--username", "a b", "--display-name", "Ann");
+
+        // Assert: exit code 1, the rule is explained, and no user exists
+        Assert.Equal(1, exitCode);
+        Assert.Contains("The user name must be", output, StringComparison.Ordinal);
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
+        Assert.Null(await app.Services.GetRequiredService<UserService>().GetAsync("a b", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a user name that exists is reported as an error with exit code 1.
     /// </summary>
     [Fact]
@@ -170,6 +241,74 @@ public class UserCommandTests
     }
 
     /// <summary>
+    ///     Makes the key presses of a typed text, ended by the Enter key.
+    /// </summary>
+    /// <param name="text">The text; <c>\b</c> stands for the Backspace key.</param>
+    /// <returns>A function that gives the next key press each time it is called.</returns>
+    private static Func<ConsoleKeyInfo> TypedKeys(string text)
+    {
+        var keys = new Queue<ConsoleKeyInfo>(
+            text.Select(c => c == '\b'
+                ? new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false)
+                : new ConsoleKeyInfo(c, ConsoleKey.A, false, false, false))
+                .Append(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)));
+        return keys.Dequeue;
+    }
+
+    /// <summary>
+    ///     Test that the prompt asks for the password and then for the repeated password, and returns the value when
+    ///     both entries are the same.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Prompt_BothEntries_AreAskedAndTheSameValueIsReturned()
+    {
+        // Arrange: a keyboard that gives the same entry twice and a writer for the questions
+        var entries = new Queue<string>(["correct horse", "correct horse"]);
+        var prompts = new StringWriter();
+
+        // Act: run the prompt
+        var password = UserCommand.Prompt(entries.Dequeue, prompts);
+
+        // Assert: the value is returned, both entries were read, and both questions were asked in order
+        Assert.Equal("correct horse", password);
+        Assert.Empty(entries);
+        Assert.Equal("Password: Repeat password: ", prompts.ToString());
+    }
+
+    /// <summary>
+    ///     Test that two different entries are refused with the error that the passwords do not match.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Prompt_DifferentEntries_ThrowsInvalidOperation()
+    {
+        // Arrange: a keyboard that gives two different entries
+        var entries = new Queue<string>(["correct horse", "correct hose"]);
+
+        // Act: run the prompt
+        var exception = Assert.Throws<InvalidOperationException>(() => UserCommand.Prompt(entries.Dequeue, new StringWriter()));
+
+        // Assert: the message says that the passwords do not match
+        Assert.Equal("The passwords do not match.", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the Backspace key removes the last character that was typed.
+    /// </summary>
+    [Fact]
+    public void UserCommand_ReadMasked_Backspace_RemovesLastCharacter()
+    {
+        // Arrange: the keys a, b, Backspace, c and Enter
+        var echo = new StringWriter();
+
+        // Act: read the line
+        var text = UserCommand.ReadMasked(TypedKeys("ab\bc"), echo);
+
+        // Assert: the b was removed, and the typed characters were not echoed
+        Assert.Equal("ac", text);
+        Assert.Equal(Environment.NewLine, echo.ToString());
+    }
+
+    /// <summary>
     ///     Runs the user command with the given arguments against a database.
     /// </summary>
     /// <param name="connectionString">The connection string of the database.</param>
@@ -184,13 +323,13 @@ public class UserCommandTests
     /// </summary>
     /// <param name="connectionString">The connection string of the database.</param>
     /// <param name="keysPath">The key folder to configure, or <c>null</c> for the default.</param>
-    /// <param name="passwordSource">Supplies the password.</param>
+    /// <param name="passwordSource">Supplies the password; <c>null</c> selects the real password sources.</param>
     /// <param name="arguments">The arguments after <c>user add</c>.</param>
     /// <returns>The exit code and everything the command wrote.</returns>
     private static (int ExitCode, string Output) Run(
         string connectionString,
         string? keysPath,
-        Func<string?> passwordSource,
+        Func<string?>? passwordSource,
         params string[] arguments)
     {
         var log = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".log");

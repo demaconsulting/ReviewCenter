@@ -18,18 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Versioning;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.SelfTest;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -262,21 +266,68 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that an invalid sign-in throttle setting stops the build with an error naming the setting.
+    ///     Test that a sign-in throttle limit that is not positive stops the build with an error naming the setting.
     /// </summary>
     /// <param name="name">The setting under <c>Identity:Throttle</c>.</param>
     /// <param name="value">The invalid value.</param>
-    /// <param name="alsoSet">An extra setting made at the same time, as <c>name=value</c>, or <c>null</c>.</param>
     [Theory]
-    [InlineData("MaxFailuresPerName", "0", null)]
-    [InlineData("MaxFailuresPerName", "-1", null)]
-    [InlineData("MaxFailuresPerAddress", "0", null)]
-    [InlineData("MaxFailuresPerAddress", "4", "MaxFailuresPerName=5")]
-    [InlineData("WindowSeconds", "0", null)]
-    [InlineData("WindowSeconds", "86401", null)]
-    public void ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError(string name, string value, string? alsoSet)
+    [InlineData("MaxFailuresPerName", "0")]
+    [InlineData("MaxFailuresPerName", "-1")]
+    [InlineData("MaxFailuresPerAddress", "0")]
+    public void ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError(string name, string value)
     {
-        // Arrange: configuration with one invalid throttle value
+        // Arrange and Act: configuration with one limit that is not positive
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?> { [$"Identity:Throttle:{name}"] = value });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"Identity:Throttle:{name}", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a sign-in throttle window outside 1 to 86400 seconds stops the build with an error naming the
+    ///     setting.
+    /// </summary>
+    /// <param name="value">The invalid number of seconds.</param>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("86401")]
+    public void ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError(string value)
+    {
+        // Arrange and Act: configuration with a window outside the allowed range
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?> { ["Identity:Throttle:WindowSeconds"] = value });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Throttle:WindowSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a per-address throttle limit below the per-name limit stops the build with an error naming the
+    ///     setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError()
+    {
+        // Arrange and Act: configuration whose address limit is below the name limit
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?>
+        {
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "4",
+            ["Identity:Throttle:MaxFailuresPerName"] = "5"
+        });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Throttle:MaxFailuresPerAddress", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Creates the application with throttle settings that are invalid and returns the error that stops the build.
+    /// </summary>
+    /// <param name="throttle">The invalid settings under <c>Identity:Throttle</c>, with their full names.</param>
+    /// <returns>The error that stopped the build.</returns>
+    private static InvalidOperationException CreateWithInvalidThrottle(Dictionary<string, string?> throttle)
+    {
         using var context = Context.Create(["serve", "--silent"]);
         var options = new ServerHostOptions
         {
@@ -284,27 +335,12 @@ public class ServerHostTests
             ConfigureBuilder = builder =>
             {
                 builder.WebHost.UseTestServer();
-                var values = new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
-                    [$"Identity:Throttle:{name}"] = value
-                };
-                if (alsoSet is not null)
-                {
-                    var parts = alsoSet.Split('=');
-                    values[$"Identity:Throttle:{parts[0]}"] = parts[1];
-                }
-
-                builder.Configuration.AddInMemoryCollection(values);
+                throttle["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+                builder.Configuration.AddInMemoryCollection(throttle);
             }
         };
 
-        // Act: create the application
-        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
-
-        // Assert: the message is the sign-in settings error and names the setting
-        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
-        Assert.Contains($"Identity:Throttle:{name}", exception.Message, StringComparison.Ordinal);
+        return Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
     }
 
     /// <summary>
@@ -336,6 +372,37 @@ public class ServerHostTests
         }));
         Assert.NotNull(defaults);
         Assert.NotNull(custom);
+    }
+
+    /// <summary>
+    ///     Test that explicit, valid throttle settings (the largest window included) build the application.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication()
+    {
+        // Arrange: explicit values, with the largest window
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Throttle:MaxFailuresPerName"] = "3",
+                    ["Identity:Throttle:MaxFailuresPerAddress"] = "3",
+                    ["Identity:Throttle:WindowSeconds"] = "86400"
+                });
+            }
+        };
+
+        // Act
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
     }
 
     /// <summary>
@@ -434,6 +501,38 @@ public class ServerHostTests
         Assert.NotNull(off);
         Assert.NotNull(secure);
         Assert.NotNull(loopback);
+    }
+
+    /// <summary>
+    ///     Test that valid settings with http on a loopback host build the application.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication()
+    {
+        // Arrange: valid enabled settings whose authority is http on a loopback host
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "http://localhost:8080/realm",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = "top-secret-value"
+                });
+            }
+        };
+
+        // Act
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
     }
 
     /// <summary>
@@ -614,6 +713,46 @@ public class ServerHostTests
         var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
 
         // Assert: the sign-in settings error names the file setting and holds no secret
+        Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-in-the-file", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a client secret file that is set together with an inline client secret stops the build with an
+    ///     error that names the file setting and never contains either secret.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret()
+    {
+        // Arrange: valid enabled settings, an existing secret file, and an inline secret as well
+        using var folder = new TemporaryDirectory();
+        var path = folder.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, "secret-in-the-file");
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "https://idp.example.com/",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = "top-secret-value",
+                    ["Identity:Oidc:ClientSecretFile"] = path
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the sign-in settings error names the file setting and holds neither secret
         Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Identity:Oidc:ClientSecretFile", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
@@ -902,6 +1041,117 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the project access rules as one shared instance.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve the rules twice
+        var first = app.Services.GetRequiredService<IProjectAccess>();
+        var second = app.Services.GetRequiredService<IProjectAccess>();
+
+        // Assert: one shared instance
+        Assert.NotNull(first);
+        Assert.Same(first, second);
+    }
+
+    /// <summary>
+    ///     Test that the host registers the audit appender, the audit store and the audit service as one shared
+    ///     instance each.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve each of the three twice
+        var appender = app.Services.GetRequiredService<AuditAppender>();
+        var store = app.Services.GetRequiredService<IAuditStore>();
+        var audit = app.Services.GetRequiredService<AuditService>();
+
+        // Assert: every resolution returns the same instance
+        Assert.Same(appender, app.Services.GetRequiredService<AuditAppender>());
+        Assert.Same(store, app.Services.GetRequiredService<IAuditStore>());
+        Assert.Same(audit, app.Services.GetRequiredService<AuditService>());
+    }
+
+    /// <summary>
+    ///     Test that an audit entry that cannot be stored is reported with a logged warning and does not throw.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse()
+    {
+        // Arrange: an application whose audit store refuses every appended entry
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(
+            logs,
+            null,
+            ["serve", "--silent"],
+            null,
+            services =>
+            {
+                services.AddSingleton<AuditStore>();
+                services.AddSingleton<IAuditStore>(provider =>
+                {
+                    var proxy = DispatchProxy.Create<IAuditStore, FailingAppendProxy>();
+                    ((FailingAppendProxy)(object)proxy).Inner = provider.GetRequiredService<AuditStore>();
+                    return proxy;
+                });
+            });
+
+        // Act: record an entry through the registered audit service
+        var recorded = await app.Services.GetRequiredService<AuditService>()
+            .TryRecordAsync(AuditDraft.By(new Actor("ann", "Ann"), "test.action", "detail"), TestContext.Current.CancellationToken);
+
+        // Assert: nothing was thrown, the result is false, and the host logged a warning about the entry
+        Assert.False(recorded);
+        Assert.Contains(
+            logs.Entries,
+            e => e.Category == typeof(ServerHost).FullName
+                 && e.Level == LogLevel.Warning
+                 && e.Message.Contains("An audit entry could not be recorded", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that registering and resolving the services creates no key file and no key folder: the key ring is
+    ///     touched only when the application starts or a secret is protected.
+    /// </summary>
+    [Fact]
+    public void ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile()
+    {
+        // Arrange: configuration that points the key ring at a folder that does not exist
+        using var folder = new TemporaryDirectory();
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                ["DataProtection:KeysPath"] = keys,
+                ["DataProtection:Protection"] = "PermissionsOnly"
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        // Act: register the services and resolve two of them, without the key ring
+        ServerHost.AddServices(services, configuration);
+        using var provider = services.BuildServiceProvider();
+        var users = provider.GetRequiredService<UserService>();
+        var audit = provider.GetRequiredService<AuditService>();
+
+        // Assert: the services exist, and neither the folder nor a key was created
+        Assert.NotNull(users);
+        Assert.NotNull(audit);
+        Assert.False(Directory.Exists(keys), "registering the services must not create the key ring");
+    }
+
+    /// <summary>
     ///     Test that the host registers the repository registry and the git source, with the key ring and the git
     ///     cache folder placed beside the database by default.
     /// </summary>
@@ -1112,6 +1362,167 @@ public class ServerHostTests
         finally
         {
             Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Test that an anonymous visitor who asks for a protected page is sent to the login page, which remembers
+    ///     the page that was asked for.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin()
+    {
+        // Arrange: the real pipeline and a visitor who is not signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request a protected page
+        var response = await browser.Client.GetAsync("/projects", TestContext.Current.CancellationToken);
+
+        // Assert: redirected to the login page with the requested page as the return address
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location?.ToString();
+        Assert.Contains("/login?ReturnUrl=", location, StringComparison.Ordinal);
+        Assert.Contains(Uri.EscapeDataString("/projects"), location, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the home page and the login page are open to an anonymous visitor.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed()
+    {
+        // Arrange: the real pipeline and a visitor who is not signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request both pages
+        var home = await browser.Client.GetAsync("/", TestContext.Current.CancellationToken);
+        var login = await browser.Client.GetAsync("/login", TestContext.Current.CancellationToken);
+
+        // Assert: both are served
+        Assert.Equal(System.Net.HttpStatusCode.OK, home.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, login.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the git timeout is the default of 120 seconds when no setting is given.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_NoGitSettings_UsesDefaultTimeout()
+    {
+        // Arrange: the real pipeline with no git settings
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+
+        // Act: read the git options in effect
+        var git = app.Services.GetRequiredService<GitOptions>();
+
+        // Assert: the default timeout
+        Assert.Equal(GitOptions.DefaultTimeoutSeconds, git.TimeoutSeconds);
+        Assert.Equal(120, git.TimeoutSeconds);
+    }
+
+    /// <summary>
+    ///     Test that the text of a start-up failure reaches the context, which writes it to the log file.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_RunAsync_UnsupportedProvider_ReportsTheError()
+    {
+        // Arrange: a log file and configuration that selects an unsupported provider
+        using var folder = new TemporaryDirectory();
+        var logFile = Path.Combine(folder.DirectoryPath, "run.log");
+        int exitCode;
+        using (var context = Context.Create(["serve", "--silent", "--log", logFile]))
+        {
+            // Act: run the server
+            exitCode = await ServerHost.RunAsync(context, UnsupportedProviderOptions(), TestContext.Current.CancellationToken);
+        }
+
+        // Assert: exit code 1, and the error text names the failure and the provider
+        Assert.Equal(1, exitCode);
+        var text = await File.ReadAllTextAsync(logFile, TestContext.Current.CancellationToken);
+        Assert.Contains("Failed to prepare the database", text, StringComparison.Ordinal);
+        Assert.Contains("Oracle", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the endpoint that receives the one-time code is mapped while the second factor is on.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_TotpOn_CodeEndpointIsMapped()
+    {
+        // Arrange: the real pipeline with the second factor on (the default)
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+
+        // Act: look for the endpoint among the mapped routes
+        var mapped = IsMapped(app, TotpSignIn.CodeEndpoint);
+
+        // Assert: it is mapped
+        Assert.True(mapped);
+    }
+
+    /// <summary>
+    ///     Test that the endpoint that receives the one-time code is not mapped while the second factor is off.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_TotpOff_CodeEndpointIsNotMapped()
+    {
+        // Arrange: the real pipeline with the second factor switched off
+        var settings = new Dictionary<string, string?> { ["Identity:Totp:Enabled"] = "false" };
+        await using var app = await TestWebApp.StartAsync(
+            new CapturingLoggerProvider(),
+            null,
+            ["serve", "--silent"],
+            settings);
+
+        // Act: look for the endpoint among the mapped routes
+        var mapped = IsMapped(app, TotpSignIn.CodeEndpoint);
+
+        // Assert: it is not mapped
+        Assert.False(mapped);
+    }
+
+    /// <summary>
+    ///     Tells whether a route pattern is mapped in an application.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="pattern">The route pattern, for example <c>/auth/login-totp</c>.</param>
+    /// <returns><c>true</c> when an endpoint with that pattern is mapped.</returns>
+    private static bool IsMapped(WebApplication app, string pattern)
+    {
+        return ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Any(endpoint => string.Equals(endpoint.RoutePattern.RawText, pattern, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     A proxy of the audit store that refuses every appended entry and passes everything else on.
+    /// </summary>
+    private class FailingAppendProxy : DispatchProxy
+    {
+        /// <summary>
+        ///     Gets or sets the store that receives all other calls.
+        /// </summary>
+        public IAuditStore Inner { get; set; } = null!;
+
+        /// <inheritdoc />
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod!.Name == nameof(IAuditStore.AppendAsync))
+            {
+                return Task.FromException<AuditEntry>(new InvalidOperationException("The audit trail is unavailable."));
+            }
+
+            try
+            {
+                return targetMethod.Invoke(Inner, args);
+            }
+            catch (TargetInvocationException exception)
+            {
+                ExceptionDispatchInfo.Capture(exception.InnerException!).Throw();
+                throw;
+            }
         }
     }
 
@@ -1454,23 +1865,6 @@ public class ServerHostKeyRingTests
     {
         var keys = Path.Combine(folder.DirectoryPath, "keys");
         return Directory.Exists(keys) ? Directory.GetFiles(keys, "key-*.xml") : [];
-    }
-
-    /// <summary>
-    ///     Test that the settings of the self-validation and of the isolated hosts choose permissions only, so that no
-    ///     test and no self-validation ever uses the key store of the operating system.
-    /// </summary>
-    [Fact]
-    public void SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection()
-    {
-        // Arrange
-        using var folder = new TemporaryDirectory();
-
-        // Act
-        var settings = SelfTestServices.CreateSettings(folder);
-
-        // Assert
-        Assert.Equal("PermissionsOnly", settings["DataProtection:Protection"]);
     }
 
     /// <summary>

@@ -4,89 +4,382 @@
 # The GitRunner class runs the installed git program on behalf of the ContentSources subsystem: without a shell, with
 # a curated environment, with the token only in the environment of the child process, with a time limit and a cap on
 # the output, and with every secret removed from what comes back.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: GitRunner Unit Requirements
     requirements:
       - id: ReviewCenter-GitRunner-NoShell
         title: >-
-          The GitRunner class shall run git as a separate program with every argument passed on its own, never
-          through a shell, and with an environment that holds only what git needs, with prompts turned off and the
-          system and user configuration ignored, so that a call can neither ask for input nor pick up a helper, a
-          hook, or credentials from elsewhere.
+          The GitRunner class shall start git as a separate program with every argument passed as its own entry, never
+          through a shell.
         justification: |
           The locations, revisions, and names that reach git come from users. Passing them as separate arguments
-          keeps them from being read as shell syntax, and a curated environment keeps the result of a call the same
-          on every server and keeps a call from hanging on a prompt.
+          keeps them from being read as shell syntax.
+        tests:
+          - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+          - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+
+      - id: ReviewCenter-GitRunner-NoShell-Environment
+        title: >-
+          The GitRunner class shall start git with an environment that holds only the variables that git needs.
+        justification: |
+          A curated environment keeps the result of a call the same on every server.
+        tests:
+          - GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit
+
+      - id: ReviewCenter-GitRunner-NoShell-Prompts
+        title: >-
+          The GitRunner class shall turn off every prompt of git, so that a call never waits for input.
+        justification: |
+          A prompt would hang the request that made the call.
         tests:
           - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+          - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-Configuration
+        title: >-
+          The GitRunner class shall make git ignore the system configuration.
+        justification: |
+          A call must not pick up settings from elsewhere on the server.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-Configuration-User
+        title: >-
+          The GitRunner class shall make git read the user configuration from a folder of the server's own cache, not
+          from the home folder of the server account.
+        justification: |
+          A call must not pick up settings from the account that runs the server.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-CredentialHelper
+        title: >-
+          The GitRunner class shall prevent git from using a credential helper.
+        justification: |
+          A helper could supply credentials from elsewhere.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-Protocols
+        title: >-
+          The GitRunner class shall allow git to use only the file, http, and https protocols.
+        justification: |
+          An external protocol helper could run a program on the server.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-Hooks
+        title: >-
+          The GitRunner class shall prevent git from running hooks.
+        justification: |
+          A repository that other people control must not be able to run code on the server.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_DisablesHooks
+
+      - id: ReviewCenter-GitRunner-NoShell-Result
+        title: >-
+          The GitRunner class shall return the standard output, the exit code, and the error text of a git call.
+        justification: |
+          Callers decide on success from the exit code and read the output as bytes.
+        tests:
           - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
 
       - id: ReviewCenter-GitRunner-TokenEnvironment
         title: >-
-          The GitRunner class shall pass an access token to git only in the environment of the child process,
-          never in an argument, a URL, a file, or a credential helper.
+          The GitRunner class shall give an access token to git only through the environment of the child process, as
+          a basic authorization header for the location of the repository.
         justification: |
-          The arguments of a process are visible to other processes of the server, and a URL is written to
-          configuration files and logs. The environment of the child process is the one place that is not.
+          A URL is written to configuration files and logs. The environment of the child process is the one place that
+          other processes of the server cannot read.
         tests:
           - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+
+      - id: ReviewCenter-GitRunner-TokenEnvironment-Arguments
+        title: >-
+          The GitRunner class shall keep the token, the user name with the token, and their encoded form out of every
+          argument of git.
+        justification: |
+          The arguments of a process are visible to other processes of the server.
+        tests:
+          - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+
+      - id: ReviewCenter-GitRunner-TokenEnvironment-Header
+        title: >-
+          The GitRunner class shall have git send the token to the server of the repository as a basic authorization
+          header.
+        justification: |
+          The route through the environment must really authenticate the call.
+        tests:
           - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+
+      - id: ReviewCenter-GitRunner-TokenEnvironment-Anonymous
+        title: >-
+          The GitRunner class shall set no credential variable for a call without credentials.
+        justification: |
+          An anonymous call must carry no authorization header.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
 
       - id: ReviewCenter-GitRunner-Redaction
         title: >-
-          The GitRunner class shall remove every form of the token, of the encoded header that carries it, and of the
-          credentials of a URL from all text that comes back from git, and shall replace the location of the
-          repository (a URL or a local path, in every form git prints it) by the repository name, before the text can
-          reach a message or a log. The text is redacted whole before it is cut to its last 8 KiB, so no part of a
-          secret that crosses the cut is left.
+          The GitRunner class shall remove the access token, alone, with the user name, and in URL-escaped form, from
+          the error text of a git call.
         justification: |
-          Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to
-          users and written to logs, and the location of a repository is information for the administrators of its
-          project only, so an
-          ordinary user must see which repository failed but never where it is kept.
+          Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to users
+          and written to logs.
         tests:
           - GitRunner_Redact_RemovesEverySecretForm
           - GitRunner_Redact_EdgeCases
+
+      - id: ReviewCenter-GitRunner-Redaction-EncodedHeader
+        title: >-
+          The GitRunner class shall remove the encoded form of the user name and token, as it appears in an
+          authorization header, from the error text of a git call.
+        justification: |
+          Git sometimes echoes the headers that it sends.
+        tests:
+          - GitRunner_Redact_RemovesEverySecretForm
+
+      - id: ReviewCenter-GitRunner-Redaction-UrlCredentials
+        title: >-
+          The GitRunner class shall mask the user information of every URL in the error text of a git call.
+        justification: |
+          A URL in the output of git may carry a user name and password in front of the host name.
+        tests:
+          - GitRunner_Redact_RemovesEverySecretForm
+
+      - id: ReviewCenter-GitRunner-Redaction-Location
+        title: >-
+          The GitRunner class shall replace the location of the repository, in every form git prints it, with the
+          repository name in the error text of a git call.
+        justification: |
+          The location of a repository is information for the administrators of its project only, so an ordinary user
+          must see which repository failed but never where it is kept.
+        tests:
           - GitRunner_Redact_ReplacesLocationWithName
-          - GitRunner_Redact_NoLocation_LeavesTextAlone
+
+      - id: ReviewCenter-GitRunner-Redaction-Cut
+        title: >-
+          The GitRunner class shall redact the error text of a git call as a whole before it cuts the text to its last
+          8 KiB, so that no part of a secret that crosses the cut remains.
+        justification: |
+          Redacting after the cut would leave half of a token in the text.
+        tests:
           - GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment
+
+      - id: ReviewCenter-GitRunner-Redaction-BufferStart
+        title: >-
+          The GitRunner class shall leave no part of a secret in the error text of a git call when a long error output
+          is cut inside the secret at the start of the retained buffer.
+        justification: |
+          The reader of the error output keeps only the tail of a long output, and a cut can fall inside a secret.
+        tests:
           - GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment
+
+      - id: ReviewCenter-GitRunner-Redaction-ErrorLimit
+        title: >-
+          The GitRunner class shall keep at most 8 KiB of the error text of a git call.
+        justification: |
+          A repository that other people control can make git print an unbounded error text.
+        tests:
+          - GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment
+
+      - id: ReviewCenter-GitRunner-Redaction-Unchanged
+        title: >-
+          The GitRunner class shall leave text that holds no secret and no registered location unchanged.
+        justification: |
+          Redaction must not damage a message that is useful.
+        tests:
+          - GitRunner_Redact_EdgeCases
+          - GitRunner_Redact_NoLocation_LeavesTextAlone
+
+      - id: ReviewCenter-GitRunner-Redaction-NoLocation
+        title: >-
+          The GitRunner class shall leave the location in the error text when no location is given for replacement.
+        justification: |
+          Replacing the location is opt-in for each repository.
+        tests:
+          - GitRunner_Redact_NoLocation_LeavesTextAlone
+
+      - id: ReviewCenter-GitRunner-Redaction-MissingText
+        title: >-
+          The GitRunner class shall treat missing error text as empty text.
+        justification: |
+          A call with no error output must not fail in the redaction.
+        tests:
+          - GitRunner_Redact_EdgeCases
 
       - id: ReviewCenter-GitRunner-Timeout
         title: >-
-          The GitRunner class shall stop a git call that does not finish within the configured time, together with
-          every process it started, and report a timeout.
+          The GitRunner class shall report a git call that does not finish within the configured time as a timeout
+          (rule GitTimeout).
         justification: |
-          A server that never answers must not hold a request, or a lock on a repository, for ever, and a stopped
-          git must not leave helper processes running.
+          A server that never answers must not hold a request, or a lock on a repository, for ever.
         tests:
           - GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit
 
+      - id: ReviewCenter-GitRunner-Timeout-Ends
+        title: >-
+          The GitRunner class shall return from a git call that never answers within 30 seconds when the configured time
+          limit is one second.
+        justification: |
+          A run that does not return would hold the page and the lock on the repository for ever, even after the limit
+          has passed.
+        tests:
+          - GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit
+
+      - id: ReviewCenter-GitRunner-Timeout-StopsGit
+        title: >-
+          The GitRunner class shall stop the git program of a call that exceeds the time limit.
+        justification: |
+          A git program that keeps running after its call was given up would use the processor and the repository
+          folder, and would pile up with every further call.
+        tests:
+          - GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself
+
+      - id: ReviewCenter-GitRunner-Timeout-StopsChildren
+        title: >-
+          The GitRunner class shall stop every process that git started for a call that exceeds the time limit.
+        justification: |
+          A stopped git must not leave helper processes running, because they would keep using the processor and
+          the repository folder after the call was reported as timed out.
+        tests:
+          - GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess
+
       - id: ReviewCenter-GitRunner-OutputLimit
         title: >-
-          The GitRunner class shall stop reading the output of a git call that exceeds the cap given for the call
-          and report an access failure.
+          The GitRunner class shall refuse a git call whose standard output exceeds the cap given for the call with an
+          access failure (rule GitAccessFailed).
         justification: |
           The output of git depends on a repository that other people control, so the memory a call may use must be
-          bounded.
+          bounded. Reading stops and git is stopped when the cap is passed.
         tests:
           - GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed
 
       - id: ReviewCenter-GitRunner-Errors
         title: >-
-          The GitRunner class shall report a clear error when git is not installed or is older than the supported
-          version, and shall describe a failed call, including refused credentials, without any secret and naming the
-          repository instead of showing its location.
+          The GitRunner class shall report a git program that is not installed as git unavailable (rule
+          GitUnavailable).
         justification: |
-          An operator must be able to tell a missing or old git from a wrong location or a refused token, and the
-          message must be safe to show to the user: no secret, and not the location of the repository.
+          An operator must be able to tell a missing git from a wrong location or a refused token.
         tests:
           - GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitRunner-Errors-OldGit
+        title: >-
+          The GitRunner class shall report an installed git that is older than version 2.31 as git unavailable.
+        justification: |
+          The route for the token needs configuration variables that git has only since version 2.31.
+        tests:
           - GitRunner_RunAsync_OldGit_ThrowsGitUnavailable
           - GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitRunner-Errors-Failure
+        title: >-
+          The GitRunner class shall report a failed git call as an access failure (rule GitAccessFailed) whose message
+          names the repository.
+        justification: |
+          The user must see which repository failed.
+        tests:
           - GitRunner_FailureFor_DescribesFailuresClearly
           - GitRunner_FailureFor_NeverContainsLocation
           - GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath
           - GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress
+
+      - id: ReviewCenter-GitRunner-Errors-FirstLine
+        title: >-
+          The GitRunner class shall give only the first line of the error text of git in the message of a failed call.
+        justification: |
+          The rest of the output of git is noise to the user.
+        tests:
+          - GitRunner_FailureFor_DescribesFailuresClearly
+
+      - id: ReviewCenter-GitRunner-Errors-ExitCode
+        title: >-
+          The GitRunner class shall give the exit code of git in the message of a failed call that printed no error
+          text.
+        justification: |
+          The message of a failed call must not be empty.
+        tests:
+          - GitRunner_FailureFor_DescribesFailuresClearly
+
+      - id: ReviewCenter-GitRunner-Errors-Length
+        title: >-
+          The GitRunner class shall shorten a long error text so that the message of a failed call stays short.
+        justification: |
+          The message may be shown on a page.
+        tests:
+          - GitRunner_FailureFor_DescribesFailuresClearly
+
+      - id: ReviewCenter-GitRunner-Errors-Denied
+        title: >-
+          The GitRunner class shall report a refusal of the credentials by the server as denied access to the
+          repository.
+        justification: |
+          An administrator must be able to tell a refused token from a wrong location.
+        tests:
+          - GitRunner_FailureFor_DescribesFailuresClearly
           - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+
+      - id: ReviewCenter-GitRunner-Errors-Secrets
+        title: >-
+          The GitRunner class shall keep every secret out of the message of a failed call, including a call whose
+          credentials were refused.
+        justification: |
+          The message may be shown to the user and written to logs.
+        tests:
+          - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+
+      - id: ReviewCenter-GitRunner-Errors-LocalPath
+        title: >-
+          The GitRunner class shall not show any part of the local path of a repository in the message of a failed
+          call.
+        justification: |
+          A local path shows the layout of the disk of the server, which only an administrator may see.
+        tests:
+          - GitRunner_FailureFor_NeverContainsLocation
+          - GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath
+
+      - id: ReviewCenter-GitRunner-Errors-WebAddress
+        title: >-
+          The GitRunner class shall not show any part of the web address or the host name of a repository in the
+          message of a failed call.
+        justification: |
+          A web address or a host name can name an internal server or carry a project name, which only an
+          administrator may see.
+        tests:
+          - GitRunner_FailureFor_NeverContainsLocation
+          - GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress
+
+      - id: ReviewCenter-GitRunner-Errors-CacheFolder
+        title: >-
+          The GitRunner class shall report a cache folder in which the home folder of git cannot be created as git
+          unavailable.
+        justification: |
+          A cache folder that cannot be written is a server problem that only an administrator can fix.
+        tests:
+          - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitRunner-Errors-CacheMalformed
+        title: >-
+          The GitRunner class shall report a cache path that is malformed or too long as git unavailable.
+        justification: |
+          An exception from a malformed or too long cache path would fail the page of the call; the runner must report
+          git as unavailable instead.
+        tests:
+          - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable
+
+      - id: ReviewCenter-GitRunner-Errors-CacheMessage
+        title: >-
+          The GitRunner class shall name the Git:CachePath setting, and neither the path nor the exception of the file
+          system, in the error for a cache folder that cannot be used.
+        justification: |
+          The error of the runner is shown on pages of ordinary users, so it must name the setting to fix and nothing
+          of the disk.
+        tests:
+          - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable
+          - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable

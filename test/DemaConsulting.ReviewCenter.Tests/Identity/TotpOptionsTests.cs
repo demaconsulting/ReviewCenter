@@ -176,4 +176,33 @@ public class TotpOptionsTests
         Assert.False(offSettings.Enabled);
         Assert.Equal("Acme", offSettings.Issuer);
     }
+
+    /// <summary>
+    ///     Test that spaces around a configured issuer are trimmed in the settings the service uses.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_IssuerWithSurroundingSpaces_ProvidesTheTrimmedIssuer()
+    {
+        // Arrange: a configuration with an issuer that has spaces around it
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Totp:Issuer"] = "  Acme  "
+                });
+            }
+        };
+
+        // Act
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the service sees the issuer without the spaces
+        Assert.Equal("Acme", application.Services.GetRequiredService<TotpSettings>().Issuer);
+    }
 }

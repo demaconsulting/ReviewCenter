@@ -113,6 +113,61 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that a variable of the server process that git does not need is not passed on to git, while a listed
+    ///     variable such as <c>PATH</c> is.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit()
+    {
+        // Arrange: a runner, anonymous access and a variable in the server process that git does not need
+        const string unlisted = "RC_TEST_UNLISTED_VARIABLE";
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", null, null);
+        var path = Environment.GetEnvironmentVariable("PATH");
+        var previous = Environment.GetEnvironmentVariable(unlisted);
+        Environment.SetEnvironmentVariable(unlisted, "value");
+
+        try
+        {
+            // Act: build the process description
+            var info = runner.BuildStartInfo(["status"], access);
+
+            // Assert: the unlisted variable is dropped and the listed PATH is kept
+            Assert.False(info.Environment.ContainsKey(unlisted));
+            if (!string.IsNullOrEmpty(path))
+            {
+                Assert.Equal(path, info.Environment["PATH"]);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(unlisted, previous);
+        }
+    }
+
+    /// <summary>
+    ///     Test that git is told to run no hooks: the hooks folder is set to the null device.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_Anonymous_DisablesHooks()
+    {
+        // Arrange: a runner and anonymous access
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", null, null);
+        var expected = "core.hooksPath=" + (OperatingSystem.IsWindows() ? "NUL" : "/dev/null");
+
+        // Act: build the process description
+        var info = runner.BuildStartInfo(["ls-remote", "origin"], access);
+
+        // Assert: the setting follows a -c option
+        var index = info.ArgumentList.IndexOf(expected);
+        Assert.True(index > 0, "The hooks setting is missing.");
+        Assert.Equal("-c", info.ArgumentList[index - 1]);
+    }
+
+    /// <summary>
     ///     Test that a secret is removed from text in every form git might print it: the token, the user and
     ///     token, the base64 header value and the user information of a URL.
     /// </summary>
@@ -635,6 +690,128 @@ public class GitRunnerTests
         // Assert: the timeout rule is named and the call ended soon after the limit
         Assert.Equal(DomainRule.GitTimeout, exception.Rule);
         Assert.True(timer.Elapsed < TimeSpan.FromSeconds(30), $"The call took {timer.Elapsed}.");
+    }
+
+    /// <summary>
+    ///     Writes a fake git into a folder that answers <c>--version</c> like a supported git until a flag file
+    ///     exists. After that every call writes a line to <c>parent.beat</c> every second, and starts a child program
+    ///     that writes a line to <c>child.beat</c> every second, and never ends by itself.
+    /// </summary>
+    /// <param name="folder">The folder for the scripts and the beat files.</param>
+    /// <returns>The path of the fake git program.</returns>
+    private static async Task<string> WriteHangingFakeGitAsync(string folder)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        if (OperatingSystem.IsWindows())
+        {
+            var git = Path.Combine(folder, "hanging-git.cmd");
+            await File.WriteAllTextAsync(
+                git,
+                "@echo off\r\n"
+                + "if not exist \"%~dp0hang.flag\" (\r\n"
+                + "echo git version 2.40.0\r\n"
+                + "exit /b 0\r\n"
+                + ")\r\n"
+                + "start \"\" /b \"%~dp0child.cmd\"\r\n"
+                + ":loop\r\n"
+                + "echo x>>\"%~dp0parent.beat\"\r\n"
+                + "ping -n 2 127.0.0.1 >nul\r\n"
+                + "goto loop\r\n",
+                cancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(folder, "child.cmd"),
+                "@echo off\r\n"
+                + ":loop\r\n"
+                + "echo x>>\"%~dp0child.beat\"\r\n"
+                + "ping -n 2 127.0.0.1 >nul\r\n"
+                + "goto loop\r\n",
+                cancellationToken);
+            return git;
+        }
+
+        var script = Path.Combine(folder, "hanging-git.sh");
+        await File.WriteAllTextAsync(
+            script,
+            "#!/bin/sh\n"
+            + "d=\"$(dirname \"$0\")\"\n"
+            + "if [ ! -f \"$d/hang.flag\" ]; then\n"
+            + "echo git version 2.40.0\n"
+            + "exit 0\n"
+            + "fi\n"
+            + "\"$d/child.sh\" &\n"
+            + "while true; do\n"
+            + "echo x >> \"$d/parent.beat\"\n"
+            + "sleep 1\n"
+            + "done\n",
+            cancellationToken);
+        var child = Path.Combine(folder, "child.sh");
+        await File.WriteAllTextAsync(
+            child,
+            "#!/bin/sh\n"
+            + "d=\"$(dirname \"$0\")\"\n"
+            + "while true; do\n"
+            + "echo x >> \"$d/child.beat\"\n"
+            + "sleep 1\n"
+            + "done\n",
+            cancellationToken);
+        var mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        File.SetUnixFileMode(script, mode);
+        File.SetUnixFileMode(child, mode);
+        return script;
+    }
+
+    /// <summary>
+    ///     Runs a call over the hanging fake git until the time limit stops it, then shows that the program that
+    ///     writes the given beat file is gone: it had written before the stop, and it writes nothing afterwards.
+    /// </summary>
+    /// <param name="beatFile">The name of the beat file of the program that must be gone.</param>
+    /// <returns>A task that completes when the check is done.</returns>
+    private static async Task AssertStoppedAfterTimeoutAsync(string beatFile)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var folder = new TempFolder();
+        var git = await WriteHangingFakeGitAsync(folder.Path);
+        var runner = new GitRunner(Options(folder.Path, 2), git);
+        await runner.CheckVersionAsync(cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(folder.Path, "hang.flag"), "hang", cancellationToken);
+
+        // Act: run a call that never ends, so that the time limit stops it
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["status"], null, 1024, cancellationToken));
+        var beat = new FileInfo(Path.Combine(folder.Path, beatFile));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+        beat.Refresh();
+        var afterStop = beat.Exists ? beat.Length : -1;
+        await Task.Delay(TimeSpan.FromMilliseconds(2500), cancellationToken);
+        beat.Refresh();
+        var later = beat.Exists ? beat.Length : -1;
+
+        // Assert: the call ended with the timeout rule, the program was running before the stop and writes no more
+        Assert.Equal(DomainRule.GitTimeout, exception.Rule);
+        Assert.True(afterStop > 0, $"The program of {beatFile} did not run before the stop.");
+        Assert.Equal(afterStop, later);
+    }
+
+    /// <summary>
+    ///     Test that the git program of a call that exceeds the time limit is really gone afterwards: a fake git
+    ///     that writes a line every second writes nothing more after the call was stopped.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself()
+    {
+        // Arrange, act and assert: the call ends with the timeout rule and the fake git writes nothing more
+        await AssertStoppedAfterTimeoutAsync("parent.beat");
+    }
+
+    /// <summary>
+    ///     Test that a process that git started is also gone after a call exceeds the time limit: a child program
+    ///     of the fake git that writes a line every second writes nothing more after the call was stopped.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess()
+    {
+        // Arrange, act and assert: the call ends with the timeout rule and the child of the fake git writes nothing more
+        await AssertStoppedAfterTimeoutAsync("child.beat");
     }
 
     /// <summary>

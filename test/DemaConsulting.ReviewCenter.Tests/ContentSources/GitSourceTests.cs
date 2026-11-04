@@ -326,6 +326,32 @@ public class GitSourceTests
     }
 
     /// <summary>
+    ///     Test that a commit on a diverged branch is not an ancestor of the other branch's commit.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_IsAncestor_DivergedBranch_AnswersNo()
+    {
+        // Arrange: an origin whose second commit follows the first, plus a side branch from the first commit
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        // The fixture marks script.sh executable in the index only, so force the switch as the test above does.
+        GitTestSupport.Git(origin.Folder, "checkout", "--force", "-b", "side", origin.First);
+        GitTestSupport.Write(origin.Folder, "side.txt", "side\n");
+        var side = GitTestSupport.Commit(origin.Folder, "side");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var session = await NewSource(Path.Combine(root.Path, "cache")).OpenAsync(Access(origin.Folder), cancellationToken);
+
+        // Act: ask in both directions about the two diverged commits
+        var sideOfSecond = await session.IsAncestorAsync(side, origin.Second, cancellationToken);
+        var secondOfSide = await session.IsAncestorAsync(origin.Second, side, cancellationToken);
+
+        // Assert: neither is an ancestor of the other
+        Assert.False(sideOfSecond);
+        Assert.False(secondOfSide);
+    }
+
+    /// <summary>
     ///     Test that a commit the repository does not have is an error with the named rule and no file path in the message.
     /// </summary>
     [Fact]
@@ -345,6 +371,41 @@ public class GitSourceTests
         // Assert: the rule, and the message does not reveal where the mirror is
         Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
         Assert.DoesNotContain(root.Path, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the first open of each repository clones one bare mirror folder for it, named for the repository,
+    ///     and leaves no temporary folder behind.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository()
+    {
+        // Arrange: an origin, a source with an empty cache folder, and two registered repositories at that location
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        var cache = Path.Combine(root.Path, "cache");
+        var source = NewSource(cache);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: open each repository for the first time
+        await OpenAndCloseAsync(source, Access(origin.Folder, 1), cancellationToken);
+        await OpenAndCloseAsync(source, Access(origin.Folder, 2), cancellationToken);
+
+        // Assert: each repository has a bare mirror folder of its own and no temporary folder is left
+        foreach (var name in new[] { "repo-1", "repo-2" })
+        {
+            var folder = Path.Combine(cache, name);
+            Assert.True(Directory.Exists(folder));
+            Assert.True(File.Exists(Path.Combine(folder, "HEAD")));
+            Assert.True(Directory.Exists(Path.Combine(folder, "objects")));
+            Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
+            Assert.Contains(
+                "bare = true",
+                await File.ReadAllTextAsync(Path.Combine(folder, "config"), cancellationToken),
+                StringComparison.Ordinal);
+            Assert.False(Directory.Exists(folder + ".tmp"));
+        }
     }
 
     /// <summary>

@@ -75,6 +75,49 @@ internal static class Runner
         string program,
         params string[] arguments)
     {
+        return Execute(out output, workingDirectory, environment, null, program, arguments);
+    }
+
+    /// <summary>
+    ///     Runs the specified program with extra environment variables and a text on its standard input, and captures
+    ///     its output.
+    /// </summary>
+    /// <param name="output">Program output (stdout and stderr combined).</param>
+    /// <param name="standardInput">The text that is written to the standard input of the program before it is closed.</param>
+    /// <param name="environment">Environment variables to set for the program, added to the inherited ones.</param>
+    /// <param name="program">Program name or path.</param>
+    /// <param name="arguments">Program arguments.</param>
+    /// <returns>Program exit code.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when process fails to start.</exception>
+    public static int RunWithInput(
+        out string output,
+        string standardInput,
+        IReadOnlyDictionary<string, string> environment,
+        string program,
+        params string[] arguments)
+    {
+        return Execute(out output, null, environment, standardInput, program, arguments);
+    }
+
+    /// <summary>
+    ///     Runs the specified program and captures its output.
+    /// </summary>
+    /// <param name="output">Program output (stdout and stderr combined).</param>
+    /// <param name="workingDirectory">The working directory of the program, or <c>null</c> for the current one.</param>
+    /// <param name="environment">Environment variables to set for the program, added to the inherited ones.</param>
+    /// <param name="standardInput">The text to write to the standard input, or <c>null</c> for none; it is closed either way.</param>
+    /// <param name="program">Program name or path.</param>
+    /// <param name="arguments">Program arguments.</param>
+    /// <returns>Program exit code.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when process fails to start.</exception>
+    private static int Execute(
+        out string output,
+        string? workingDirectory,
+        IReadOnlyDictionary<string, string> environment,
+        string? standardInput,
+        string program,
+        string[] arguments)
+    {
         // Construct the start information
         var startInfo = new ProcessStartInfo(program)
         {
@@ -105,7 +148,13 @@ internal static class Runner
         using var process = Process.Start(startInfo) ??
                             throw new InvalidOperationException("Failed to start process");
 
-        // Nothing is ever typed into the program: a prompt would see the end of input instead of waiting forever
+        // Nothing is typed into the program unless the caller supplies a text: a prompt would see the end of input
+        // instead of waiting forever
+        if (standardInput is not null)
+        {
+            process.StandardInput.Write(standardInput);
+        }
+
         process.StandardInput.Close();
 
         // Read output asynchronously to avoid buffer overflow

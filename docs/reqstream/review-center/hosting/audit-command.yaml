@@ -3,34 +3,123 @@
 #
 # The AuditCommand class runs the audit verify verb: it verifies the hash chain of the audit trail in the configured
 # database and reports the result through the exit code.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: AuditCommand Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Verify: the verdict on the chain of the trail
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditCommand-Verify
         title: >-
-          The AuditCommand class shall verify the hash chain of the audit trail in the configured, existing database
-          without creating or changing it, report the number of entries with exit code 0 when the chain is intact
-          (also for an empty trail), and report the first broken entry with exit code 1 when it is not.
+          The AuditCommand class shall report that the audit trail is intact, with its number of entries, and return
+          exit code 0 when every entry of the trail verifies.
         justification: |
-          Scripts and scheduled jobs check the trail without the web interface and alert on the exit code. A check
-          that created an empty database at a wrong path would report an intact trail of nothing.
+          Scripts and scheduled jobs check the trail without the web interface and alert on the exit code.
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+
+      - id: ReviewCenter-AuditCommand-Verify-EmptyTrail
+        title: >-
+          The AuditCommand class shall report a trail without entries as intact, with zero entries, and return exit
+          code 0.
+        justification: |
+          A new installation has no history yet, and its first check must not raise an alarm.
+        tests:
           - AuditCommand_Run_EmptyTrail_ReportsIntactWithZeroEntries
+
+      - id: ReviewCenter-AuditCommand-Verify-EditedEntry
+        title: >-
+          The AuditCommand class shall report the first broken entry by its sequence number and return exit code 1
+          when an entry of the trail was edited.
+        justification: |
+          An edit behind the back of the application must be located and signalled to scripts.
+        tests:
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
+
+      - id: ReviewCenter-AuditCommand-Verify-DeletedEntry
+        title: >-
+          The AuditCommand class shall report the first broken entry and return exit code 1 when an entry was deleted
+          from the middle of the trail.
+        justification: |
+          A deleted entry breaks the chain of hashes, and the deletion must be detected as surely as an edit.
+        tests:
           - AuditCommand_Run_DeletedEntry_ReportsBrokenChainWithExitCodeOne
 
+      - id: ReviewCenter-AuditCommand-Verify-Unchanged
+        title: >-
+          The AuditCommand class shall leave the database file unchanged when it verifies an intact trail.
+        justification: |
+          A check that altered the database would alter the evidence that it examines.
+        tests:
+          - AuditCommand_Run_IntactTrail_LeavesDatabaseFileUnchanged
+
+      - id: ReviewCenter-AuditCommand-Verify-NoKeyRing
+        title: >-
+          The AuditCommand class shall verify the trail without creating a Data Protection key file or the key
+          folder.
+        justification: |
+          A check must not change the key ring, because a key ring that appears next to a database that already holds
+          secrets would hide that the original ring is lost.
+        tests:
+          - AuditCommand_Run_IntactTrail_CreatesNoKeyFile
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Errors: a check that cannot run must not look like a check that passed
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditCommand-Errors
         title: >-
-          The AuditCommand class shall report a database file that does not exist, and a database that cannot be
-          read, as an error with exit code 1, opening the database read-only so that neither the file nor its folder
-          can be created (also not for a file URI that asks for creation), and shall reject a null context.
+          The AuditCommand class shall report that the database file does not exist and return exit code 1 when the
+          configured database file is missing.
         justification: |
-          A check that cannot run must not look like a check that passed, and a wrong path must not leave a new empty
-          database behind, not even when the file disappears between the check and the open.
+          A mistyped path must not look like an intact trail.
         tests:
           - AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-AuditCommand-Errors-NothingCreated
+        title: >-
+          The AuditCommand class shall create neither the database file nor its folder when the configured database
+          file is missing.
+        justification: |
+          A check that created an empty database at a wrong path would report an intact trail of nothing the next time.
+        tests:
+          - AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-AuditCommand-Errors-FileUri
+        title: >-
+          The AuditCommand class shall report an error and return exit code 1, without reporting an intact trail,
+          when the database is named by a `file:` URI that asks for creation and the file does not exist.
+        justification: |
+          A URI with the create mode is the one way to ask SQLite to create a file, and it must not turn the check into
+          a creation.
+        tests:
           - AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-AuditCommand-Errors-FileUriNothingCreated
+        title: >-
+          The AuditCommand class shall create no file in the folder of the database when the database is named by a
+          `file:` URI that asks for creation and the file does not exist.
+        justification: |
+          The guarantee that a check never creates a database holds for the URI form as well as for a plain path.
+        tests:
+          - AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing
+
+      - id: ReviewCenter-AuditCommand-Errors-Unreadable
+        title: >-
+          The AuditCommand class shall report an error and return exit code 1 when the database file cannot be read
+          as a database.
+        justification: |
+          A damaged database must not verify as intact.
+        tests:
           - AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne
+
+      - id: ReviewCenter-AuditCommand-Errors-Arguments
+        title: >-
+          The AuditCommand class shall throw an ArgumentNullException when it is run without a context.
+        justification: |
+          The audit verb is started by Program; a missing context there is a programming error and must fail at once.
+        tests:
           - AuditCommand_Run_NullContext_ThrowsArgumentNullException

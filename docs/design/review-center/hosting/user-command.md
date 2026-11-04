@@ -22,6 +22,12 @@ and in the shell history. It is read from the first of these that applies:
 3. an interactive prompt that does not echo the typed characters, asked twice ("Password" and "Repeat password"),
    because a typo in the only password of the first system administrator would lock the operator out.
 
+The interactive prompt is built from two small internal methods that take the keyboard and the console as arguments
+instead of reading them directly: `Prompt(Func<string> readMasked, TextWriter prompts)` asks the two questions and
+refuses two different entries, and `ReadMasked(Func<ConsoleKeyInfo> readKey, TextWriter echo)` reads one hidden line and
+applies Backspace. The real command passes `Console.ReadKey` and standard error, so the behavior is the same; the
+arguments exist only so that a unit test can type without a console.
+
 The password is used as it is, so the line read from standard input is not trimmed. Neither the password nor its hash
 is printed or logged.
 
