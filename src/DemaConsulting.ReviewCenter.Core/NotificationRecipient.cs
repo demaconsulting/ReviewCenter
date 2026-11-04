@@ -35,6 +35,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <param name="State">What the dispatcher remembers about the user.</param>
 /// <param name="IsDisabled"><c>true</c> when the account of the user is disabled.</param>
 /// <param name="MustChangePassword"><c>true</c> when the user must still replace a temporary password.</param>
+/// <param name="Generation">
+///     The generation of the preference when it was read (see <see cref="NotificationPreference.Generation"/>).
+/// </param>
 public sealed record NotificationRecipient(
     int UserId,
     string Username,
@@ -43,4 +46,5 @@ public sealed record NotificationRecipient(
     NotificationMode Mode,
     NotificationDispatchState State,
     bool IsDisabled,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    int Generation);

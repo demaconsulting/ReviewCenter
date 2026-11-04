@@ -49,7 +49,7 @@ public sealed record NotificationCandidate(
     /// <summary>
     ///     Gets the identity of the item, the key of the dedupe rule.
     /// </summary>
-    public NotifiedKey Key => new(ProjectId, ReviewId, Section);
+    public NotifiedKey Key => new(ProjectId, ReviewId, Section, NotificationComposer.KindOf(State));
 }
 
 /// <summary>
@@ -189,6 +189,19 @@ public sealed class NotificationComposer
         return state is null
             ? null
             : new NotificationCandidate(item.Section, item.ProjectId, item.ProjectName, item.ReviewId, item.Title, state);
+    }
+
+    /// <summary>
+    ///     Gets the kind of the reason of a state token: the token without a count.
+    /// </summary>
+    /// <param name="state">The state token, for example <c>question</c> or <c>replies:3</c>.</param>
+    /// <returns>The kind, for example <c>question</c> or <c>replies</c>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="state"/> is null.</exception>
+    public static string KindOf(string state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var colon = state.IndexOf(':', StringComparison.Ordinal);
+        return colon < 0 ? state : state[..colon];
     }
 
     /// <summary>

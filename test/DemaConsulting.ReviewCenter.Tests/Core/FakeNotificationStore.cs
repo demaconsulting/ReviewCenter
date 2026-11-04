@@ -80,6 +80,13 @@ internal sealed class FakeNotificationStore : INotificationStore
     public Exception? ApplyFailure { get; set; }
 
     /// <summary>
+    ///     Gets or sets an action that runs after <see cref="ListRecipientsAsync"/> has read the recipients and before
+    ///     it returns them, so a test can change the store while a pass is already working on what it read, or
+    ///     <c>null</c> for none.
+    /// </summary>
+    public Action? AfterListRecipients { get; set; }
+
+    /// <summary>
     ///     Gets the audit drafts received so far, in the order the changes were made.
     /// </summary>
     public List<AuditDraft> Audits { get; } = [];
@@ -139,7 +146,7 @@ internal sealed class FakeNotificationStore : INotificationStore
     }
 
     /// <summary>
-    ///     Gets the notified items of a user as a snapshot, ordered by project, review and section.
+    ///     Gets the notified items of a user as a snapshot, ordered by project, review, section and kind.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <returns>The items.</returns>
@@ -148,9 +155,51 @@ internal sealed class FakeNotificationStore : INotificationStore
         lock (_lock)
         {
             return _notified.TryGetValue(userId, out var items)
-                ? [.. items.OrderBy(i => i.ProjectId).ThenBy(i => i.ReviewId, StringComparer.Ordinal).ThenBy(i => i.Section)]
+                ? [.. items.OrderBy(i => i.ProjectId).ThenBy(i => i.ReviewId, StringComparer.Ordinal).ThenBy(i => i.Section).ThenBy(i => i.Kind, StringComparer.Ordinal)]
                 : [];
         }
+    }
+
+    /// <summary>
+    ///     Replaces the confirmed address of a user as a confirmation does, so the generation of the row rises.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="address">The new confirmed address.</param>
+    public void ReplaceConfirmedAddress(int userId, string address)
+    {
+        lock (_lock)
+        {
+            var row = _rows[userId];
+            _rows[userId] = Rebuild(
+                row,
+                userId,
+                address,
+                row.PendingEmail,
+                row.PendingCodeHash,
+                row.PendingCodeSalt,
+                row.PendingCodeExpiresUtc,
+                row.PendingAttempts,
+                row.PendingSentUtc,
+                row.Updated,
+                1);
+        }
+    }
+
+    /// <summary>
+    ///     Switches the mode of a user as the person does on the settings page, so the generation of the row rises.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="mode">The new mode; it must differ from the current one.</param>
+    public void SwitchMode(int userId, NotificationMode mode)
+    {
+        var changed = SetModeAsync(
+            userId,
+            mode,
+            DateTimeOffset.UnixEpoch,
+            AuditDraft.By(InboxTestWorld.ActorOf("ann"), "test.mode", mode.ToString()))
+            .GetAwaiter()
+            .GetResult();
+        Assert.True(changed);
     }
 
     /// <summary>
@@ -331,7 +380,7 @@ internal sealed class FakeNotificationStore : INotificationStore
                 return Task.FromResult(false);
             }
 
-            _rows[userId] = Rebuild(row, userId, row.PendingEmail, null, null, null, null, 0, null, now);
+            _rows[userId] = Rebuild(row, userId, row.PendingEmail, null, null, null, null, 0, null, now, 1);
             Audits.Add(audit);
             return Task.FromResult(true);
         }
@@ -385,6 +434,7 @@ internal sealed class FakeNotificationStore : INotificationStore
                 Mode = mode,
                 BaselinePending = switchedOn,
                 DigestHandledUtc = mode == NotificationMode.None ? null : row.DigestHandledUtc,
+                Generation = row.Generation + 1,
                 Updated = nowUtc
             };
             if (mode == NotificationMode.None)
@@ -421,9 +471,11 @@ internal sealed class FakeNotificationStore : INotificationStore
                             r.Mode,
                             StateOfRow(r),
                             user.Item3,
-                            user.Item4);
+                            user.Item4,
+                            r.Generation);
                     })
             ];
+            AfterListRecipients?.Invoke();
             return Task.FromResult(recipients);
         }
     }
@@ -447,7 +499,10 @@ internal sealed class FakeNotificationStore : INotificationStore
                 throw ApplyFailure;
             }
 
-            if (!_rows.TryGetValue(userId, out var row) || row.Mode == NotificationMode.None)
+            if (!_rows.TryGetValue(userId, out var row)
+                || row.Mode == NotificationMode.None
+                || row.Email != commit.Address
+                || row.Generation != commit.Generation)
             {
                 return Task.FromResult(false);
             }
@@ -489,6 +544,7 @@ internal sealed class FakeNotificationStore : INotificationStore
                 DigestHandledUtc = commit.State.DigestHandledUtc,
                 FailureCount = commit.State.FailureCount,
                 NextAttemptUtc = commit.State.NextAttemptUtc,
+                Generation = row.Generation,
                 Updated = commit.NowUtc
             };
             if (commit.Log is { } log)
@@ -532,6 +588,7 @@ internal sealed class FakeNotificationStore : INotificationStore
     /// <param name="attempts">The wrong attempts.</param>
     /// <param name="sent">When the code was mailed.</param>
     /// <param name="updated">When the row changed.</param>
+    /// <param name="generationStep">How much the generation rises; zero when the confirmed address stays.</param>
     /// <returns>The new row.</returns>
     private static NotificationPreference Rebuild(
         NotificationPreference? old,
@@ -543,7 +600,8 @@ internal sealed class FakeNotificationStore : INotificationStore
         DateTimeOffset? expires,
         int attempts,
         DateTimeOffset? sent,
-        DateTimeOffset updated)
+        DateTimeOffset updated,
+        int generationStep = 0)
     {
         return new NotificationPreference
         {
@@ -561,6 +619,7 @@ internal sealed class FakeNotificationStore : INotificationStore
             DigestHandledUtc = old?.DigestHandledUtc,
             FailureCount = old?.FailureCount ?? 0,
             NextAttemptUtc = old?.NextAttemptUtc,
+            Generation = (old?.Generation ?? 0) + generationStep,
             Updated = updated
         };
     }
@@ -588,7 +647,8 @@ internal sealed class FakeNotificationStore : INotificationStore
     /// <returns><c>true</c> when it matches.</returns>
     private static bool Matches(NotifiedItem item, NotifiedKey key)
     {
-        return item.ProjectId == key.ProjectId && item.ReviewId == key.ReviewId && item.Section == key.Section;
+        return item.ProjectId == key.ProjectId && item.ReviewId == key.ReviewId && item.Section == key.Section
+               && item.Kind == key.Kind;
     }
 
     /// <summary>
@@ -614,6 +674,7 @@ internal sealed class FakeNotificationStore : INotificationStore
             ProjectId = key.ProjectId,
             ReviewId = key.ReviewId,
             Section = key.Section,
+            Kind = key.Kind,
             State = state,
             NotifiedUtc = notifiedUtc
         });
@@ -642,6 +703,7 @@ internal sealed class FakeNotificationStore : INotificationStore
             DigestHandledUtc = row.DigestHandledUtc,
             FailureCount = row.FailureCount,
             NextAttemptUtc = row.NextAttemptUtc,
+            Generation = row.Generation,
             Updated = row.Updated
         };
     }

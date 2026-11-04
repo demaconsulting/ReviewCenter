@@ -433,8 +433,9 @@ public class NotificationPreferenceServiceModeTests
         var world = await World.CreateAsync();
         await world.ConfirmAsync();
         await world.Service.SetModeAsync(Ann, NotificationMode.Daily, world.Token);
-        world.Store.AddNotified(AnnId, new NotifiedKey(1, "r1", InboxSection.ToAnswer), "to-answer");
         var recipients = await world.Store.ListRecipientsAsync(world.Token);
+        var recipient = recipients.Single();
+        world.Store.AddNotified(AnnId, new NotifiedKey(1, "r1", InboxSection.ToAnswer, "to-answer"), "to-answer");
         await world.Store.ApplyAsync(
             AnnId,
             new NotificationCommit(
@@ -442,8 +443,10 @@ public class NotificationPreferenceServiceModeTests
                 [],
                 [],
                 null,
-                recipients.Single().State with { BaselinePending = false },
-                null),
+                recipient.State with { BaselinePending = false },
+                null,
+                recipient.Address,
+                recipient.Generation),
             world.Token);
         return world;
     }

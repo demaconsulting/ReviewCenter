@@ -67,6 +67,40 @@ public class NotificationDispatcherRetryTests
     }
 
     /// <summary>
+    ///     Test that the extra full read after a failed pass does not send a failed mail earlier than its wait.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_FullReadAfterFailedPass_RetryWaitHonored()
+    {
+        // Arrange: ann's mail fails and bob's inbox cannot be read, in the same pass
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Every);
+        world.Enroll("bob", NotificationMode.Every);
+        await world.PassAsync();
+        world.Advance(NotificationDispatcherWorld.DefaultWindow);
+        await world.ChangeAsync();
+        world.Sender.Fail = true;
+        world.InboxStore.FailForUserId = world.IdOf("bob");
+        var failed = await world.PassAsync();
+        Assert.Equal(1, failed.Failed);
+        world.Sender.Fail = false;
+        world.InboxStore.FailForUserId = null;
+
+        // Act: a pass that reads everything again, before the wait of 5 minutes is over
+        world.Advance(NotificationDispatcher.RetryDelays[0] - TimeSpan.FromSeconds(1));
+        var early = await world.PassAsync();
+
+        // Assert: nothing was sent; one second later the retry goes out
+        Assert.Equal(new NotificationPassResult(0, 0, 0), early);
+        Assert.Equal(0, world.SentTo("ann"));
+        world.Advance(TimeSpan.FromSeconds(1));
+        var due = await world.PassAsync();
+        Assert.Equal(new NotificationPassResult(1, 0, 0), due);
+        Assert.Equal(1, world.SentTo("ann"));
+    }
+
+    /// <summary>
     ///     Test that a failed send stores the number of failed sends in a row.
     /// </summary>
     [Fact]

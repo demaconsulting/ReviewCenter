@@ -518,6 +518,70 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped
 
+      - id: ReviewCenter-NotificationDispatcher-DedupeQuestionAfterToAnswer
+        title: >-
+          The NotificationDispatcher class shall send a mail for a question that is asked in a review after the item
+          to answer of that review was mailed.
+        justification: |
+          The inbox lists a standing item to answer and a question for the user in the same section, and a question that
+          is asked later is news that the standing item does not tell.
+        tests:
+          - NotificationDispatcher_RunPass_QuestionAfterToAnswerNotified_Mailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeQuestionNotRepeated
+        title: >-
+          The NotificationDispatcher class shall send no second mail for a question and an item to answer of one review
+          that were both mailed in the same state.
+        justification: |
+          Keeping the two items apart must not make the same news be mailed again in each pass.
+        tests:
+          - NotificationDispatcher_RunPass_QuestionAndToAnswerNotified_NotMailedAgain
+
+      # Concurrent change of the preference
+      - id: ReviewCenter-NotificationDispatcher-StaleAddressNoSend
+        title: >-
+          The NotificationDispatcher class shall send no mail to an address that was replaced before the send.
+        justification: |
+          The old address no longer belongs to the user, so it must not receive news that the user did not ask it to
+          get.
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NothingSent
+
+      - id: ReviewCenter-NotificationDispatcher-StaleAddressNextPass
+        title: >-
+          The NotificationDispatcher class shall mail the items to the new address in the next pass when the address
+          was replaced before the send.
+        justification: |
+          A discarded mail must not lose the news.
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NextPassMailsNewAddress
+
+      - id: ReviewCenter-NotificationDispatcher-StaleAddressNothingRecorded
+        title: >-
+          The NotificationDispatcher class shall record nothing of a mail when the address was replaced during the
+          send.
+        justification: |
+          The items were not told to the new address, so recording them would hide their news from the user.
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-StaleModeFlipNothingRecorded
+        title: >-
+          The NotificationDispatcher class shall record nothing of a mail when the user switched the mode off and on
+          again during the send.
+        justification: |
+          A switch on starts a new baseline, so the result of a send that began before it must not be recorded.
+        tests:
+          - NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-StaleModeOffNoSend
+        title: >-
+          The NotificationDispatcher class shall send no mail to a user who switched the mode to None before the send.
+        justification: |
+          A user who switched the mail off must get no further mail.
+        tests:
+          - NotificationDispatcher_RunPass_ModeSwitchedOffBeforeSend_NothingSent
+
       # Retry
       - id: ReviewCenter-NotificationDispatcher-RetryStoresFailure
         title: >-
@@ -742,6 +806,33 @@ sections:
           A pass that failed for a user must not mark the change as seen.
         tests:
           - NotificationDispatcher_RunPass_PassFails_NextPassReads
+
+      - id: ReviewCenter-NotificationDispatcher-IdleSweepKeptOnError
+        title: >-
+          The NotificationDispatcher class shall read the inbox of each recipient in the pass after a failed pass
+          although no sweep is due.
+        justification: |
+          A pass that failed for a user must not mark the sweep as done, or the user would wait for the next sweep.
+        tests:
+          - NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain
+          - NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain
+
+      - id: ReviewCenter-NotificationDispatcher-IdleResumesAfterCleanPass
+        title: >-
+          The NotificationDispatcher class shall read no inbox in an idle pass that follows a clean pass.
+        justification: |
+          Reading everything after a failure must not keep the dispatcher from becoming cheap again.
+        tests:
+          - NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle
+
+      - id: ReviewCenter-NotificationDispatcher-IdleRetryWaitKept
+        title: >-
+          The NotificationDispatcher class shall wait for the retry time of a failed send when the pass reads every
+          inbox again.
+        justification: |
+          Reading the inbox again after a failed pass must not shorten the waits of the retry.
+        tests:
+          - NotificationDispatcher_RunPass_FullReadAfterFailedPass_RetryWaitHonored
 
       - id: ReviewCenter-NotificationDispatcher-ErrorIsolation
         title: >-

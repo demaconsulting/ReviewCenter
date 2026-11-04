@@ -14,15 +14,21 @@ sends it through `INotificationSender`. It is called by the background worker of
 #### Data Model
 
 The dispatcher keeps in memory only what makes a pass cheap: the audit sequence that it saw at the end of the last
-clean pass, and the time of the last full sweep. Everything that must survive a restart is kept by `INotificationStore`
-(table `NotificationPreferences` and its related tables), one record for each user:
+clean pass, and the time of the last full sweep. A pass that failed for a user resets both, so that the next pass
+reads every inbox again and the failed user does not wait for the next sweep. Everything that must survive a restart is
+kept by `INotificationStore` (table `NotificationPreferences` and its related tables), one record for each user:
 
 - the mode (`None`, `Every`, or `Daily`) and the confirmed address;
+- `Generation` — a counter that the store raises by one with every change of the mode and every confirmed address; the
+  dispatcher carries it into its commit, and a commit whose generation is not the current one is discarded;
 - `BaselinePending` — the mode was switched on and the backlog is not recorded yet;
 - `DigestHandledUtc` — the instant at which the last daily slot was handled;
 - `BatchStartedUtc` — the start of the running batch window of the mode Every, or null;
 - `FailureCount` and `NextAttemptUtc` — the state of the retry of a failed send;
-- the notified items: for each key (project id, review id, section) the state that the user was told about.
+- the notified items: for each key (project id, review id, section, kind) the state that the user was told about. The
+  kind is the part of the state before the first colon (`NotificationComposer.KindOf`). The inbox lists a standing item
+  to answer and a "Question for you" item in the same section of one review, and the kind keeps them apart, so that a
+  question that is asked after the item to answer was mailed is mailed too.
 
 Each mail that is sent is a `NotificationSendLogEntry` of the kind `update` (the mode Every) or `digest` (the mode
 Daily). The same log holds the confirmation mails of `NotificationPreferenceService`, with the kind `confirmation`.
@@ -51,9 +57,12 @@ Constants:
   the audit trail. Otherwise the pass reads the latest audit sequence and decides whether this pass is a sweep, which
   it is when it is the first pass, when 15 minutes have passed since the last sweep, or when the sequence changed. A
   pass that is not a sweep still serves the users whose batch window has elapsed, whose daily slot is due, whose next
-  attempt is due, or whose baseline is pending; it reads the inbox only for them. The sequence is remembered only when
-  every recipient was handled without an error, so a pass that failed for a user reads again in the next pass. For each
-  recipient the pass does the following steps in order.
+  attempt is due, or whose baseline is pending; it reads the inbox only for them. The sequence and the time of the sweep
+  are remembered only when every recipient was handled without an error; a pass that failed for a user resets both, so
+  the next pass reads every inbox again, also when the sequence is unchanged and no sweep is due. The reset does not
+  shorten a retry wait: `NextAttemptUtc` of a user whose send failed still ends the work for that user (step 4). While
+  an inbox read keeps failing, every pass therefore reads every inbox again; this is read-only, and the sends stay
+  limited by the backoff and the caps. For each recipient the pass does the following steps in order.
   1. A disabled user and a user who must still change a temporary password are skipped.
   2. The inbox is read as the recipient: `InboxService.GetInboxAsync` is called with an actor that has the user name and
      the display name of the recipient and no API token. Because the inbox applies its own masking for that actor, a
@@ -73,12 +82,21 @@ Constants:
   7. A mail is sent by one common step. The limits are checked first: the number of log rows of any kind in the last
      hour against the setting for the server, and the number of rows of the user in the last day against 24. A mail
      that exceeds a limit is deferred: no state changes, the items stay new, and they go out when the limit allows it.
-     Otherwise the mail is composed and sent. When the sender fails, `FailureCount` is raised and `NextAttemptUtc` is
-     set according to the waits above; the sixth failure gives up, which records the items as notified, clears the
+     Otherwise the mail is composed. Right before the send the dispatcher reads the preference of the user again and
+     goes on only when the mode is still not None and the generation and the confirmed address are those that the batch
+     was prepared for; otherwise the batch is discarded, nothing is sent, nothing is recorded, and the next pass starts
+     again from the current preference. The mail is then sent. When the sender fails, `FailureCount` is raised and
+     `NextAttemptUtc` is set according to the waits above; the sixth failure gives up, which records the items as
+     notified, clears the
      failure state, and passes the error on to the callback once. When the sender succeeds, one call of
      `INotificationStore.ApplyAsync` records the new items, removes the keys of items that left the inbox, writes the
-     log row, clears the batch window and the failure state, and, in the mode Daily, sets `DigestHandledUtc`. One
-     transaction means that a crash can repeat a mail but never lose the record of one.
+     log row, clears the batch window and the failure state, and, in the mode Daily, sets `DigestHandledUtc`. The
+     commit carries the address and the generation of the recipient, and the store applies it only when both are still
+     current, in the same conditional update; a commit that is stale because the user changed the address, or switched
+     the mode off and on again, during the send is discarded and records nothing. One transaction means that a crash
+     can repeat a mail but never lose the record of one. A change of the preference between the re-read and the
+     send itself can not be excluded, because the send is outside of the database; in that case the mail has gone out
+     and the commit is discarded, so that the new preference starts from its own state.
 
 An item is new when `NotificationComposer.IsNew` says so for the stored state. A key that is not in the inbox any more
 is forgotten, so an item that returns is mailed again.

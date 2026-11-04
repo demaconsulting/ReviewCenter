@@ -21,12 +21,18 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     The identity of a notified item of one user: the project, the review and the inbox section.
+///     The identity of a notified item of one user: the project, the review, the inbox section and the kind of the
+///     reason.
 /// </summary>
+/// <remarks>
+///     The kind keeps two reasons that the inbox shows in the same section of the same review apart, such as the
+///     standing of a reviewer and a question for the user, so that each is told on its own.
+/// </remarks>
 /// <param name="ProjectId">The project of the review.</param>
 /// <param name="ReviewId">The identifier of the review.</param>
 /// <param name="Section">The inbox section the item is shown in.</param>
-public sealed record NotifiedKey(int ProjectId, string ReviewId, InboxSection Section);
+/// <param name="Kind">The kind of the reason: the state token without a count, for example <c>question</c>.</param>
+public sealed record NotifiedKey(int ProjectId, string ReviewId, InboxSection Section, string Kind);
 
 /// <summary>
 ///     A notified item with the state token the user was told about.
@@ -49,7 +55,10 @@ public sealed record NotificationLogRecord(string Kind, string Address, DateTime
 /// <remarks>
 ///     Notified items, the dispatch state and the send-log row are saved together or not at all, so a crash can
 ///     not leave a mail recorded without its items or the items without the mail. The record is immutable; the
-///     lists must not be changed after construction.
+///     lists must not be changed after construction. The commit is conditional: it names the confirmed address and
+///     the generation of the preference the pass was prepared for, and the store applies it only while both still
+///     hold, so a result that was prepared before the user changed the address or the mode is discarded and nothing
+///     of it is recorded.
 /// </remarks>
 /// <param name="NowUtc">The time of the pass (UTC); stored as the notified time of the upserted items.</param>
 /// <param name="Upserts">The items to insert or whose state to update.</param>
@@ -60,10 +69,17 @@ public sealed record NotificationLogRecord(string Kind, string Address, DateTime
 /// </param>
 /// <param name="State">The new dispatch state of the user.</param>
 /// <param name="Log">The send-log row to write; <c>null</c> when no mail was sent.</param>
+/// <param name="Address">The confirmed address the pass was prepared for.</param>
+/// <param name="Generation">
+///     The generation of the preference the pass was prepared for (see
+///     <see cref="NotificationPreference.Generation"/>).
+/// </param>
 public sealed record NotificationCommit(
     DateTimeOffset NowUtc,
     IReadOnlyList<NotifiedEntry> Upserts,
     IReadOnlyList<NotifiedKey> RemoveKeys,
     IReadOnlyList<NotifiedEntry>? ReplaceAll,
     NotificationDispatchState State,
-    NotificationLogRecord? Log);
+    NotificationLogRecord? Log,
+    string Address,
+    int Generation);

@@ -4,7 +4,8 @@
 
 `NotificationDispatcher` is verified with unit tests defined in `NotificationDispatcherMaskingTests.cs`,
 `NotificationDispatcherBaselineTests.cs`, `NotificationDispatcherEveryTests.cs`, `NotificationDispatcherDailyTests.cs`,
-`NotificationDispatcherDedupeTests.cs`, `NotificationDispatcherRetryTests.cs`, `NotificationDispatcherCapTests.cs`, and
+`NotificationDispatcherDedupeTests.cs`, `NotificationDispatcherRetryTests.cs`, `NotificationDispatcherCapTests.cs`,
+`NotificationDispatcherStaleTests.cs`, and
 `NotificationDispatcherIdleTests.cs`. All of them use one test world (`NotificationDispatcherWorld`) that builds the real
 dispatcher, the real `NotificationComposer`, the real `DigestSchedule`, and the real `InboxService` over the in-memory
 stand-ins that the other Core tests use (a fake review store, a fake inbox store, a fake user store, and a fake audit
@@ -38,7 +39,10 @@ N/A - standard test environment (the in-memory stand-ins and the fake clock are 
 - A mail beyond the limit of the server or of the user is deferred without a change of state, and a sent mail writes a
   log row of the kind `update` or `digest`.
 - An idle pass reads one audit sequence, reads the inbox only when the sequence changed, a sweep is due, or a
-  time-driven duty waits, and a failure of one user does not stop the others.
+  time-driven duty waits, a pass that failed for a user is followed by a full read, and a failure of one user does not
+  stop the others.
+- A question that is asked after the item to answer was mailed is mailed, and a mail that was prepared for an address
+  or a mode that the user changed is neither sent nor recorded.
 - A canceled pass raises a cancellation, and the result holds only counts.
 
 #### Test Scenarios
@@ -117,6 +121,23 @@ user saw before the send is dropped. These scenarios are tested by
 `NotificationDispatcher_RunPass_SendInProgress_ItemsNotYetRecorded` (the items are not recorded while the send is still
 running), and `NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped`.
 
+**Question and standing item**: The inbox returns a standing item to answer and a question for the user in the same
+section of one review. A question that is asked after the item to answer was mailed is mailed, and when both were mailed
+in the same state neither is mailed again. These scenarios are tested by
+`NotificationDispatcher_RunPass_QuestionAfterToAnswerNotified_Mailed` and
+`NotificationDispatcher_RunPass_QuestionAndToAnswerNotified_NotMailedAgain`.
+
+**Concurrent change of the preference** (`NotificationDispatcherStaleTests.cs`): The fake store can change the
+preference of a user at a chosen point of a pass. When the address is replaced before the send, nothing is sent to the
+old address, and the next pass mails the new address. When the address is replaced during the send, nothing is
+recorded. When the mode is switched off and on again during the send, nothing is recorded. When the mode is switched
+off before the send, nothing is sent. These scenarios are tested by
+`NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NothingSent`,
+`NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NextPassMailsNewAddress`,
+`NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded`,
+`NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded`, and
+`NotificationDispatcher_RunPass_ModeSwitchedOffBeforeSend_NothingSent`.
+
 **Retry**: A failed send stores the failure count and the time of the next attempt, the five waits are 5 minutes, 15
 minutes, 1 hour, 4 hours, and 12 hours, no attempt is made before the next attempt time, a retry uses the inbox as it is
 then, the sixth failure gives up and records the items, a successful retry clears the failure state, and a failed send
@@ -140,12 +161,21 @@ and `NotificationDispatcher_RunPass_DailySent_LogKindDigest`.
 
 **Idle cost**: Without a recipient the audit sequence is not read, the first pass reads the inbox, an unchanged sequence
 causes no inbox read, a changed sequence does, 15 minutes without a change cause one, an elapsed window is served
-although the sequence did not move, and a pass in which a user failed does not remember the sequence. These scenarios
+although the sequence did not move, and a pass in which a user failed does not remember the sequence or the time of
+the sweep, so the next pass reads again even when the sequence is unchanged and no sweep is due, a retry wait is still
+honored in that pass, and a clean pass after a failed one makes the next idle pass read nothing. The reset is proved
+by two scenarios: a failed pass after a change of the audit trail, and a failed pass that was a time-driven sweep
+(a clean pass, the sweep interval elapses with no audit change, one inbox fails, the failure is cleared, and one
+minute later both inboxes are read again). These scenarios
 are tested by `NotificationDispatcher_RunPass_NoRecipients_NoSequenceRead`, `NotificationDispatcher_RunPass_First_ReadsInbox`,
 `NotificationDispatcher_RunPass_SequenceUnchanged_NoInboxRead`, `NotificationDispatcher_RunPass_SequenceChanged_ReadsInbox`,
 `NotificationDispatcher_RunPass_15MinutesNoChange_ReadsInbox`,
-`NotificationDispatcher_RunPass_WindowElapsedSequenceUnchanged_Sends`, and
-`NotificationDispatcher_RunPass_PassFails_NextPassReads`.
+`NotificationDispatcher_RunPass_WindowElapsedSequenceUnchanged_Sends`,
+`NotificationDispatcher_RunPass_PassFails_NextPassReads`,
+`NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain`,
+`NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain`,
+`NotificationDispatcher_RunPass_FullReadAfterFailedPass_RetryWaitHonored`, and
+`NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle`.
 
 **Resilience and result**: A failure of the inbox of one user does not keep another user from being mailed and is passed
 to the error callback, a canceled pass raises a cancellation, and the result counts the sent, failed, and deferred mails

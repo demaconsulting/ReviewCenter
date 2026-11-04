@@ -19,10 +19,11 @@ transaction together with its audit entry. The commit of a notification pass (`A
 gate and transaction but writes no audit entry.
 
 The tables are `NotificationPreferences` (one row per user, keyed by the user, with the mode and the dispatcher state),
-`NotifiedItems` (one row per user, project, review, and inbox section that the user was told about, with the state
-token and the time as a fixed width UTC text), and `NotificationSendLog` (one row per mail that was sent, with the
+`NotifiedItems` (one row per user, project, review, inbox section, and kind that the user was told about, with the
+state token and the time as a fixed width UTC text), and `NotificationSendLog` (one row per mail that was sent, with the
 user, the recipient address, the kind, and the time as a fixed width UTC text, and with indexes on the user and time,
-on the address and time, and on the time alone). All are deleted with the user (see `ReviewCenterDbContext`). Only the
+on the address and time, and on the time alone). All are deleted with the user, and `NotifiedItems` also with the
+review (see `ReviewCenterDbContext`). Only the
 preference row holds the code, and only as a salted hash. The timestamps of the dispatcher state
 (`BatchStartedUtc`, `DigestHandledUtc`, `NextAttemptUtc`) are stored the same way, as UTC text of the form
 `yyyy-MM-ddTHH:mm:ss.fffffffZ`, so that an instant keeps its meaning and the database can compare them.
@@ -39,8 +40,9 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 
 - *Returns*: True when they can; false when the database was created before they existed and has to be recreated, so
   the server can switch the feature off (or refuse to start) instead of failing on each request. The check reads the
-  mode and dispatcher columns of `NotificationPreferences`, the send log, and `NotifiedItems`, so a database of the
-  first version of the feature, which lacks the new table and columns, is reported as old. Only the failure of a missing
+  mode and dispatcher columns of `NotificationPreferences` (including the generation), the send log, and
+  `NotifiedItems` (including its kind), so a database of
+  an earlier version of the feature, which lacks the new table and columns, is reported as old. Only the failure of a missing
   table or column (SQLite error 1, "no such table" or "no such column") gives false; every other database failure, such
   as a locked, read-only, or corrupt file, propagates, so a real fault is never mistaken for an old database.
 
@@ -82,7 +84,8 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 - *Returns*: True for exactly one caller; false when the hash does not match, nothing is pending, or the code has
   expired at the given time, that is, its expiry is not later than the time (nothing is changed or audited).
 - *Postconditions*: One conditional update (`PendingCodeHash = @hash AND PendingEmail IS NOT NULL AND
-  PendingCodeExpiresUtc > @now`) sets the confirmed address and clears the pending address, hash, salt, expiry, send
+  PendingCodeExpiresUtc > @now`) sets the confirmed address, raises `Generation` by one, and clears the pending
+  address, hash, salt, expiry, send
   time, and the count of attempts; the audit entry is stored in the same transaction. The expiry is checked in the
   same statement as the change, so a request that was delayed after the service read the row can not confirm a code
   that expired in the meantime.
@@ -100,7 +103,8 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 - *Parameters*: The identity of the user, the mode, the current time, the audit draft, and a cancellation token.
 - *Returns*: True when the mode changed. False, with nothing changed and nothing audited, when the user has no row,
   when a mode other than `None` is asked for a row without a confirmed address, or when the row already has the mode.
-- *Postconditions*: In one transaction the mode is set, the batch window and the failure state are cleared, and the
+- *Postconditions*: In one transaction the mode is set, `Generation` is raised by one, the batch window and the failure
+  state are cleared, and the
   audit entry is stored. Switching on from `None` sets the baseline flag (`BaselinePending`). Switching to `None`
   deletes the notified items of the user and the time of the last digest. Switching between `Daily` and `Every` keeps
   the notified items and sets no flag. If the audit entry cannot be stored, the mode stays as it was.
@@ -108,21 +112,26 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 **ListRecipientsAsync**: Lists the users whom the dispatcher may mail.
 
 - *Returns*: The users with a mode other than `None` and a confirmed address, ordered by user identity. Each entry has
-  the user name, the display name, the address, the mode, the dispatcher state, and whether the user is disabled or
+  the user name, the display name, the address, the mode, the generation, the dispatcher state, and whether the user is
+  disabled or
   must still change a temporary password. The state timestamps are read back as the same instants. A read is untracked.
 
 **GetNotifiedAsync**: Gets the items a user was told about, ordered by identity. Only the items of that user are read.
 
 **ApplyAsync**: Records the result of a dispatcher pass for one user.
 
-- *Parameters*: The identity of the user, a `NotificationCommit` (the time, the items to insert or update, the keys to
-  forget, an optional replace-all set, the new dispatcher state, and an optional send log record), and a cancellation
-  token.
-- *Returns*: True when applied; false, with nothing recorded, when the row is gone or its mode is `None` again, which
-  can happen when the user changed the mode while the pass ran.
-- *Postconditions*: In one transaction the unit deletes the forgotten items, updates the state of known items and
-  inserts new ones (one row per user, project, review, and section), or replaces the whole set for a baseline; stores
-  the dispatcher state; inserts the send log row, if any; and deletes the log rows that are older than one day. No audit
+- *Parameters*: The identity of the user, a `NotificationCommit` (the time, the address and the generation that the mail
+  was prepared for, the items to insert or update, the keys to forget, an optional replace-all set, the new dispatcher
+  state, and an optional send log record), and a cancellation token.
+- *Returns*: True when applied; false, with nothing recorded, when the row is gone, its mode is `None` again, its
+  confirmed address is not the address of the commit, or its generation is not the generation of the commit, which can
+  happen when the user changed the mode or the address while the pass ran.
+- *Postconditions*: In one transaction the unit first runs a conditional update on the preference row that requires
+  the mode not to be `None` and the address and the generation to be those of the commit; when it changes no row,
+  nothing is written. Then it deletes the forgotten items, updates the state of known items and
+  inserts new ones (one row per user, project, review, section, and kind), or replaces the whole set for a baseline;
+  stores the dispatcher state; inserts the send log row, if any; and deletes the log rows that are older than one day.
+  No audit
   entry is written. If any part fails, nothing of the commit remains.
 
 **CountSentAsync**: Counts the rows of the send log since an instant, of all kinds, for one user or, with no user, for

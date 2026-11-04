@@ -173,6 +173,84 @@ public class NotificationDispatcherIdleTests
     }
 
     /// <summary>
+    ///     Test that a pass in which a recipient failed forgets the markers of the earlier clean pass, so the next
+    ///     pass reads every inbox again although the audit sequence is unchanged and no sweep is due.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain()
+    {
+        // Arrange: a clean pass, then a pass in which bob's inbox cannot be read
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        world.Enroll("ann", NotificationMode.Every);
+        world.Enroll("bob", NotificationMode.Every);
+        await world.PassAsync();
+        world.Advance(TimeSpan.FromMinutes(1));
+        await world.ChangeAsync();
+        world.InboxStore.FailForUserId = world.IdOf("bob");
+        await world.PassAsync();
+        world.InboxStore.FailForUserId = null;
+        var reads = world.InboxStore.InboxReads;
+        world.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: no change, within the sweep interval
+        await world.PassAsync();
+
+        // Assert: both inboxes were read again
+        Assert.Equal(reads + 2, world.InboxStore.InboxReads);
+    }
+
+    /// <summary>
+    ///     Test that a failed pass that was a time-driven sweep does not mark the sweep as done: with no audit change
+    ///     the next pass still reads every inbox, although the sweep interval has not elapsed again.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain()
+    {
+        // Arrange: a clean pass, then the sweep interval elapses with no audit change and bob's inbox fails
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        world.Enroll("ann", NotificationMode.Every);
+        world.Enroll("bob", NotificationMode.Every);
+        await world.PassAsync();
+        world.Advance(NotificationDispatcher.SweepInterval);
+        world.InboxStore.FailForUserId = world.IdOf("bob");
+        await world.PassAsync();
+        world.InboxStore.FailForUserId = null;
+        var reads = world.InboxStore.InboxReads;
+        world.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: no change, within the sweep interval
+        await world.PassAsync();
+
+        // Assert: both inboxes were read again
+        Assert.Equal(reads + 2, world.InboxStore.InboxReads);
+    }
+
+    /// <summary>
+    ///     Test that after the failed pass was followed by a clean one, the markers are kept again and an idle pass
+    ///     reads nothing.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle()
+    {
+        // Arrange: a failed pass, then a clean pass that reads everything
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        world.Enroll("ann", NotificationMode.Every);
+        world.InboxStore.FailForUserId = world.IdOf("ann");
+        await world.PassAsync();
+        world.InboxStore.FailForUserId = null;
+        world.Advance(TimeSpan.FromMinutes(1));
+        await world.PassAsync();
+        var reads = world.InboxStore.InboxReads;
+        world.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: no change, within the sweep interval
+        await world.PassAsync();
+
+        // Assert
+        Assert.Equal(reads, world.InboxStore.InboxReads);
+    }
+
+    /// <summary>
     ///     Test that a failure of the inbox of one user does not keep another user from being mailed.
     /// </summary>
     [Fact]

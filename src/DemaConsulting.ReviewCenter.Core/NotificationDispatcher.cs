@@ -45,10 +45,15 @@ public sealed record NotificationPassResult(int Sent, int Failed, int Deferred);
 ///     12 hours; after the sixth failure the items are recorded as notified and the mail is dropped. The server-wide
 ///     hourly limit and a limit per user and day defer a mail without counting it as a failure. A mail is recorded
 ///     (items, state and send log together) only after it was sent, so a crash between the send and the record can
-///     repeat a mail but never lose one. To keep an idle server cheap, the inbox of a recipient is read only when the
+///     repeat a mail but never lose one; the record is conditional on the confirmed address and the generation of the
+///     preference that the mail was prepared for, so a mail whose recipient changed the address or the mode meanwhile
+///     is neither sent when the change is seen before the send nor recorded when it is seen after it. To keep an idle
+///     server cheap, the inbox of a recipient is read only when the
 ///     audit trail has a new entry, every <see cref="SweepInterval"/>, or when stored time-driven work is due. A failure
-///     of one recipient is reported through the error callback and does not stop the pass. The dispatcher keeps
-///     only the last audit sequence and the last sweep time in memory; one pass runs at a time (a later call waits),
+///     of one recipient is reported through the error callback and does not stop the pass, and the next pass reads
+///     every inbox again. The dispatcher keeps
+///     only the last audit sequence and the last sweep time in memory, and keeps them only after a pass without a
+///     failed recipient; one pass runs at a time (a later call waits),
 ///     so the type is thread-safe.
 /// </remarks>
 public sealed class NotificationDispatcher
@@ -280,7 +285,7 @@ public sealed class NotificationDispatcher
             }
             catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
             {
-                // One recipient must not stop the others; the next pass reads again because the sequence is not kept
+                // One recipient must not stop the others; the markers are not kept, so the next pass reads again
                 clean = false;
                 _onError?.Invoke(exception);
             }
@@ -289,11 +294,18 @@ public sealed class NotificationDispatcher
         if (clean)
         {
             _lastSequence = sequence;
+            if (sweep)
+            {
+                _lastSweepUtc = now;
+            }
         }
-
-        if (sweep)
+        else
         {
-            _lastSweepUtc = now;
+            // A recipient failed: forget both markers, so the next pass reads every inbox again, whatever the audit
+            // sequence says and however recently a sweep ran. What a failed send waits for is stored with the
+            // recipient (see RetryDelays), so the extra read can not send earlier than that
+            _lastSequence = null;
+            _lastSweepUtc = null;
         }
 
         return new NotificationPassResult(sent, failed, deferred);
@@ -362,7 +374,10 @@ public sealed class NotificationDispatcher
             NextAttemptUtc = null
         };
         var all = candidates.Select(c => new NotifiedEntry(c.Key, c.State)).ToList();
-        await _store.ApplyAsync(recipient.UserId, new NotificationCommit(now, [], [], all, state, null), cancellationToken);
+        await _store.ApplyAsync(
+            recipient.UserId,
+            new NotificationCommit(now, [], [], all, state, null, recipient.Address, recipient.Generation),
+            cancellationToken);
     }
 
     /// <summary>
@@ -484,6 +499,15 @@ public sealed class NotificationDispatcher
         var message = new NotificationMessage(recipient.Address, composition.Subject, composition.Text, composition.Html);
         var state = recipient.State;
         var upserts = diff.Fresh.Select(c => new NotifiedEntry(c.Key, c.State)).ToList();
+
+        // Look at the preference once more right before the send: when the user confirmed another address or changed
+        // the mode since the pass read the recipient, this mail was prepared for a state that no longer holds, so
+        // nothing is sent and nothing is recorded; the next pass starts from the current preference
+        if (!await IsStillCurrentAsync(recipient, cancellationToken))
+        {
+            return Outcome.None;
+        }
+
         try
         {
             await _sender.SendAsync(message, cancellationToken);
@@ -508,6 +532,24 @@ public sealed class NotificationDispatcher
         var log = new NotificationLogRecord(kind, recipient.Address, now);
         await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), log, cancellationToken);
         return Outcome.Sent;
+    }
+
+    /// <summary>
+    ///     Tells whether the stored preference of a recipient is still the one a mail was prepared for.
+    /// </summary>
+    /// <param name="recipient">The recipient as the pass read it.</param>
+    /// <param name="cancellationToken">Cancels the pass.</param>
+    /// <returns>
+    ///     <c>true</c> when the row exists, has a mode, and still has the confirmed address and the generation that the
+    ///     recipient was read with.
+    /// </returns>
+    private async Task<bool> IsStillCurrentAsync(NotificationRecipient recipient, CancellationToken cancellationToken)
+    {
+        var current = await _store.GetAsync(recipient.UserId, cancellationToken);
+        return current is not null
+               && current.Mode != NotificationMode.None
+               && current.Generation == recipient.Generation
+               && string.Equals(current.Email, recipient.Address, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -561,7 +603,7 @@ public sealed class NotificationDispatcher
     {
         await _store.ApplyAsync(
             recipient.UserId,
-            new NotificationCommit(now, upserts, stale, null, state, log),
+            new NotificationCommit(now, upserts, stale, null, state, log, recipient.Address, recipient.Generation),
             cancellationToken);
     }
 
@@ -575,7 +617,7 @@ public sealed class NotificationDispatcher
     {
         var candidates = await ReadCandidatesAsync(recipient, cancellationToken);
         var stored = await _store.GetNotifiedAsync(recipient.UserId, cancellationToken);
-        var states = stored.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section), i => i.State);
+        var states = stored.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section, i.Kind), i => i.State);
         var fresh = candidates
             .Where(c => NotificationComposer.IsNew(states.GetValueOrDefault(c.Key), c.State))
             .ToList();
@@ -589,10 +631,11 @@ public sealed class NotificationDispatcher
     /// </summary>
     /// <param name="recipient">The recipient.</param>
     /// <param name="cancellationToken">Cancels the pass.</param>
-    /// <returns>The candidates, one for each item (project, review and section).</returns>
+    /// <returns>The candidates, one for each item (project, review, section and kind of reason).</returns>
     /// <remarks>
     ///     An inbox can list the same review twice in the section "to answer" (the standing of the reviewer and a
-    ///     question for the user); the first row wins, so the key stays unique.
+    ///     question for the user). The two rows have different kinds, so both are kept and each is told on its own; a
+    ///     second row of the same kind is dropped, so the key stays unique.
     /// </remarks>
     private async Task<IReadOnlyList<NotificationCandidate>> ReadCandidatesAsync(
         NotificationRecipient recipient,

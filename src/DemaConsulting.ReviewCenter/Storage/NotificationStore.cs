@@ -75,12 +75,13 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     p.BatchStartedUtc,
                     p.DigestHandledUtc,
                     p.FailureCount,
-                    p.NextAttemptUtc
+                    p.NextAttemptUtc,
+                    p.Generation
                 })
                 .Take(1)
                 .ToListAsync(cancellationToken);
             _ = await context.NotificationSendLog.AsNoTracking().AnyAsync(cancellationToken);
-            _ = await context.NotifiedItems.AsNoTracking().AnyAsync(cancellationToken);
+            _ = await context.NotifiedItems.AsNoTracking().Select(i => new { i.Id, i.Kind }).Take(1).ToListAsync(cancellationToken);
             return true;
         }
         catch (SqliteException ex) when (IsMissingTable(ex))
@@ -266,6 +267,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(p => p.Email, p => p.PendingEmail)
+                            .SetProperty(p => p.Generation, p => p.Generation + 1)
                             .SetProperty(p => p.PendingEmail, (string?)null)
                             .SetProperty(p => p.PendingCodeHash, (string?)null)
                             .SetProperty(p => p.PendingCodeSalt, (string?)null)
@@ -327,6 +329,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(p => p.Mode, mode)
+                            .SetProperty(p => p.Generation, p => p.Generation + 1)
                             .SetProperty(p => p.BaselinePending, baseline)
                             .SetProperty(p => p.BatchStartedUtc, (DateTimeOffset?)null)
                             .SetProperty(p => p.FailureCount, 0)
@@ -373,7 +376,8 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     preference.FailureCount,
                     preference.NextAttemptUtc,
                     IsDisabled = !user.Enabled,
-                    user.MustChangePassword
+                    user.MustChangePassword,
+                    preference.Generation
                 })
             .ToListAsync(cancellationToken);
         return
@@ -391,7 +395,8 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     r.FailureCount,
                     r.NextAttemptUtc),
                 r.IsDisabled,
-                r.MustChangePassword))
+                r.MustChangePassword,
+                r.Generation))
         ];
     }
 
@@ -413,21 +418,18 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             factory,
             async context =>
             {
-                var current = await context.NotificationPreferences.AsNoTracking()
-                    .Where(p => p.UserId == userId)
-                    .Select(p => (NotificationMode?)p.Mode)
-                    .FirstOrDefaultAsync(cancellationToken);
-                if (current is null or NotificationMode.None)
-                {
-                    return (false, null);
-                }
-
-                await ApplyItemsAsync(context, userId, commit, cancellationToken);
-
-                // The state of the dispatcher
+                // The conditional update that writes the state of the dispatcher is also the guard: the commit was
+                // prepared for one confirmed address and one generation of the preference, and a change of either one
+                // (a replaced address, a mode that was switched off and on again) makes it stale. A stale commit
+                // changes nothing, so no item, state or mail of it is recorded
                 var state = commit.State;
-                _ = await context.NotificationPreferences
-                    .Where(p => p.UserId == userId)
+                var address = commit.Address;
+                var generation = commit.Generation;
+                var changed = await context.NotificationPreferences
+                    .Where(p => p.UserId == userId
+                                && p.Mode != NotificationMode.None
+                                && p.Email == address
+                                && p.Generation == generation)
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(p => p.BaselinePending, state.BaselinePending)
@@ -437,6 +439,12 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                             .SetProperty(p => p.NextAttemptUtc, state.NextAttemptUtc)
                             .SetProperty(p => p.Updated, commit.NowUtc),
                         cancellationToken);
+                if (changed != 1)
+                {
+                    return (false, null);
+                }
+
+                await ApplyItemsAsync(context, userId, commit, cancellationToken);
 
                 // The mail is counted in the same transaction; rows that can not count towards a limit any more go
                 if (commit.Log is { } log)
@@ -501,7 +509,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
         var existing = await context.NotifiedItems.AsNoTracking()
             .Where(i => i.UserId == userId)
             .ToListAsync(cancellationToken);
-        var byKey = existing.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section), i => i.Id);
+        var byKey = existing.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section, i.Kind), i => i.Id);
 
         // Forget what left the inbox
         var removeIds = commit.RemoveKeys.Where(byKey.ContainsKey).Select(key => byKey[key]).ToList();
@@ -549,6 +557,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             ProjectId = entry.Key.ProjectId,
             ReviewId = entry.Key.ReviewId,
             Section = entry.Key.Section,
+            Kind = entry.Key.Kind,
             State = entry.State,
             NotifiedUtc = nowUtc
         };

@@ -849,6 +849,7 @@ public class StorageSubsystemTests
         var actor = new Actor("ann", "Ann");
         var state = new NotificationDispatchState(false, _now.AddMinutes(-3), _now.AddHours(-9), 2, _now.AddMinutes(15));
         int userId;
+        int projectId;
         var first = Open(options);
         using (first.Provider)
         {
@@ -858,6 +859,20 @@ public class StorageSubsystemTests
                 new User { Username = "ann", DisplayName = "Ann", PasswordHash = "hash", Created = _now },
                 cancellationToken);
             userId = user.Id;
+            var reviewStore = new ReviewStore(factory, appender);
+            var project = await reviewStore.AddProjectAsync(new Project { Name = "Apollo", Created = _now }, cancellationToken);
+            projectId = project.Id;
+            await reviewStore.AddReviewAsync(
+                new Review
+                {
+                    ProjectId = projectId,
+                    Id = "rev-1",
+                    Title = "Title",
+                    Created = _now,
+                    ContentFingerprint = Fingerprint.Compute(Array.Empty<byte[]>())
+                },
+                AuditDraft.By(actor, "review.created", "setup"),
+                cancellationToken);
             var notifications = new NotificationStore(factory, appender);
             var request = new ConfirmationRequest(
                 userId,
@@ -875,15 +890,19 @@ public class StorageSubsystemTests
 
             // Act: choose the mode, and let a pass notify one item
             await notifications.SetModeAsync(userId, NotificationMode.Every, _now, AuditDraft.By(actor, "notification.settings-changed", "mode"), cancellationToken);
+            var current = await notifications.GetAsync(userId, cancellationToken);
+            Assert.NotNull(current);
             await notifications.ApplyAsync(
                 userId,
                 new NotificationCommit(
                     _now,
-                    [new NotifiedEntry(new NotifiedKey(1, "rev-1", InboxSection.ToAnswer), "to-answer")],
+                    [new NotifiedEntry(new NotifiedKey(projectId, "rev-1", InboxSection.ToAnswer, "to-answer"), "to-answer")],
                     [],
                     null,
                     state,
-                    null),
+                    null,
+                    current.Email!,
+                    current.Generation),
                 cancellationToken);
         }
 

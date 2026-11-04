@@ -63,7 +63,7 @@ public class NotificationDispatcherDedupeTests
         var world = await NotificationDispatcherWorld.CreateAsync();
         await world.SeatAsync("r1", "ann");
         world.Enroll("ann", NotificationMode.Every);
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer), NotificationComposer.StateQuestion);
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "question"), NotificationComposer.StateQuestion);
 
         // Act
         var sent = await world.DeliverEveryAsync();
@@ -71,6 +71,54 @@ public class NotificationDispatcherDedupeTests
         // Assert
         Assert.Single(sent);
         Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that a question asked after the item to answer was mailed is mailed as well.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_QuestionAfterToAnswerNotified_Mailed()
+    {
+        // Arrange: ann holds a seat and was mailed that she has answers to give
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Every);
+        var first = await world.DeliverEveryAsync();
+        Assert.Single(first);
+        Assert.DoesNotContain("a question is waiting for you", first[0].TextBody, StringComparison.Ordinal);
+
+        // Act: bob asks a question, so ann's inbox holds the standing row and the "Question for you" row
+        await world.Inbox.StartThreadAsync("r1", "bob", "Why is this here?");
+        await world.ChangeAsync();
+        var all = await world.DeliverEveryAsync();
+
+        // Assert: a second mail tells her about the question, and both states are remembered
+        Assert.Equal(2, all.Count);
+        Assert.Contains("a question is waiting for you", all[1].TextBody, StringComparison.Ordinal);
+        Assert.Equal(["r1/ToAnswer=question", "r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that the question and the item to answer, once both were mailed, are not mailed again.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_QuestionAndToAnswerNotified_NotMailedAgain()
+    {
+        // Arrange: both rows exist and were mailed
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        await world.Inbox.StartThreadAsync("r1", "bob", "Why is this here?");
+        await world.ChangeAsync();
+        world.Enroll("ann", NotificationMode.Every);
+        var first = await world.DeliverEveryAsync();
+        Assert.Single(first);
+        await world.ChangeAsync();
+
+        // Act: a later pass with an unchanged inbox
+        var all = await world.DeliverEveryAsync();
+
+        // Assert
+        Assert.Single(all);
     }
 
     /// <summary>
@@ -112,8 +160,8 @@ public class NotificationDispatcherDedupeTests
         await world.ChangeAsync();
         Assert.Equal("2 waiting", Assert.Single(await world.Inbox.RowsAsync("ann", InboxSection.RepliesWaiting)).Chip);
         world.Enroll("ann", NotificationMode.Every);
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.RepliesWaiting), "replies:1");
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer), NotificationComposer.StateToAnswer);
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.RepliesWaiting, "replies"), "replies:1");
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "to-answer"), NotificationComposer.StateToAnswer);
 
         // Act
         var sent = await world.DeliverEveryAsync();
@@ -137,8 +185,8 @@ public class NotificationDispatcherDedupeTests
         await world.Inbox.ReplyAsync("r1", thread.Id, "bob");
         await world.ChangeAsync();
         world.Enroll("ann", NotificationMode.Every);
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.RepliesWaiting), "replies:3");
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer), NotificationComposer.StateToAnswer);
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.RepliesWaiting, "replies"), "replies:3");
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "to-answer"), NotificationComposer.StateToAnswer);
 
         // Act
         var sent = await world.DeliverEveryAsync();

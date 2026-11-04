@@ -136,16 +136,21 @@ repository registry is the one exception, see `Repositories`).
   enumeration `NotificationMode` stored as an integer, so `None` is 0 and is what a row that was written without a
   choice means), `BaselinePending` (a flag), `BatchStartedUtc`, `DigestHandledUtc`, and `NextAttemptUtc` (all optional,
   fixed-width UTC text through the same kind of value converter, in the form `yyyy-MM-ddTHH:mm:ss.fffffffZ`), and
-  `FailureCount`. A foreign key to
+  `FailureCount`, and `Generation` (an integer, default 0, that the store raises by one with every change of the mode
+  and every confirmed address; the dispatcher state does not change it). A foreign key to
   `Users` deletes the row with its user. The state is a table of its own, not columns of the user, for the same reason
   as the second factor. The code itself is never a column, only its salted hash.
 - **NotifiedItems** (`NotifiedItem`): key `Id`, assigned by the database. It is the memory of the dispatcher of what a
-  user was already told: one row per user, project, review, and inbox section. `UserId` is a foreign key to `Users`
-  with cascade delete, so the rows go with the user. `ReviewId` is required, at most the length of a review identifier;
-  `Section` is stored as text, at most the width of a state column; `State` is the required state token of the item, at
+  user was already told: one row per user, project, review, inbox section, and kind. `UserId` is a foreign key to
+  `Users` with cascade delete, so the rows go with the user. `ProjectId` and `ReviewId` are a composite foreign key to
+  `Reviews` with cascade delete, like the other per-review tables, so the rows go with the review and a review that is
+  created again under the same identifier is news again. `ReviewId` is required, at most the length of a review
+  identifier; `Section` is stored as text, at most the width of a state column; `Kind` is the required kind of the
+  item (the state token before its first colon), at most the width of a state column, which keeps a "Question for you"
+  item apart from the standing item to answer of the same section; `State` is the required state token of the item, at
   most the width of a state column; `NotifiedUtc` is fixed-width UTC text. A unique index on `UserId`, `ProjectId`,
-  `ReviewId`, and `Section` makes a second row for one item impossible, so the database is the last defense of the
-  question "is this news?". The rows hold no text of a review, only identifiers and a token.
+  `ReviewId`, `Section`, and `Kind` makes a second row for one item impossible, so the database is the last defense of
+  the question "is this news?". The rows hold no text of a review, only identifiers and tokens.
 - **NotificationSendLog** (`NotificationSendLogEntry`): key `Id`, assigned by the database. `UserId` is a foreign key to
   `Users` with cascade delete. `ToAddress` is required, at most 254; `Kind` is required, at most the width of a state
   column (the values `confirmation`, `update`, and `digest`); `SentUtc` is stored as fixed-width UTC text through a
@@ -270,8 +275,9 @@ is no migration, so a development database created before them must be deleted a
 the `NotificationPreferences` and `NotificationSendLog` tables (e-mail notifications): a development database created
 before them must be deleted and created again, and until then the `NotificationStore` reports itself as not available.
 The same holds for the `NotifiedItems` table and the `Mode`, `BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`,
-`FailureCount`, and `NextAttemptUtc` columns of `NotificationPreferences` (the notification mode and its dispatcher):
-a database of the first version of the notifications lacks them, must be deleted and created again, and is reported as
+`FailureCount`, `NextAttemptUtc`, and `Generation` columns of `NotificationPreferences` (the notification mode and its
+dispatcher), and for the `Kind` column, the unique index, and the relationship to `Reviews` of `NotifiedItems`:
+a database of an earlier version of the notifications lacks them, must be deleted and created again, and is reported as
 not available in the meantime.
 The checklist keys
 are what makes "one answer per check" a rule of the database.

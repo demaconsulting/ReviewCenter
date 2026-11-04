@@ -2161,25 +2161,31 @@ sections:
 
       - id: ReviewCenter-Storage-NotificationNotifiedItems
         title: >-
-          The Storage subsystem shall keep the items that a user was told about, one for each user, project, review, and
-          section.
+          The Storage subsystem shall keep the items that a user was told about, one for each user, project, review,
+          section, and kind.
         justification: |
           The items decide on every pass which items are news, so they must survive a restart and must not outlive the
-          user, the address, or the item. The table is created from the model without a migration, so a database that
-          was created before it has to be recreated.
+          user, the review, the address, or the item. The table is created from the model without a migration, so a
+          database that was created before it has to be recreated.
         children:
           - ReviewCenter-NotificationStore-ItemsUniqueKey
+          - ReviewCenter-NotificationStore-ItemsPerKind
+          - ReviewCenter-NotificationStore-ItemsRemoveKind
           - ReviewCenter-NotificationStore-ItemsRead
           - ReviewCenter-NotificationStore-ItemsCascade
+          - ReviewCenter-NotificationStore-ItemsReviewCascade
           - ReviewCenter-NotificationStore-ItemsRemoveAddress
           - ReviewCenter-NotificationStore-UnavailableNoItemsTable
           - ReviewCenter-NotificationStore-UnavailableNoModeColumn
+          - ReviewCenter-NotificationStore-UnavailableNoGenerationColumn
           - ReviewCenter-DbContext-NotifiedItemsTable
           - ReviewCenter-DbContext-NotifiedItemsUniqueIndex
           - ReviewCenter-DbContext-NotifiedItemsCascade
+          - ReviewCenter-DbContext-NotifiedItemsReviewCascade
         tests:
           - StorageSubsystem_NotificationState_PersistsModeItemsAndState
           - NotificationStore_Delete_User_CascadesNotifiedItems
+          - NotificationStore_Delete_Review_CascadesNotifiedItems
 
       - id: ReviewCenter-Storage-NotificationCommit
         title: >-
@@ -2194,9 +2200,29 @@ sections:
           - ReviewCenter-NotificationStore-ApplyReplaceAll
           - ReviewCenter-NotificationStore-ApplyLogRow
           - ReviewCenter-NotificationStore-ApplyAtomic
+          - ReviewCenter-NotificationStore-ApplyCurrent
         tests:
           - StorageSubsystem_NotificationState_PersistsModeItemsAndState
           - NotificationStore_Apply_Failure_NothingPersisted
+
+      - id: ReviewCenter-Storage-NotificationCommit-Stale
+        title: >-
+          The Storage subsystem shall record nothing of a sent mail for a user whose notification preference changed
+          since the mail was prepared.
+        justification: |
+          A user who replaced the address, or switched the mail off and on again, during a send must not get the items
+          of the old preference recorded. The generation of the preference tells the change, and the check and the
+          write are one conditional update.
+        children:
+          - ReviewCenter-NotificationStore-ApplyStaleGeneration
+          - ReviewCenter-NotificationStore-ApplyChangedAddress
+          - ReviewCenter-NotificationStore-GenerationOnMode
+          - ReviewCenter-NotificationStore-GenerationOnConfirm
+          - ReviewCenter-NotificationStore-RecipientsGeneration
+          - ReviewCenter-DbContext-NotificationDispatchColumns-Generation
+        tests:
+          - NotificationStore_Apply_StaleGeneration_WritesNothing
+          - NotificationStore_Apply_ChangedAddress_WritesNothing
 
       - id: ReviewCenter-Storage-NotificationCommit-ModeNone
         title: >-

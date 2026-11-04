@@ -833,6 +833,18 @@ sections:
           - NotificationStore_Get_NewRow_ModeNone
           - NotificationStore_IsAvailable_NoModeColumn_False
 
+      - id: ReviewCenter-DbContext-NotificationDispatchColumns-Generation
+        title: >-
+          The ReviewCenterDbContext class shall map the generation of the notification preference of a user to a column
+          of the preference row.
+        justification: |
+          The generation lets the store tell a commit that was prepared before the user changed the mode or the
+          address. The schema is created from the model without a migration, so a database from before the column
+          existed has to be recreated; the store reports such a database as not available.
+        tests:
+          - NotificationStore_SetMode_Changed_RaisesGeneration
+          - NotificationStore_IsAvailable_NoGenerationColumn_False
+
       - id: ReviewCenter-DbContext-NotifiedItemsTable
         title: >-
           The ReviewCenterDbContext class shall map the items that a user was told about to a table with one row for
@@ -847,13 +859,23 @@ sections:
 
       - id: ReviewCenter-DbContext-NotifiedItemsUniqueIndex
         title: >-
-          The ReviewCenterDbContext class shall enforce a unique index on the user, the project, the review, and the
-          section of a notified item.
+          The ReviewCenterDbContext class shall enforce a unique index on the user, the project, the review, the
+          section, and the kind of a notified item.
         justification: |
           The database is the last defense against two rows for one key, which would make the decision about news
-          ambiguous.
+          ambiguous. The kind keeps a question and a standing item to answer of one review apart.
         tests:
           - NotificationStore_Create_Database_NotifiedItemsKeyUnique
+
+      - id: ReviewCenter-DbContext-NotifiedItemsReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the notified items of a review together with the review.
+        justification: |
+          Having the database own the relationship keeps the rows consistent, and the items of a deleted review must
+          not suppress the first mail of a review that is created again under the same id.
+        tests:
+          - NotificationStore_Delete_Review_CascadesNotifiedItems
+          - NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems
 
       - id: ReviewCenter-DbContext-NotifiedItemsCascade
         title: >-

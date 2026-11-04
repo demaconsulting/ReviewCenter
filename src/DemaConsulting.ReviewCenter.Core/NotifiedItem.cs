@@ -24,8 +24,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     One inbox item a user was already told about, in the state the user was told about it.
 /// </summary>
 /// <remarks>
-///     The row is the dedupe memory of the notification dispatcher: an item (user, project, review and inbox
-///     section) is mailed only when it has no row or when its state differs from <see cref="State"/>. The state
+///     The row is the dedupe memory of the notification dispatcher: an item (user, project, review, inbox
+///     section and kind of reason) is mailed only when it has no row or when its state differs from <see cref="State"/>. The state
 ///     is a short token such as <c>to-answer</c> or <c>replies:3</c>; it never holds an outcome word, a comment
 ///     or any other content. The type is not thread-safe.
 /// </remarks>
@@ -55,6 +55,12 @@ public sealed class NotifiedItem
     ///     Gets the inbox section the item was shown in.
     /// </summary>
     public InboxSection Section { get; init; }
+
+    /// <summary>
+    ///     Gets the kind of the reason: the state token without a count (see <see cref="NotifiedKey.Kind"/>), so the
+    ///     same review can hold a row for each reason that the inbox shows in one section.
+    /// </summary>
+    public string Kind { get; init; } = string.Empty;
 
     /// <summary>
     ///     Gets the state token the user was told about.

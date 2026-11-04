@@ -213,6 +213,48 @@ public class NotificationComposerTests
     }
 
     /// <summary>
+    ///     Test that the kind of a state with a count is the state without the count.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_KindOf_StateWithCount_WithoutCount()
+    {
+        // Arrange, Act
+        var kind = NotificationComposer.KindOf("replies:3");
+
+        // Assert
+        Assert.Equal("replies", kind);
+    }
+
+    /// <summary>
+    ///     Test that the kind of a state without a count is the state itself.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_KindOf_StateWithoutCount_TheState()
+    {
+        // Arrange, Act
+        var kind = NotificationComposer.KindOf(NotificationComposer.StateQuestion);
+
+        // Assert
+        Assert.Equal("question", kind);
+    }
+
+    /// <summary>
+    ///     Test that the standing item and the question of one review get different keys.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_Classify_QuestionAndStanding_DifferentKeys()
+    {
+        // Arrange, Act
+        var standing = NotificationComposer.Classify(Row(InboxSection.ToAnswer, InboxService.NotStartedChip));
+        var question = NotificationComposer.Classify(Row(InboxSection.ToAnswer, InboxService.QuestionChip));
+
+        // Assert
+        Assert.NotNull(standing);
+        Assert.NotNull(question);
+        Assert.NotEqual(standing.Key, question.Key);
+    }
+
+    /// <summary>
     ///     Test that an approved update is classified as concluded.
     /// </summary>
     [Fact]

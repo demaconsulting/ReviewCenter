@@ -19,8 +19,11 @@ paragraph separator in it becomes a
 space, so a name can not break a header line. The base address must not be empty.
 
 A `NotificationCandidate` holds the project id, the project name, the review id, the title, the section of the inbox,
-and the state. Its key is the project id, the review id, and the section; one review can be a candidate in several
-sections at the same time. The state is a short text token:
+and the state. Its key is the project id, the review id, the section, and the kind; one review can be a candidate in
+several sections at the same time, and the section to answer holds a standing item and a question of the user side by
+side, which the kind keeps apart. The kind is the part of the state before the first colon (`KindOf`): `to-answer`,
+`question`, `disputed`, `ready`, `sign-again`, `lost`, `replies`, `concluded`, or `reopened`. The state is a short text
+token:
 
 - `to-answer` — for the rows "Not started" and "Draft" of the section to answer, which are one state, because starting
   an answer is no news;
@@ -49,6 +52,12 @@ for a mail about new items, and `<name>: your daily summary` for a daily summary
   review that waits for others. The failed checks hint at the verdicts of the reviewers, and a review that waits for
   others calls for no action of the user. A row with a kind that the composer does not know also gives null.
 - *Postconditions*: The candidate holds no detail text, no due date, and no read flag of the row.
+
+**KindOf**: Gives the kind of a state.
+
+- *Parameters*: A state token.
+- *Returns*: The part before the first colon, or the whole state when it has no colon, so `replies:3` has the kind
+  `replies` and `to-answer` has the kind `to-answer`. The count of waiting replies is no part of the kind.
 
 **IsNew**: Tells whether a candidate is new for a user.
 

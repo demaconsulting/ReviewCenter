@@ -270,7 +270,7 @@ public class NotificationDispatcherDailyTests
         world.Enroll("ann", NotificationMode.Every);
         await world.DeliverEveryAsync();
         world.Store.Seed(world.IdOf("ann"), "ann", NotificationDispatcherWorld.AddressOf("ann"), NotificationMode.Daily);
-        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer), NotificationComposer.StateToAnswer);
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "to-answer"), NotificationComposer.StateToAnswer);
         await world.SeatAsync("r2", "ann");
         await world.PassAsync();
         Assert.Single(world.Sender.Sent);

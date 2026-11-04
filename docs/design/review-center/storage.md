@@ -309,15 +309,20 @@ the pending address, the salted hash of its code, the expiry, the count of attem
 state of the dispatcher (a baseline flag, the start of the current batch, the last digest handled, the count of failed
 sends, and the time of the next attempt); the `NotificationSendLog` table
 holds one row per mail that was sent (a confirmation, an update, or a digest), which the limits count; the
-`NotifiedItems` table holds one row per user, review, and kind that has already been mailed, with a unique key on those
-three columns. All three are deleted with the user, and the notified items also with the review. They are separate
+`NotifiedItems` table holds one row per user, project, review, section, and kind that has already been mailed, with a
+unique key on those five columns (the kind keeps a "Question for you" item apart from the standing item to answer of the
+same section). The preference rows hold a generation that rises with every change of the mode or of the confirmed
+address. The tables are deleted with the user, and the notified items also with the review. They are separate
 tables, not columns of `Users`, for the same reason as the second factor. `NotificationStore` reserves a confirmation in
 one serialized transaction that counts the log, decides, and then stores the log entry, the pending state, and the audit
 entry; an attempt is counted and an address is confirmed only by a conditional update. Setting the mode stores the mode,
 the baseline flag, and the audit entry together; changing between `Every` and `Daily` keeps the notified items, and
 `None` clears them. Applying a mail stores the items, the log row, and the state in one transaction, so a failure leaves
-no half result. The send log is kept when an address is removed. A mail that could not be sent is taken back by an
-abort, so it costs nothing. The tables and columns have no migration: a development database that was created before
+no half result; it starts with a conditional update that requires the mode not to be `None` and the address and the
+generation to be those of the commit, so a mail that was prepared before the user replaced the address, or switched
+the mode off and on again, records nothing. The send log is kept when an address is removed. A mail that could not be
+sent is taken back by an abort, so it costs nothing. The tables and columns have no migration: a development database
+that was created before
 them (including one of the first version of the notifications) is recreated, and until then the store reports itself
 as not available.
 

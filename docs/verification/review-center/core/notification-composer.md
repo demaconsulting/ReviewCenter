@@ -22,6 +22,8 @@ N/A - standard test environment (no special fixtures).
   row give no candidate, and a missing row is refused.
 - An item is new when nothing was stored or the state differs, is not new when the state is the same, and waiting
   replies are new only when their number rises.
+- The kind of an item is the part of its state before the first colon, and a question and a standing item to answer
+  have different keys.
 - No detail text, no outcome word, and no number of disputed answers appears in a message.
 - Each item shows the project, the title or the review id, and a link that has the form of the review links, starts with
   the base address, is escaped, and has no query.
@@ -59,6 +61,12 @@ by `NotificationComposer_Classify_FailedChecks_ReturnsNull` and
 **What is new**: With nothing stored an item is new, with a different state it is new, with the same state it is not
 new, and waiting replies are new when their number rises and not new when it falls or stays. This scenario is tested by
 `NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules`.
+
+**Kind of an item**: The kind of a state is the part before the first colon, so a state with a count of waiting replies
+has the kind without the count, and a state without a colon is its own kind. A question and a standing item to answer
+of one review have different keys. These scenarios are tested by `NotificationComposer_KindOf_StateWithCount_WithoutCount`,
+`NotificationComposer_KindOf_StateWithoutCount_TheState`, and
+`NotificationComposer_Classify_QuestionAndStanding_DifferentKeys`.
 
 **No detail and no outcome**: A sentinel detail sentence of an inbox row is in neither part, the words Approved and
 Rejected are nowhere in a message about updates, a concluded review reads "the review was concluded", a reopened review

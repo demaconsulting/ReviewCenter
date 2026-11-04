@@ -177,7 +177,7 @@ public interface INotificationStore
 
     /// <summary>
     ///     Makes the pending address the confirmed address, only while the pending code is the given one and has not
-    ///     expired at the given time, together with the audit entry.
+    ///     expired at the given time, together with the audit entry. The generation of the row rises by one.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="codeHash">The hash of the code that was typed correctly.</param>
@@ -216,7 +216,8 @@ public interface INotificationStore
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the mode changed; <c>false</c> when nothing changed and no audit entry was written.</returns>
     /// <remarks>
-    ///     A change clears the batch window and the failure state. Switching on from <see cref="NotificationMode.None"/>
+    ///     A change clears the batch window and the failure state and raises the generation of the row by one.
+    ///     Switching on from <see cref="NotificationMode.None"/>
     ///     marks the baseline as pending; switching to <see cref="NotificationMode.None"/> deletes the notified items
     ///     and the time of the last digest.
     /// </remarks>
@@ -250,7 +251,15 @@ public interface INotificationStore
     /// <param name="userId">The user.</param>
     /// <param name="commit">What to change. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when applied; <c>false</c> when the user has no row or the mode is none any more.</returns>
+    /// <returns>
+    ///     <c>true</c> when applied; <c>false</c> when nothing was changed because the user has no row, the mode is
+    ///     none, the confirmed address is not <see cref="NotificationCommit.Address"/>, or the generation is not
+    ///     <see cref="NotificationCommit.Generation"/> any more.
+    /// </returns>
+    /// <remarks>
+    ///     The conditions are checked in the same conditional update that writes the dispatch state, so a commit that
+    ///     was prepared before a change of the address or the mode can never be applied.
+    /// </remarks>
     Task<bool> ApplyAsync(int userId, NotificationCommit commit, CancellationToken cancellationToken = default);
 
     /// <summary>

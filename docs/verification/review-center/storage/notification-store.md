@@ -38,9 +38,12 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 - The mode is stored with its audit entry in one transaction; `None` deletes the notified items; an unchanged mode
   writes nothing; a new row reads as `None`.
 - Only users with a mode and a confirmed address are listed as recipients, with their flags and dispatch state.
-- A commit of a mail is atomic, is refused for a user without a mode or a row, keeps one row per key, and prunes old
-  log rows; the mails sent are counted per user and for all users.
-- A database without the table of notified items or without the mode column is reported as not available.
+- A commit of a mail is atomic, is refused for a user without a mode or a row, or whose address or generation is not the
+  current one, keeps one row per key and kind, and prunes old log rows; the mails sent are counted per user and for all
+  users.
+- The generation rises with a change of the mode and with a confirmed address, and the items go away with their review.
+- A database without the table of notified items, the mode column, or the generation column is reported as not
+  available.
 
 #### Test Scenarios
 
@@ -171,6 +174,23 @@ are counted. These scenarios are tested by `NotificationStore_Create_Database_Ha
 `NotificationStore_Remove_DeletesNotified`, `NotificationStore_CountSent_User_CountsOwn`, and
 `NotificationStore_CountSent_All_CountsEverything`.
 
-**Availability of the new parts**: A database without the table of notified items, or without the mode column, is
-reported as not available (a database of the first version of the notifications). These scenarios are tested by
-`NotificationStore_IsAvailable_NoNotifiedItems_False` and `NotificationStore_IsAvailable_NoModeColumn_False`.
+**Generation and stale commits**: The generation of a preference rises by one when the mode changes and when an address
+is confirmed, and it is reported with each recipient. A commit whose generation differs from the current one, or whose
+address differs from the confirmed address, returns false and writes nothing (no item, no state, no log row), and a
+commit with the current address and generation is applied. These scenarios are tested by
+`NotificationStore_SetMode_Changed_RaisesGeneration`, `NotificationStore_Confirm_Address_RaisesGeneration`,
+`NotificationStore_ListRecipients_Generation_Joined`, `NotificationStore_Apply_StaleGeneration_WritesNothing`,
+`NotificationStore_Apply_ChangedAddress_WritesNothing`, and
+`NotificationStore_Apply_CurrentAddressAndGeneration_Applied`.
+
+**Kind and review of the items**: Two items of one section with different kinds are two rows, removing the key of one
+kind keeps the row of the other kind, the items go away with the deletion of their review, and a review that is deleted
+and created again has no items. The tests seed a project and a review, because the items now relate to the review.
+These scenarios are tested by `NotificationStore_Apply_SameSectionOtherKind_TwoRows`,
+`NotificationStore_Apply_RemoveOneKind_KeepsOtherKind`, `NotificationStore_Delete_Review_CascadesNotifiedItems`, and
+`NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems`.
+
+**Availability of the new parts**: A database without the table of notified items, without the mode column, or without
+the generation column is reported as not available (a database of an earlier version of the notifications). These
+scenarios are tested by `NotificationStore_IsAvailable_NoNotifiedItems_False`,
+`NotificationStore_IsAvailable_NoModeColumn_False`, and `NotificationStore_IsAvailable_NoGenerationColumn_False`.

@@ -112,6 +112,13 @@ public sealed class NotificationPreference
     public DateTimeOffset? NextAttemptUtc { get; init; }
 
     /// <summary>
+    ///     Gets the generation of the row: a counter that rises by one every time the mode changes and every time a
+    ///     new address is confirmed, and never when the dispatcher records a pass. The dispatcher prepares a mail for
+    ///     one generation, and the store refuses its result after the generation moved on.
+    /// </summary>
+    public int Generation { get; init; }
+
+    /// <summary>
     ///     Gets the moment the row last changed (UTC).
     /// </summary>
     public DateTimeOffset Updated { get; init; }

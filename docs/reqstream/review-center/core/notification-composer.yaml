@@ -197,6 +197,33 @@ sections:
         tests:
           - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
 
+      - id: ReviewCenter-NotificationComposer-KindInKey
+        title: >-
+          The NotificationComposer class shall give a question and a standing item to answer of one review different
+          keys.
+        justification: |
+          The inbox lists both in the same section, and a question that is asked after the standing item was mailed is
+          news that a shared key would hide.
+        tests:
+          - NotificationComposer_Classify_QuestionAndStanding_DifferentKeys
+
+      - id: ReviewCenter-NotificationComposer-KindOfStripsCount
+        title: >-
+          The NotificationComposer class shall take the kind of an item from the part of its state before the first
+          colon.
+        justification: |
+          The count of waiting replies changes without a change of the kind, so the count is no part of the kind.
+        tests:
+          - NotificationComposer_KindOf_StateWithCount_WithoutCount
+
+      - id: ReviewCenter-NotificationComposer-KindOfPlainState
+        title: >-
+          The NotificationComposer class shall take the whole state as the kind of an item whose state has no colon.
+        justification: |
+          Most states are a single token that is its own kind.
+        tests:
+          - NotificationComposer_KindOf_StateWithoutCount_TheState
+
       - id: ReviewCenter-NotificationComposer-NeverUseDetail
         title: >-
           The NotificationComposer class shall keep the detail text of an inbox row out of a mail.

@@ -260,15 +260,20 @@ database that was created before they existed, the store reports that it is not 
 unit.
 
 **Notification mode and notified items**: The mode and the dispatch state are columns of the `NotificationPreferences`
-table, and `NotifiedItems` is a table with a unique key on the user, the project, the review, and the section, deleted
-with the user. They are exercised over a real database file by `NotificationStoreModeTests.cs`: a new row reads as the
+table, and `NotifiedItems` is a table with a unique key on the user, the project, the review, the section, and the kind,
+deleted with the user and with the review. They are exercised over a real database file by
+`NotificationStoreModeTests.cs`: a new row reads as the
 mode `None` (`NotificationStore_Get_NewRow_ModeNone`), the dispatch state and its timestamps round-trip
-(`NotificationStore_ListRecipients_State_RoundTrips` and `NotificationStore_Apply_State_TimestampsRoundTrip`), a new
-database has the table (`NotificationStore_Create_Database_HasNotifiedItems`), the database refuses a second row for the
-same key (`NotificationStore_Create_Database_NotifiedItemsKeyUnique`), and deleting a user removes the items
-(`NotificationStore_Delete_User_CascadesNotifiedItems`). A database of the first version of the notifications has neither
-the table nor the columns and is reported as not available (`NotificationStore_IsAvailable_NoNotifiedItems_False` and
-`NotificationStore_IsAvailable_NoModeColumn_False`). These tests are described with the `NotificationStore` unit.
+(`NotificationStore_ListRecipients_State_RoundTrips` and `NotificationStore_Apply_State_TimestampsRoundTrip`), the
+generation of the preference rises with a change of the mode (`NotificationStore_SetMode_Changed_RaisesGeneration`), a
+new database has the table (`NotificationStore_Create_Database_HasNotifiedItems`), the database refuses a second row
+for the same key (`NotificationStore_Create_Database_NotifiedItemsKeyUnique`), deleting a user removes the items
+(`NotificationStore_Delete_User_CascadesNotifiedItems`), and deleting a review removes the items, so that a review that
+is created again under the same identifier has none (`NotificationStore_Delete_Review_CascadesNotifiedItems` and
+`NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems`). A database of an earlier version of the notifications
+has neither the table nor the columns and is reported as not available (`NotificationStore_IsAvailable_NoNotifiedItems_False`,
+`NotificationStore_IsAvailable_NoModeColumn_False`, and `NotificationStore_IsAvailable_NoGenerationColumn_False`). These
+tests are described with the `NotificationStore` unit.
 
 **The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.
 

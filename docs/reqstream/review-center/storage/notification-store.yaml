@@ -549,14 +549,86 @@ sections:
         tests:
           - NotificationStore_Apply_NoRow_ReturnsFalse
 
+      - id: ReviewCenter-NotificationStore-ApplyStaleGeneration
+        title: >-
+          The NotificationStore class shall write nothing of a commit whose generation differs from the generation of
+          the preference of the user.
+        justification: |
+          The generation rises with every change of the mode or the address, so a different generation shows that the
+          user changed the preference after the mail was prepared, for example by switching the mail off and on again.
+        tests:
+          - NotificationStore_Apply_StaleGeneration_WritesNothing
+
+      - id: ReviewCenter-NotificationStore-ApplyChangedAddress
+        title: >-
+          The NotificationStore class shall write nothing of a commit whose address differs from the confirmed address
+          of the user.
+        justification: |
+          A mail that went to an address that the user replaced must not be recorded as told.
+        tests:
+          - NotificationStore_Apply_ChangedAddress_WritesNothing
+
+      - id: ReviewCenter-NotificationStore-ApplyCurrent
+        title: >-
+          The NotificationStore class shall apply a commit whose address and generation are those of the preference of
+          the user.
+        justification: |
+          The check against a stale commit must not reject the commit of a mail that went to the current address.
+        tests:
+          - NotificationStore_Apply_CurrentAddressAndGeneration_Applied
+
+      - id: ReviewCenter-NotificationStore-GenerationOnMode
+        title: >-
+          The NotificationStore class shall raise the generation of the preference of a user by one when the mode of
+          the user changes.
+        justification: |
+          A commit that was prepared under the old mode must be recognized as stale.
+        tests:
+          - NotificationStore_SetMode_Changed_RaisesGeneration
+
+      - id: ReviewCenter-NotificationStore-GenerationOnConfirm
+        title: >-
+          The NotificationStore class shall raise the generation of the preference of a user by one when the user
+          confirms an address.
+        justification: |
+          A commit that was prepared for the old address must be recognized as stale.
+        tests:
+          - NotificationStore_Confirm_Address_RaisesGeneration
+
+      - id: ReviewCenter-NotificationStore-RecipientsGeneration
+        title: >-
+          The NotificationStore class shall report the generation of the preference with each recipient.
+        justification: |
+          The dispatcher carries the generation into its commit, so that the store can tell a stale commit.
+        tests:
+          - NotificationStore_ListRecipients_Generation_Joined
+
       - id: ReviewCenter-NotificationStore-ItemsUniqueKey
         title: >-
-          The NotificationStore class shall keep one notified item for each user, project, review, and section.
+          The NotificationStore class shall keep one notified item for each user, project, review, section, and kind.
         justification: |
           The key decides whether an item is news, so two rows for one key would make the decision ambiguous.
         tests:
           - NotificationStore_Apply_SameKeyTwice_OneRow
           - NotificationStore_Create_Database_NotifiedItemsKeyUnique
+
+      - id: ReviewCenter-NotificationStore-ItemsPerKind
+        title: >-
+          The NotificationStore class shall keep two notified items for one user, project, review, and section when
+          their kinds differ.
+        justification: |
+          The inbox lists a question and a standing item to answer in one section, and each is news of its own.
+        tests:
+          - NotificationStore_Apply_SameSectionOtherKind_TwoRows
+
+      - id: ReviewCenter-NotificationStore-ItemsRemoveKind
+        title: >-
+          The NotificationStore class shall keep the notified item of another kind when a commit removes the key of one
+          kind.
+        justification: |
+          An item that left the inbox is forgotten, and an item of another kind in the same section did not leave.
+        tests:
+          - NotificationStore_Apply_RemoveOneKind_KeepsOtherKind
 
       - id: ReviewCenter-NotificationStore-ItemsRead
         title: >-
@@ -573,6 +645,16 @@ sections:
           Items must not outlive their user.
         tests:
           - NotificationStore_Delete_User_CascadesNotifiedItems
+
+      - id: ReviewCenter-NotificationStore-ItemsReviewCascade
+        title: >-
+          The NotificationStore class shall delete the notified items of a review together with the review.
+        justification: |
+          A review that is deleted and created again under the same id must be news again, so its old items must not
+          outlive it.
+        tests:
+          - NotificationStore_Delete_Review_CascadesNotifiedItems
+          - NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems
 
       - id: ReviewCenter-NotificationStore-ItemsRemoveAddress
         title: >-
@@ -616,6 +698,16 @@ sections:
           failing in a pass.
         tests:
           - NotificationStore_IsAvailable_NoNotifiedItems_False
+
+      - id: ReviewCenter-NotificationStore-UnavailableNoGenerationColumn
+        title: >-
+          The NotificationStore class shall report itself as not available when the generation column of the
+          preferences is missing.
+        justification: |
+          A database from before the generation existed has to be recreated, and the server must say so at the start
+          instead of failing in a pass.
+        tests:
+          - NotificationStore_IsAvailable_NoGenerationColumn_False
 
       - id: ReviewCenter-NotificationStore-UnavailableNoModeColumn
         title: >-

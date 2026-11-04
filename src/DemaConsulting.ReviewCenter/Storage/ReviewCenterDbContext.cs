@@ -40,7 +40,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     <c>TotpRecoveryCodes</c>) and for the e-mail notification tables (<c>NotificationPreferences</c>,
 ///     <c>NotificationSendLog</c> and <c>NotifiedItems</c>) and the mode and dispatch state columns of
 ///     <c>NotificationPreferences</c> (<c>Mode</c>, <c>BaselinePending</c>, <c>BatchStartedUtc</c>,
-///     <c>DigestHandledUtc</c>, <c>FailureCount</c> and <c>NextAttemptUtc</c>): a database from before them must be
+///     <c>DigestHandledUtc</c>, <c>FailureCount</c>, <c>NextAttemptUtc</c> and <c>Generation</c>) and the <c>Kind</c>
+///     column and the review relationship of <c>NotifiedItems</c>: a database from before them must be
 ///     deleted and recreated. The same is true for
 ///     the <c>ReviewReopens</c> table, for the <c>RequireIndependentReviewers</c>,
 ///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
@@ -468,16 +469,24 @@ internal sealed class ReviewCenterDbContext : DbContext
         });
 
         // Items a user was already told about (the dedupe memory of the notification dispatcher): one row per user,
-        // project, review and inbox section, with the state token the user was told. They go away with the user
+        // project, review, inbox section and kind of reason, with the state token the user was told. The kind keeps the
+        // two reasons that one section can show for one review apart (the standing of a reviewer and a question for
+        // the user). They go away with the user and with the review: a review that is deleted and created again under
+        // the same identifier is new to every user, so nothing of the old one may suppress its first mail
         modelBuilder.Entity<NotifiedItem>(item =>
         {
             item.HasKey(i => i.Id);
             item.Property(i => i.ReviewId).IsRequired().HasMaxLength(ReviewLimits.MaxReviewIdLength);
             item.Property(i => i.Section).HasConversion<string>().HasMaxLength(StateColumnLength);
+            item.Property(i => i.Kind).IsRequired().HasMaxLength(StateColumnLength);
             item.Property(i => i.State).IsRequired().HasMaxLength(StateColumnLength);
             item.Property(i => i.NotifiedUtc).HasConversion(UtcTextConverter());
-            item.HasIndex(i => new { i.UserId, i.ProjectId, i.ReviewId, i.Section }).IsUnique();
+            item.HasIndex(i => new { i.UserId, i.ProjectId, i.ReviewId, i.Section, i.Kind }).IsUnique();
             item.HasOne<User>().WithMany().HasForeignKey(i => i.UserId).OnDelete(DeleteBehavior.Cascade);
+            item.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(i => new { i.ProjectId, i.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<NotificationSendLogEntry>(entry =>

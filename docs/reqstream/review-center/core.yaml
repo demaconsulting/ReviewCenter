@@ -1688,9 +1688,44 @@ sections:
           - ReviewCenter-NotificationDispatcher-DedupeRecordAfterSend
           - ReviewCenter-NotificationDispatcher-DedupeNotRecordedOnFailure
           - ReviewCenter-NotificationDispatcher-DedupeUnseenOnly
+          - ReviewCenter-NotificationDispatcher-DedupeQuestionAfterToAnswer
+          - ReviewCenter-NotificationDispatcher-DedupeQuestionNotRepeated
+          - ReviewCenter-NotificationComposer-KindInKey
+          - ReviewCenter-NotificationComposer-KindOfStripsCount
+          - ReviewCenter-NotificationComposer-KindOfPlainState
         tests:
           - CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce
           - NotificationDispatcher_RunPass_SameItemSameState_NotMailedTwice
+
+      - id: ReviewCenter-Core-NotificationCurrentAddress
+        title: >-
+          The Core subsystem shall mail a user only at the confirmed address that the user has at the time of the
+          send.
+        justification: |
+          A user who replaced the address must not see the news go to the old address, and the result of a mail that
+          went nowhere must not hide the news.
+        children:
+          - ReviewCenter-NotificationDispatcher-StaleAddressNoSend
+          - ReviewCenter-NotificationDispatcher-StaleAddressNextPass
+          - ReviewCenter-NotificationDispatcher-StaleAddressNothingRecorded
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NothingSent
+          - NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded
+
+      - id: ReviewCenter-Core-NotificationCurrentMode
+        title: >-
+          The Core subsystem shall discard a notification that was prepared before the user changed the notification
+          mode.
+        justification: |
+          A user who switched the mail off, or off and on again, chose a new start, and the result of a send that began
+          before it must not decide what is news. Discarding means that nothing is sent when the mail is off before
+          the send, and that nothing is recorded when the mode flipped during the send.
+        children:
+          - ReviewCenter-NotificationDispatcher-StaleModeOffNoSend
+          - ReviewCenter-NotificationDispatcher-StaleModeFlipNothingRecorded
+        tests:
+          - NotificationDispatcher_RunPass_ModeSwitchedOffBeforeSend_NothingSent
+          - NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded
 
       - id: ReviewCenter-Core-NotificationRetry
         title: >-
@@ -1708,6 +1743,7 @@ sections:
           - ReviewCenter-NotificationDispatcher-RetryFourthFourHours
           - ReviewCenter-NotificationDispatcher-RetryFifthTwelveHours
           - ReviewCenter-NotificationDispatcher-RetryNoSendBeforeDue
+          - ReviewCenter-NotificationDispatcher-IdleRetryWaitKept
           - ReviewCenter-NotificationDispatcher-RetryRecomputes
           - ReviewCenter-NotificationDispatcher-RetrySuccessResets
           - ReviewCenter-NotificationDispatcher-RetryFailureKeepsOthers
@@ -1791,6 +1827,28 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_SequenceChanged_ReadsInbox
           - NotificationDispatcher_RunPass_PassFails_NextPassReads
+
+      - id: ReviewCenter-Core-NotificationIdleCost-AfterFailure
+        title: >-
+          When a notification pass failed for a user, the Core subsystem shall read the inbox of each recipient in the
+          next pass although no sweep is due.
+        justification: |
+          A failed pass must not mark the sweep as done, or the user would wait for the next sweep to get the news.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleSweepKeptOnError
+        tests:
+          - NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain
+          - NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain
+
+      - id: ReviewCenter-Core-NotificationIdleCost-Resume
+        title: >-
+          When a notification pass is clean, the Core subsystem shall read no inbox in the next idle pass.
+        justification: |
+          Reading everything after a failure must not keep the dispatcher from becoming cheap again.
+        children:
+          - ReviewCenter-NotificationDispatcher-IdleResumesAfterCleanPass
+        tests:
+          - NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle
 
       - id: ReviewCenter-Core-NotificationIdleCost-Sweep
         title: >-

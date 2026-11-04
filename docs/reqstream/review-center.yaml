@@ -1685,6 +1685,23 @@ sections:
           - NotificationDispatcher_RunPass_SameItemSameState_NotMailedTwice
           - StorageSubsystem_NotificationState_PersistsModeItemsAndState
 
+      - id: ReviewCenter-System-NotificationCurrentPreference
+        title: >-
+          The tool shall discard a notification mail that was prepared before the user changed the notification
+          preference.
+        tags: [system]
+        justification: |
+          A user who replaced the address, or switched the mail off and on again, while a mail was in flight must not
+          get the mail recorded as told, and must not get mail at the old address. The notification preference is the
+          confirmed address and the mode of the user.
+        children:
+          - ReviewCenter-Core-NotificationCurrentAddress
+          - ReviewCenter-Core-NotificationCurrentMode
+          - ReviewCenter-Storage-NotificationCommit-Stale
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded
+          - NotificationStore_Apply_StaleGeneration_WritesNothing
+
       - id: ReviewCenter-System-NotificationRetry
         title: >-
           When the send of a notification mail fails, the tool shall try again after 5 minutes, 15 minutes, 1 hour,
@@ -1777,6 +1794,30 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_SequenceChanged_ReadsInbox
           - NotificationDispatcher_RunPass_First_ReadsInbox
+
+      - id: ReviewCenter-System-NotificationIdleCost-AfterFailure
+        title: >-
+          When a notification pass failed for a user, the tool shall read the inbox of each recipient in the next pass
+          although no sweep is due.
+        tags: [system]
+        justification: |
+          A failed pass must not mark the sweep as done, or the user would wait for the next sweep to get the news.
+        children:
+          - ReviewCenter-Core-NotificationIdleCost-AfterFailure
+        tests:
+          - NotificationDispatcher_RunPass_FailedAfterCleanPass_NextPassReadsAgain
+          - NotificationDispatcher_RunPass_FailedSweepAfterCleanPass_NextPassReadsAgain
+
+      - id: ReviewCenter-System-NotificationIdleCost-Resume
+        title: >-
+          When a notification pass is clean, the tool shall read no inbox in the next idle pass.
+        tags: [system]
+        justification: |
+          Reading everything after a failure must not keep the server from becoming cheap again.
+        children:
+          - ReviewCenter-Core-NotificationIdleCost-Resume
+        tests:
+          - NotificationDispatcher_RunPass_CleanAfterFailedPass_NextPassIdle
 
       - id: ReviewCenter-System-NotificationIdleCost-TimeDriven
         title: >-

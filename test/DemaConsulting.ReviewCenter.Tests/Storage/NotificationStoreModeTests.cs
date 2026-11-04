@@ -212,8 +212,8 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]));
 
         // Act
         var changed = await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
@@ -233,7 +233,7 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(userId, Commit(), Token);
+        await ApplyCurrentAsync(db, userId, Commit());
 
         // Act
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
@@ -449,7 +449,7 @@ public class NotificationStoreModeTests
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
         var state = new NotificationDispatchState(false, _now.AddMinutes(-3), _now.AddHours(-9), 2, _now.AddMinutes(15));
-        await db.Notifications.ApplyAsync(userId, Commit(state: state), Token);
+        await ApplyCurrentAsync(db, userId, Commit(state: state));
 
         // Act
         var recipient = Assert.Single(await db.Notifications.ListRecipientsAsync(Token));
@@ -474,8 +474,8 @@ public class NotificationStoreModeTests
         var next = _now.AddTicks(1234567);
 
         // Act
-        await db.Notifications.ApplyAsync(
-            userId, Commit(state: new NotificationDispatchState(false, started, handled, 1, next)), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(state: new NotificationDispatchState(false, started, handled, 1, next)));
 
         // Assert
         Assert.Equal("2025-03-04T05:06:07.1234567Z", ReadText(db, $"SELECT NextAttemptUtc FROM NotificationPreferences WHERE UserId = {userId}"));
@@ -497,8 +497,8 @@ public class NotificationStoreModeTests
         var next = _now.AddTicks(1234567);
 
         // Act
-        await db.Notifications.ApplyAsync(
-            userId, Commit(state: new NotificationDispatchState(false, started, handled, 1, next)), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(state: new NotificationDispatchState(false, started, handled, 1, next)));
 
         // Assert
         var row = await db.Notifications.GetAsync(userId, Token);
@@ -518,12 +518,12 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]));
 
         // Act: insert another item
-        var applied = await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r2", InboxSection.ToSign, "to-sign")]), Token);
+        var applied = await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r2", InboxSection.ToSign, "to-sign")]));
 
         // Assert
         Assert.True(applied);
@@ -542,13 +542,13 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")]));
 
         // Act
         var later = _now.AddHours(1);
-        await db.Notifications.ApplyAsync(
-            userId, Commit(later, upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer:2")]), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(later, upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer:2")]));
 
         // Assert
         var first = Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
@@ -566,16 +566,16 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a"), Entry(1, "r2", InboxSection.ToSign, "b")]),
-            Token);
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a"), Entry(1, "r2", InboxSection.ToSign, "b")]));
 
         // Act
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(removeKeys: [new NotifiedKey(1, "r1", InboxSection.ToAnswer), new NotifiedKey(9, "none", InboxSection.Updates)]),
-            Token);
+            Commit(removeKeys: [Key(1, "r1", InboxSection.ToAnswer), Key(9, "none", InboxSection.Updates)]));
 
         // Assert
         var remaining = Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
@@ -592,16 +592,16 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a"), Entry(1, "r2", InboxSection.ToSign, "b")]),
-            Token);
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a"), Entry(1, "r2", InboxSection.ToSign, "b")]));
 
         // Act: the baseline holds one old and one new item
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(replaceAll: [Entry(1, "r2", InboxSection.ToSign, "b2"), Entry(2, "r3", InboxSection.Disputed, "d")]),
-            Token);
+            Commit(replaceAll: [Entry(1, "r2", InboxSection.ToSign, "b2"), Entry(2, "r3", InboxSection.Disputed, "d")]));
 
         // Assert
         var items = await db.Notifications.GetNotifiedAsync(userId, Token);
@@ -622,10 +622,10 @@ public class NotificationStoreModeTests
         var before = await CountLogAsync(db);
 
         // Act
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)),
-            Token);
+            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
 
         // Assert
         Assert.Equal(before + 1, await CountLogAsync(db));
@@ -654,7 +654,7 @@ public class NotificationStoreModeTests
             log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now));
 
         // Act
-        await Assert.ThrowsAnyAsync<Exception>(() => db.Notifications.ApplyAsync(userId, commit, Token));
+        await Assert.ThrowsAnyAsync<Exception>(() => ApplyCurrentAsync(db, userId, commit));
 
         // Assert: neither the item, nor the state
         Execute(db, "DROP TRIGGER refuse_log");
@@ -676,8 +676,8 @@ public class NotificationStoreModeTests
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
 
         // Act
-        var applied = await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
+        var applied = await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
 
         // Assert
         Assert.False(applied);
@@ -695,12 +695,12 @@ public class NotificationStoreModeTests
         var before = await CountLogAsync(db);
 
         // Act
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
             Commit(
                 upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
-                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)),
-            Token);
+                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
 
         // Assert
         Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
@@ -718,12 +718,308 @@ public class NotificationStoreModeTests
         var userId = await AddUserAsync(db, "ann");
 
         // Act
-        var applied = await db.Notifications.ApplyAsync(
-            userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
+        var applied = await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
 
         // Assert
         Assert.False(applied);
         Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
+    }
+
+    /// <summary>
+    ///     Test that a commit made for an earlier generation of the preferences changes nothing, though the mode is
+    ///     the same again (the mode was switched off and on while the pass was sending).
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_StaleGeneration_WritesNothing()
+    {
+        // Arrange: a commit prepared in the mode Every, then the mode flips Every -> None -> Every
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        var prepared = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(prepared);
+        await db.Notifications.SetModeAsync(userId, NotificationMode.None, _now, Draft(), Token);
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        var before = await CountLogAsync(db);
+
+        // Act
+        var applied = await db.Notifications.ApplyAsync(
+            userId,
+            Commit(
+                upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
+                state: new NotificationDispatchState(false, null, _now, 4, _now.AddHours(1)),
+                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now))
+            with
+            {
+                Address = prepared.Email!,
+                Generation = prepared.Generation
+            },
+            Token);
+
+        // Assert: nothing was written
+        Assert.False(applied);
+        Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
+        Assert.Equal(before, await CountLogAsync(db));
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.Equal(0, row.FailureCount);
+        Assert.Null(row.DigestHandledUtc);
+    }
+
+    /// <summary>
+    ///     Test that a commit made for another confirmed address changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_ChangedAddress_WritesNothing()
+    {
+        // Arrange: the current generation, but the commit was prepared for the address that was replaced
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        var current = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(current);
+        var before = await CountLogAsync(db);
+
+        // Act
+        var applied = await db.Notifications.ApplyAsync(
+            userId,
+            Commit(
+                upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
+                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "old@example.com", _now))
+            with
+            {
+                Address = "old@example.com",
+                Generation = current.Generation
+            },
+            Token);
+
+        // Assert: nothing was written
+        Assert.False(applied);
+        Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
+        Assert.Equal(before, await CountLogAsync(db));
+    }
+
+    /// <summary>
+    ///     Test that a commit made for the current address and generation is applied.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_CurrentAddressAndGeneration_Applied()
+    {
+        // Arrange
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        var current = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(current);
+
+        // Act
+        var applied = await db.Notifications.ApplyAsync(
+            userId,
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]) with
+            {
+                Address = "ann@example.com",
+                Generation = current.Generation
+            },
+            Token);
+
+        // Assert
+        Assert.True(applied);
+        Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
+    }
+
+    /// <summary>
+    ///     Test that a change of the mode raises the generation of the preferences.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_SetMode_Changed_RaisesGeneration()
+    {
+        // Arrange
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        var before = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(before);
+
+        // Act
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+
+        // Assert
+        var after = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(after);
+        Assert.Equal(before.Generation + 1, after.Generation);
+    }
+
+    /// <summary>
+    ///     Test that confirming an address raises the generation of the preferences.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Confirm_Address_RaisesGeneration()
+    {
+        // Arrange: a confirmed address and a replacement that waits for its code
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        var before = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(before);
+        await ReserveAsync(db, userId, "new@example.com", 'b');
+
+        // Act
+        Assert.True(await db.Notifications.ConfirmAsync(userId, Hash('b'), _now, Draft("setup"), Token));
+
+        // Assert
+        var after = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(after);
+        Assert.Equal("new@example.com", after.Email);
+        Assert.Equal(before.Generation + 1, after.Generation);
+    }
+
+    /// <summary>
+    ///     Test that the listed recipients carry the generation of their preferences.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_ListRecipients_Generation_Joined()
+    {
+        // Arrange
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+
+        // Act
+        var recipients = await db.Notifications.ListRecipientsAsync(Token);
+
+        // Assert
+        Assert.Equal(row.Generation, Assert.Single(recipients).Generation);
+    }
+
+    /// <summary>
+    ///     Test that the items of one section with different kinds are kept side by side.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_SameSectionOtherKind_TwoRows()
+    {
+        // Arrange
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+
+        // Act: the standing item and the question of the same review
+        await ApplyCurrentAsync(
+            db,
+            userId,
+            Commit(
+                upserts:
+                [
+                    Entry(1, "r1", InboxSection.ToAnswer, "to-answer"),
+                    Entry(1, "r1", InboxSection.ToAnswer, "question", "question")
+                ]));
+
+        // Assert
+        var items = await db.Notifications.GetNotifiedAsync(userId, Token);
+        Assert.Equal(["question", "to-answer"], items.Select(i => i.Kind).Order().ToArray());
+    }
+
+    /// <summary>
+    ///     Test that removing one kind keeps the other kind of the same section.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_RemoveOneKind_KeepsOtherKind()
+    {
+        // Arrange: both items of the section
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        await ApplyCurrentAsync(
+            db,
+            userId,
+            Commit(
+                upserts:
+                [
+                    Entry(1, "r1", InboxSection.ToAnswer, "to-answer"),
+                    Entry(1, "r1", InboxSection.ToAnswer, "question", "question")
+                ]));
+
+        // Act
+        await ApplyCurrentAsync(db, userId, Commit(removeKeys: [Key(1, "r1", InboxSection.ToAnswer, "question")]));
+
+        // Assert
+        var item = Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
+        Assert.Equal("to-answer", item.Kind);
+    }
+
+    /// <summary>
+    ///     Test that deleting a review deletes the notified items of that review (cascade).
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Delete_Review_CascadesNotifiedItems()
+    {
+        // Arrange: items for two reviews
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        await ApplyCurrentAsync(
+            db,
+            userId,
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a"), Entry(1, "r2", InboxSection.ToSign, "b")]));
+
+        // Act: delete one review row directly
+        await using (var context = await db.Factory.CreateDbContextAsync(Token))
+        {
+            await context.Reviews.Where(review => review.Id == "r1").ExecuteDeleteAsync(Token);
+        }
+
+        // Assert: only the item of the other review is left
+        var left = Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
+        Assert.Equal("r2", left.ReviewId);
+    }
+
+    /// <summary>
+    ///     Test that a review that is deleted and created again under the same id has no notified items, so the
+    ///     first mail about it is not suppressed.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems()
+    {
+        // Arrange: an item for r1
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        await ApplyCurrentAsync(db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
+
+        // Act: delete the review and create one with the same id
+        await using (var context = await db.Factory.CreateDbContextAsync(Token))
+        {
+            await context.Reviews.Where(review => review.Id == "r1").ExecuteDeleteAsync(Token);
+            context.Reviews.Add(new Review
+            {
+                ProjectId = 1,
+                Id = "r1",
+                Title = "Again",
+                Created = _now,
+                ContentFingerprint = Fingerprint.Compute(Array.Empty<byte[]>())
+            });
+            await context.SaveChangesAsync(Token);
+        }
+
+        // Assert: nothing is remembered about the new review
+        Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
+    }
+
+    /// <summary>
+    ///     Test that a database without the generation column is reported as not available.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_IsAvailable_NoGenerationColumn_False()
+    {
+        // Arrange: a database from before the generation existed
+        using var db = new TestStore();
+        Execute(db, "ALTER TABLE NotificationPreferences DROP COLUMN Generation");
+
+        // Act
+        var available = await db.Notifications.IsAvailableAsync(Token);
+
+        // Assert
+        Assert.False(available);
     }
 
     /// <summary>
@@ -738,8 +1034,8 @@ public class NotificationStoreModeTests
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
 
         // Act
-        await db.Notifications.ApplyAsync(userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
-        await db.Notifications.ApplyAsync(userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "b")]), Token);
+        await ApplyCurrentAsync(db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
+        await ApplyCurrentAsync(db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "b")]));
 
         // Assert
         var item = Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token));
@@ -747,7 +1043,8 @@ public class NotificationStoreModeTests
     }
 
     /// <summary>
-    ///     Test that the database itself refuses a second row for the same key.
+    ///     Test that the database itself refuses a second row for the same key, and accepts a row for another section
+    ///     and a row of another kind in the same section.
     /// </summary>
     [Fact]
     public async Task NotificationStore_Create_Database_NotifiedItemsKeyUnique()
@@ -756,16 +1053,19 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         const string insert =
-            "INSERT INTO NotifiedItems (UserId, ProjectId, ReviewId, Section, State, NotifiedUtc) VALUES ({0}, 1, 'r1', 'ToAnswer', 'a', '2025-03-04T05:06:07.0000000Z')";
+            "INSERT INTO NotifiedItems (UserId, ProjectId, ReviewId, Section, Kind, State, NotifiedUtc) VALUES ({0}, 1, 'r1', 'ToAnswer', 'to-answer', 'a', '2025-03-04T05:06:07.0000000Z')";
         Execute(db, string.Format(System.Globalization.CultureInfo.InvariantCulture, insert, userId));
 
-        // Act and Assert: a duplicate and a row for another section
+        // Act and Assert: a duplicate is refused; another section and another kind are accepted
         Assert.ThrowsAny<SqliteException>(
             () => Execute(db, string.Format(System.Globalization.CultureInfo.InvariantCulture, insert, userId)));
         Execute(
             db,
             string.Format(System.Globalization.CultureInfo.InvariantCulture, insert, userId).Replace("'ToAnswer'", "'ToSign'", StringComparison.Ordinal));
-        Assert.Equal(2, (await db.Notifications.GetNotifiedAsync(userId, Token)).Count);
+        Execute(
+            db,
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, insert, userId).Replace("'to-answer'", "'question'", StringComparison.Ordinal));
+        Assert.Equal(3, (await db.Notifications.GetNotifiedAsync(userId, Token)).Count);
     }
 
     /// <summary>
@@ -798,8 +1098,8 @@ public class NotificationStoreModeTests
             await db.Notifications.SetModeAsync(id, NotificationMode.Every, _now, Draft(), Token);
         }
 
-        await db.Notifications.ApplyAsync(ann, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
-        await db.Notifications.ApplyAsync(bob, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "b")]), Token);
+        await ApplyCurrentAsync(db, ann, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
+        await ApplyCurrentAsync(db, bob, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "b")]));
 
         // Act
         var items = await db.Notifications.GetNotifiedAsync(ann, Token);
@@ -823,7 +1123,7 @@ public class NotificationStoreModeTests
         foreach (var id in new[] { ann, bob })
         {
             await db.Notifications.SetModeAsync(id, NotificationMode.Every, _now, Draft(), Token);
-            await db.Notifications.ApplyAsync(id, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
+            await ApplyCurrentAsync(db, id, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
         }
 
         // Act
@@ -847,7 +1147,7 @@ public class NotificationStoreModeTests
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]), Token);
+        await ApplyCurrentAsync(db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
 
         // Act
         var removed = await db.Notifications.RemoveAsync(userId, Draft(), Token);
@@ -927,10 +1227,10 @@ public class NotificationStoreModeTests
         var before = await CountLogAsync(db);
 
         // Act
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
-            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)),
-            Token);
+            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
 
         // Assert: one row went, one row came
         Assert.Equal(before, await CountLogAsync(db));
@@ -996,7 +1296,9 @@ public class NotificationStoreModeTests
             removeKeys ?? [],
             replaceAll,
             state ?? NotificationDispatchState.Empty,
-            log);
+            log,
+            string.Empty,
+            0);
     }
 
     /// <summary>
@@ -1023,12 +1325,12 @@ public class NotificationStoreModeTests
     {
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        await db.Notifications.ApplyAsync(
+        await ApplyCurrentAsync(
+            db,
             userId,
             Commit(
                 upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer")],
-                state: new NotificationDispatchState(false, null, _now, 0, null)),
-            Token);
+                state: new NotificationDispatchState(false, null, _now, 0, null)));
         return userId;
     }
 
@@ -1039,10 +1341,76 @@ public class NotificationStoreModeTests
     /// <param name="reviewId">The review.</param>
     /// <param name="section">The section.</param>
     /// <param name="state">The state token.</param>
+    /// <param name="kind">The kind of the item.</param>
     /// <returns>The entry.</returns>
-    private static NotifiedEntry Entry(int projectId, string reviewId, InboxSection section, string state)
+    private static NotifiedEntry Entry(
+        int projectId,
+        string reviewId,
+        InboxSection section,
+        string state,
+        string kind = "to-answer")
     {
-        return new NotifiedEntry(new NotifiedKey(projectId, reviewId, section), state);
+        return new NotifiedEntry(Key(projectId, reviewId, section, kind), state);
+    }
+
+    /// <summary>
+    ///     Builds the key of a notified item.
+    /// </summary>
+    /// <param name="projectId">The project.</param>
+    /// <param name="reviewId">The review.</param>
+    /// <param name="section">The section.</param>
+    /// <param name="kind">The kind of the item.</param>
+    /// <returns>The key.</returns>
+    private static NotifiedKey Key(int projectId, string reviewId, InboxSection section, string kind = "to-answer")
+    {
+        return new NotifiedKey(projectId, reviewId, section, kind);
+    }
+
+    /// <summary>
+    ///     Applies a commit as a dispatcher would that has just read the current address and generation of the user.
+    /// </summary>
+    /// <param name="db">The test store.</param>
+    /// <param name="userId">The user.</param>
+    /// <param name="commit">The commit; its address and generation are replaced by the current ones.</param>
+    /// <returns><c>true</c> when the commit was applied.</returns>
+    private static async Task<bool> ApplyCurrentAsync(TestStore db, int userId, NotificationCommit commit)
+    {
+        var row = await db.Notifications.GetAsync(userId, Token);
+        return await db.Notifications.ApplyAsync(
+            userId,
+            commit with { Address = row?.Email ?? string.Empty, Generation = row?.Generation ?? 0 },
+            Token);
+    }
+
+    /// <summary>
+    ///     Creates the projects and reviews the notified items of the tests refer to, when they do not exist yet.
+    /// </summary>
+    /// <param name="db">The test store.</param>
+    /// <returns>A task that completes when the reviews exist.</returns>
+    private static async Task EnsureReviewsAsync(TestStore db)
+    {
+        await using var context = await db.Factory.CreateDbContextAsync(Token);
+        if (await context.Projects.AnyAsync(Token))
+        {
+            return;
+        }
+
+        context.Projects.Add(new Project { Id = 1, Name = "One", Created = _now });
+        context.Projects.Add(new Project { Id = 2, Name = "Two", Created = _now });
+        await context.SaveChangesAsync(Token);
+        foreach (var (projectId, reviewId) in new[] { (1, "r1"), (1, "r2"), (2, "r3") })
+        {
+            context.Reviews.Add(new Review
+            {
+                ProjectId = projectId,
+                Id = reviewId,
+                Title = "Title " + reviewId,
+                Created = _now,
+                ContentFingerprint = Fingerprint.Compute(Array.Empty<byte[]>())
+            });
+        }
+
+        await context.SaveChangesAsync(Token);
     }
 
     /// <summary>
@@ -1055,6 +1423,7 @@ public class NotificationStoreModeTests
     private static async Task<int> ConfirmedUserAsync(TestStore db, string username, string address)
     {
         var userId = await AddUserAsync(db, username);
+        await EnsureReviewsAsync(db);
         await ReserveAsync(db, userId, address, 'a');
         Assert.True(await db.Notifications.ConfirmAsync(userId, Hash('a'), _now, Draft("setup"), Token));
         return userId;
