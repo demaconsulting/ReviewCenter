@@ -106,7 +106,10 @@ sections:
           - ReviewCenter-ServerHost-Authentication
           - ReviewCenter-ServerHost-Authentication-RevalidationInterval
           - ReviewCenter-ServerHost-Authentication-ThrottleLimits
+          - ReviewCenter-ServerHost-Authentication-ThrottleLimits-Window
+          - ReviewCenter-ServerHost-Authentication-ThrottleLimits-AddressBelowName
           - ReviewCenter-ServerHost-Authentication-ThrottleAccepted
+          - ReviewCenter-ServerHost-Authentication-ThrottleAccepted-Explicit
           - ReviewCenter-ServerHost-Authentication-ProtectedPages
           - ReviewCenter-ServerHost-Authentication-PublicPages
         tests:
@@ -279,6 +282,7 @@ sections:
           - ReviewCenter-KeysCommand-RefusesUnreadable-Arguments
           - ReviewCenter-KeysCommand-Report
           - ReviewCenter-KeysCommand-Report-Counts
+          - ReviewCenter-KeysCommand-Report-Counts-SecondFactor
           - ReviewCenter-KeysCommand-Report-ReferencedKeys
           - ReviewCenter-KeysCommand-Report-UnreferencedKeys
           - ReviewCenter-KeysCommand-Report-PayloadHeaders
@@ -353,6 +357,7 @@ sections:
           - ReviewCenter-KeyRingProtection-Auto-Unix
           - ReviewCenter-KeyRingProtection-Auto-Default
           - ReviewCenter-KeyRingProtection-Auto-Explicit
+          - ReviewCenter-KeyRingProtection-Auto-Explicit-Spaces
           - ReviewCenter-KeyRingProtection-Dpapi
           - ReviewCenter-KeyRingProtection-Dpapi-CurrentUser
           - ReviewCenter-KeyRingProtection-Dpapi-LocalMachine
@@ -384,13 +389,16 @@ sections:
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
           - ReviewCenter-KeyRingProtection-PermissionsOnly-UnixFolder
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder-NoInheritance
           - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsInherit
           - ReviewCenter-KeyRingProtection-PermissionsOnly-Warning
           - ReviewCenter-KeyRingProtection-Require
+          - ReviewCenter-KeyRingProtection-Require-Auto
           - ReviewCenter-KeyRingProtection-Require-PlaintextRing
           - ReviewCenter-KeyRingProtection-Require-EncryptedRing
           - ReviewCenter-KeyRingProtection-PreviousCertificates
           - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword
+          - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword-NoPassword
           - ReviewCenter-KeyRingProtection-PreviousCertificates-Entry
           - ReviewCenter-KeyRingProtection-WrongKeyGuard
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoCertificate
@@ -398,6 +406,8 @@ sections:
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-UnreadableKeys
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-ContentHidden
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-MissingFolder
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-RequireEncrypted
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRingNoKey
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyError
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyStart
@@ -412,6 +422,9 @@ sections:
           - ReviewCenter-KeyRingProtection-Validation-Report
           - ReviewCenter-KeyRingProtection-Validation-BadType
           - ReviewCenter-KeyRingProtection-Validation-Binding
+          - ReviewCenter-KeyRingProtection-Validation-Binding-PreviousList
+          - ReviewCenter-KeyRingProtection-Validation-Binding-RequireEncrypted
+          - ReviewCenter-KeyRingProtection-Validation-Binding-LetterCase
           - ReviewCenter-ServerHost-KeyProtection
           - ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
           - ReviewCenter-ServerHost-KeyProtection-NoPasswordLogged
@@ -449,7 +462,9 @@ sections:
           - ReviewCenter-SecretScan-SecretReadability
           - ReviewCenter-SecretScan-SecretReadability-Readable
           - ReviewCenter-SecretScan-SecretReadability-Unreadable
+          - ReviewCenter-SecretScan-SecretReadability-Unreadable-SecondFactor
           - ReviewCenter-SecretScan-SecretReadability-Ids
+          - ReviewCenter-SecretScan-SecretReadability-Ids-Users
           - ReviewCenter-SecretScan-SecretReadability-IdList
           - ReviewCenter-SecretScan-SecretReadability-NoKeyFiles
           - ReviewCenter-SecretScan-SecretReadability-MalformedKeys
@@ -580,8 +595,10 @@ sections:
           - ReviewCenter-ServerHost-OidcSettings
           - ReviewCenter-ServerHost-OidcSettings-NoSecret
           - ReviewCenter-ServerHost-OidcSettings-SecretFile
+          - ReviewCenter-ServerHost-OidcSettings-SecretFile-InlineSecret
           - ReviewCenter-ServerHost-OidcSettings-Off
           - ReviewCenter-ServerHost-OidcSettings-ValidBuilds
+          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
         tests:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
@@ -597,6 +614,7 @@ sections:
           - ReviewCenter-ServerHost-TotpWiring
           - ReviewCenter-ServerHost-TotpWiring-DefaultsOn
           - ReviewCenter-ServerHost-TotpWiring-SettingsApplied
+          - ReviewCenter-ServerHost-TotpWiring-SettingsApplied-IssuerTrimmed
           - ReviewCenter-ServerHost-TotpWiring-EndpointMapped
           - ReviewCenter-ServerHost-TotpWiring-EndpointOffNotMapped
         tests:

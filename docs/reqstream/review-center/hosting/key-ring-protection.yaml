@@ -53,11 +53,19 @@ sections:
       - id: ReviewCenter-KeyRingProtection-Auto-Explicit
         title: >-
           The KeyRingProtection class shall use the protection that DataProtection:Protection names, in any letter
-          case and ignoring surrounding spaces, instead of the choice of Auto.
+          case, instead of the choice of Auto.
         justification: |
           An operator who names a protection must get it, whatever else is configured.
         tests:
           - KeyRingProtection_ResolveMode_ExplicitChoice_IsHonoredInAnyCase
+
+      - id: ReviewCenter-KeyRingProtection-Auto-Explicit-Spaces
+        title: >-
+          The KeyRingProtection class shall ignore spaces around the value of DataProtection:Protection.
+        justification: |
+          A setting that was typed or pasted with a stray space must still name the protection that was meant.
+        tests:
+          - KeyRingProtection_ResolveMode_ExplicitChoiceWithSurroundingSpaces_IsHonored
 
       # ---------------------------------------------------------------------------------------------------------------
       # Dpapi: Windows DPAPI protection
@@ -355,8 +363,17 @@ sections:
 
       - id: ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
         title: >-
-          The KeyRingProtection class shall, on Windows, restrict the key folder to access rules without inheritance
-          that admit only the account of the server and the system.
+          The KeyRingProtection class shall, on Windows, restrict the key folder to access rules that admit only the
+          account of the server and the system.
+        justification: |
+          Only the account of the server may read keys that decrypt the stored tokens.
+        tests:
+          - windows@KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem
+
+      - id: ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder-NoInheritance
+        title: >-
+          The KeyRingProtection class shall, on Windows, make the key folder not inherit the access rules of its
+          parent.
         justification: |
           A folder inherits the access rules of its parent on Windows, and those usually admit other users.
         tests:
@@ -387,13 +404,21 @@ sections:
       - id: ReviewCenter-KeyRingProtection-Require
         title: >-
           The KeyRingProtection class shall report DataProtection:RequireEncryptedKeys true together with the
-          PermissionsOnly protection, whether chosen explicitly or by Auto, as a problem that names
+          PermissionsOnly protection, when chosen explicitly, as a problem that names
           DataProtection:RequireEncryptedKeys.
         justification: |
           An operator who must not run with plain keys needs the server to enforce that, rather than to rely on a log
           line.
         tests:
           - KeyRingProtection_Prepare_PermissionsOnlyWithRequireEncryptedKeys_ReturnsProblem
+
+      - id: ReviewCenter-KeyRingProtection-Require-Auto
+        title: >-
+          The KeyRingProtection class shall report DataProtection:RequireEncryptedKeys true together with the
+          PermissionsOnly protection, when chosen by Auto, as a problem that names DataProtection:RequireEncryptedKeys.
+        justification: |
+          An operator who leaves the choice to Auto on Linux or macOS must not end up with plain keys unnoticed.
+        tests:
           - KeyRingProtection_Prepare_AutoOnUnixWithRequireEncryptedKeys_ReturnsProblem
 
       - id: ReviewCenter-KeyRingProtection-Require-PlaintextRing
@@ -431,11 +456,20 @@ sections:
       - id: ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword
         title: >-
           The KeyRingProtection class shall open each certificate of DataProtection:PreviousCertificatePaths with the
-          password of the current certificate or, when that password does not open it, without a password.
+          password of the current certificate.
+        justification: |
+          Earlier certificates are often protected with the same password as the new one.
+        tests:
+          - KeyRingProtection_Prepare_PreviousCertificates_LoadWithSharedPasswordOrNone
+
+      - id: ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword-NoPassword
+        title: >-
+          The KeyRingProtection class shall open a certificate of DataProtection:PreviousCertificatePaths without a
+          password when the password of the current certificate does not open it.
         justification: |
           Earlier certificates are often kept without the password of the new one.
         tests:
-          - KeyRingProtection_Prepare_PreviousCertificates_LoadWithSharedPasswordOrNone
+          - KeyRingProtection_Prepare_PreviousCertificateWithoutPassword_LoadsWithoutIt
 
       - id: ReviewCenter-KeyRingProtection-PreviousCertificates-Entry
         title: >-
@@ -500,10 +534,25 @@ sections:
 
       - id: ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing
         title: >-
-          The KeyRingProtection class shall accept a key folder that is empty or does not exist, also when
-          DataProtection:RequireEncryptedKeys is true.
+          The KeyRingProtection class shall accept a key folder that is empty.
         justification: |
           A new installation has no ring yet and must start.
+        tests:
+          - KeyRingProtection_CheckRing_EmptyRing_Passes
+
+      - id: ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-MissingFolder
+        title: >-
+          The KeyRingProtection class shall accept a key folder that does not exist.
+        justification: |
+          A new installation may not have created the key folder yet and must start.
+        tests:
+          - KeyRingProtection_CheckRing_EmptyRing_Passes
+
+      - id: ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-RequireEncrypted
+        title: >-
+          The KeyRingProtection class shall accept a new key ring when DataProtection:RequireEncryptedKeys is true.
+        justification: |
+          A new installation has no plain key file that the setting could refuse, so it must start.
         tests:
           - KeyRingProtection_CheckRing_EmptyRing_Passes
 
@@ -630,10 +679,35 @@ sections:
 
       - id: ReviewCenter-KeyRingProtection-Validation-Binding
         title: >-
-          The KeyRingProtection class shall read its settings from the DataProtection configuration section, including
-          the list of previous certificates and DataProtection:RequireEncryptedKeys, without regard to the letter case
-          of the names.
+          The KeyRingProtection class shall read its settings from the DataProtection configuration section.
         justification: |
           The settings of the operator must reach the logic that decides how the key ring is protected.
         tests:
           - KeyRingProtection_Prepare_Configuration_BindsTheSectionAndReportsBadValues
+
+      - id: ReviewCenter-KeyRingProtection-Validation-Binding-PreviousList
+        title: >-
+          The KeyRingProtection class shall read the list of previous certificates from the DataProtection
+          configuration section.
+        justification: |
+          A list of earlier certificates that is not read would leave their keys unreadable after a certificate change.
+        tests:
+          - KeyRingProtection_Prepare_Configuration_PreviousCertificatePaths_AreRead
+
+      - id: ReviewCenter-KeyRingProtection-Validation-Binding-RequireEncrypted
+        title: >-
+          The KeyRingProtection class shall read DataProtection:RequireEncryptedKeys from the DataProtection
+          configuration section.
+        justification: |
+          A requirement of encryption that is not read would let the server run with plain keys.
+        tests:
+          - KeyRingProtection_Prepare_Configuration_RequireEncryptedKeys_IsRead
+
+      - id: ReviewCenter-KeyRingProtection-Validation-Binding-LetterCase
+        title: >-
+          The KeyRingProtection class shall read the DataProtection configuration section without regard to the
+          letter case of the names.
+        justification: |
+          Configuration names are case-insensitive for the operator, for example in environment variables.
+        tests:
+          - KeyRingProtection_Prepare_Configuration_NamesInAnyLetterCase_AreRead

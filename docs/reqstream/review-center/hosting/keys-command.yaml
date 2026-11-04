@@ -267,14 +267,21 @@ sections:
 
       - id: ReviewCenter-KeysCommand-Report-Counts
         title: >-
-          The KeysCommand class shall report how many repository tokens and how many second-factor secrets it
-          re-protected.
+          The KeysCommand class shall report how many repository tokens it re-protected.
         justification: |
-          The counts confirm that nothing was missed.
+          The count confirms that no token was missed.
         tests:
           - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
           - KeysCommand_Run_SecondRun_IsIdempotentAndGivesAnotherKey
           - KeysCommand_Run_NoSecrets_SucceedsWithZeroCounts
+
+      - id: ReviewCenter-KeysCommand-Report-Counts-SecondFactor
+        title: >-
+          The KeysCommand class shall report how many second-factor secrets it re-protected.
+        justification: |
+          The count confirms that no second-factor secret was missed.
+        tests:
+          - KeysCommand_Run_OnlySecondFactorSecrets_ReportsTheirCount
 
       - id: ReviewCenter-KeysCommand-Report-ReferencedKeys
         title: >-

@@ -26,6 +26,7 @@ sections:
           - ReviewCenter-GitRunner-NoShell-Environment
           - ReviewCenter-GitRunner-NoShell-Prompts
           - ReviewCenter-GitRunner-NoShell-Configuration
+          - ReviewCenter-GitRunner-NoShell-Configuration-User
           - ReviewCenter-GitRunner-NoShell-CredentialHelper
           - ReviewCenter-GitRunner-NoShell-Protocols
           - ReviewCenter-GitRunner-NoShell-Hooks
@@ -95,6 +96,7 @@ sections:
           - ReviewCenter-GitSource-Changes-ModeOnly
           - ReviewCenter-GitSource-Changes-Order
           - ReviewCenter-GitSource-Changes-Blobs
+          - ReviewCenter-GitSource-Changes-Blobs-MissingSide
           - ReviewCenter-GitSource-SpecialEntries
           - ReviewCenter-GitSource-SpecialEntries-Reported
         tests:
@@ -276,6 +278,7 @@ sections:
           - ReviewCenter-ReviewSetParser-Errors-Content
           - ReviewCenter-GitSource-Ancestry
           - ReviewCenter-GitSource-Ancestry-NotAncestor
+          - ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
           - ReviewCenter-GitSource-Ancestry-Itself
           - ReviewCenter-GitSource-Ancestry-UnknownCommit
           - ReviewCenter-GitSource-Ancestry-NoPaths

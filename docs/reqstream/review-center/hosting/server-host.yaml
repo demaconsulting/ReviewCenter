@@ -141,22 +141,46 @@ sections:
       - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits
         title: >-
           The ServerHost class shall fail with an error that names the Identity:Throttle setting when a sign-in
-          throttle limit is not positive, the window is outside 1 to 86400 seconds, or the per-address limit is below
-          the per-name limit.
+          throttle limit is not positive.
         justification: |
           A wrong limit would switch off or distort the protection against guessing passwords, so it must stop the
           server at start-up.
         tests:
           - ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError
 
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits-Window
+        title: >-
+          The ServerHost class shall fail with an error that names the Identity:Throttle setting when the sign-in
+          throttle window is outside 1 to 86400 seconds.
+        justification: |
+          A window of no length would never count a failure, and one of many days would lock a name for too long.
+        tests:
+          - ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleLimits-AddressBelowName
+        title: >-
+          The ServerHost class shall fail with an error that names the Identity:Throttle setting when the per-address
+          sign-in throttle limit is below the per-name limit.
+        justification: |
+          An address limit below the name limit would make the name limit unreachable from a single address.
+        tests:
+          - ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError
+
       - id: ReviewCenter-ServerHost-Authentication-ThrottleAccepted
         title: >-
-          The ServerHost class shall build the application with the default sign-in throttle settings and with valid
-          explicit throttle settings.
+          The ServerHost class shall build the application with the default sign-in throttle settings.
         justification: |
-          The defaults and the largest allowed window have to work, or an administrator cannot keep the throttle at all.
+          The defaults have to work, or an administrator cannot keep the throttle at all.
         tests:
           - ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication
+
+      - id: ReviewCenter-ServerHost-Authentication-ThrottleAccepted-Explicit
+        title: >-
+          The ServerHost class shall build the application with valid explicit sign-in throttle settings.
+        justification: |
+          The largest allowed window has to work, or an administrator cannot choose the throttle.
+        tests:
+          - ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication
 
       - id: ReviewCenter-ServerHost-Authentication-ProtectedPages
         title: >-
@@ -926,12 +950,22 @@ sections:
       - id: ReviewCenter-ServerHost-OidcSettings-SecretFile
         title: >-
           The ServerHost class shall stop the start with an error that names Identity:Oidc:ClientSecretFile when the
-          client secret file is missing or is set together with an inline client secret.
+          client secret file is missing.
         justification: |
-          A client secret in two places, or in a file that does not exist, is a mistake that the administrator must
-          find when the server starts.
+          A client secret in a file that does not exist is a mistake that the administrator must find when the server
+          starts.
         tests:
           - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-OidcSettings-SecretFile-InlineSecret
+        title: >-
+          The ServerHost class shall stop the start with an error that names Identity:Oidc:ClientSecretFile when the
+          client secret file is set together with an inline client secret.
+        justification: |
+          A client secret in two places leaves it unclear which one is meant, and the administrator must find that when
+          the server starts.
+        tests:
+          - ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret
 
       - id: ReviewCenter-ServerHost-OidcSettings-Off
         title: >-
@@ -944,13 +978,21 @@ sections:
 
       - id: ReviewCenter-ServerHost-OidcSettings-ValidBuilds
         title: >-
-          The ServerHost class shall build the application when the OpenID Connect settings are valid, with https or
-          with http on a loopback host.
+          The ServerHost class shall build the application when the OpenID Connect settings are valid with https.
         justification: |
-          The settings that an identity provider needs (https, or http on a loopback host for development) must not be
-          refused by their own validation.
+          The settings that an identity provider needs must not be refused by their own validation.
         tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+
+      - id: ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
+        title: >-
+          The ServerHost class shall build the application when the OpenID Connect settings are valid with http on a
+          loopback host.
+        justification: |
+          A provider that runs on the developer machine is reached with http, which must not be refused by the
+          validation of the settings.
+        tests:
+          - ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication
 
       - id: ReviewCenter-ServerHost-TotpWiring
         title: >-
@@ -972,11 +1014,19 @@ sections:
 
       - id: ReviewCenter-ServerHost-TotpWiring-SettingsApplied
         title: >-
-          The ServerHost class shall provide the settings of the second factor as configured, with the issuer trimmed.
+          The ServerHost class shall provide the settings of the second factor as configured.
         justification: |
           The settings of the operator must take effect.
         tests:
           - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-ServerHost-TotpWiring-SettingsApplied-IssuerTrimmed
+        title: >-
+          The ServerHost class shall provide the issuer of the second factor without the spaces around it.
+        justification: |
+          A stray space in the setting must not end up in the name that an authenticator app shows.
+        tests:
+          - ServerHost_CreateApplication_IssuerWithSurroundingSpaces_ProvidesTheTrimmedIssuer
 
       - id: ReviewCenter-ServerHost-TotpWiring-EndpointMapped
         title: >-

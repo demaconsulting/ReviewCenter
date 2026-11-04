@@ -326,6 +326,32 @@ public class GitSourceTests
     }
 
     /// <summary>
+    ///     Test that a commit on a diverged branch is not an ancestor of the other branch's commit.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_IsAncestor_DivergedBranch_AnswersNo()
+    {
+        // Arrange: an origin whose second commit follows the first, plus a side branch from the first commit
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        // The fixture marks script.sh executable in the index only, so force the switch as the test above does.
+        GitTestSupport.Git(origin.Folder, "checkout", "--force", "-b", "side", origin.First);
+        GitTestSupport.Write(origin.Folder, "side.txt", "side\n");
+        var side = GitTestSupport.Commit(origin.Folder, "side");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var session = await NewSource(Path.Combine(root.Path, "cache")).OpenAsync(Access(origin.Folder), cancellationToken);
+
+        // Act: ask in both directions about the two diverged commits
+        var sideOfSecond = await session.IsAncestorAsync(side, origin.Second, cancellationToken);
+        var secondOfSide = await session.IsAncestorAsync(origin.Second, side, cancellationToken);
+
+        // Assert: neither is an ancestor of the other
+        Assert.False(sideOfSecond);
+        Assert.False(secondOfSide);
+    }
+
+    /// <summary>
     ///     Test that a commit the repository does not have is an error with the named rule and no file path in the message.
     /// </summary>
     [Fact]

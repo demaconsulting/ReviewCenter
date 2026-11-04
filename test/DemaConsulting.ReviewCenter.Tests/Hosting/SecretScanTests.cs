@@ -116,6 +116,30 @@ public class SecretScanTests
     }
 
     /// <summary>
+    ///     Test that a second-factor secret that the ring cannot read is counted and named by the id of its user,
+    ///     apart from the repository tokens.
+    /// </summary>
+    [Fact]
+    public async Task SecretScan_ScanAsync_ForeignSecondFactorSecret_CountsAndNamesOnlyThatUser()
+    {
+        // Arrange: one secret of the ring and one that was protected by another ring, and no repository token
+        using var install = new Install();
+        install.AddTotp(1);
+        using var other = new Install();
+        install.AddProtectedTotp(2, other.TotpSecrets.Protect(2, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]));
+
+        // Act
+        var result = await install.ScanAsync();
+
+        // Assert: two second-factor secrets, one unreadable and named by its user id; no token is involved
+        Assert.Equal(2, result.TotpSecrets);
+        Assert.Equal(1, result.UnreadableTotpSecrets);
+        Assert.Equal([2], result.UnreadableUserIds);
+        Assert.Equal(0, result.UnreadableRepositoryTokens);
+        Assert.Empty(result.UnreadableRepositoryIds);
+    }
+
+    /// <summary>
     ///     Test that an empty ring with secrets in the database counts them all as unreadable without asking the ring,
     ///     which would create a key.
     /// </summary>
@@ -495,6 +519,13 @@ public class SecretScanTests
         /// <param name="id">The id of the repository.</param>
         /// <param name="cipher">The protected text.</param>
         public void AddProtectedToken(int id, string cipher) => SecretSeed.AddRepositoryToken(ConnectionString, id, cipher);
+
+        /// <summary>
+        ///     Stores a protected second-factor secret in the row of a user.
+        /// </summary>
+        /// <param name="userId">The id of the user.</param>
+        /// <param name="cipher">The protected text.</param>
+        public void AddProtectedTotp(int userId, string cipher) => SecretSeed.AddTotpSecret(ConnectionString, userId, cipher);
 
         /// <summary>
         ///     Protects a second-factor secret with the ring and stores it.

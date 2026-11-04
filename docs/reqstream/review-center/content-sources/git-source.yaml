@@ -160,9 +160,18 @@ sections:
       - id: ReviewCenter-GitSource-Changes-Blobs
         title: >-
           The GitSource class shall give with each change the blob identifiers of the baseline version and the head
-          version, and none for a side on which the file does not exist.
+          version.
         justification: |
           The content of a file is read by its blob identifier.
+        tests:
+          - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+
+      - id: ReviewCenter-GitSource-Changes-Blobs-MissingSide
+        title: >-
+          The GitSource class shall give no blob identifier for a side of a change on which the file does not exist.
+        justification: |
+          An added file has no baseline version and a deleted file has no head version, and a made-up identifier would
+          read the wrong content.
         tests:
           - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 
@@ -233,12 +242,22 @@ sections:
       - id: ReviewCenter-GitSource-Ancestry-NotAncestor
         title: >-
           The GitSource class shall tell that a commit is not an ancestor of another commit when it is later than the
-          other commit or lies on a diverged branch.
+          other commit.
         justification: |
           A rewritten history makes the commits unrelated, and the planner then has to fall back to a full review
           instead of listing changes against a commit that is not part of the history.
         tests:
           - GitSource_IsAncestor_History_AnswersYesAndNo
+
+      - id: ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
+        title: >-
+          The GitSource class shall tell that a commit is not an ancestor of another commit when it lies on a diverged
+          branch.
+        justification: |
+          A commit on another branch is not part of the history of the new head, so it cannot be the baseline of a
+          review.
+        tests:
+          - GitSource_IsAncestor_DivergedBranch_AnswersNo
 
       - id: ReviewCenter-GitSource-Ancestry-Itself
         title: >-

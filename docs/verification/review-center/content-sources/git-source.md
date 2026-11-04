@@ -59,6 +59,10 @@ over the limit is `GitAccessFailed`, not a truncated result. This scenario is te
 later commit and of itself, a later commit is not an ancestor of an earlier one, and a commit on another branch is not
 an ancestor of the main branch. This scenario is tested by `GitSource_IsAncestor_History_AnswersYesAndNo`.
 
+**GitSource_IsAncestor_DivergedBranch_AnswersNo**: In a repository with a side branch from the first commit, the side
+commit is not an ancestor of the second commit on the main branch, and the second commit is not an ancestor of the side
+commit. This scenario is tested by `GitSource_IsAncestor_DivergedBranch_AnswersNo`.
+
 **GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths**: A well-formed commit id that does not exist in
 the repository gives `GitAccessFailed`, and the message shows neither the location nor the folder of the mirror. This
 scenario is tested by `GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths`.

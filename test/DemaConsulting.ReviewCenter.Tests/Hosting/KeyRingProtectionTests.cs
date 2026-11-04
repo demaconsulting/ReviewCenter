@@ -231,6 +231,22 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that an explicit mode is honored when the setting has spaces around the name.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_ResolveMode_ExplicitChoiceWithSurroundingSpaces_IsHonored()
+    {
+        // Arrange: a setting with leading and trailing spaces, on Windows, where the choice is possible
+        var settings = new KeyRingSettings { Protection = "  Dpapi  " };
+
+        // Act
+        var mode = KeyRingProtection.ResolveMode(settings, WindowsPlatform);
+
+        // Assert
+        Assert.Equal(KeyRingProtectionMode.Dpapi, mode);
+    }
+
+    /// <summary>
     ///     Test that DPAPI off Windows is refused with a message that names the setting.
     /// </summary>
     [Fact]
@@ -677,6 +693,99 @@ public class KeyRingProtectionTests
         Assert.True(plan.RequireEncryptedKeys);
         Assert.Single(plan.Previous);
         Assert.StartsWith("Invalid key ring settings: ", invalidPlan.Problem, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an earlier certificate that has no password, which the password of the current certificate
+    ///     does not open, loads without a password.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PreviousCertificateWithoutPassword_LoadsWithoutIt()
+    {
+        // Arrange: the current certificate with a password and an earlier one that has none
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var plain = KeyRingTestCertificates.WritePfx(folder, "plain", null);
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(current, Password, plain), UnixPlatform);
+
+        // Assert: no problem and the earlier certificate is loaded
+        Assert.Null(plan.Problem);
+        Assert.Single(plan.Previous);
+    }
+
+    /// <summary>
+    ///     Test that the list of earlier certificates is read from the configuration section.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_PreviousCertificatePaths_AreRead()
+    {
+        // Arrange: a configuration with two earlier certificates
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var first = KeyRingTestCertificates.WritePfx(folder, "first", Password);
+        var second = KeyRingTestCertificates.WritePfx(folder, "second", Password);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DataProtection:CertificatePath"] = current,
+            ["DataProtection:CertificatePassword"] = Password,
+            ["DataProtection:PreviousCertificatePaths:0"] = first,
+            ["DataProtection:PreviousCertificatePaths:1"] = second
+        }).Build();
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(configuration, UnixPlatform);
+
+        // Assert: both earlier certificates were read and loaded
+        Assert.Null(plan.Problem);
+        Assert.Equal(2, plan.Previous.Count);
+    }
+
+    /// <summary>
+    ///     Test that DataProtection:RequireEncryptedKeys is read from the configuration section.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_RequireEncryptedKeys_IsRead()
+    {
+        // Arrange: a configuration that requires encrypted keys, with a certificate so that there is no problem
+        using var folder = new TemporaryDirectory();
+        var current = KeyRingTestCertificates.WritePfx(folder, "current", Password);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DataProtection:CertificatePath"] = current,
+            ["DataProtection:CertificatePassword"] = Password,
+            ["DataProtection:RequireEncryptedKeys"] = "true"
+        }).Build();
+
+        // Act
+        using var plan = KeyRingProtection.Prepare(configuration, UnixPlatform);
+
+        // Assert
+        Assert.Null(plan.Problem);
+        Assert.True(plan.RequireEncryptedKeys);
+    }
+
+    /// <summary>
+    ///     Test that the section and the setting names are read in any letter case.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_Configuration_NamesInAnyLetterCase_AreRead()
+    {
+        // Arrange: a configuration whose section and names are in other letter cases
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DATAPROTECTION:PROTECTION"] = "dpapi",
+            ["dataprotection:dpapiscope"] = "localmachine"
+        }).Build();
+
+        // Act: on a Windows platform, where DPAPI is possible
+        using var plan = KeyRingProtection.Prepare(configuration, WindowsPlatform);
+
+        // Assert: the choices that the differently cased names give are in force
+        Assert.Null(plan.Problem);
+        Assert.Equal(KeyRingProtectionMode.Dpapi, plan.Mode);
+        Assert.True(plan.LocalMachine);
     }
 
     /// <summary>

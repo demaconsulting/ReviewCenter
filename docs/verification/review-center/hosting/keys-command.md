@@ -41,6 +41,10 @@ key store is used because the key files are not encrypted).
 are stored; the command succeeds, reports the counts, and restarted production services decrypt every value. This
 scenario is tested by `KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards`.
 
+**KeysCommand_Run_OnlySecondFactorSecrets_ReportsTheirCount**: Three second-factor secrets and no repository token are
+stored; the command succeeds and reports "Re-protected 0 repository token(s) and 3 second-factor secret(s)". This
+scenario is tested by `KeysCommand_Run_OnlySecondFactorSecrets_ReportsTheirCount`.
+
 **KeysCommand_Run_NewKey_IsTheOnlyOneReferencedAndOldKeyIsReported**: After the run the key folder holds a second key
 file, the payload headers of the stored values name the new key only, and the output names the new key and lists the
 old key as not referenced. This scenario is tested by

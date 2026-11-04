@@ -155,14 +155,27 @@ the setting is thrown. This scenario is tested by
 `ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError`.
 
 **ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError**: A theory; the pipeline is built with one
-invalid `Identity:Throttle` value (a per-name limit of 0 or -1, a per-address limit of 0, a per-address limit of 4 with
-a per-name limit of 5, and a window of 0 or 86401 seconds); an `InvalidOperationException` that says "Invalid sign-in
-settings" and names the setting is thrown. This scenario is tested by
-`ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError`.
+invalid `Identity:Throttle` value (a per-name limit of 0 or -1, or a per-address limit of 0); an
+`InvalidOperationException` that says "Invalid sign-in settings" and names the setting is thrown. This scenario is
+tested by `ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError`.
+
+**ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError**: A theory over 0 and 86401; the pipeline
+is built with `Identity:Throttle:WindowSeconds` set to that value; an `InvalidOperationException` that says "Invalid
+sign-in settings" and names the setting is thrown. This scenario is tested by
+`ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError`.
+
+**ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError**: The pipeline is built with a
+per-address limit of 4 and a per-name limit of 5; an `InvalidOperationException` that says "Invalid sign-in settings"
+and names `Identity:Throttle:MaxFailuresPerAddress` is thrown. This scenario is tested by
+`ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError`.
 
 **ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication**: The pipeline is built with the default
 throttle settings and with explicit valid ones (3, 3, and 86400 seconds); both are built. This scenario is tested by
 `ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication`.
+
+**ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication**: The pipeline is built with
+explicit valid throttle settings (3, 3, and the largest window of 86400 seconds) and is built. This scenario is tested
+by `ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication`.
 
 **ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret**: A theory; with
 `Identity:Oidc:Enabled` true and valid settings otherwise (and a secret), the pipeline is built with one invalid value:
@@ -176,6 +189,15 @@ names the setting is thrown, and its message never holds the secret. This scenar
 **ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: The pipeline is built with the provider off and a
 garbage authority (not read), with an https authority, and with an http loopback authority and the largest age of 900
 seconds; all three are built. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+
+**ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication**: With sign-in on and an http authority
+on `localhost`, the pipeline is built. This scenario is tested by
+`ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication`.
+
+**ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret**: With sign-in on, an
+existing secret file and an inline secret both set, the start of the application stops with a message that names
+`Identity:Oidc:ClientSecretFile` and contains neither secret. This scenario is tested by
+`ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret`.
 
 **ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
 with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting
@@ -373,6 +395,10 @@ described with the `TotpSignIn` unit.
 with the feature on and the issuer `ReviewCenter`; with the feature off and an issuer with spaces around it the
 settings carry the feature off and the trimmed issuer, in `TotpOptionsTests.cs`. This scenario is tested by
 `ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`.
+
+**ServerHost_CreateApplication_IssuerWithSurroundingSpaces_ProvidesTheTrimmedIssuer**: With `Identity:Totp:Issuer` set
+to `Acme` the settings that the service uses carry the issuer `Acme`, in `TotpOptionsTests.cs`. This scenario is
+tested by `ServerHost_CreateApplication_IssuerWithSurroundingSpaces_ProvidesTheTrimmedIssuer`.
 
 **ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret**: A theory over valid enabled
 SMTP settings (with the inline password `top-secret-value`) in which one value is replaced: `FromAddress` set to text

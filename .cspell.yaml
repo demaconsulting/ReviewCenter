@@ -34,6 +34,8 @@ words:
   - toggleable
   - offadm
   - dpapi
+  - dpapiscope
+  - dataprotection
   - encryptor
   - encryptors
   - decryptor

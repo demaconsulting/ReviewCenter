@@ -266,21 +266,68 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that an invalid sign-in throttle setting stops the build with an error naming the setting.
+    ///     Test that a sign-in throttle limit that is not positive stops the build with an error naming the setting.
     /// </summary>
     /// <param name="name">The setting under <c>Identity:Throttle</c>.</param>
     /// <param name="value">The invalid value.</param>
-    /// <param name="alsoSet">An extra setting made at the same time, as <c>name=value</c>, or <c>null</c>.</param>
     [Theory]
-    [InlineData("MaxFailuresPerName", "0", null)]
-    [InlineData("MaxFailuresPerName", "-1", null)]
-    [InlineData("MaxFailuresPerAddress", "0", null)]
-    [InlineData("MaxFailuresPerAddress", "4", "MaxFailuresPerName=5")]
-    [InlineData("WindowSeconds", "0", null)]
-    [InlineData("WindowSeconds", "86401", null)]
-    public void ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError(string name, string value, string? alsoSet)
+    [InlineData("MaxFailuresPerName", "0")]
+    [InlineData("MaxFailuresPerName", "-1")]
+    [InlineData("MaxFailuresPerAddress", "0")]
+    public void ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError(string name, string value)
     {
-        // Arrange: configuration with one invalid throttle value
+        // Arrange and Act: configuration with one limit that is not positive
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?> { [$"Identity:Throttle:{name}"] = value });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"Identity:Throttle:{name}", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a sign-in throttle window outside 1 to 86400 seconds stops the build with an error naming the
+    ///     setting.
+    /// </summary>
+    /// <param name="value">The invalid number of seconds.</param>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("86401")]
+    public void ServerHost_CreateApplication_ThrottleWindowOutsideRange_ThrowsClearError(string value)
+    {
+        // Arrange and Act: configuration with a window outside the allowed range
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?> { ["Identity:Throttle:WindowSeconds"] = value });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Throttle:WindowSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a per-address throttle limit below the per-name limit stops the build with an error naming the
+    ///     setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ThrottleAddressLimitBelowNameLimit_ThrowsClearError()
+    {
+        // Arrange and Act: configuration whose address limit is below the name limit
+        var exception = CreateWithInvalidThrottle(new Dictionary<string, string?>
+        {
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "4",
+            ["Identity:Throttle:MaxFailuresPerName"] = "5"
+        });
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Throttle:MaxFailuresPerAddress", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Creates the application with throttle settings that are invalid and returns the error that stops the build.
+    /// </summary>
+    /// <param name="throttle">The invalid settings under <c>Identity:Throttle</c>, with their full names.</param>
+    /// <returns>The error that stopped the build.</returns>
+    private static InvalidOperationException CreateWithInvalidThrottle(Dictionary<string, string?> throttle)
+    {
         using var context = Context.Create(["serve", "--silent"]);
         var options = new ServerHostOptions
         {
@@ -288,27 +335,12 @@ public class ServerHostTests
             ConfigureBuilder = builder =>
             {
                 builder.WebHost.UseTestServer();
-                var values = new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
-                    [$"Identity:Throttle:{name}"] = value
-                };
-                if (alsoSet is not null)
-                {
-                    var parts = alsoSet.Split('=');
-                    values[$"Identity:Throttle:{parts[0]}"] = parts[1];
-                }
-
-                builder.Configuration.AddInMemoryCollection(values);
+                throttle["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+                builder.Configuration.AddInMemoryCollection(throttle);
             }
         };
 
-        // Act: create the application
-        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
-
-        // Assert: the message is the sign-in settings error and names the setting
-        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
-        Assert.Contains($"Identity:Throttle:{name}", exception.Message, StringComparison.Ordinal);
+        return Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
     }
 
     /// <summary>
@@ -340,6 +372,37 @@ public class ServerHostTests
         }));
         Assert.NotNull(defaults);
         Assert.NotNull(custom);
+    }
+
+    /// <summary>
+    ///     Test that explicit, valid throttle settings (the largest window included) build the application.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ExplicitValidThrottleSettings_BuildsTheApplication()
+    {
+        // Arrange: explicit values, with the largest window
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Throttle:MaxFailuresPerName"] = "3",
+                    ["Identity:Throttle:MaxFailuresPerAddress"] = "3",
+                    ["Identity:Throttle:WindowSeconds"] = "86400"
+                });
+            }
+        };
+
+        // Act
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
     }
 
     /// <summary>
@@ -438,6 +501,38 @@ public class ServerHostTests
         Assert.NotNull(off);
         Assert.NotNull(secure);
         Assert.NotNull(loopback);
+    }
+
+    /// <summary>
+    ///     Test that valid settings with http on a loopback host build the application.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication()
+    {
+        // Arrange: valid enabled settings whose authority is http on a loopback host
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "http://localhost:8080/realm",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = "top-secret-value"
+                });
+            }
+        };
+
+        // Act
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
     }
 
     /// <summary>
@@ -618,6 +713,46 @@ public class ServerHostTests
         var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
 
         // Assert: the sign-in settings error names the file setting and holds no secret
+        Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-in-the-file", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a client secret file that is set together with an inline client secret stops the build with an
+    ///     error that names the file setting and never contains either secret.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret()
+    {
+        // Arrange: valid enabled settings, an existing secret file, and an inline secret as well
+        using var folder = new TemporaryDirectory();
+        var path = folder.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, "secret-in-the-file");
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "https://idp.example.com/",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = "top-secret-value",
+                    ["Identity:Oidc:ClientSecretFile"] = path
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the sign-in settings error names the file setting and holds neither secret
         Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Identity:Oidc:ClientSecretFile", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);

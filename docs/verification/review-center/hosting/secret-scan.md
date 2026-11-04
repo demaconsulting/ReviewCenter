@@ -45,6 +45,11 @@ id are reported. This scenario is tested by the test of the same name.
 **SecretScan_ScanAsync_MixedSecrets_CountsOnlyTheUnreadableOnes**: A token of the ring and a token of another ring are
 scanned; only the second is unreadable. This scenario is tested by the test of the same name.
 
+**SecretScan_ScanAsync_ForeignSecondFactorSecret_CountsAndNamesOnlyThatUser**: A second-factor secret of the ring and
+one that another ring protected are scanned, and no repository token exists; two secrets are counted, one is
+unreadable and named by the id of its user, and no repository token or repository id is reported. This scenario is
+tested by `SecretScan_ScanAsync_ForeignSecondFactorSecret_CountsAndNamesOnlyThatUser`.
+
 **SecretScan_ScanAsync_EmptyRingWithSecrets_CountsThemUnreadableAndCreatesNoKey**: The database is scanned with the
 protectors of an installation whose ring was never used; the ring is empty, every secret is unreadable, and no key file
 exists afterwards (the scan did not ask the ring). This scenario is tested by the test of the same name.

@@ -41,10 +41,18 @@ sections:
 
       - id: ReviewCenter-GitRunner-NoShell-Configuration
         title: >-
-          The GitRunner class shall make git ignore the system configuration and the user configuration of the server
-          account.
+          The GitRunner class shall make git ignore the system configuration.
         justification: |
           A call must not pick up settings from elsewhere on the server.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+
+      - id: ReviewCenter-GitRunner-NoShell-Configuration-User
+        title: >-
+          The GitRunner class shall make git read the user configuration from a folder of the server's own cache, not
+          from the home folder of the server account.
+        justification: |
+          A call must not pick up settings from the account that runs the server.
         tests:
           - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
 

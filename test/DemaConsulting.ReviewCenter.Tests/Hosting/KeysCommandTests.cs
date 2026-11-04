@@ -74,6 +74,27 @@ public class KeysCommandTests
     }
 
     /// <summary>
+    ///     Test that the command reports the number of second-factor secrets that it re-protected, apart from the
+    ///     repository tokens.
+    /// </summary>
+    [Fact]
+    public void KeysCommand_Run_OnlySecondFactorSecrets_ReportsTheirCount()
+    {
+        // Arrange: three second-factor secrets and no repository token
+        using var install = new Install();
+        install.AddTotp(7);
+        install.AddTotp(8);
+        install.AddTotp(9);
+
+        // Act
+        var (exitCode, output) = Reprotect(install.Folder);
+
+        // Assert: success, with a count of 3 second-factor secrets and 0 tokens
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Re-protected 0 repository token(s) and 3 second-factor secret(s)", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a new key exists afterwards, that every stored payload references it and none the old key, and
     ///     that the report names the old key as one that nothing references any more.
     /// </summary>
