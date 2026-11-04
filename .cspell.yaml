@@ -23,6 +23,8 @@ words:
   - selftest
   - unpooled
   - unsubmitted
+  - onclick
+  - onsubmit
   - pyhanko
   - hanko
   - appsettings

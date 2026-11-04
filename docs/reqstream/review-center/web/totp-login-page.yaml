@@ -11,14 +11,54 @@ sections:
       - id: ReviewCenter-TotpLoginPage-SecondStepForm
         title: >-
           The TotpLoginPage unit shall show, only while a valid pending sign-in for the client exists, a form with one
-          code field that posts to the endpoint of the second step with the antiforgery token and that does not show
-          the user name, shall show a message that does not tell the cause for a wrong code and a message for too many
-          attempts, and shall send everybody else to the login page with the notice that the sign-in has ended.
+          code field that posts to the endpoint of the second step.
         justification: |
-          The page is reached with a cookie only, so it must not open for somebody without a pending sign-in, and it
-          must not tell anybody whose account is being signed in or why a code failed.
+          The page is reached with a cookie only, so it must not open for somebody without a pending sign-in.
         tests:
           - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
+
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm-NoUserName
+        title: >-
+          The TotpLoginPage unit shall not show the user name of the account that is being signed in.
+        justification: |
+          Whoever sees the screen must not learn whose account is being signed in.
+        tests:
+          - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
+
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm-WrongCode
+        title: >-
+          The TotpLoginPage unit shall show the same message for a wrong code whatever the reason, a message that does
+          not tell the cause.
+        justification: |
+          A message that differed by reason would tell an observer whether a recovery code was used before or whether
+          a code was close.
+        tests:
           - TotpLoginPage_Render_ErrorFlag_ShowsMatchingMessage
+
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm-Throttled
+        title: >-
+          The TotpLoginPage unit shall show a message that there were too many attempts when the client made too many
+          attempts.
+        justification: |
+          A person who is refused for the number of attempts must be told why a right code does not work now.
+        tests:
+          - TotpLoginPage_Render_ErrorFlag_ShowsMatchingMessage
+
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm-NoPendingSignIn
+        title: >-
+          The TotpLoginPage unit shall send a visitor who has no valid pending sign-in to the login page with the notice
+          that the sign-in has ended.
+        justification: |
+          The page must not open for somebody who did not pass the first step, and the notice tells why the sign-in
+          page is shown.
+        tests:
           - TotpLoginPage_Render_NoValidChallenge_RedirectsToLoginWithExpiredFlag
+
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm-OtherAddress
+        title: >-
+          The TotpLoginPage unit shall send a visitor whose pending sign-in was started from another address to the
+          login page.
+        justification: |
+          A pending sign-in that is used from a different address may be a stolen cookie, so it is not accepted.
+        tests:
           - TotpLoginPage_Render_ChallengeFromOtherAddress_RedirectsToLogin

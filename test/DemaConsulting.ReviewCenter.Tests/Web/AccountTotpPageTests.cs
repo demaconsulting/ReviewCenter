@@ -329,6 +329,29 @@ public class AccountTotpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the right password and a fresh authenticator code turn the second factor off.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_Disable_RightPasswordAndCode_TurnsItOff()
+    {
+        // Arrange: an enrolled user; the code of the next time step, as the one of enrolling was used
+        await CreateAnnAsync();
+        var (secret, _) = await EnrollTotpAsync("ann", Password);
+        Time.Advance(TimeSpan.FromSeconds(30));
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='totp-disable-password']").InputAsync(Password);
+        await cut.Find("[data-testid='totp-disable-code']").InputAsync(TotpOracle.CodeAt(secret, Time.GetUtcNow()));
+
+        // Act: turn off
+        await cut.Find("[data-testid='totp-disable-form']").SubmitAsync();
+
+        // Assert: it is off and the start form is back
+        Assert.Equal("Off", cut.Find("[data-testid='totp-status']").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='totp-start-form']"));
+        Assert.False(await Totp.IsEnrolledAsync("ann", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that new recovery codes are shown once, replace the old ones, and that the fields are emptied.
     /// </summary>
     [Fact]
@@ -480,6 +503,29 @@ public class AccountTotpPageTests : PageTestBase
         Assert.Equal("Your password was changed.", cut.Find("[data-testid='account-message']").TextContent);
         Assert.NotNull(await Users.ConfirmPasswordAsync("ann", NewPassword, TestContext.Current.CancellationToken));
         Assert.Contains("9 recovery codes left", cut.Find("[data-testid='totp-recovery-left']").TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an enrolled user who types a wrong code gets the generic error and nothing changes.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_Enrolled_WrongCode_ShowsGenericErrorAndChangesNothing()
+    {
+        // Arrange: an enrolled user who types the right current password, a new one and a wrong code
+        await CreateAnnAsync();
+        await EnrollTotpAsync("ann", Password);
+        var cut = Render<AccountPage>();
+        await FillChangeFormAsync(cut, Password, NewPassword, "000000");
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: the generic error, no confirmation, the old password still works and the new one does not
+        Assert.Equal("The code is not valid or was already used.", cut.Find("[data-testid='account-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='account-message']"));
+        var token = TestContext.Current.CancellationToken;
+        Assert.NotNull(await Users.ConfirmPasswordAsync("ann", Password, token));
+        Assert.Null(await Users.ConfirmPasswordAsync("ann", NewPassword, token));
     }
 
     /// <summary>

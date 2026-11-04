@@ -10,8 +10,7 @@ sections:
     requirements:
       - id: ReviewCenter-InboxPage-Access
         title: >-
-          The InboxPage unit shall be shown only to a signed-in user and shall show nobody who is not signed in the
-          items of the inbox.
+          The InboxPage unit shall show the items of the inbox only to a signed-in user.
         justification: |
           The inbox says what waits for a person, so it is personal and needs the identity of the person.
         tests:
@@ -19,53 +18,170 @@ sections:
 
       - id: ReviewCenter-InboxPage-Sections
         title: >-
-          The InboxPage unit shall show the groups to answer, disputed, ready to sign, signature no longer counts,
-          replies waiting, failed checks, waiting for others and updates, each with its items, and for each item the
-          project and the review with a
-          link (to the checklist for the groups to answer and disputed, except the question for you, and to the review
-          for the others), a chip, a detail
-          line, the Overdue or Due mark of an action item, and a New badge when it is unread, and shall show a short
-          message when nothing needs action.
+          The InboxPage unit shall show the items under the titled groups to answer, disputed, ready to sign,
+          signature no longer counts, replies waiting, failed checks, waiting for others, and updates.
         justification: |
-          The reader must see what to do and where, in one place, and must find an empty inbox as good news and not as
-          an error. A ballot or a dispute is worked on in the checklist, so the link goes there; a question is read in
-          its thread on the review page.
+          The reader must see what to do, and what only to know, in one place and grouped by the kind of action.
         tests:
-          - InboxPage_Render_NothingWaiting_ShowsEmptyState
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
           - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+          - InboxPage_Render_SignatureLost_ShowsSectionChipAndReason
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+          - InboxPage_Render_FailedChecks_ShowsTitledSection
+          - InboxPage_Render_Update_ShowsTitledSection
+
+      - id: ReviewCenter-InboxPage-Sections-Project
+        title: >-
+          The InboxPage unit shall show with each item the project and the review.
+        justification: |
+          The reader must know which review an item belongs to before opening it.
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+
+      - id: ReviewCenter-InboxPage-Sections-ChecklistLink
+        title: >-
+          The InboxPage unit shall link an item of the groups to answer and disputed to the checklist of the review.
+        justification: |
+          A ballot or a dispute is worked on in the checklist, so the link goes there.
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+
+      - id: ReviewCenter-InboxPage-Sections-ReviewLink
+        title: >-
+          The InboxPage unit shall link an item of the groups other than to answer and disputed to the review.
+        justification: |
+          What waits in these groups is read or done on the review page.
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+          - InboxPage_Render_SignatureLost_ShowsSectionChipAndReason
+
+      - id: ReviewCenter-InboxPage-Sections-QuestionLink
+        title: >-
+          The InboxPage unit shall link the question for you in the group to answer to the review and not to the
+          checklist.
+        justification: |
+          A question is read in its thread on the review page.
+        tests:
+          - InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview
+
+      - id: ReviewCenter-InboxPage-Sections-Chip
+        title: >-
+          The InboxPage unit shall show a chip with the reason on each item.
+        justification: |
+          The chip tells at a glance why the item is listed.
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+          - InboxPage_Render_SignatureLost_ShowsSectionChipAndReason
+          - InboxPage_Render_SummaryLine_ShowsActionAndUpdateCounts
+
+      - id: ReviewCenter-InboxPage-Sections-DetailLine
+        title: >-
+          The InboxPage unit shall show a detail line on an item that has one.
+        justification: |
+          The detail line names who or what the item waits for, so that the reader need not open it to find out.
+        tests:
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
           - InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview
           - InboxPage_Render_SignatureLost_ShowsSectionChipAndReason
-          - InboxPage_Render_UnreadItem_ShowsDot
+          - InboxPage_Render_SummaryLine_ShowsActionAndUpdateCounts
+
+      - id: ReviewCenter-InboxPage-Sections-DueMark
+        title: >-
+          The InboxPage unit shall mark the due date of an action item with the word Due.
+        justification: |
+          The reader sees when the work is expected.
+        tests:
           - InboxPage_Render_OverdueReview_ShowsOverdueChip
+
+      - id: ReviewCenter-InboxPage-Sections-OverdueMark
+        title: >-
+          The InboxPage unit shall mark the due date of an action item with the word Overdue when the date has passed.
+        justification: |
+          Late work must stand out from work that is only due.
+        tests:
+          - InboxPage_Render_OverdueReview_ShowsOverdueChip
+
+      - id: ReviewCenter-InboxPage-Sections-NewBadge
+        title: >-
+          The InboxPage unit shall show a New badge on an item that the user has not seen.
+        justification: |
+          The badge tells what changed since the last visit.
+        tests:
+          - InboxPage_Render_UnreadItem_ShowsDot
+
+      - id: ReviewCenter-InboxPage-Sections-EmptyMessage
+        title: >-
+          The InboxPage unit shall show a short message when nothing needs action.
+        justification: |
+          An empty inbox must read as good news and not as an error.
+        tests:
+          - InboxPage_Render_NothingWaiting_ShowsEmptyState
           - InboxPage_Render_Auditor_ShowsNoSignItems
 
       - id: ReviewCenter-InboxPage-Summary
         title: >-
           The InboxPage unit shall show a summary line with the number of reviews that need action and the number of
-          updates, and, only when some review waits for others, the number of those, which are not counted as action.
+          updates.
         justification: |
-          The totals tell the reader at once how much work is waiting before any group is read, and a review that only
-          waits for other people must not look like work.
+          The totals tell the reader at once how much work is waiting before any group is read.
         tests:
           - InboxPage_Render_SummaryLine_ShowsActionAndUpdateCounts
+          - InboxPage_Render_NothingWaiting_ShowsEmptyState
+
+      - id: ReviewCenter-InboxPage-Summary-WaitingCount
+        title: >-
+          The InboxPage unit shall add the number of reviews that wait for others to the summary line only when some
+          review waits for others.
+        justification: |
+          The count tells the reader that something is under way without crowding the line when nothing is.
+        tests:
           - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+          - InboxPage_Render_SummaryLine_ShowsActionAndUpdateCounts
+          - InboxPage_Render_NothingWaiting_ShowsEmptyState
+
+      - id: ReviewCenter-InboxPage-Summary-WaitingNotAction
+        title: >-
+          The InboxPage unit shall not count a review that waits for others as a review that needs action.
+        justification: |
+          A review that only waits for other people must not look like work.
+        tests:
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+          - InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview
 
       - id: ReviewCenter-InboxPage-MarkAllRead
         title: >-
-          The InboxPage unit shall offer a button that marks every listed review as seen and then shows the items
-          without the New badge.
+          The InboxPage unit shall offer a button that marks every listed review as seen.
         justification: |
           A user who has caught up wants to start from a clean list without opening each review.
+        tests:
+          - InboxPage_MarkAllRead_ClearsUnreadDots
+
+      - id: ReviewCenter-InboxPage-MarkAllRead-BadgesCleared
+        title: >-
+          The InboxPage unit shall show the items without the New badge once the button has marked them as seen.
+        justification: |
+          The list must show at once that the user has caught up.
         tests:
           - InboxPage_MarkAllRead_ClearsUnreadDots
 
       - id: ReviewCenter-InboxPage-Interactive
         title: >-
           The InboxPage unit shall be served as an interactive page of a signed-in session, so that a button on it
-          works, and a request without a sign-in shall be challenged and not served.
+          works.
         justification: |
-          The page keeps the rules of every other page of the application: no page that holds personal data is open
-          without a sign-in, and a button needs the live session.
+          The button that marks everything as read needs the live session of the user.
         tests:
-          - WebSubsystem_InboxPage_Unauthenticated_IsChallenged
+          - InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead
+
+      - id: ReviewCenter-InboxPage-Interactive-Challenge
+        title: >-
+          The InboxPage unit shall challenge a request without a sign-in and not serve the page.
+        justification: |
+          The page keeps the rule of every other page of the application: no page that holds personal data is open
+          without a sign-in.
+        tests:
+          - InboxPage_Render_AnonymousThroughRouter_ShowsLoginLinkAndNoInbox

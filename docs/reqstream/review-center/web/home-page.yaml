@@ -19,44 +19,97 @@ sections:
 
       - id: ReviewCenter-HomePage-Anonymous
         title: >-
-          The HomePage unit shall show a visitor who is not signed in the tagline of the product and no link to any
-          other page.
+          The HomePage unit shall show a visitor who is not signed in the tagline of the product.
         justification: |
-          The home page is open to everyone, but the pages it would lead to need a sign-in. A visitor should learn what
-          the product is and be left to the sign-in link in the header, not be offered links that only lead to a
-          refusal.
+          A visitor should learn what the product is as soon as the page opens.
+        tests:
+          - HomePage_Render_Anonymous_ShowsTaglineAndNoLinks
+
+      - id: ReviewCenter-HomePage-Anonymous-NoLinks
+        title: >-
+          The HomePage unit shall show a visitor who is not signed in no link to any other page.
+        justification: |
+          The home page is open to everyone, but the pages it would lead to need a sign-in. A visitor is left to the
+          sign-in link in the header and is not offered links that only lead to a refusal.
         tests:
           - HomePage_Render_Anonymous_ShowsTaglineAndNoLinks
 
       - id: ReviewCenter-HomePage-GetStarted
         title: >-
-          The HomePage unit shall show a signed-in user a Get started section with a link, and a one-line
-          description, for the inbox page and for the projects page.
+          The HomePage unit shall show a signed-in user a Get started section with a link to the inbox page.
         justification: |
-          A new user needs a clear first step after signing in. The inbox says what waits for the user and the
-          projects page is where every review starts, so the home page points to both directly.
+          A new user needs a clear first step after signing in. The inbox says what waits for the user, so the home
+          page points to it directly.
         tests:
           - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
+
+      - id: ReviewCenter-HomePage-GetStarted-ProjectsLink
+        title: >-
+          The HomePage unit shall show in the Get started section a link to the projects page.
+        justification: |
+          The projects page is where every review starts, so the home page points to it directly.
+        tests:
+          - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
+
+      - id: ReviewCenter-HomePage-GetStarted-Descriptions
+        title: >-
+          The HomePage unit shall give the link to the inbox page and the link to the projects page a one-line
+          description each.
+        justification: |
+          A new user should know what each page is for before opening it.
+        tests:
+          - HomePage_Render_Reviewer_EachLinkHasOneLineDescription
 
       - id: ReviewCenter-HomePage-InboxCard
         title: >-
           The HomePage unit shall show on the inbox card a sentence with the number of reviews that need the action of
-          the user, and the sentence that nothing needs action when the number is zero.
+          the user.
         justification: |
-          The number is the reason to open the inbox, and a card without work should not suggest any.
+          The number is the reason to open the inbox.
         tests:
           - HomePage_Render_Reviewer_InboxCardShowsActionCount
+
+      - id: ReviewCenter-HomePage-InboxCard-NoAction
+        title: >-
+          The HomePage unit shall show on the inbox card the sentence that nothing needs action when the number of
+          reviews that need the action of the user is zero.
+        justification: |
+          A card without work should not suggest any.
+        tests:
           - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
 
       - id: ReviewCenter-HomePage-AdminLinks
         title: >-
-          The HomePage unit shall add to the Get started section, each with a one-line description, links to the
-          audit and users pages only while an enabled system administrator is signed in, so that a system
-          administrator sees four cards and any other user two, and shall offer no link to a repositories page.
+          The HomePage unit shall add to the Get started section links to the audit page and the users page while a
+          system administrator is signed in.
         justification: |
-          The links must not invite other users to pages they cannot open, and a system administrator needs the same
-          first steps for the pages that administration involves. Repositories belong to projects and are reached
-          from the page of a project.
+          A system administrator needs the same first steps for the pages that administration involves.
+        tests:
+          - HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks
+
+      - id: ReviewCenter-HomePage-AdminLinks-OtherUsers
+        title: >-
+          The HomePage unit shall show a signed-in user who is no system administrator no link to the audit page and no
+          link to the users page.
+        justification: |
+          The links must not invite other users to pages they cannot open.
+        tests:
+          - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
+
+      - id: ReviewCenter-HomePage-AdminLinks-NoRepositories
+        title: >-
+          The HomePage unit shall offer no link to a repositories page.
+        justification: |
+          Repositories belong to projects and are reached from the page of a project.
         tests:
           - HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks
           - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
+
+      - id: ReviewCenter-HomePage-AdminLinks-Descriptions
+        title: >-
+          The HomePage unit shall give the link to the audit page and the link to the users page a one-line
+          description each.
+        justification: |
+          A system administrator should know what each page is for before opening it.
+        tests:
+          - HomePage_Render_Admin_AdminLinksHaveOneLineDescription

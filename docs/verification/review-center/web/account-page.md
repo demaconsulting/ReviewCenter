@@ -29,7 +29,8 @@ N/A - standard test environment.
 - The page shows the form for the current, new, and repeated new password and the change button, and no message.
 - The page shows the appearance options System, Light, and Dark with System selected when nothing is stored; choosing
   one is applied through the browser script at once and shown as selected; a stored choice is shown as selected.
-- A valid change changes the password of the signed-in user, shows a confirmation, and empties the fields.
+- A valid change changes the password of the signed-in user, shows a confirmation, and empties all three password
+  fields.
 - A user who signs in with an identity provider sees a sentence that names the provider instead of the password form,
   and has no password field and no change button.
 - A wrong current password, new passwords that do not match, and a new password that breaks the policy are each shown
@@ -52,10 +53,11 @@ N/A - standard test environment.
   the codes are gone from the page afterwards; cancelling removes the secret and shows the start form.
 - An enrolled user sees the status On, the number of recovery codes left, the forms to turn it off and to get new
   recovery codes, and no secret; a wrong code in either form shows the generic message, keeps the state, and empties the
-  fields; a recovery code and the password turn it off; the right password and code show ten new codes once.
+  fields; a recovery code or an authenticator code with the password turns it off; the right password and code show ten
+  new codes once.
 - For an enrolled user the change-password form has a field for a code or a recovery code (no field for others); the
-  password alone is refused with the general message and changes nothing, and the right password with a code or a
-  recovery code changes the password and empties the fields.
+  password alone and a wrong code are refused with the general message and change nothing, and the right password
+  with a code or a recovery code changes the password and empties the fields.
 
 #### Test Scenarios
 
@@ -67,6 +69,10 @@ and change controls are present, and no error and no confirmation are shown. Thi
 current password and a valid new one, and submitted; the confirmation "Your password was changed." is shown, the new
 password works, the old one does not, and the fields are empty. This scenario is tested by
 `AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields`.
+
+**AccountPage_ChangePassword_ValidInput_EmptiesAllThreePasswordFields**: The form is filled in with the right current
+password and a valid new one, and submitted; the current, the new, and the repeated password field are all empty. This
+scenario is tested by `AccountPage_ChangePassword_ValidInput_EmptiesAllThreePasswordFields`.
 
 **AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing**: A theory over a wrong current password, a
 repeated password that differs, and a new password that is too short; an error naming the problem is shown, no
@@ -90,6 +96,11 @@ scenario is tested by `AccountPage_ChangePassword_Enrolled_RightCode_ChangesPass
 recovery code; the password changes and the card shows nine recovery codes left. This scenario is tested by
 `AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount`.
 
+**AccountPage_ChangePassword_Enrolled_WrongCode_ShowsGenericErrorAndChangesNothing**: An enrolled user submits the
+right current password, a new one, and a wrong code; the general message is shown, no confirmation is shown, the old
+password still works, and the new one does not. This scenario is tested by
+`AccountPage_ChangePassword_Enrolled_WrongCode_ShowsGenericErrorAndChangesNothing`.
+
 **AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected**: With no stored choice the appearance card
 shows three radio options, and System is selected while Light and Dark are not. This scenario is tested by
 `AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected`.
@@ -111,6 +122,10 @@ submitted. The value box shows a value that starts with `rcpat_`, the confirmati
 and the name field is empty. The list has the token with its name, display id, state Active, the expiry 30 days later,
 and "never" as last use, and the value is not in the list. Dismissing the box removes the value from the page for good.
 This scenario is tested by `AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken`.
+
+**AccountPage_CreateToken_ValidInput_ShowsNoteThatValueCannotBeShownAgain**: A name is typed and the form is
+submitted; the box that shows the value says that the value cannot be shown again. This scenario is tested by
+`AccountPage_CreateToken_ValidInput_ShowsNoteThatValueCannotBeShownAgain`.
 
 **AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing**: The form is submitted with an empty name; an error is
 shown, no value box is shown, and the store holds no token. This scenario is tested by
@@ -176,7 +191,9 @@ enrolled user sees status "On", the number of codes left, the turn-off and renew
 no start form, which is tested by `AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft`. A wrong code when turning it
 off shows the generic message, keeps the status "On", empties both fields, and the user stays enrolled, which is tested
 by `AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields`. A recovery code and the password turn it
-off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The right password and code show ten new codes
+off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The password and a fresh authenticator code turn
+it off as well and bring the start form back, which is tested by `AccountPage_Disable_RightPasswordAndCode_TurnsItOff`.
+The right password and code show ten new codes
 that differ from the old ones, empty the fields, and the codes are gone after dismissal, which is tested by
 `AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce`. A wrong code shows the generic message and no codes,
 which is tested by `AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes`.

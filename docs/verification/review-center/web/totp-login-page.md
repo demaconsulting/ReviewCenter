@@ -15,8 +15,9 @@ N/A - standard test environment. The tests render in memory and need no server, 
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- With a valid pending sign-in the page shows a form that posts to `/auth/login-totp` with the antiforgery field, a
-  code field that asks for a one-time code, and a link back to the sign-in page, and it does not show the user name.
+- With a valid pending sign-in the page shows a form that posts to `/auth/login-totp`, a
+  code field that asks for a one-time code, and a link back to the sign-in page, and it does not show the user name;
+  the served form carries a non-empty antiforgery token (the subsystem requirement).
 - A failed attempt shows one generic message whatever the value of the error flag and never says why the code failed;
   the flag `throttled` shows the throttle message instead.
 - Without a cookie, with a cookie that names no pending sign-in, or with the cookie from another client address the
@@ -30,6 +31,14 @@ N/A - standard test environment. The tests render in memory and need no server, 
 posts to `/auth/login-totp`, the code field is named `code` with the one-time code hint, the link goes to `/login`, no
 error is shown, the main text does not contain the user name, and the address stays on the page. This scenario is
 tested by `TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName`.
+
+**TotpSignIn_CodePage_PendingSignIn_FormCarriesAntiforgeryToken**: Through the real pipeline, a user with a second
+factor passes the password step and requests `/login/totp` over HTTP with the cookie of the pending sign-in; the form of
+the page carries a non-empty antiforgery token field. The token is added by the server when the page is served, so
+the in-memory component test cannot see it. This scenario is tested by
+`TotpSignIn_CodePage_PendingSignIn_FormCarriesAntiforgeryToken`, defined in `TotpSignInTests.cs` and described with
+the `TotpSignIn` unit; it is the evidence of the requirement `ReviewCenter-Web-TotpSecondFactor-CodePage-Antiforgery`
+of the `Web` subsystem.
 
 **TotpLoginPage_Render_ErrorFlag_ShowsMatchingMessage**: A theory over the flags `error=1`, `error=anything`, and
 `error=throttled`; the first two show the generic message and the third shows the throttle message, and the other

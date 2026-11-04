@@ -1,10 +1,10 @@
 ---
-# Software Unit Requirements for the RepositoriesPage Component
+# Software Unit Requirements for the RepositoriesPage Unit
 #
-# The RepositoriesPage component lets whoever manages a project (a system administrator or a project admin of it)
+# The RepositoriesPage unit lets whoever manages a project (a system administrator or a project admin of it)
 # register, change, disable, and enable the git repositories of that project, at /projects/{project}/repositories.
 # Reviews of the project can be created from them. The token is write-only on this page. The unit includes the
-# NewRepositoryPage component, the separate page at /projects/{project}/repositories/new that holds the form that
+# NewRepositoryPage page, the separate page at /projects/{project}/repositories/new that holds the form that
 # registers a repository. There is no registry of repositories outside the projects. A user who may not manage the
 # project is shown the not-found message of a project that does not exist.
 
@@ -13,87 +13,299 @@ sections:
     requirements:
       - id: ReviewCenter-RepositoriesPage-Display
         title: >-
-          The RepositoriesPage component shall list the repositories of the project, and no other, with their name,
-          location, and enabled state, with the user name and a token indicator only where they are set, never
-          showing a token, and shall offer no way to delete a repository.
+          The RepositoriesPage unit shall list each repository of the project with its name, location, and
+          enabled state.
         justification: |
-          Whoever manages the project needs to see what is registered for it and whether a token is set, but a token
-          shown on a page can be copied, shoulder-surfed, and logged. A repository is retired by disabling it, and the
-          repositories of other projects are not this project's business.
+          Whoever manages the project needs to see what is registered for it and whether each repository can be used.
         tests:
           - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
-          - RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed
           - RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions
+
+      - id: ReviewCenter-RepositoriesPage-Display-ProjectOnly
+        title: >-
+          The RepositoriesPage unit shall list only the repositories of the project and none of another project.
+        justification: |
+          The repositories of other projects are not this project's business, and listing them would show a manager
+          what the manager may not manage.
+        tests:
+          - RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed
+
+      - id: ReviewCenter-RepositoriesPage-Display-OptionalFields
+        title: >-
+          The RepositoriesPage unit shall show the user name and a token indicator of a repository only where they
+          are set.
+        justification: |
+          A repository that is read anonymously has no user name and no token, and an indicator for a token that does
+          not exist would mislead.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-Display-NoToken
+        title: >-
+          The RepositoriesPage unit shall never show a token of a repository in the list.
+        justification: |
+          A token shown on a page can be copied, shoulder-surfed, and logged, so the page tells only whether a token is
+          set.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-Display-NoDelete
+        title: >-
+          The RepositoriesPage unit shall offer no way to delete a repository.
+        justification: |
+          A repository is retired by disabling it, which keeps the reviews that were made from it.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
 
       - id: ReviewCenter-RepositoriesPage-AddPage
         title: >-
-          The RepositoriesPage component shall offer an add button that leads to a separate page that holds only the
-          form that registers a repository, and that page shall offer a way back to the list without registering
-          anything and return to the list after a repository was registered.
+          The RepositoriesPage unit shall offer on the list an add button that leads to a separate page for
+          registering a repository.
         justification: |
-          A form between the rows of a list pushes the list down and invites a half-typed token to stay on a page
-          that is meant for reading. A page of its own keeps the list clean and makes cancelling obvious.
+          A page of its own for the form keeps the list free of the form.
         tests:
           - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-AddPage-NoFormOnList
+        title: >-
+          The RepositoriesPage unit shall hold no form for registering a repository on the list.
+        justification: |
+          A form between the rows of a list pushes the list down and invites a half-typed token to stay on a page that
+          is meant for reading.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-AddPage-FormOnly
+        title: >-
+          The RepositoriesPage unit shall hold on the add page only the form that registers a repository.
+        justification: |
+          A page of its own keeps the form free of the rows of the list, so that the manager sees what is being
+          registered and nothing else.
+        tests:
+          - NewRepositoryPage_Render_ProjectWithRepository_ShowsOnlyTheForm
+
+      - id: ReviewCenter-RepositoriesPage-AddPage-Cancel
+        title: >-
+          The RepositoriesPage unit shall offer on the add page a way back to the list without registering
+          anything.
+        justification: |
+          A page of its own makes cancelling obvious: the manager who changed their mind leaves without a trace.
+        tests:
+          - NewRepositoryPage_Render_FilledForm_CancelIsPlainLinkBackAndRegistersNothing
+
+      - id: ReviewCenter-RepositoriesPage-AddPage-Return
+        title: >-
+          The RepositoriesPage unit shall return from the add page to the list after a repository was registered.
+        justification: |
+          The manager who registered a repository wants to see it in the list, and must not be left on a form that
+          still looks as if it had to be filled in.
+        tests:
           - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
 
       - id: ReviewCenter-RepositoriesPage-Create
         title: >-
-          The RepositoriesPage component shall register a repository in the project from a form with a name, a
-          location, an optional user name, and an optional token, empty the token field afterwards, and show a rule
-          violation without creating anything.
+          The RepositoriesPage unit shall register a repository in the project from a form with a name, a
+          location, a user name, and a token.
         justification: |
-          Registering a repository is how an administrator makes a source reachable. A token must not stay in the form
-          after it is saved.
+          Registering a repository is how an administrator makes a source reachable for the reviews of the project.
         tests:
           - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-RepositoriesPage-Create-Optional
+        title: >-
+          The RepositoriesPage unit shall register a repository without a user name and without a token.
+        justification: |
+          A repository that is read anonymously needs neither, and the form must not force a manager to invent them.
+        tests:
+          - NewRepositoryPage_CreateForm_NameAndLocationOnly_RegistersRepositoryWithoutTokenOrUserName
+
+      - id: ReviewCenter-RepositoriesPage-Create-TokenCleared
+        title: >-
+          The RepositoriesPage unit shall empty the token field after the form is submitted.
+        justification: |
+          A token must not stay in the form after it is saved, where it could be read from the screen or sent again.
+        tests:
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-RepositoriesPage-Create-Violation
+        title: >-
+          The RepositoriesPage unit shall show a violated rule as an error message when a repository is registered.
+        justification: |
+          A manager whose input is refused must be told why, to be able to correct it.
+        tests:
+          - NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Create-NothingCreated
+        title: >-
+          The RepositoriesPage unit shall create no repository when a rule is violated.
+        justification: |
+          A refused registration must leave no half-registered repository behind.
+        tests:
           - NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-RepositoriesPage-Edit
         title: >-
-          The RepositoriesPage component shall let whoever manages the project change the name, location, and user
-          name of a repository and keep, replace, or clear its token, never showing the stored token, and cancel
-          without any change.
+          The RepositoriesPage unit shall let whoever manages the project change the name, location, and user
+          name of a repository.
         justification: |
-          Locations move and tokens expire. The stored token cannot be read back, so keeping, replacing, and
-          clearing are the only operations that make sense for it.
+          Locations move and service accounts change, and the repository must stay registered when they do.
+        tests:
+          - RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken
+          - RepositoriesPage_Edit_NameAndLocation_ShowsChangedValues
+
+      - id: ReviewCenter-RepositoriesPage-Edit-KeepToken
+        title: >-
+          The RepositoriesPage unit shall keep the stored token of a repository by default when the repository is
+          edited.
+        justification: |
+          The stored token cannot be read back, so an edit that does not mention it must not lose it.
+        tests:
+          - RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken
+
+      - id: ReviewCenter-RepositoriesPage-Edit-ReplaceToken
+        title: >-
+          The RepositoriesPage unit shall replace the stored token of a repository with a new token that is typed
+          into the edit form.
+        justification: |
+          Tokens expire, and the manager must be able to give the repository a new one.
+        tests:
+          - RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly
+
+      - id: ReviewCenter-RepositoriesPage-Edit-ClearToken
+        title: >-
+          The RepositoriesPage unit shall clear the stored token of a repository when the user chooses to clear it.
+        justification: |
+          A repository that no longer needs a credential, or whose token was exposed, must be able to lose it.
+        tests:
+          - RepositoriesPage_Edit_ClearToken_RemovesToken
+
+      - id: ReviewCenter-RepositoriesPage-Edit-NoStoredToken
+        title: >-
+          The RepositoriesPage unit shall never show the stored token in the edit form.
+        justification: |
+          Keeping, replacing, and clearing are the only operations that make sense for a token that cannot be read back,
+          and a form that showed it would put it on the screen.
         tests:
           - RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken
           - RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly
-          - RepositoriesPage_Edit_ClearToken_RemovesToken
+
+      - id: ReviewCenter-RepositoriesPage-Edit-Cancel
+        title: >-
+          The RepositoriesPage unit shall close the edit form and change nothing when the user cancels the edit.
+        justification: |
+          A manager who opened the form by mistake must be able to leave without changing the repository.
+        tests:
           - RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing
 
       - id: ReviewCenter-RepositoriesPage-Enable
         title: >-
-          The RepositoriesPage component shall let whoever manages the project disable a repository and enable it
+          The RepositoriesPage unit shall let whoever manages the project disable a repository and enable it
           again.
         justification: |
           Disabling stops the use of a repository at once, for example after a token was exposed, and keeps the
           reviews made from it.
         tests:
           - RepositoriesPage_ToggleEnabled_Repository_DisablesAndEnablesAgain
+          - RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions
 
       - id: ReviewCenter-RepositoriesPage-Admin
         title: >-
-          The RepositoriesPage component shall be available only to a system administrator and to a project admin of
-          the project, shall show anybody else, a plain member or a user who is no member, only the not-found
-          message of a project that does not exist, with no repository and no control, shall check on every action
-          that the user still manages the project, and, when the user no longer does or nobody is signed in, shall
-          change nothing and replace the page with the not-found message, dropping the project, the repositories,
-          the edit form and the token state, even when the check that follows an action fails.
+          The RepositoriesPage unit shall serve the page to a system administrator and to a project admin of the
+          project.
         justification: |
-          The repositories control what the server reads and hold secrets. An open page keeps its state for a while
-          after a user is demoted, disabled, or signed out, and a plain member must not read the locations and user
-          names of the repositories. A refusal that said "not allowed" would show that the project exists, and an
-          error shown above the stale data would still leave it readable, so the page answers as for a missing
-          project and clears everything it loaded.
+          The repositories control what the server reads and hold secrets, so the people who manage the project, and
+          only they, may see and change them.
         tests:
-          - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
+          - RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions
+          - RepositoriesPage_Render_SystemAdminWithoutMembership_ShowsRepositoriesAndActions
+
+      - id: ReviewCenter-RepositoriesPage-Admin-NotFound
+        title: >-
+          The RepositoriesPage unit shall show a plain member, and a user who is no member, only the not-found
+          message of a project that does not exist, with no repository and no control.
+        justification: |
+          A refusal that said "not allowed" would show that the project exists, and a plain member must not read the
+          locations and user names of the repositories.
+        tests:
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
+
+      - id: ReviewCenter-RepositoriesPage-Admin-RightLost
+        title: >-
+          The RepositoriesPage unit shall replace the page with the not-found message when the user, at an action,
+          no longer manages the project.
+        justification: |
+          An open page keeps its state for a while after a user was demoted or disabled, and every action must meet the
+          rights that the user has now. The not-found message is the answer to an action; a page that is only left open
+          gets the session-ended message from the periodic re-check instead (see the Revalidated requirement).
+        tests:
           - RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData
           - RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData
           - RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm
-          - RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList
-          - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
-          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
           - NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Admin-SignedOut
+        title: >-
+          The RepositoriesPage unit shall replace the page with the not-found message when, at an action, nobody
+          is signed in any more.
+        justification: |
+          A session that ended while the page stayed open must not leave the page usable.
+        tests:
+          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Admin-NothingChanged
+        title: >-
+          The RepositoriesPage unit shall change nothing when the user no longer manages the project or nobody is
+          signed in.
+        justification: |
+          An action from a page that is out of step with the user's rights must not alter any repository, token, or
+          registration.
+        tests:
+          - RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData
+          - RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData
+          - NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing
+          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+          - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
+
+      - id: ReviewCenter-RepositoriesPage-Admin-Revalidated
+        title: >-
+          The RepositoriesPage unit shall replace the page with the session-ended message, without any action, when
+          the periodic re-check of the sign-in state finds that the user lost the system administrator right.
+        justification: |
+          A page that stays open without any action must not stay usable after the user was demoted. Unlike an action,
+          which is answered with the not-found message, the idle page tells the user to sign in again instead of
+          showing the page of a project that does not exist.
+        tests:
+          - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
+
+      - id: ReviewCenter-RepositoriesPage-Admin-DropData
+        title: >-
+          The RepositoriesPage unit shall drop the project and its repositories, with their locations, names, and
+          user names, from the page when the right to manage the project is gone.
+        justification: |
+          An error shown above the stale data would still leave it readable, so the page clears what it loaded.
+        tests:
+          - RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData
+          - RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData
+          - RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm
+          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Admin-DropEditState
+        title: >-
+          The RepositoriesPage unit shall drop the edit form and every token that was typed from the page when the
+          right to manage the project is gone.
+        justification: |
+          A token that was typed into a form must not stay on a page whose user may no longer manage the project.
+        tests:
+          - RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData
+          - RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm
+          - NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Admin-FailedReload
+        title: >-
+          The RepositoriesPage unit shall show the not-found message, with no old rows, when the reload that
+          follows an action is refused because the right to manage the project was lost during the action.
+        justification: |
+          A right can be lost between the check of an action and the reload of the list, and the page must not fall back
+          to the list that it showed before.
+        tests:
+          - RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList

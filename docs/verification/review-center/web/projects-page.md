@@ -26,7 +26,8 @@ N/A - standard test environment.
 - Submitting a valid name creates the project and opens its page; submitting a blank name, or submitting after the
   sign-in state ended, shows an error and creates nothing; a user who is no system administrator is refused with an
   error that names the system administrator and creates nothing.
-- The interactive marker is `true` after each page has rendered on a live connection.
+- The interactive marker is `true` after each page has rendered on a live connection (`ProjectsPage` and
+  `NewProjectPage`).
 
 #### Test Scenarios
 
@@ -56,8 +57,8 @@ element has `data-interactive` equal to `true`. This scenario is tested by
 `NewProjectPage_Render_Default_ShowsFormAndCancelLink`.
 
 **NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt**: A name and a description are entered and the form
-is submitted; the project is stored, no error is shown, and the browser is sent to the page of the new project. This
-scenario is tested by `NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt`.
+is submitted; the project is stored with that name and description, no error is shown, and the browser is sent to the
+page of the new project. This scenario is tested by `NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt`.
 
 **NewProjectPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing**: The form is submitted with a blank name; an
 error that mentions the name is shown and no project is stored. This scenario is tested by

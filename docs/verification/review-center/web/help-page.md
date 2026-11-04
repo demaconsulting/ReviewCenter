@@ -64,6 +64,13 @@ N/A - standard test environment.
 - The Inbox topic follows the Getting started topic in the list (second), explains the eight groups, the New marker and
   Mark all as read, says that a reviewer who has not handed in never sees how the others answered, and links to the
   inbox.
+- The Signed attestation topic says that the signature proves integrity and origin, that the signing time is the server
+  clock, and shows its screenshot; the Reviewers and signing topic says that a rejection needs a conclusion text; the
+  Reading a review topic names who sees the conclusion at once; the API tokens topic says that a token does not open
+  the web pages; the Project members topic says that a new password must be chosen at the first sign-in; the Evidence
+  settings topic says that the anonymous switches are off by default; the Checklist template topic says that a token
+  can only read the template and explains the import; the Two-factor sign-in topic explains the sign-in with a code and
+  that API tokens are not affected; the signing and inbox topics explain what changed since a signature.
 
 #### Test Scenarios
 
@@ -192,7 +199,8 @@ the setting `Identity:Totp:Enabled` with the warning about the password alone. T
 `/help/two-factor`, and no link begins with `#`. This scenario is tested by
 `HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning`.
 
-**HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead**: The topic `inbox` is listed second, after the first
+**HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead**: The topic `inbox` is listed second, after the
+first
 topic. Its page is rendered; the text names the eight groups (To answer, with the Question for you row and its limit,
 that a thread has no addressee and that the author is told by Replies waiting instead; Disputed, which names the
 checks; Ready to sign, with the caution about ballots not handed
@@ -200,7 +208,57 @@ in; Your signature no longer counts; Replies waiting; Failed checks; Waiting for
 New marker, and Mark all as read, and it links to `/inbox`. This scenario is tested by
 `HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead`.
 
+**HelpPage_HelpInboxPage_Render_SaysWhatYouHaveSeenIsNotPartOfTheSignedRecord**: The `inbox` topic page is rendered;
+the text says that what the user has seen is kept for that user alone and that it is not part of the signed record.
+This scenario is tested by `HelpPage_HelpInboxPage_Render_SaysWhatYouHaveSeenIsNotPartOfTheSignedRecord`.
+
 **HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe**: The topics on signing, comments and the inbox
 are rendered. The signing topic explains the "Where are we?" panel and the words "Signed, then the review changed",
 and says that reviewers look again and sign again; none of the three topics contains the words "out of date" or
 "out-of-date". This scenario is tested by `HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe`.
+
+**HelpAttestationPage_Render_ExplainsIntegrityOriginAndDevelopmentOnlyKey**: The Signed attestation page is rendered;
+the text says that the signature proves that the document has not changed since it was signed and that it was produced
+by the holder of the key, that the signing time is the server clock, that the self-signed key is for development and
+test only, and names `CertificateStore`. This scenario is tested by
+`HelpAttestationPage_Render_ExplainsIntegrityOriginAndDevelopmentOnlyKey`.
+
+**HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime**: The Signed attestation page is rendered;
+the screenshot `/help/signed-attestation-1.png` is shown with alternative text, the text says that the PDF lists the
+name and time of each answer, and that the review page then shows why attestation is unavailable. This scenario is
+tested by `HelpAttestationPage_Render_ShowsDownloadScreenshotAndAnswerNameAndTime`.
+
+**HelpPage_Signing_ExplainsRejectionRecordsAndNeedsConclusionText**: The Reviewers and signing page is rendered; the
+text says that the review is Rejected when the ballots agree on a Fail, that a rejection needs a written conclusion with
+the reasons, and names the Review conclusion card. This scenario is tested by
+`HelpPage_Signing_ExplainsRejectionRecordsAndNeedsConclusionText`.
+
+**HelpPage_ReadingReview_NamesWhoSeesTheConclusionAtOnce**: The Reading a review page is rendered; the text says that
+administrators and Auditors always see the conclusion, and so does everyone in a review with a single reviewer slot and
+in a concluded review. This scenario is tested by `HelpPage_ReadingReview_NamesWhoSeesTheConclusionAtOnce`.
+
+**HelpApiTokensPage_Render_SaysTokenDoesNotOpenWebPages**: The API tokens page is rendered; the text says that a token
+does not sign the user in to the web pages. This scenario is tested by
+`HelpApiTokensPage_Render_SaysTokenDoesNotOpenWebPages`.
+
+**HelpMembersPage_Render_SaysNewAccountMustChoosePasswordAtFirstSignIn**: The Project members page is rendered; the
+text says that the person with a new account must choose a new password at the first sign-in. This scenario is tested
+by `HelpMembersPage_Render_SaysNewAccountMustChoosePasswordAtFirstSignIn`.
+
+**HelpEvidenceSettingsPage_Render_ExplainsDefaultsAndExposureOfTheAnonymousSwitches**: The Evidence settings page is
+rendered; the text says that the anonymous switches are off by default, that ReviewMark also needs the PDFs, and that
+anyone who can reach the server can read what was opened. This scenario is tested by
+`HelpEvidenceSettingsPage_Render_ExplainsDefaultsAndExposureOfTheAnonymousSwitches`.
+
+**HelpChecklistTemplatePage_Render_ExplainsTokenReadOnlyImportAndErrorPaths**: The Checklist template page is rendered;
+the text says that an API token can only read the template, has the section "Import, validate and preview" with the
+upload limit of 256 KiB, says that every error is shown with its path, and that a preview of all sections and checks is
+shown. This scenario is tested by `HelpChecklistTemplatePage_Render_ExplainsTokenReadOnlyImportAndErrorPaths`.
+
+**HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens**: The Two-factor sign-in page is rendered; the text
+says that a second page asks for a code, that a code works once, and that API tokens are not affected. This scenario is
+tested by `HelpTwoFactorPage_Render_ExplainsSignInCodeAndUnaffectedApiTokens`.
+
+**HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature**: The Reviewers and signing page and the Your inbox page
+are rendered; both say that the review page explains what changed since the signature. This scenario is tested by
+`HelpPage_SigningAndInbox_ExplainWhatChangedSinceTheSignature`.

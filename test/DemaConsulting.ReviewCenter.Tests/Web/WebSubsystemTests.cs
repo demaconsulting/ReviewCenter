@@ -444,6 +444,29 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the inbox route serves a signed-in user the page of an interactive component, which has no live
+    ///     connection yet in the first response.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage()
+    {
+        // Arrange: start the real pipeline in memory and sign in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+
+        // Act: request the inbox (no circuit exists for a plain HTTP request)
+        var response = await browser.Client.GetAsync("/inbox", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the page is served, waits for its live connection, and carries the interactive component marker
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("data-testid=\"inbox-page\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-interactive=\"false\"", html, StringComparison.Ordinal);
+        Assert.Contains("<!--Blazor:", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the inbox route sends a visitor who is not signed in to the login page, which returns to the
     ///     inbox, and shows nothing of the inbox.
     /// </summary>

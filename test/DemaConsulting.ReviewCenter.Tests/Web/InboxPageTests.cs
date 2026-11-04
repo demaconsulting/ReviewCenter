@@ -21,6 +21,8 @@
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
@@ -48,6 +50,52 @@ public class InboxPageTests : InboxWebTestBase
         Assert.Empty(cut.FindAll("[data-testid='inbox-page']"));
         Assert.Empty(cut.FindAll("[data-testid='inbox-row-1']"));
         Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']"));
+    }
+
+    /// <summary>
+    ///     Test that the page reports that it is interactive once it has rendered, and offers the button that needs the
+    ///     live session of the user.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead()
+    {
+        // Arrange: ann has a review waiting, so that the button that marks everything as read is offered
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the page (bUnit runs OnAfterRender like a live circuit does)
+        var cut = Render<InboxPage>();
+
+        // Assert: the root element reports interactivity and the button is there
+        Assert.Equal("true", cut.Find("[data-testid='inbox-page']").GetAttribute("data-interactive"));
+        Assert.NotNull(cut.Find("[data-testid='inbox-mark-read']"));
+    }
+
+    /// <summary>
+    ///     Test that the router, which applies the authorization rules of a page, does not show the inbox to a visitor
+    ///     who is not signed in and points the visitor to the login page, which returns to the inbox.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_AnonymousThroughRouter_ShowsLoginLinkAndNoInbox()
+    {
+        // Arrange: a review that would be listed, nobody signed in, and the router at /inbox
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/inbox");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: no inbox, and a link to the login page that returns to the inbox
+        Assert.Empty(cut.FindAll("[data-testid='inbox-page']"));
+        Assert.Empty(cut.FindAll("[data-testid='inbox-row-1']"));
+        Assert.Equal(
+            "/login?ReturnUrl=" + Uri.EscapeDataString("/inbox"),
+            cut.Find("[data-testid='access-denied-login-link']").GetAttribute("href"));
     }
 
     /// <summary>
@@ -178,6 +226,54 @@ public class InboxPageTests : InboxWebTestBase
         Assert.Equal($"/projects/{ProjectId}/reviews/r1", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
         Assert.NotEmpty(cut.FindAll("[data-testid='inbox-empty']"));
         Assert.Equal("0 need your action, 0 updates, 1 waiting for others", cut.Find("[data-testid='inbox-summary']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a review with a check that a reviewer marked as Fail is shown to its author under the titled
+    ///     section Failed checks.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_FailedChecks_ShowsTitledSection()
+    {
+        // Arrange: bob holds a slot of the review of the author and marks one check as Fail
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "bob");
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await Checklists.SetAnswerAsync(ProjectId, "r1", first.Id, ChecklistOutcome.Fail, "Wrong", ActorOf("bob"), Ct);
+        SignInAs("author", "Author", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and the row of the review
+        Assert.Equal("Failed checks", cut.Find("[data-testid='inbox-section-failed-checks']").TextContent);
+        Assert.Equal("Apollo / r1", cut.Find("[data-testid='inbox-review-1']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a review that was approved after the user signed is shown under the titled section Updates.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_Update_ShowsTitledSection()
+    {
+        // Arrange: ann and bob signed r1, so the review was approved after ann signed
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var annSlot = await AddSlotAsync("r1", "ann");
+        var bobSlot = await AddSlotAsync("r1", "bob");
+        await AnswerAllAsync("r1", "ann");
+        await AnswerAllAsync("r1", "bob");
+        await SignSlotAsync("r1", annSlot.Id, "ann");
+        await SignSlotAsync("r1", bobSlot.Id, "bob");
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and the row of the review
+        Assert.Equal("Updates", cut.Find("[data-testid='inbox-section-updates']").TextContent);
+        Assert.Equal("Apollo / r1", cut.Find("[data-testid='inbox-review-1']").TextContent);
     }
 
     /// <summary>

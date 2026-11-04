@@ -145,6 +145,31 @@ public class UsersTotpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a reset is refused with an error, and the enrollment kept, when the signed-in administrator was
+    ///     demoted after the page was opened.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_ResetTotp_AdminDemotedAfterOpening_ShowsErrorAndKeepsEnrollment()
+    {
+        // Arrange: two administrators and an enrolled reviewer; one administrator has the page open and is demoted
+        await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await EnrollTotpAsync("ann", Password);
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = Render<UsersPage>();
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: try to reset (the second click is the one that is checked)
+        await cut.Find($"[data-testid='user-reset-totp-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-reset-totp-yes-{ann.Id}']").ClickAsync();
+
+        // Assert: a message says why, and the enrollment is unchanged
+        Assert.Contains("System administrator", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.True(await Totp.IsEnrolledAsync("ann", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that the service behind the button refuses a user who is not a system administrator, so that a
     ///     project administrator or a reviewer cannot reset a second factor even by sending the request directly.
     ///     A project administrator is an ordinary user who holds a membership, so the user store has no flag for it.

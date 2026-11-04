@@ -9,15 +9,39 @@ sections:
     requirements:
       - id: ReviewCenter-AboutPage-Version
         title: >-
-          The AboutPage unit shall serve at /about, to a visitor who is not signed in, the full version of the program,
-          the copyright holder, and a link to the project page on GitHub.
+          The AboutPage unit shall show the full version of the program, the same text that the command line prints.
         justification: |
           Users and auditors must be able to tell exactly which build they are using, for example when reporting a
           problem or recording the version used for a review. The footer shows a shortened version; this page gives the
-          full one, the same text that the command line prints. The page must be open to everyone, so that the version
-          can be read before signing in.
+          full one.
         tests:
           - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+
+      - id: ReviewCenter-AboutPage-Version-Copyright
+        title: >-
+          The AboutPage unit shall show the copyright holder of the program.
+        justification: |
+          The page is where a user finds out whose program this is, next to the version that is running.
+        tests:
+          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+
+      - id: ReviewCenter-AboutPage-Version-ProjectLink
+        title: >-
+          The AboutPage unit shall show a link to the project page on GitHub.
+        justification: |
+          A user who wants to report a problem or read about the program needs to find the project from the page that
+          names the version.
+        tests:
+          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+
+      - id: ReviewCenter-AboutPage-Version-AnonymousAccess
+        title: >-
+          The AboutPage unit shall serve the page at /about to a visitor who is not signed in.
+        justification: |
+          The version must be readable before signing in, for example by somebody who has to say which build of the
+          product they are about to use.
+        tests:
+          - AboutPage_Render_AnonymousThroughRouter_ShowsPageAndNoSignInPrompt
 
       - id: ReviewCenter-AboutPage-Description
         title: >-

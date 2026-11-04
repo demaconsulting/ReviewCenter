@@ -9,6 +9,8 @@
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface, including what each
 #   kind of user (system administrator, project member, user who is no member) is shown
+# - Each requirement states one criterion. The criterion that the old requirement stated first keeps its id; the
+#   others are named <OldId>-<Aspect>. A requirement without tests is verified through its child requirements
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
 #   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
 #   uploads, the switch of the marker to interactive) is verified by the component tests of the child units.
@@ -18,304 +20,851 @@ sections:
     requirements:
       - id: ReviewCenter-Web-HomePage
         title: >-
-          The Web subsystem shall serve a home page at the root URL, inside an HTML document
-          titled ReviewCenter, with the product name and the tagline.
+          The Web subsystem shall serve a home page at the root URL.
         justification: |
-          The home page is the entry point of the web user interface. Delivering it in a
-          complete HTML document through a routing layer proves that the shell, the router,
-          and the page work together to put the page in front of the user.
+          The home page is the entry point of the web user interface. Reaching it through the routing layer proves
+          that the router and the page work together to put the page in front of the user.
+        children:
+          - ReviewCenter-App-Routing
+          - ReviewCenter-App-Routing-NotFound
+          - ReviewCenter-App-Routing-NotFoundFrame
+          - ReviewCenter-App-NotFoundPage
+          - ReviewCenter-App-NotFoundPage-Message
+          - ReviewCenter-App-NotFoundPage-Frame
+          - ReviewCenter-App-NotFoundPage-ProjectsButton
+          - ReviewCenter-App-NotFoundPage-ApiAddress
+          - ReviewCenter-App-NotFoundPage-FileExtension
+          - ReviewCenter-App-NotFoundPage-NonPageRequest
+          - ReviewCenter-HomePage-GetStarted
+          - ReviewCenter-HomePage-GetStarted-ProjectsLink
+          - ReviewCenter-HomePage-GetStarted-Descriptions
+          - ReviewCenter-HomePage-AdminLinks
+          - ReviewCenter-HomePage-AdminLinks-OtherUsers
+          - ReviewCenter-HomePage-AdminLinks-Descriptions
+          - ReviewCenter-App-HomeLink
+          - ReviewCenter-App-HomeLink-ProductName
+          - ReviewCenter-App-Footer
+          - ReviewCenter-App-Footer-AboutLink
+        tests:
+          - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
+
+      - id: ReviewCenter-Web-HomePage-Document
+        title: >-
+          The Web subsystem shall serve the home page inside an HTML document titled ReviewCenter.
+        justification: |
+          A complete HTML document with the product title is what a browser, a bookmark, and a screen reader need to
+          identify the page.
         children:
           - ReviewCenter-App-Shell
-          - ReviewCenter-App-Routing
-          - ReviewCenter-App-NotFoundPage
+          - ReviewCenter-App-Shell-PageTitle
+          - ReviewCenter-App-Shell-ClientScript
+          - ReviewCenter-App-Shell-CopyHelper
+          - ReviewCenter-App-Shell-FocusHelper
+          - ReviewCenter-App-Shell-CtrlEnterShortcut
+        tests:
+          - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
+
+      - id: ReviewCenter-Web-HomePage-Tagline
+        title: >-
+          The Web subsystem shall show the product name and the tagline on the home page.
+        justification: |
+          A visitor who arrives at the product must see at once what it is called and what it is for.
+        children:
           - ReviewCenter-HomePage-Title
           - ReviewCenter-HomePage-Anonymous
-          - ReviewCenter-HomePage-GetStarted
-          - ReviewCenter-HomePage-AdminLinks
-          - ReviewCenter-App-HomeLink
-          - ReviewCenter-App-Footer
-          - ReviewCenter-App-Theme
-          - ReviewCenter-AccountPage-Appearance
+          - ReviewCenter-HomePage-Anonymous-NoLinks
         tests:
           - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
 
       - id: ReviewCenter-Web-Help
         title: >-
-          The Web subsystem shall serve an About page at /about, and a built-in Help at /help with an index of
-          topics and one page per topic at /help/{topic}, each with links to the previous topic, the next topic,
-          and the index, among them the topic /help/project-members for the management of project members and the
-          topic /help/evidence-settings for the evidence settings of a project, and a friendly message for an
-          unknown topic.
+          The Web subsystem shall serve a built-in Help at /help with an index of the topics.
         justification: |
-          Users need to learn what the product does, which version they run, and how to work with it without
-          leaving the application. One page per topic keeps every link a plain address that can be shared and
-          avoids in-page anchors, which the base address of the HTML document would break.
+          Users need to learn how to work with the product without leaving the application. One page per topic keeps
+          every link a plain address that can be shared and avoids in-page anchors, which the base address of the
+          HTML document would break.
         children:
-          - ReviewCenter-AboutPage-Version
-          - ReviewCenter-AboutPage-Description
           - ReviewCenter-HelpPage-Index
-          - ReviewCenter-HelpPage-Topics
-          - ReviewCenter-HelpPage-Navigation
-          - ReviewCenter-HelpPage-NotFound
-          - ReviewCenter-HelpPage-MembersTopic
-          - ReviewCenter-HelpPage-SigningTopic
-          - ReviewCenter-HelpPage-ReadingReviewTopic
-          - ReviewCenter-HelpPage-EvidenceSettingsTopic
           - ReviewCenter-App-HelpLink
+          - ReviewCenter-App-HelpLink-BeforeSignIn
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic
         tests:
           - HelpPage_Render_ListsEveryTopicWithItsPageLink
+
+      - id: ReviewCenter-Web-Help-About
+        title: >-
+          The Web subsystem shall serve an About page at /about.
+        justification: |
+          Users and auditors must be able to tell which version of the product they run and what it does, before
+          signing in as well.
+        children:
+          - ReviewCenter-AboutPage-Version
+          - ReviewCenter-AboutPage-Version-Copyright
+          - ReviewCenter-AboutPage-Version-ProjectLink
+          - ReviewCenter-AboutPage-Version-AnonymousAccess
+          - ReviewCenter-AboutPage-Description
+          - ReviewCenter-HelpPage-Index-AboutLink
+        tests:
+          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+          - AboutPage_Request_Anonymous_IsServedWithoutSignIn
+
+      - id: ReviewCenter-Web-Help-TopicPages
+        title: >-
+          The Web subsystem shall serve one Help page per topic at /help/{topic}.
+        justification: |
+          One page per topic keeps every link a plain address that can be shared.
+        children:
+          - ReviewCenter-HelpPage-Topics
+          - ReviewCenter-HelpPage-Topics-ImageAlt
+          - ReviewCenter-HelpPage-SigningTopic
+          - ReviewCenter-HelpPage-SigningTopic-ReopenRefused
+          - ReviewCenter-HelpPage-SigningTopic-FailDoesNotBlock
+          - ReviewCenter-HelpPage-SigningTopic-Rejection
+          - ReviewCenter-HelpPage-SigningTopic-RejectionConclusion
+          - ReviewCenter-HelpPage-ReadingReviewTopic
+          - ReviewCenter-HelpPage-ReadingReviewTopic-Concluding
+          - ReviewCenter-HelpPage-ReadingReviewTopic-Locked
+          - ReviewCenter-HelpPage-ReadingReviewTopic-ConclusionCard
+          - ReviewCenter-HelpPage-ReadingReviewTopic-ConclusionHidden
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic
+        tests:
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
-          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
           - HelpSigningPage_Render_ExplainsTheReopenerRule
           - HelpPage_ReadingReview_ShowsSlotOwnerNote
-          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
-          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+
+      - id: ReviewCenter-Web-Help-Navigation
+        title: >-
+          The Web subsystem shall give every Help topic page links to the previous topic, the next topic, and the
+          index.
+        justification: |
+          A reader who finishes a topic must be able to go on, or back, without returning to the index first.
+        children:
+          - ReviewCenter-HelpPage-Navigation
+          - ReviewCenter-HelpPage-Navigation-FirstPage
+          - ReviewCenter-HelpPage-Navigation-LastPage
+          - ReviewCenter-HelpPage-Navigation-NoAnchors
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-Web-Help-MembersTopic
+        title: >-
+          The Web subsystem shall explain the management of project members in the topic /help/project-members.
+        justification: |
+          Adding people to a project, and the rule that a project keeps an administrator, are the first things a new
+          project admin has to learn.
+        children:
+          - ReviewCenter-HelpPage-MembersTopic
+          - ReviewCenter-HelpPage-MembersTopic-NewAccount
+          - ReviewCenter-HelpPage-MembersTopic-LastAdmin
+          - ReviewCenter-HelpPage-MembersTopic-FormerMember
+          - ReviewCenter-HelpPage-MembersTopic-AuditTrail
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+
+      - id: ReviewCenter-Web-Help-UnknownTopic
+        title: >-
+          The Web subsystem shall show a friendly message for an unknown Help topic.
+        justification: |
+          A mistyped or outdated address must lead the reader back to the Help, not to an error.
+        children:
+          - ReviewCenter-HelpPage-NotFound
+          - ReviewCenter-HelpPage-NotFound-IndexLink
 
       - id: ReviewCenter-Web-Interactive
         title: >-
-          The Web subsystem shall mark an interactive page, such as the projects page, as not yet interactive in
-          its initial server-rendered response, and as interactive once the live connection is established.
+          The Web subsystem shall mark an interactive page, such as the projects page, as not yet interactive in its
+          initial server-rendered response.
         justification: |
-          Clicks made before the live server connection exists are lost. A marker on the page
-          lets users, automated tests, and tooling wait until the page can respond instead of
-          guessing with fixed delays. The subsystem test covers the initial server-rendered marker; the switch
-          to interactive needs a live connection and is verified by the component tests of the page units.
-        children:
-          - ReviewCenter-ProjectsPage-Interactive
+          Clicks made before the live server connection exists are lost. A marker on the page lets users, automated
+          tests, and tooling wait until the page can respond instead of guessing with fixed delays. The subsystem
+          test covers the initial server-rendered marker.
         tests:
           - WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
+
+      - id: ReviewCenter-Web-Interactive-Live
+        title: >-
+          The Web subsystem shall mark an interactive page as interactive once the live connection is established.
+        justification: |
+          The switch to interactive needs a live connection, so it is verified by the component tests of the page
+          units.
+        children:
+          - ReviewCenter-ProjectsPage-Interactive
 
       - id: ReviewCenter-Web-Projects
         title: >-
           The Web subsystem shall serve a projects page at /projects that lists the projects the user may see, each
-          linking to its page, and offers a New project button, to a system administrator only, that opens a page at
-          /projects/new holding the creation form; a page for each project at /projects/{project} that shows its
-          reviews; and a link to the projects page in the header of every page for a signed-in user.
+          linking to its page.
         justification: |
-          Projects are the entry point to the review features. Pages reached through plain addresses can be
-          bookmarked and shared, and the header must lead to them.
+          Projects are the entry point to the review features. Pages reached through plain addresses can be bookmarked
+          and shared.
         children:
           - ReviewCenter-ProjectsPage-List
+          - ReviewCenter-ProjectsPage-List-Description
+          - ReviewCenter-ProjectsPage-List-Empty
           - ReviewCenter-ProjectsPage-Visibility
-          - ReviewCenter-ProjectsPage-CreateAccess
-          - ReviewCenter-ProjectsPage-Create
+          - ReviewCenter-ProjectsPage-Visibility-Administrator
+          - ReviewCenter-ProjectsPage-Visibility-EmptyReason
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-Projects-NewButton
+        title: >-
+          The Web subsystem shall offer the New project button on the projects page to a system administrator only.
+        justification: |
+          Creating a project is a decision of the people who run the tool, so the page offers the button to them
+          alone.
+        children:
           - ReviewCenter-ProjectsPage-NewForm
+          - ReviewCenter-ProjectsPage-Visibility-NoCreateButton
+          - ReviewCenter-ProjectsPage-CreateAccess
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-Web-Projects-NewPage
+        title: >-
+          The Web subsystem shall serve a page at /projects/new that holds the project creation form.
+        justification: |
+          A page of its own for the form keeps the project list short and gives the creation a plain address.
+        children:
+          - ReviewCenter-ProjectsPage-NewForm
+          - ReviewCenter-ProjectsPage-NewForm-NotInList
+          - ReviewCenter-ProjectsPage-NewForm-FormPage
+          - ReviewCenter-ProjectsPage-NewForm-Cancel
+          - ReviewCenter-ProjectsPage-Create
+          - ReviewCenter-ProjectsPage-Create-Opens
           - ReviewCenter-ProjectsPage-Error
-          - ReviewCenter-ProjectsPage-Interactive
+          - ReviewCenter-ProjectsPage-Error-SessionEnded
+          - ReviewCenter-ProjectsPage-Error-NothingCreated
+
+      - id: ReviewCenter-Web-Projects-Project
+        title: >-
+          The Web subsystem shall serve a page for each project at /projects/{project} that shows its reviews.
+        justification: |
+          A project page is the place where a team finds the reviews of one body of work, and its plain address can
+          be shared.
+        children:
           - ReviewCenter-ProjectPage-Show
           - ReviewCenter-ProjectPage-Reviews
           - ReviewCenter-ProjectPage-NewReview
-          - ReviewCenter-App-Navigation
           - ReviewCenter-App-FormRoutes
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
+      - id: ReviewCenter-Web-Projects-HeaderLink
+        title: >-
+          The Web subsystem shall show a link to the projects page in the header of every page for a signed-in user.
+        justification: |
+          The header must lead to the projects from every page, and only a signed-in user has projects to reach.
+        children:
+          - ReviewCenter-App-Navigation
+          - ReviewCenter-App-Navigation-SignedOut
+
       - id: ReviewCenter-Web-ProjectAccess
         title: >-
-          The Web subsystem shall show a user only the projects the user is a member of, and a system administrator
-          every project; shall show a project the user may not see exactly as a project that does not exist, so that
-          a user cannot tell a hidden project from a missing one; shall let only a system administrator create
-          projects, and only whoever administers a project, a system administrator or a project admin of it, manage
-          its members, on the project page and the two pages for a new member, with a role of project admin, auditor or
-          member for each member, where a member is added by the exact user name, with no list of users, or as a new
-          account together with its membership; shall let only whoever manages a project
-          open its repositories, and offer in a new review only the repositories of that project; and shall keep
-          that rule for a page that stays open, by checking the view access again at the start of every action of
-          a project page and, once the user has lost it, showing the page for a project that does not exist and
-          none of the data the page had loaded; and shall do the same for the administer or system administrator
-          right that the repositories, new repository, project members and users pages need, so that a user who
-          was demoted sees no repository, member or user data that the page had loaded.
+          The Web subsystem shall show a user only the projects the user is a member of.
         justification: |
-          Reviews of one body of work must not be visible to people who do not work on it, and the answer for a
-          project the user may not see must not reveal that it exists. Membership is the one rule that decides what
-          a user sees, so the pages ask the Core access service instead of deciding for themselves. A page that
-          stays open does not load again, so a user whose membership was removed would otherwise keep reading
-          through it; the shared ProjectViewGuard asks again at every action, for the view, the administer and the
-          system administrator right, and the read services need no
-          guard of their own because every page reaches them only after that check. The subsystem
-          requirement is verified by the page tests of the units, which render the pages for a system administrator,
-          a member, and a user who is no member, and remove the membership while the page is open.
+          Reviews of one body of work must not be visible to people who do not work on it. Membership is the one rule
+          that decides what a user sees.
         children:
           - ReviewCenter-ProjectsPage-Visibility
-          - ReviewCenter-ProjectsPage-CreateAccess
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-Web-ProjectAccess-AdminSeesAll
+        title: >-
+          The Web subsystem shall show a system administrator every project.
+        justification: |
+          A system administrator runs the tool and must be able to reach every project to administer it.
+        children:
+          - ReviewCenter-ProjectsPage-Visibility
+          - ReviewCenter-ProjectsPage-Visibility-Administrator
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+
+      - id: ReviewCenter-Web-ProjectAccess-HiddenProject
+        title: >-
+          The Web subsystem shall show a project that the user may not see exactly as a project that does not exist.
+        justification: |
+          The answer for a project the user may not see must not reveal that the project exists.
+        children:
           - ReviewCenter-ProjectPage-Show
+        tests:
+          - ProjectPage_Render_NonMember_LooksLikeAMissingProject
+
+      - id: ReviewCenter-Web-ProjectAccess-CreateProjects
+        title: >-
+          The Web subsystem shall let only a system administrator create projects.
+        justification: |
+          Creating a project is a decision of the people who run the tool.
+        children:
+          - ReviewCenter-ProjectsPage-CreateAccess
+          - ReviewCenter-ProjectsPage-CreateAccess-NothingCreated
+          - ReviewCenter-ProjectsPage-Visibility-NoCreateButton
+
+      - id: ReviewCenter-Web-ProjectAccess-MemberAccess
+        title: >-
+          The Web subsystem shall let only whoever administers a project, a system administrator or a project admin of
+          it, list, change, and remove its members on the project page.
+        justification: |
+          Who may work on a project is decided by the people who answer for it, and nobody else.
+        children:
           - ReviewCenter-ProjectPage-Members
           - ReviewCenter-ProjectPage-MemberChange
-          - ReviewCenter-ProjectPage-AddMember
-          - ReviewCenter-ProjectPage-CreateAccount
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+
+      - id: ReviewCenter-Web-ProjectAccess-Roles
+        title: >-
+          The Web subsystem shall give each member of a project the role project admin, auditor, or member.
+        justification: |
+          The three roles separate who administers a project, who only reads it, and who works in it.
+        children:
           - ReviewCenter-ProjectPage-MemberRoles
+        tests:
+          - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+
+      - id: ReviewCenter-Web-ProjectAccess-AuditorReadOnly
+        title: >-
+          The Web subsystem shall show an auditor of a project its pages without any control that changes something.
+        justification: |
+          An auditor reads the review record and must not be able to alter it, so the pages say that they are
+          read-only and offer no control that writes.
+        children:
           - ReviewCenter-ReviewPage-ReadOnly
           - ReviewCenter-ChecklistPage-ReadOnly
           - ReviewCenter-PlanPage-ReadOnly
-          - ReviewCenter-ProjectPage-RepositoriesLink
-          - ReviewCenter-ProjectPage-RepositoryForm
+        tests:
+          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+          - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
+          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+
+      - id: ReviewCenter-Web-ProjectAccess-AddMember
+        title: >-
+          The Web subsystem shall let whoever administers a project add a member by the exact user name, with no list
+          of users.
+        justification: |
+          A list of all users would reveal who has an account, so a member is added only by a name that the
+          administrator already knows.
+        children:
+          - ReviewCenter-ProjectPage-AddMember
+        tests:
+          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
+
+      - id: ReviewCenter-Web-ProjectAccess-CreateAccount
+        title: >-
+          The Web subsystem shall let whoever administers a project add a member as a new account together with its
+          membership.
+        justification: |
+          A project admin who brings in a person without an account would otherwise need a system administrator.
+        children:
+          - ReviewCenter-ProjectPage-CreateAccount
+        tests:
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+
+      - id: ReviewCenter-Web-ProjectAccess-RepositoriesAccess
+        title: >-
+          The Web subsystem shall let only whoever manages a project open its repositories page.
+        justification: |
+          A repository controls what source code the server reads, so only the people who manage the project may
+          reach its page, and other users are shown a project that does not exist.
+        children:
           - ReviewCenter-RepositoriesPage-Admin
+          - ReviewCenter-RepositoriesPage-Admin-NotFound
+          - ReviewCenter-ProjectPage-RepositoriesLink
+        tests:
+          - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
+          - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
+
+      - id: ReviewCenter-Web-ProjectAccess-ReviewRepositories
+        title: >-
+          The Web subsystem shall offer in a new review only the repositories of that project.
+        justification: |
+          A review must not read the source code of a repository that belongs to another project.
+        children:
+          - ReviewCenter-ProjectPage-RepositoryForm
           - ReviewCenter-PlanPage-Form
+        tests:
+          - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
+
+      - id: ReviewCenter-Web-ProjectAccess-ViewRecheck
+        title: >-
+          The Web subsystem shall check the view access of the project again at the start of every action of a project
+          page.
+        justification: |
+          A page that stays open does not load again, so a user whose membership was removed would otherwise keep
+          reading through it.
+        children:
           - ReviewCenter-ReviewPage-Access
           - ReviewCenter-ChecklistPage-Access
           - ReviewCenter-PlanPage-Access
           - ReviewCenter-HistoryPage-Access
         tests:
-          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
-          - ProjectPage_Render_NonMember_LooksLikeAMissingProject
-          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
-          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
-          - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
-          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
-          - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
-          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
-          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
-          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
-          - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
-          - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
           - ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback
-          - ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce
           - ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse
+
+      - id: ReviewCenter-Web-ProjectAccess-ViewLost
+        title: >-
+          The Web subsystem shall show a user who has lost the view access the page of a project that does not exist
+          and none of the data the page had loaded.
+        justification: |
+          The user must learn nothing of the project after the membership ended, neither that it exists nor what the
+          page had loaded.
+        children:
+          - ReviewCenter-ReviewPage-Access
+          - ReviewCenter-ChecklistPage-Access
+          - ReviewCenter-PlanPage-Access
+          - ReviewCenter-HistoryPage-Access
+        tests:
+          - ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce
           - ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback
-          - ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse
-          - ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback
-          - ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce
           - ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData
           - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
           - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
           - PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan
           - NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing
 
+      - id: ReviewCenter-Web-ProjectAccess-AdministerRecheck
+        title: >-
+          The Web subsystem shall check the administer right of the project again at the start of every action of the
+          repositories, new repository, and project members pages.
+        justification: |
+          A page that stays open does not load again, so a user who was demoted would otherwise keep managing the
+          project through it.
+        children:
+          - ReviewCenter-RepositoriesPage-Admin-RightLost
+          - ReviewCenter-RepositoriesPage-Admin-SignedOut
+        tests:
+          - ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse
+          - ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+
+      - id: ReviewCenter-Web-ProjectAccess-AdministerLost
+        title: >-
+          The Web subsystem shall show a user who has lost the administer right no repository or member data that the
+          page had loaded.
+        justification: |
+          A user who was demoted must not keep reading the repositories, locations, and members of the project.
+        children:
+          - ReviewCenter-RepositoriesPage-Admin-NothingChanged
+          - ReviewCenter-RepositoriesPage-Admin-DropData
+          - ReviewCenter-RepositoriesPage-Admin-DropEditState
+          - ReviewCenter-RepositoriesPage-Admin-FailedReload
+          - ReviewCenter-RepositoriesPage-Admin-Revalidated
+
+      - id: ReviewCenter-Web-ProjectAccess-SystemAdminRecheck
+        title: >-
+          The Web subsystem shall check the system administrator right again at the start of every action of the
+          users page.
+        justification: |
+          A page that stays open does not load again, so a user who was demoted would otherwise keep managing users
+          through it.
+        children:
+          - ReviewCenter-UsersPage-AdminCheck
+        tests:
+          - ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+
+      - id: ReviewCenter-Web-ProjectAccess-SystemAdminLost
+        title: >-
+          The Web subsystem shall show a user who has lost the system administrator right no user data that the page
+          had loaded.
+        justification: |
+          A user who was demoted must not keep reading the user list that the page had loaded.
+        children:
+          - ReviewCenter-UsersPage-AdminCheck-StopRendering
+
       - id: ReviewCenter-Web-Reviews
         title: >-
-          The Web subsystem shall let a user create a review of selected files on a page of its own, reached from
-          the project page and within the upload limits, and shall serve a page for each review at
-          /projects/{project}/reviews/{review} that opens with a summary of the checklist progress, reviewers and
-          threads, and shows its files and the content of a selected file ahead of its fingerprint and file hashes,
-          which are in a collapsed Details section.
+          The Web subsystem shall let a user create a review of selected files on a page of its own.
         justification: |
-          Creating a review from files, and seeing the fingerprint and the exact content again, is the first
-          review capability of the product. Showing the user the reason for every refusal makes the upload
-          limits usable. The subsystem test covers the served review and project pages; creating a review (form
-          and upload) needs a live connection and is verified by the component tests of the page units.
+          Creating a review from files, and seeing the fingerprint and the exact content again, is the first review
+          capability of the product. Creating a review (form and upload) needs a live connection and is verified by
+          the component tests of the page units.
         children:
           - ReviewCenter-ProjectPage-Selection
           - ReviewCenter-ProjectPage-Create
-          - ReviewCenter-ProjectPage-Error
-          - ReviewCenter-ProjectPage-ReservedId
-          - ReviewCenter-ProjectPage-Limits
           - ReviewCenter-ProjectPage-Interactive
+
+      - id: ReviewCenter-Web-Reviews-ProjectLink
+        title: >-
+          The Web subsystem shall offer the page for a new review from the project page.
+        justification: |
+          A user who looks at the reviews of a project must find the way to add one without knowing an address.
+        children:
+          - ReviewCenter-ProjectPage-NewReview
+
+      - id: ReviewCenter-Web-Reviews-UploadLimits
+        title: >-
+          The Web subsystem shall keep the files of a new review within the upload limits.
+        justification: |
+          Showing the user the reason for a refusal makes the upload limits usable, and the limits protect the
+          server from a review too large to store.
+        children:
+          - ReviewCenter-ProjectPage-Limits
+          - ReviewCenter-ProjectPage-ReservedId
+          - ReviewCenter-ProjectPage-Error
+
+      - id: ReviewCenter-Web-Reviews-Page
+        title: >-
+          The Web subsystem shall serve a page for each review at /projects/{project}/reviews/{review}.
+        justification: |
+          A review is the unit of work of the product, and a plain address lets the team share and bookmark it.
+        children:
           - ReviewCenter-ReviewPage-Show
-          - ReviewCenter-ReviewPage-Summary
-          - ReviewCenter-ReviewPage-Layout
-          - ReviewCenter-ReviewPage-Files
-          - ReviewCenter-ReviewPage-Content
-          - ReviewCenter-ReviewPage-Binary
           - ReviewCenter-ReviewPage-Interactive
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
+      - id: ReviewCenter-Web-Reviews-Summary
+        title: >-
+          The Web subsystem shall open the review page with a summary of the checklist progress, the reviewers, and
+          the threads.
+        justification: |
+          A reader must see how far the review has got before reading the files.
+        children:
+          - ReviewCenter-ReviewPage-Summary
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+          - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+
+      - id: ReviewCenter-Web-Reviews-Files
+        title: >-
+          The Web subsystem shall show the files of the review and the content of a selected file ahead of the
+          fingerprint and the file hashes.
+        justification: |
+          The content is what a reviewer reads, so it comes first, and the technical identifiers follow.
+        children:
+          - ReviewCenter-ReviewPage-Files
+          - ReviewCenter-ReviewPage-Content
+          - ReviewCenter-ReviewPage-Binary
+          - ReviewCenter-ReviewPage-Layout
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-Reviews-Details
+        title: >-
+          The Web subsystem shall show the fingerprint and the file hashes in a collapsed Details section.
+        justification: |
+          The identifiers matter when a record is checked, not when it is read, so they stay out of the way until
+          opened.
+        children:
+          - ReviewCenter-ReviewPage-Layout
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
       - id: ReviewCenter-Web-Comments
         title: >-
-          The Web subsystem shall let a signed-in user, on the review page, start comment threads on the selected
-          file, reply to them, resolve and reopen them, with the signed-in user as the author, and shall show the
-          next step, an index of the threads of all files, the threads with their comments (resolved ones
-          collapsed), and the open and resolved counts.
+          The Web subsystem shall let a signed-in user, on the review page, start comment threads on the selected file,
+          with the signed-in user as the author.
         justification: |
-          Comments are written and read next to the code on the review page. The subsystem test covers the
-          counts served from the database; starting, replying, and resolving need a live connection and are
+          Comments are written next to the code on the review page. Starting a thread needs a live connection and is
           verified by the component tests of the page unit.
         children:
-          - ReviewCenter-ReviewPage-ThreadSummary
-          - ReviewCenter-ReviewPage-NextStep
-          - ReviewCenter-ReviewPage-ThreadIndex
-          - ReviewCenter-ReviewPage-ThreadCollapse
           - ReviewCenter-ReviewPage-ThreadStart
-          - ReviewCenter-ReviewPage-ThreadShow
-          - ReviewCenter-ReviewPage-ThreadUpdate
-          - ReviewCenter-ReviewPage-CheckThreads
-          - ReviewCenter-ReviewPage-ThreadKinds
           - ReviewCenter-ReviewPage-ThreadComposer
+          - ReviewCenter-ReviewPage-ThreadKinds
+
+      - id: ReviewCenter-Web-Comments-Reply
+        title: >-
+          The Web subsystem shall let a signed-in user reply to a comment thread.
+        justification: |
+          A discussion is a sequence of answers, so a thread must accept replies.
+        children:
+          - ReviewCenter-ReviewPage-ThreadUpdate
           - ReviewCenter-ReviewPage-ThreadActions
+
+      - id: ReviewCenter-Web-Comments-Resolve
+        title: >-
+          The Web subsystem shall let a signed-in user resolve a comment thread.
+        justification: |
+          A thread that is settled must be marked so that the open ones stand out.
+        children:
+          - ReviewCenter-ReviewPage-ThreadActions
+
+      - id: ReviewCenter-Web-Comments-Reopen
+        title: >-
+          The Web subsystem shall let a signed-in user reopen a resolved comment thread.
+        justification: |
+          A thread resolved too early must be able to come back.
+        children:
+          - ReviewCenter-ReviewPage-ThreadActions
+
+      - id: ReviewCenter-Web-Comments-NextStep
+        title: >-
+          The Web subsystem shall show the next step on the review page.
+        justification: |
+          A reviewer should be told what to do next instead of having to work it out from the cards.
+        children:
+          - ReviewCenter-ReviewPage-NextStep
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
+      - id: ReviewCenter-Web-Comments-Index
+        title: >-
+          The Web subsystem shall show an index of the threads of all files on the review page.
+        justification: |
+          A reviewer must find every discussion of the review without opening each file.
+        children:
+          - ReviewCenter-ReviewPage-ThreadIndex
           - ReviewCenter-ReviewPage-ThreadKindIndex
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
+      - id: ReviewCenter-Web-Comments-Threads
+        title: >-
+          The Web subsystem shall show the threads with their comments on the review page.
+        justification: |
+          The comments are read next to the file that they are about.
+        children:
+          - ReviewCenter-ReviewPage-ThreadShow
+          - ReviewCenter-ReviewPage-CheckThreads
           - ReviewCenter-ReviewPage-ConclusionFindings
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
+      - id: ReviewCenter-Web-Comments-Collapsed
+        title: >-
+          The Web subsystem shall show resolved threads collapsed on the review page.
+        justification: |
+          Settled discussions must not crowd out the open ones.
+        children:
+          - ReviewCenter-ReviewPage-ThreadCollapse
+
+      - id: ReviewCenter-Web-Comments-Counts
+        title: >-
+          The Web subsystem shall show the number of open and of resolved threads on the review page.
+        justification: |
+          The counts tell a reader at a glance how much discussion is left. The subsystem test covers the counts
+          served from the database.
+        children:
+          - ReviewCenter-ReviewPage-ThreadSummary
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 
       - id: ReviewCenter-Web-Checklist
         title: >-
-          The Web subsystem shall show on the review page the progress of the review's checklist with a link to
-          a checklist page at /projects/{project}/reviews/{review}/checklist, where a reviewer can see what is left
-          to do, answer each check in the ballot of the own reviewer slot as the signed-in user, mark sections as not
-          applicable, hand the ballot in, and be led to the next unanswered check, and where a user without a slot is
-          told how to join and sees the consolidated standing of a single-slot or concluded review, while in a
-          multi-slot review that is not concluded the standing stays hidden behind a notice unless the viewer is the
-          lead, an administrator or an Auditor.
+          The Web subsystem shall show on the review page the progress of the review's checklist with a link to a
+          checklist page at /projects/{project}/reviews/{review}/checklist.
         justification: |
-          The checklist is worked through on its own page, and the review page shows how far it has got. The
-          subsystem test covers the pages served from the database; answering needs a live connection and is
-          verified by the component tests of the page units.
+          The checklist is worked through on its own page, and the review page shows how far it has got.
         children:
           - ReviewCenter-ReviewPage-Checklist
+        tests:
+          - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+
+      - id: ReviewCenter-Web-Checklist-Page
+        title: >-
+          The Web subsystem shall serve the checklist page at /projects/{project}/reviews/{review}/checklist.
+        justification: |
+          A plain address lets a reviewer return to the checklist and share it.
+        children:
           - ReviewCenter-ChecklistPage-Show
-          - ReviewCenter-ChecklistPage-Answer
-          - ReviewCenter-ChecklistPage-SubmitBallot
-          - ReviewCenter-ChecklistPage-NoSlot
-          - ReviewCenter-ChecklistPage-Applicability
-          - ReviewCenter-ChecklistPage-NextUnanswered
           - ReviewCenter-ChecklistPage-Interactive
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
+      - id: ReviewCenter-Web-Checklist-Remaining
+        title: >-
+          The Web subsystem shall show a reviewer on the checklist page what is left to do.
+        justification: |
+          A reviewer who sees what remains can finish the checklist without counting.
+        children:
+          - ReviewCenter-ChecklistPage-Show
+
+      - id: ReviewCenter-Web-Checklist-Answer
+        title: >-
+          The Web subsystem shall let a reviewer answer each check in the ballot of the own reviewer slot as the
+          signed-in user.
+        justification: |
+          An answer is the reviewer's own statement, so it is recorded in the own ballot under the own name. The
+          subsystem test covers that the answers survive a reload; answering needs a live connection.
+        children:
+          - ReviewCenter-ChecklistPage-Answer
+        tests:
+          - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+
+      - id: ReviewCenter-Web-Checklist-Applicability
+        title: >-
+          The Web subsystem shall let a reviewer mark sections of the checklist as not applicable.
+        justification: |
+          A section that does not apply to the change must not demand an answer for each of its checks.
+        children:
+          - ReviewCenter-ChecklistPage-Applicability
+
+      - id: ReviewCenter-Web-Checklist-SubmitBallot
+        title: >-
+          The Web subsystem shall let a reviewer hand in the own ballot.
+        justification: |
+          Handing in the ballot is the step after which the reviewer sees how the others answered.
+        children:
+          - ReviewCenter-ChecklistPage-SubmitBallot
+
+      - id: ReviewCenter-Web-Checklist-NextUnanswered
+        title: >-
+          The Web subsystem shall lead a reviewer to the next unanswered check.
+        justification: |
+          A reviewer who works through a long checklist must not have to search for the place to continue.
+        children:
+          - ReviewCenter-ChecklistPage-NextUnanswered
+
+      - id: ReviewCenter-Web-Checklist-JoinNotice
+        title: >-
+          The Web subsystem shall tell a user without a reviewer slot on the checklist page how to join.
+        justification: |
+          A user who sees a checklist but cannot answer it must be told why and what to do.
+        children:
+          - ReviewCenter-ChecklistPage-NoSlot
+
+      - id: ReviewCenter-Web-Checklist-Standing
+        title: >-
+          The Web subsystem shall show a user without a reviewer slot the consolidated standing of a single-slot or
+          concluded review.
+        justification: |
+          Where nothing is left to hide, the standing of the review is shown to every reader. Where the standing
+          stays hidden, the ballot requirement of the Web subsystem governs.
+        children:
+          - ReviewCenter-ChecklistPage-NoSlot
+
       - id: ReviewCenter-Web-Signatures
         title: >-
-          The Web subsystem shall show on the review page a Reviewers card with the reviewer slots and their
-          signature status, where a reviewer who occupies a slot signs the review after confirming the password, as an
-          approval or, when the ballots agree on a Fail, as a rejection with a conclusion text that the slot owners
-          write in a Review conclusion card,
-          the approval status of the review (Approved, Rejected, or In review) next to its title, and the record digest
-          in
-          the Details section, and shall show the approval status of each review on the project page.
+          The Web subsystem shall show on the review page a Reviewers card with the reviewer slots and their signature
+          status.
         justification: |
-          Re-authenticated signatures are what turns a reviewed record into an approved or a rejected one. The
-          subsystem test
-          covers what the pages show from the database: the sign form, the approval after a signature, and the
-          approval going out of date when the record changes; adding slots and signing need a live connection and
-          are verified by the component tests of the page units.
+          Re-authenticated signatures are what turn a reviewed record into an approved or a rejected one. The
+          subsystem test covers what the pages show from the database, including the approval going out of date when
+          the record changes.
         children:
           - ReviewCenter-ReviewPage-Reviewers
-          - ReviewCenter-ReviewPage-Sign
-          - ReviewCenter-ReviewPage-ConclusionCard
-          - ReviewCenter-ReviewPage-Digest
-          - ReviewCenter-ProjectPage-Approval
           - ReviewCenter-ReviewPage-SignatureWarning
           - ReviewCenter-ChecklistPage-SignatureWarning
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
+      - id: ReviewCenter-Web-Signatures-Approve
+        title: >-
+          The Web subsystem shall let a reviewer who occupies a slot sign the review as an approval after confirming
+          the password.
+        justification: |
+          A signature is the statement of a person, so the person confirms the password before it is recorded.
+        children:
+          - ReviewCenter-ReviewPage-Sign
+        tests:
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
+      - id: ReviewCenter-Web-Signatures-Reject
+        title: >-
+          The Web subsystem shall let a reviewer who occupies a slot sign the review as a rejection, with a conclusion
+          text, when the ballots agree on a Fail.
+        justification: |
+          A review that finds the work not acceptable must be able to end with a rejection that says why.
+        children:
+          - ReviewCenter-ReviewPage-Sign
+
+      - id: ReviewCenter-Web-Signatures-Conclusion
+        title: >-
+          The Web subsystem shall let the slot owners write the conclusion text in a Review conclusion card.
+        justification: |
+          The conclusion is the shared statement of the reviewers, so it has a card where they write it together.
+        children:
+          - ReviewCenter-ReviewPage-ConclusionCard
+
+      - id: ReviewCenter-Web-Signatures-Status
+        title: >-
+          The Web subsystem shall show the approval status of the review (Approved, Rejected, or In review) next to its
+          title.
+        justification: |
+          The status is the first thing a reader looks for on the page of a review.
+        tests:
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
+      - id: ReviewCenter-Web-Signatures-Digest
+        title: >-
+          The Web subsystem shall show the record digest in the Details section of the review page.
+        justification: |
+          The digest identifies the exact record that was signed, so a reader can check it outside the tool.
+        children:
+          - ReviewCenter-ReviewPage-Digest
+
+      - id: ReviewCenter-Web-Signatures-ProjectStatus
+        title: >-
+          The Web subsystem shall show the approval status of each review on the project page.
+        justification: |
+          A lead must see which reviews are approved without opening each one.
+        children:
+          - ReviewCenter-ProjectPage-Approval
+        tests:
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
       - id: ReviewCenter-Web-ReviewLock
         title: >-
-          The Web subsystem shall show a review that is concluded, approved or rejected, as locked on the review page
-          and on the checklist page,
-          with the controls that change the review disabled and the reason given, let an administrator of the project
-          or a system administrator reopen the review on the review page with a reason, show the reopenings in a
-          history, and show the user who created the review that a different project member has to review and sign
-          it when the project requires independent reviewers.
+          The Web subsystem shall show a review that is concluded, approved or rejected, as locked on the review page,
+          with the reason given.
         justification: |
-          The lock and the independence rule are enforced by the services, but the pages are where people meet them. The
-          pages must say what is locked and why, offer the way out only to those who may take it, and keep the
-          history of reopenings visible, so that a user is not left with controls that fail for no visible reason.
+          The lock is enforced by the services, but the page is where people meet it. The page must say what is locked
+          and why, so that a user is not left with controls that fail for no visible reason.
         children:
           - ReviewCenter-ReviewPage-Locked
-          - ReviewCenter-ReviewPage-Reopen
-          - ReviewCenter-ReviewPage-Independence
-          - ReviewCenter-ChecklistPage-Locked
         tests:
           - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
+
+      - id: ReviewCenter-Web-ReviewLock-ChecklistLocked
+        title: >-
+          The Web subsystem shall show a review that is concluded, approved or rejected, as locked on the checklist
+          page, with the reason given.
+        justification: |
+          A reviewer who opens the checklist of a concluded review must be told why nothing can be changed.
+        children:
+          - ReviewCenter-ChecklistPage-Locked
+
+      - id: ReviewCenter-Web-ReviewLock-Controls
+        title: >-
+          The Web subsystem shall disable the controls that change a locked review.
+        justification: |
+          A control that is offered but refused is confusing, so the controls of a locked review are disabled.
+        children:
+          - ReviewCenter-ReviewPage-Locked
+          - ReviewCenter-ChecklistPage-Locked
+
+      - id: ReviewCenter-Web-ReviewLock-Reopen
+        title: >-
+          The Web subsystem shall let an administrator of the project or a system administrator reopen a locked review
+          on the review page with a reason.
+        justification: |
+          The way out of a lock is offered only to those who may take it, and the reason keeps the record honest.
+        children:
+          - ReviewCenter-ReviewPage-Reopen
+        tests:
+          - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
+
+      - id: ReviewCenter-Web-ReviewLock-ReopenHistory
+        title: >-
+          The Web subsystem shall show the reopenings of a review in a history.
+        justification: |
+          A reader must see that a review was reopened, when, and why.
+        children:
+          - ReviewCenter-ReviewPage-Reopen
+        tests:
+          - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
+
+      - id: ReviewCenter-Web-ReviewLock-Independence
+        title: >-
+          The Web subsystem shall show the user who created a review that a different project member has to review and
+          sign it when the project requires independent reviewers.
+        justification: |
+          The user must be told why the own review cannot be signed and what to do, instead of being left with controls
+          that fail.
+        children:
+          - ReviewCenter-ReviewPage-Independence
 
       - id: ReviewCenter-Web-ReviewRules
         title: >-
           The Web subsystem shall let an administrator of the project or a system administrator switch the requirement
-          of independent reviewers on the project page, and shall not show the setting to any other user.
+          of independent reviewers on the project page.
         justification: |
           A project that has to let one person do both must be able to say so, and only the people who administer the
           project may relax a rule that protects its reviews.
@@ -324,17 +873,53 @@ sections:
         tests:
           - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
 
+      - id: ReviewCenter-Web-ReviewRules-Hidden
+        title: >-
+          The Web subsystem shall not show the independent-reviewers setting to any other user.
+        justification: |
+          Only the people who administer the project may see and change a rule that protects its reviews.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRules
+        tests:
+          - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
+
       - id: ReviewCenter-Web-ReviewRuleSwitches
         title: >-
-          The Web subsystem shall let an administrator of the project or a system administrator switch the two
-          further review rules (authors answering the checklist of their own review, and the person who reopened a
-          review signing it again) on the project page, shall say next to them that the rules are on by default and
-          apply to every project of the tool, also the projects that existed before, and shall not show them to any
-          other user.
+          The Web subsystem shall let an administrator of the project or a system administrator switch the rule that
+          authors answer the checklist of their own review on the project page.
+        justification: |
+          Only the people who administer the project may change a rule that protects its reviews.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches
+        tests:
+          - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-ReopenerSigning
+        title: >-
+          The Web subsystem shall let an administrator of the project or a system administrator switch the rule that
+          the person who reopened a review signs it again on the project page.
+        justification: |
+          Only the people who administer the project may change a rule that protects its reviews.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches
+        tests:
+          - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-DefaultNotice
+        title: >-
+          The Web subsystem shall say next to the rules that they are on by default and apply to every project of the
+          tool, also to the projects that existed before.
         justification: |
           The rules are enforced for every project from the day they are enforced, so a page that offered a switch
-          without saying so would hide that an existing project is affected too. Only the people who administer the
-          project may change a rule that protects its reviews.
+          without saying so would hide that an existing project is affected too.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-Hidden
+        title: >-
+          The Web subsystem shall not show the two review rules to any other user.
+        justification: |
+          Only the people who administer the project may see and change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
         tests:
@@ -343,544 +928,2034 @@ sections:
       - id: ReviewCenter-Web-ReviewRuleNotices
         title: >-
           The Web subsystem shall tell the author of a review on the checklist page, while the project does not let
-          authors answer the checklist, that another member has to answer it, with the answer controls disabled, shall
-          tell the person who reopened a review on the review page, while the project does not let that person sign
-          again, that another reviewer must sign, instead of the sign form, and shall show the user the message of the
-          rule when a reopening is refused because a slot would have nobody who may sign it.
+          authors answer the checklist, that another member has to answer it.
         justification: |
-          The services enforce the rules, but the pages are where people meet them. A user must not be left with
-          controls that fail for no visible reason, and must be told what to do instead.
+          The services enforce the rules, but the pages are where people meet them. A user must be told what to do
+          instead of being left with controls that fail for no visible reason.
         children:
           - ReviewCenter-ChecklistPage-AuthorBlocked
-          - ReviewCenter-ReviewPage-ReopenerBlocked
         tests:
           - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
+      - id: ReviewCenter-Web-ReviewRuleNotices-AuthorControls
+        title: >-
+          The Web subsystem shall disable the answer controls for the author of a review while the project does not let
+          authors answer the checklist.
+        justification: |
+          A control that the rules refuse must not be offered.
+        children:
+          - ReviewCenter-ChecklistPage-AuthorBlocked
+        tests:
+          - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
+
+      - id: ReviewCenter-Web-ReviewRuleNotices-ReopenerNotice
+        title: >-
+          The Web subsystem shall tell the person who reopened a review on the review page, while the project does not
+          let that person sign again, that another reviewer must sign, instead of the sign form.
+        justification: |
+          A user must be told what to do instead of being offered a form that the rules refuse.
+        children:
+          - ReviewCenter-ReviewPage-ReopenerBlocked
+
+      - id: ReviewCenter-Web-ReviewRuleNotices-ReopenRefused
+        title: >-
+          The Web subsystem shall show the user the message of the rule when a reopening is refused because a slot
+          would have nobody who may sign it.
+        justification: |
+          A refused reopening must say why, so that the user can fix the cause.
+        children:
+          - ReviewCenter-ReviewPage-ReopenerBlocked
+
       - id: ReviewCenter-Web-SignIn
         title: >-
-          The Web subsystem shall show in the page header the name of the signed-in user with a link to the
-          account page and a logout button, or a sign-in link when nobody is signed in, serve a login page at
-          /login with a user name and a password field that shows a failed sign-in without revealing its reason,
-          serve an account page at /account where a signed-in user changes the own password and chooses the
-          appearance, and, for a user who signed in with a temporary password, shows a banner and the password change
-          only, with the header of such a session free of navigation tabs and every other page replaced by the account
-          page, and the login page showing a notice to sign in again after the change, and serve a users page at
-          /users where a system administrator enables and disables users, makes
-          users system administrators or takes that away, and sets passwords, and reaches the page at /users/new that
-          creates users.
+          The Web subsystem shall show in the page header the name of the signed-in user with a link to the account
+          page.
         justification: |
-          Users must be able to sign in, see who they are signed in as, and sign out from every page. Account and
-          user management are done in the web interface so that no command line is needed after the first
-          administrator exists. The subsystem tests cover the pages served over HTTP; the forms need a live
-          connection and are verified by the component tests of the page units.
+          Users must be able to see who they are signed in as, and reach their account, from every page.
         children:
           - ReviewCenter-App-Header
-          - ReviewCenter-App-UsersLink
-          - ReviewCenter-App-RouteAuthorization
-          - ReviewCenter-App-TemporaryPassword
-          - ReviewCenter-LoginPage-Form
-          - ReviewCenter-LoginPage-Error
-          - ReviewCenter-LoginPage-PasswordChanged
-          - ReviewCenter-AccountPage-Show
-          - ReviewCenter-AccountPage-ChangePassword
-          - ReviewCenter-AccountPage-TemporaryPassword
-          - ReviewCenter-UsersPage-List
-          - ReviewCenter-UsersPage-Create
-          - ReviewCenter-UsersPage-NewPage
-          - ReviewCenter-UsersPage-Update
-          - ReviewCenter-UsersPage-Status
-          - ReviewCenter-UsersPage-SearchFilter
-          - ReviewCenter-UsersPage-DisableImpact
-          - ReviewCenter-UsersPage-Confirmations
-          - ReviewCenter-UsersPage-SystemAdmin
-          - ReviewCenter-UsersPage-LastAdmin
-          - ReviewCenter-UsersPage-AdminCheck
+          - ReviewCenter-App-Header-AccountLink
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Web-SignIn-Logout
+        title: >-
+          The Web subsystem shall show a logout button in the page header for a signed-in user.
+        justification: |
+          A user must be able to sign out from every page, for example on a shared computer.
+        children:
+          - ReviewCenter-App-Header-LogoutButton
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Web-SignIn-SignInLink
+        title: >-
+          The Web subsystem shall show a sign-in link in the page header when nobody is signed in.
+        justification: |
+          A visitor must find the way to sign in from every page.
+        children:
+          - ReviewCenter-App-Header-SignInLink
+
+      - id: ReviewCenter-Web-SignIn-LoginPage
+        title: >-
+          The Web subsystem shall serve a login page at /login with a user name and a password field.
+        justification: |
+          Users must be able to sign in with a local account in the web interface. The subsystem test covers the
+          page served over HTTP.
+        children:
+          - ReviewCenter-LoginPage-Form
+          - ReviewCenter-LoginPage-Form-Fields
+          - ReviewCenter-LoginPage-Form-PostTarget
+          - ReviewCenter-App-RouteAuthorization
+          - ReviewCenter-App-RouteAuthorization-AccessDenied
+          - ReviewCenter-App-RouteAuthorization-LoginLink
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Web-SignIn-LoginPage-Antiforgery
+        title: >-
+          The Web subsystem shall put an antiforgery token into the form of the login page.
+        justification: |
+          The antiforgery token stops another site from signing a user in to an account chosen by an attacker. The
+          token is added by the server when the page is served, so only the page requested over HTTP shows it.
+        tests:
+          - SignIn_LoginPage_Anonymous_FormPostsToSignInEndpointWithAntiforgeryToken
+
+      - id: ReviewCenter-Web-SignIn-LoginFailure
+        title: >-
+          The Web subsystem shall show a failed sign-in without revealing its reason.
+        justification: |
+          A page that tells whether the user name or the password was wrong helps somebody who guesses accounts.
+        children:
+          - ReviewCenter-LoginPage-Error
+          - ReviewCenter-LoginPage-Error-Throttled
+          - ReviewCenter-LoginPage-Error-ReturnAddress
+          - ReviewCenter-LoginPage-Error-ForeignAddress
+
+      - id: ReviewCenter-Web-SignIn-AccountPage
+        title: >-
+          The Web subsystem shall serve an account page at /account for a signed-in user.
+        justification: |
+          Account management is done in the web interface, so that no command line is needed after the first
+          administrator exists.
+        children:
+          - ReviewCenter-AccountPage-Show
+
+      - id: ReviewCenter-Web-SignIn-ChangePassword
+        title: >-
+          The Web subsystem shall let a signed-in user change the own password on the account page.
+        justification: |
+          A user must be able to replace a password that is old or that others may know, without asking anybody.
+        children:
+          - ReviewCenter-AccountPage-ChangePassword
+          - ReviewCenter-AccountPage-ChangePassword-ClearFields
+          - ReviewCenter-AccountPage-ChangePassword-RuleViolation
+          - ReviewCenter-AccountPage-ChangePassword-NothingChanged
+          - ReviewCenter-AccountPage-ChangePassword-CodeField
+          - ReviewCenter-AccountPage-ChangePassword-NoCodeField
+          - ReviewCenter-AccountPage-ChangePassword-CodeAccepted
+          - ReviewCenter-AccountPage-ChangePassword-RecoveryCode
+          - ReviewCenter-AccountPage-ChangePassword-MissingCode
+          - ReviewCenter-AccountPage-ChangePassword-WrongCode
+          - ReviewCenter-AccountPage-ChangePassword-ClearCode
+
+      - id: ReviewCenter-Web-SignIn-Appearance
+        title: >-
+          The Web subsystem shall let a signed-in user choose the appearance on the account page.
+        justification: |
+          Readers differ in what they can read comfortably, so the choice between the system, a light, and a dark
+          appearance belongs to the user.
+        children:
+          - ReviewCenter-AccountPage-Appearance
+          - ReviewCenter-AccountPage-Appearance-Default
+          - ReviewCenter-AccountPage-Appearance-Apply
+          - ReviewCenter-AccountPage-Appearance-BrowserOnly
+          - ReviewCenter-AccountPage-Appearance-StoredChoice
+          - ReviewCenter-App-Theme
+
+      - id: ReviewCenter-Web-SignIn-TemporaryPassword
+        title: >-
+          The Web subsystem shall show a user who signed in with a temporary password a banner and the password change
+          only.
+        justification: |
+          A temporary password is known to the person who set it, so the user must replace it before anything else.
+        children:
+          - ReviewCenter-AccountPage-TemporaryPassword
+          - ReviewCenter-AccountPage-TemporaryPassword-PasswordFormOnly
+          - ReviewCenter-AccountPage-TemporaryPassword-NormalSession
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+
+      - id: ReviewCenter-Web-SignIn-TemporaryHeader
+        title: >-
+          The Web subsystem shall keep the header of a temporary-password session free of navigation tabs.
+        justification: |
+          A tab that leads to a page that is replaced anyway would only confuse the user.
+        children:
+          - ReviewCenter-App-TemporaryPassword-NoTabs
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+
+      - id: ReviewCenter-Web-SignIn-TemporaryPages
+        title: >-
+          The Web subsystem shall replace every other page in a temporary-password session by the account page.
+        justification: |
+          The user must change the password first, so no other page may be reached until it is changed.
+        children:
+          - ReviewCenter-App-TemporaryPassword
+          - ReviewCenter-App-TemporaryPassword-OpenPages
+          - ReviewCenter-App-TemporaryPassword-LaterNavigation
+        tests:
           - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
           - MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose
+
+      - id: ReviewCenter-Web-SignIn-PasswordChanged
+        title: >-
+          The Web subsystem shall show a notice to sign in again on the login page after the temporary password was
+          changed.
+        justification: |
+          The change ends the session, and the user must be told why the login page appears.
+        children:
+          - ReviewCenter-LoginPage-PasswordChanged
+          - ReviewCenter-AccountPage-TemporaryPassword-SignInAgain
+        tests:
           - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
-          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-Web-SignIn-UsersPage
+        title: >-
+          The Web subsystem shall serve a users page at /users that lists the users to a system administrator.
+        justification: |
+          User management is done in the web interface, so that no command line is needed after the first
+          administrator exists.
+        children:
+          - ReviewCenter-UsersPage-List
+          - ReviewCenter-UsersPage-List-AdminOnly
+          - ReviewCenter-UsersPage-List-Controls
+          - ReviewCenter-UsersPage-List-NoRole
+          - ReviewCenter-UsersPage-SearchFilter
+          - ReviewCenter-UsersPage-SearchFilter-Status
+          - ReviewCenter-UsersPage-SearchFilter-Combined
+          - ReviewCenter-UsersPage-SearchFilter-NoReload
+          - ReviewCenter-UsersPage-Status
+          - ReviewCenter-UsersPage-Status-Temporary
+          - ReviewCenter-UsersPage-Status-LastSignIn
+          - ReviewCenter-UsersPage-Status-NeverSignedIn
+          - ReviewCenter-UsersPage-Status-UnlockButton
+          - ReviewCenter-UsersPage-Status-Unlock
+          - ReviewCenter-UsersPage-Status-UnlockOutcome
+          - ReviewCenter-App-UsersLink
+
+      - id: ReviewCenter-Web-SignIn-Enable
+        title: >-
+          The Web subsystem shall let a system administrator enable a user.
+        justification: |
+          An account that was disabled must be able to come back without a command line.
+        children:
+          - ReviewCenter-UsersPage-Update
+
+      - id: ReviewCenter-Web-SignIn-Disable
+        title: >-
+          The Web subsystem shall let a system administrator disable a user.
+        justification: |
+          A person who leaves must lose the access at once. The confirmation shows what the disabling affects.
+        children:
+          - ReviewCenter-UsersPage-Update
+          - ReviewCenter-UsersPage-DisableImpact
+          - ReviewCenter-UsersPage-DisableImpact-Projects
+          - ReviewCenter-UsersPage-DisableImpact-NothingWaiting
+          - ReviewCenter-UsersPage-DisableImpact-SecondClick
+          - ReviewCenter-UsersPage-DisableImpact-Cancel
+          - ReviewCenter-UsersPage-DisableImpact-LoadError
+          - ReviewCenter-UsersPage-DisableImpact-NoPanel
+
+      - id: ReviewCenter-Web-SignIn-MakeAdmin
+        title: >-
+          The Web subsystem shall let a system administrator make a user a system administrator.
+        justification: |
+          The administration of the tool needs more than one person.
+        children:
+          - ReviewCenter-UsersPage-SystemAdmin
+          - ReviewCenter-UsersPage-SystemAdmin-Outcome
+
+      - id: ReviewCenter-Web-SignIn-TakeAdmin
+        title: >-
+          The Web subsystem shall let a system administrator take the system administrator role away from a user.
+        justification: |
+          A role that is no longer needed must be able to go, but the tool keeps at least one enabled system
+          administrator.
+        children:
+          - ReviewCenter-UsersPage-SystemAdmin
+          - ReviewCenter-UsersPage-SystemAdmin-Outcome
+          - ReviewCenter-UsersPage-LastAdmin
+          - ReviewCenter-UsersPage-LastAdmin-NothingChanged
+
+      - id: ReviewCenter-Web-SignIn-SetPassword
+        title: >-
+          The Web subsystem shall let a system administrator set the password of a user.
+        justification: |
+          A user who lost the password must be able to get back in, and the confirmation says what the user has to do
+          next.
+        children:
+          - ReviewCenter-UsersPage-Update-SetPassword
+          - ReviewCenter-UsersPage-Update-PasswordCleared
+          - ReviewCenter-UsersPage-Update-TemporaryNotice
+          - ReviewCenter-UsersPage-Confirmations-PasswordExplained
+          - ReviewCenter-UsersPage-Confirmations-OwnPassword
+          - ReviewCenter-UsersPage-Confirmations-PasswordSecondClick
+          - ReviewCenter-UsersPage-Confirmations-PasswordCancel
+
+      - id: ReviewCenter-Web-SignIn-NewUser
+        title: >-
+          The Web subsystem shall serve a page at /users/new that creates users.
+        justification: |
+          Accounts are created in the web interface, so that no command line is needed after the first administrator
+          exists.
+        children:
+          - ReviewCenter-UsersPage-Create
+          - ReviewCenter-UsersPage-Create-PasswordCleared
+          - ReviewCenter-UsersPage-Create-Violation
+          - ReviewCenter-UsersPage-Create-NothingCreated
+          - ReviewCenter-UsersPage-NewPage
+          - ReviewCenter-UsersPage-NewPage-FormOnly
+          - ReviewCenter-UsersPage-NewPage-Cancel
+          - ReviewCenter-UsersPage-NewPage-Return
 
       - id: ReviewCenter-Web-SessionEnd
         title: >-
-          The Web subsystem shall make an open protected page, when its user is no longer valid, stop showing
-          data and stop offering actions by replacing the page with a message that the session has ended and a
-          link to the login page, and shall refuse every action that changes something on a protected page, with a
-          message and without saving anything, once the sign-in state of the page has ended, and, until then,
-          refuse every action of a user administration page that is no longer made by an enabled administrator.
+          The Web subsystem shall replace an open protected page whose user is no longer valid by a message that the
+          session has ended, with a link to the login page.
         justification: |
-          A page that stays open makes no request, so a user who was disabled, removed, or given another role
-          would otherwise keep seeing and changing review data until the page is reloaded. The page is replaced
-          once the sign-in state of the page ends, which happens at most one revalidation interval after the
-          change; the header is served once and keeps the old name until the next navigation. An event that was
-          already queued when the state ended can still reach a handler of the replaced page, so every handler
-          that changes something asks for the current user first, even where its service takes no actor yet. The
-          component tests of the page units cover the live pages, because ending an open page needs a live
-          connection. On the pages of a project, the message is the one for a project that does not exist,
-          because the access check that runs first finds no signed-in user.
+          A page that stays open makes no request, so a user who was disabled, removed, or given another role would
+          otherwise keep seeing and changing review data until the page is reloaded. The page is replaced once the
+          sign-in state of the page ends, and the component tests of the page units cover the live pages.
         children:
           - ReviewCenter-App-SessionGate
-          - ReviewCenter-UsersPage-AdminCheck
+          - ReviewCenter-App-SessionGate-Ended
+          - ReviewCenter-App-SessionGate-LoginLink
+          - ReviewCenter-App-SessionGate-NoContent
         tests:
           - ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions
           - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
+
+      - id: ReviewCenter-Web-SessionEnd-ChangeRefused
+        title: >-
+          The Web subsystem shall refuse every action that changes something on a protected page with a message once
+          the sign-in state of the page has ended.
+        justification: |
+          An event that was already queued when the state ended can still reach a handler of the replaced page, so
+          every handler that changes something asks for the current user first. On the pages of a project, the message
+          is the one for a project that does not exist.
+        tests:
           - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
           - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing
           - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
 
+      - id: ReviewCenter-Web-SessionEnd-NothingChanged
+        title: >-
+          The Web subsystem shall save nothing when an action is refused because the sign-in state of the page has
+          ended.
+        justification: |
+          A refused action that still saved something would let a user who is no longer valid change the record.
+        tests:
+          - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing
+          - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+
+      - id: ReviewCenter-Web-SessionEnd-UserAdminRefused
+        title: >-
+          The Web subsystem shall refuse every action of a user administration page that is no longer made by an
+          enabled administrator.
+        justification: |
+          A user who was demoted must not keep managing users through a page that stays open.
+        children:
+          - ReviewCenter-UsersPage-AdminCheck
+          - ReviewCenter-UsersPage-AdminCheck-NotSignedIn
+          - ReviewCenter-UsersPage-AdminCheck-NothingChanged
+          - ReviewCenter-UsersPage-AdminCheck-CreateAction
+        tests:
+          - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
+
       - id: ReviewCenter-Web-TestIds
         title: >-
-          The Web subsystem shall give every interactive element (link, button, input, select, and text area) of
-          every page a stable, lowercase hyphenated data-testid attribute that is unique within the page (the
-          breadcrumb links are distinct from the header tabs), so that automated tests and the
-          Puppet tool can address it without depending on its text or layout.
+          The Web subsystem shall give every interactive element (link, button, input, select, and text area) of every
+          page a stable data-testid attribute.
         justification: |
-          Tests that locate elements by visible text or position break whenever wording or layout changes. A
-          stable identifier on every interactive element keeps the automated tests and the Puppet tool working
-          as the pages evolve, and a repeated identifier would make a selector match the wrong element.
+          Tests that locate elements by visible text or position break whenever wording or layout changes. A stable
+          identifier on every interactive element keeps the automated tests and the Puppet tool working as the pages
+          evolve.
         tests:
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
-          - WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct
           - ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId
           - ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-Web-TestIds-Format
+        title: >-
+          The Web subsystem shall write each data-testid in lowercase hyphenated form.
+        justification: |
+          A single form lets automated tests and the Puppet tool address an element without guessing its spelling.
+        tests:
+          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-Web-TestIds-Unique
+        title: >-
+          The Web subsystem shall keep each data-testid unique within the page, with the breadcrumb links distinct from
+          the header tabs.
+        justification: |
+          A repeated identifier would make a selector match the wrong element.
+        tests:
+          - WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct
 
       - id: ReviewCenter-Web-AuditHistory
         title: >-
           The Web subsystem shall show every signed-in user who may see the project of a review the audit entries of
-          the review, newest first, 50 to a
-          page, on a history page that is reached from the review, with all text shown as plain text.
+          that review on a history page.
         justification: |
           Participants need to see who did what to a review and when, from the review itself.
         children:
           - ReviewCenter-HistoryPage-Display
-          - ReviewCenter-HistoryPage-Paging
           - ReviewCenter-HistoryPage-Access
-          - ReviewCenter-ReviewPage-HistoryLink
         tests:
           - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
           - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries
 
+      - id: ReviewCenter-Web-AuditHistory-Newest
+        title: >-
+          The Web subsystem shall show the audit entries of a review newest first.
+        justification: |
+          The latest change is what a reader looks for first.
+        children:
+          - ReviewCenter-HistoryPage-Display
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+
+      - id: ReviewCenter-Web-AuditHistory-Paging
+        title: >-
+          The Web subsystem shall show the audit entries of a review 50 to a page.
+        justification: |
+          A long history must stay quick to load and easy to read.
+        children:
+          - ReviewCenter-HistoryPage-Paging
+
+      - id: ReviewCenter-Web-AuditHistory-Link
+        title: >-
+          The Web subsystem shall let a user reach the history page from the review page.
+        justification: |
+          The history belongs to the review, so it is reached from the review.
+        children:
+          - ReviewCenter-ReviewPage-HistoryLink
+
+      - id: ReviewCenter-Web-AuditHistory-PlainText
+        title: >-
+          The Web subsystem shall show all text of the audit entries as plain text.
+        justification: |
+          Entries contain text that users typed, and markup in it must not be interpreted.
+        children:
+          - ReviewCenter-HistoryPage-Access
+
       - id: ReviewCenter-Web-AuditPage
         title: >-
-          The Web subsystem shall show system administrators the whole audit trail on an audit page
-          that is reached from the header, and let them verify the hash chain and read the entry count and the head
-          hash of an intact chain or the first broken entry, and shall let them narrow the trail by project, actor,
-          action, review, and date, shall offer, to whoever sees an audit page, links that export what the filter
-          matches as CSV or JSON, and shall show whoever may read the audit trail of a project, a system
-          administrator or a project admin of it, and nobody else, the audit trail of that project only on a page
-          that is reached from the project page.
+          The Web subsystem shall show system administrators the whole audit trail on an audit page, and nobody else.
         justification: |
-          The whole trail names every user and action. The head hash is what a system administrator records outside
-          the database to detect the later removal of the newest entries. Project admins answer for their project, so
-          they see its trail, and only that.
+          The whole trail names every user and action, so only the people who run the tool may read all of it.
         children:
           - ReviewCenter-AuditPage-Display
-          - ReviewCenter-AuditPage-ShortHash
-          - ReviewCenter-AuditPage-Verify
           - ReviewCenter-AuditPage-Admin
-          - ReviewCenter-AuditPage-ProjectView
-          - ReviewCenter-AuditPage-Filter
           - ReviewCenter-AuditPage-Paging
-          - ReviewCenter-AuditPage-Export
+          - ReviewCenter-AuditPage-ShortHash
+        tests:
+          - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+
+      - id: ReviewCenter-Web-AuditPage-HeaderLink
+        title: >-
+          The Web subsystem shall let a system administrator reach the audit page from the header.
+        justification: |
+          The audit trail is checked often by those who run the tool, so it needs a place in the header.
+        children:
           - ReviewCenter-App-AuditLink
+
+      - id: ReviewCenter-Web-AuditPage-Verify
+        title: >-
+          The Web subsystem shall let a system administrator verify the hash chain of the audit trail.
+        justification: |
+          A trail that cannot be checked proves nothing, so the check is offered next to the trail.
+        children:
+          - ReviewCenter-AuditPage-Verify
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
-          - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+
+      - id: ReviewCenter-Web-AuditPage-Intact
+        title: >-
+          The Web subsystem shall show the entry count and the head hash of an intact chain.
+        justification: |
+          The head hash is what a system administrator records outside the database to detect the later removal of the
+          newest entries.
+        children:
+          - ReviewCenter-AuditPage-Verify
+        tests:
+          - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
+
+      - id: ReviewCenter-Web-AuditPage-Broken
+        title: >-
+          The Web subsystem shall show the first broken entry of a broken chain.
+        justification: |
+          A system administrator who learns that the trail was altered needs to know where to look first.
+        children:
+          - ReviewCenter-AuditPage-Verify
+
+      - id: ReviewCenter-Web-AuditPage-Filter
+        title: >-
+          The Web subsystem shall let a system administrator narrow the audit trail by project, actor, action, review,
+          and date.
+        justification: |
+          A trail is read to answer a question, and the question names a project, a person, an action, or a time.
+        children:
+          - ReviewCenter-AuditPage-Filter
+
+      - id: ReviewCenter-Web-AuditPage-ExportCsv
+        title: >-
+          The Web subsystem shall offer to whoever sees an audit page a link that exports what the filter matches as
+          CSV.
+        justification: |
+          An auditor must be able to take the trail into a spreadsheet.
+        children:
+          - ReviewCenter-AuditPage-Export
+
+      - id: ReviewCenter-Web-AuditPage-ExportJson
+        title: >-
+          The Web subsystem shall offer to whoever sees an audit page a link that exports what the filter matches as
+          JSON.
+        justification: |
+          An auditor must be able to take the trail into a tool that reads structured data.
+        children:
+          - ReviewCenter-AuditPage-Export
+
+      - id: ReviewCenter-Web-AuditPage-ProjectTrail
+        title: >-
+          The Web subsystem shall show whoever may read the audit trail of a project, a system administrator or a
+          project admin of it, the trail of that project only, on a page that is reached from the project page.
+        justification: |
+          Project admins answer for their project, so they see its trail, and only that.
+        children:
+          - ReviewCenter-AuditPage-ProjectView
+        tests:
           - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
+
+      - id: ReviewCenter-Web-AuditPage-ProjectTrailOnly
+        title: >-
+          The Web subsystem shall show nobody else the audit trail of a project.
+        justification: |
+          The trail of a project names its members and their actions, so it is not for other users.
+        children:
+          - ReviewCenter-AuditPage-ProjectView
 
       - id: ReviewCenter-Web-Repositories
         title: >-
-          The Web subsystem shall let whoever manages a project, a system administrator or a project admin of it,
-          and nobody else, register, change, disable, and enable the git repositories of that project on a
-          repositories page at /projects/{project}/repositories that is reached from the project page, and set,
-          replace, or clear the token of a repository without it ever being shown again, and shall have no
-          registry of repositories outside the projects.
+          The Web subsystem shall serve a repositories page at /projects/{project}/repositories, reached from the
+          project page, to whoever manages the project.
         justification: |
-          A repository belongs to one project and controls what source code the server reads for it, and the
-          repository holds secrets. A token that can be read back from a page can be copied or leaked, so it is
-          write-only. A user who may not manage the project is shown the page of a project that does not exist,
-          so the page does not reveal a project to its members or to other users.
+          A repository belongs to one project and controls what source code the server reads for it. A user who may
+          not manage the project is shown the page of a project that does not exist, so the page does not reveal a
+          project to its members or to other users.
         children:
           - ReviewCenter-RepositoriesPage-Display
-          - ReviewCenter-RepositoriesPage-Create
-          - ReviewCenter-RepositoriesPage-AddPage
-          - ReviewCenter-RepositoriesPage-Edit
-          - ReviewCenter-RepositoriesPage-Enable
-          - ReviewCenter-RepositoriesPage-Admin
+          - ReviewCenter-RepositoriesPage-Display-ProjectOnly
+          - ReviewCenter-RepositoriesPage-Display-OptionalFields
+          - ReviewCenter-RepositoriesPage-Display-NoDelete
           - ReviewCenter-ProjectPage-RepositoriesLink
-          - ReviewCenter-App-NoRepositoriesLink
         tests:
           - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
+
+      - id: ReviewCenter-Web-Repositories-Register
+        title: >-
+          The Web subsystem shall let whoever manages a project register a git repository of that project, optionally
+          with a token.
+        justification: |
+          The server reads source code only from repositories that the people who manage the project registered.
+        children:
+          - ReviewCenter-RepositoriesPage-Create
+          - ReviewCenter-RepositoriesPage-Create-Optional
+          - ReviewCenter-RepositoriesPage-Create-Violation
+          - ReviewCenter-RepositoriesPage-Create-NothingCreated
+          - ReviewCenter-RepositoriesPage-AddPage
+          - ReviewCenter-RepositoriesPage-AddPage-NoFormOnList
+          - ReviewCenter-RepositoriesPage-AddPage-FormOnly
+          - ReviewCenter-RepositoriesPage-AddPage-Cancel
+          - ReviewCenter-RepositoriesPage-AddPage-Return
+        tests:
           - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-Web-Repositories-Change
+        title: >-
+          The Web subsystem shall let whoever manages a project change a repository.
+        justification: |
+          A repository moves or is renamed, and the registration must follow without a new one.
+        children:
+          - ReviewCenter-RepositoriesPage-Edit
+          - ReviewCenter-RepositoriesPage-Edit-KeepToken
+          - ReviewCenter-RepositoriesPage-Edit-Cancel
+
+      - id: ReviewCenter-Web-Repositories-Disable
+        title: >-
+          The Web subsystem shall let whoever manages a project disable a repository.
+        justification: |
+          A repository that must no longer be read can be switched off without losing its registration.
+        children:
+          - ReviewCenter-RepositoriesPage-Enable
+
+      - id: ReviewCenter-Web-Repositories-Enable
+        title: >-
+          The Web subsystem shall let whoever manages a project enable a repository.
+        justification: |
+          A repository that was switched off must be able to come back.
+        children:
+          - ReviewCenter-RepositoriesPage-Enable
+
+      - id: ReviewCenter-Web-Repositories-TokenReplace
+        title: >-
+          The Web subsystem shall let whoever manages a project replace the token of a repository.
+        justification: |
+          A token expires or leaks, and it must be replaceable without registering the repository again.
+        children:
+          - ReviewCenter-RepositoriesPage-Edit-ReplaceToken
+
+      - id: ReviewCenter-Web-Repositories-TokenClear
+        title: >-
+          The Web subsystem shall let whoever manages a project clear the token of a repository.
+        justification: |
+          A repository that no longer needs a token must not keep a secret that nobody uses.
+        children:
+          - ReviewCenter-RepositoriesPage-Edit-ClearToken
+
+      - id: ReviewCenter-Web-Repositories-TokenHidden
+        title: >-
+          The Web subsystem shall never show a stored repository token again.
+        justification: |
+          A token that can be read back from a page can be copied or leaked, so it is write-only.
+        children:
+          - ReviewCenter-RepositoriesPage-Display-NoToken
+          - ReviewCenter-RepositoriesPage-Edit-NoStoredToken
+          - ReviewCenter-RepositoriesPage-Create-TokenCleared
+        tests:
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-Web-Repositories-NoRegistry
+        title: >-
+          The Web subsystem shall have no registry of repositories outside the projects.
+        justification: |
+          A repository belongs to one project, so no page lists the repositories of all projects.
+        children:
+          - ReviewCenter-App-NoRepositoriesLink
+          - ReviewCenter-HomePage-AdminLinks-NoRepositories
 
       - id: ReviewCenter-Web-RepositoryReviews
         title: >-
-          The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
-          the enabled repositories of the project by name, with a head revision, an optional baseline revision, and a
-          selection, show
-          the reason when it cannot be created, and show on the review page the change kind of each file, the source,
-          and for a file of a review with a baseline a choice between the Diff view, the Head version (not for a
-          deleted file) and a read-only Baseline version (not for an added file).
+          The Web subsystem shall let a user create a review from a git repository on the project page, with a head
+          revision, an optional baseline revision, and a selection.
         justification: |
-          Reviewing a change means seeing what it replaces. The page keeps the full texts one click away and never
-          shows how the server reaches the repository.
+          Reviewing a change means seeing what it replaces, so a review can start from a repository and a baseline.
         children:
-          - ReviewCenter-ProjectPage-SourceChoice
           - ReviewCenter-ProjectPage-RepositoryForm
-          - ReviewCenter-ProjectPage-RepositoryError
-          - ReviewCenter-ReviewPage-Source
-          - ReviewCenter-ReviewPage-Versions
         tests:
           - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+
+      - id: ReviewCenter-Web-RepositoryReviews-EnabledOnly
+        title: >-
+          The Web subsystem shall offer, for the source of a new review, the enabled repositories of the project by
+          name.
+        justification: |
+          A disabled repository must not be read, and the page never shows how the server reaches a repository.
+        children:
+          - ReviewCenter-ProjectPage-SourceChoice
+
+      - id: ReviewCenter-Web-RepositoryReviews-Reason
+        title: >-
+          The Web subsystem shall show the reason when a review from a repository cannot be created.
+        justification: |
+          A user who is refused must be told why, in words and not as raw git output.
+        children:
+          - ReviewCenter-ProjectPage-RepositoryError
+
+      - id: ReviewCenter-Web-RepositoryReviews-ChangeKind
+        title: >-
+          The Web subsystem shall show on the review page the change kind of each file.
+        justification: |
+          A reviewer must see at once which files were added, changed, or deleted.
+        children:
+          - ReviewCenter-ReviewPage-Source
+
+      - id: ReviewCenter-Web-RepositoryReviews-Source
+        title: >-
+          The Web subsystem shall show on the review page the source of the review.
+        justification: |
+          A reader must know which repository and revisions the review is about.
+        children:
+          - ReviewCenter-ReviewPage-Source
+        tests:
+          - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+
+      - id: ReviewCenter-Web-RepositoryReviews-DiffView
+        title: >-
+          The Web subsystem shall offer, for a file of a review with a baseline, a choice of the Diff view.
+        justification: |
+          Reviewing a change means seeing what it replaces.
+        children:
+          - ReviewCenter-ReviewPage-Versions
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-RepositoryReviews-HeadVersion
+        title: >-
+          The Web subsystem shall offer, for a file of a review with a baseline, the Head version, and not for a
+          deleted file.
+        justification: |
+          The page keeps the full text one click away, and a deleted file has no head version to show.
+        children:
+          - ReviewCenter-ReviewPage-Versions
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-RepositoryReviews-BaselineVersion
+        title: >-
+          The Web subsystem shall offer, for a file of a review with a baseline, a read-only Baseline version, and not
+          for an added file.
+        justification: |
+          The page keeps the replaced text one click away, and an added file has no baseline version to show.
+        children:
+          - ReviewCenter-ReviewPage-Versions
+        tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
       - id: ReviewCenter-Web-DiffReview
         title: >-
           The Web subsystem shall show a changed file of a review from a repository as a side-by-side diff on the
-          review page, with the unchanged lines collapsed, let a signed-in user comment on a line of either version
-          and read the threads under their rows, say in plain words when a comparison cannot be shown, and keep the
-          diff inside the width of a phone by stacking its two sides.
+          review page.
         justification: |
-          Reviewers judge a change by reading what changed. The subsystem test guards the stylesheet rules that keep
-          the page from scrolling sideways; the interactions need a live connection and are verified by the
-          component tests of the page unit.
+          Reviewers judge a change by reading what changed.
         children:
           - ReviewCenter-ReviewPage-Diff
-          - ReviewCenter-ReviewPage-DiffStates
-          - ReviewCenter-ReviewPage-DiffComment
-          - ReviewCenter-ReviewPage-DiffThreads
-          - ReviewCenter-ReviewPage-DiffLayout
         tests:
-          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-DiffReview-Collapsed
+        title: >-
+          The Web subsystem shall collapse the unchanged lines of a diff.
+        justification: |
+          The lines that did not change would bury the lines that did.
+        children:
+          - ReviewCenter-ReviewPage-Diff
+
+      - id: ReviewCenter-Web-DiffReview-LineComment
+        title: >-
+          The Web subsystem shall let a signed-in user comment on a line of either version of a diff.
+        justification: |
+          A comment belongs to the line that it is about, whether the line is in the old or the new version. The
+          subsystem tests guard the stylesheet rules that show the comment control.
+        children:
+          - ReviewCenter-ReviewPage-DiffComment
+        tests:
           - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
           - WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill
 
+      - id: ReviewCenter-Web-DiffReview-LineThreads
+        title: >-
+          The Web subsystem shall show the threads of a diff under their rows.
+        justification: |
+          A reader sees the discussion next to the line that it is about.
+        children:
+          - ReviewCenter-ReviewPage-DiffThreads
+
+      - id: ReviewCenter-Web-DiffReview-Unavailable
+        title: >-
+          The Web subsystem shall say in plain words when a comparison cannot be shown.
+        justification: |
+          A reader who sees no diff must be told why instead of seeing an empty page.
+        children:
+          - ReviewCenter-ReviewPage-DiffStates
+
+      - id: ReviewCenter-Web-DiffReview-PhoneLayout
+        title: >-
+          The Web subsystem shall keep a diff inside the width of a phone by stacking its two sides.
+        justification: |
+          A page that scrolls sideways is hard to read on a phone. The subsystem test guards the stylesheet rules that
+          keep the code scrolling inside itself.
+        children:
+          - ReviewCenter-ReviewPage-DiffLayout
+        tests:
+          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+
       - id: ReviewCenter-Web-DeepLinks
         title: >-
-          The Web subsystem shall give every file, line and thread of a review a stable address that opens the review
-          page at that place, keep the address bar equal to what is shown as the reader chooses files and threads,
-          and bring a signed-out visitor back to the same address after signing in.
+          The Web subsystem shall give every file, line, and thread of a review a stable address that opens the review
+          page at that place.
         justification: |
           Review is a conversation between people, so a reviewer must be able to point a colleague at one file, one
-          line or one thread by sending a link, and the link must still work after a sign-in or a reload.
+          line, or one thread by sending a link. The subsystem test guards the style of the link to a thread.
         children:
           - ReviewCenter-ReviewPage-DeepLinks
           - ReviewCenter-ReviewPage-DeepLinksNotFound
+        tests:
+          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
+
+      - id: ReviewCenter-Web-DeepLinks-AddressBar
+        title: >-
+          The Web subsystem shall keep the address bar equal to what is shown as the reader chooses files and threads.
+        justification: |
+          A link that the reader copies from the address bar must open what the reader sees.
+        children:
+          - ReviewCenter-ReviewPage-DeepLinks
+
+      - id: ReviewCenter-Web-DeepLinks-ReturnAfterSignIn
+        title: >-
+          The Web subsystem shall bring a signed-out visitor back to the same address after signing in.
+        justification: |
+          The link must still work after a sign-in, so the address survives the login page.
+        children:
           - ReviewCenter-SignIn-ReturnDeepLink
         tests:
           - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
-          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-
-          The Web subsystem shall let a user plan the reviews a head revision of a repository of the project needs on
-          a plan page that is reached from the project page, showing one plain summary, the sets that need a review
-          ticked first and the sets with nothing to review collapsed, creating the ticked reviews with a result per
-          review, explaining every failure in plain English, and showing on the review page the review-set a
-          planned review belongs to.
+          The Web subsystem shall let a user plan the reviews that a head revision of a repository of the project needs
+          on a plan page that is reached from the project page.
         justification: |
-          Planning is useful only when a user can read the answer at a glance and knows what to do next. The page
-          therefore leads with the sets that need action, hides the rest, and never shows raw git output.
+          Planning is useful only when a user can start it from the project and read the answer without raw git output.
         children:
           - ReviewCenter-PlanPage-Form
-          - ReviewCenter-PlanPage-Summary
-          - ReviewCenter-PlanPage-Rows
-          - ReviewCenter-PlanPage-Create
-          - ReviewCenter-PlanPage-Error
           - ReviewCenter-PlanPage-State
           - ReviewCenter-PlanPage-Interactive
           - ReviewCenter-ProjectPage-PlanLink
           - ReviewCenter-HelpPage-PlanningTopic
-          - ReviewCenter-ReviewPage-ReviewSet
+          - ReviewCenter-HelpPage-PlanningTopic-Approved
+          - ReviewCenter-HelpPage-PlanningTopic-NoApproved
         tests:
           - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
 
+      - id: ReviewCenter-Web-PlanReviews-Summary
+        title: >-
+          The Web subsystem shall show one plain summary of the plan on the plan page.
+        justification: |
+          A user must read the answer at a glance.
+        children:
+          - ReviewCenter-PlanPage-Summary
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-Web-PlanReviews-Ordering
+        title: >-
+          The Web subsystem shall show the sets that need a review first and ticked on the plan page.
+        justification: |
+          The sets that need action are what the user came for, so they lead and are ready to be created.
+        children:
+          - ReviewCenter-PlanPage-Rows
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-Web-PlanReviews-EmptySets
+        title: >-
+          The Web subsystem shall show the sets with nothing to review collapsed on the plan page.
+        justification: |
+          Sets with nothing to do would bury the sets that need action.
+        children:
+          - ReviewCenter-PlanPage-Rows
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-Web-PlanReviews-Create
+        title: >-
+          The Web subsystem shall create the ticked reviews of a plan and show a result per review.
+        justification: |
+          The user must see which reviews were created and which were not.
+        children:
+          - ReviewCenter-PlanPage-Create
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+
+      - id: ReviewCenter-Web-PlanReviews-Failures
+        title: >-
+          The Web subsystem shall explain every failure of planning in plain English.
+        justification: |
+          Raw git output does not tell a user what to do next.
+        children:
+          - ReviewCenter-PlanPage-Error
+
+      - id: ReviewCenter-Web-PlanReviews-ReviewSet
+        title: >-
+          The Web subsystem shall show on the review page the review-set that a planned review belongs to.
+        justification: |
+          A reader of a planned review must see which set of files it covers.
+        children:
+          - ReviewCenter-ReviewPage-ReviewSet
+
       - id: ReviewCenter-Web-Attestation
         title: >-
-          The Web subsystem shall offer the signed attestation of a review on the review page only when the review is
-          approved, as a download of the PDF that says which kind of key will sign it, with a link to a help topic that
-          explains what the signature proves and what it does not, and shall show why it is unavailable instead of the
-          download when the signing key cannot be used.
+          The Web subsystem shall offer the signed attestation of a review on the review page as a download of the PDF
+          only when the review is approved.
         justification: |
-          A user who completes a review needs the evidence at hand and needs to know how much it is worth. The
-          reader of the user interface must see that the default key is not an organization key before taking the
+          A user who completes a review needs the evidence at hand, and a review that is not approved has none yet.
+        children:
+          - ReviewCenter-ReviewPage-Attestation
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-Web-Attestation-KeyNote
+        title: >-
+          The Web subsystem shall say next to the attestation download which kind of key will sign it.
+        justification: |
+          The reader of the user interface must see that the default key is not an organization key before taking the
           document anywhere.
         children:
           - ReviewCenter-ReviewPage-Attestation
-          - ReviewCenter-HelpPage-AttestationTopic
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-Web-Attestation-HelpLink
+        title: >-
+          The Web subsystem shall link from the attestation download to a help topic.
+        justification: |
+          A user needs to know how much the signature is worth before relying on it.
+        children:
+          - ReviewCenter-ReviewPage-Attestation
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-Web-Attestation-HelpTopic
+        title: >-
+          The Web subsystem shall explain in a help topic what the signature of the attestation proves and what it does
+          not.
+        justification: |
+          A signature that is read as more than it proves misleads those who rely on it.
+        children:
+          - ReviewCenter-HelpPage-AttestationTopic
+          - ReviewCenter-HelpPage-AttestationTopic-KeyChoice
+          - ReviewCenter-HelpPage-AttestationTopic-ExpiryWarning
+          - ReviewCenter-HelpPage-AttestationTopic-TrustedKey
+          - ReviewCenter-HelpPage-AttestationTopic-CodeSigning
+          - ReviewCenter-HelpPage-AttestationTopic-PdfContents
+          - ReviewCenter-HelpPage-AttestationTopic-Concluded
+          - ReviewCenter-HelpPage-AttestationTopic-Screenshot
+        tests:
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-Web-Attestation-Unavailable
+        title: >-
+          The Web subsystem shall show why the attestation is unavailable instead of the download when the signing key
+          cannot be used.
+        justification: |
+          A user who sees no download must be told why instead of looking for it.
+        children:
+          - ReviewCenter-ReviewPage-Attestation
 
       - id: ReviewCenter-Web-AccessTokens
         title: >-
-          The Web subsystem shall let a signed-in user manage personal access tokens on the account page, creating a
-          token and seeing its value once with a way to copy it, seeing the tokens with their expiry and last use,
-          and revoking a token, and shall explain the tokens and the API in a help topic that the account page links
-          to.
+          The Web subsystem shall let a signed-in user create a personal access token on the account page and see its
+          value once.
         justification: |
-          A token is made, read and taken back by its owner, so the page where the user already manages the account is
-          where it belongs, and a help topic next to it tells how a token is used and what it cannot do.
+          A token is made by its owner, so the page where the user already manages the account is where it belongs.
         children:
-          - ReviewCenter-AccountPage-TokensCard
           - ReviewCenter-AccountPage-TokenCreate
-          - ReviewCenter-AccountPage-TokenCopy
-          - ReviewCenter-AccountPage-TokenRevoke
-          - ReviewCenter-HelpPage-ApiTokensTopic
+          - ReviewCenter-AccountPage-TokenCreate-ValueOnce
+          - ReviewCenter-AccountPage-TokenCreate-Note
+          - ReviewCenter-AccountPage-TokenCreate-Listed
+          - ReviewCenter-AccountPage-TokenCreate-EmptyName
+          - ReviewCenter-AccountPage-TokenCreate-LimitReached
+          - ReviewCenter-AccountPage-TokenCreate-NothingCreated
         tests:
           - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-Web-AccessTokens-Copy
+        title: >-
+          The Web subsystem shall offer a way to copy the value of a new token.
+        justification: |
+          The value is shown once, so copying it must be easy.
+        children:
+          - ReviewCenter-AccountPage-TokenCopy
+          - ReviewCenter-AccountPage-TokenCopy-Hint
+          - ReviewCenter-AccountPage-TokenCopy-ValueKept
+
+      - id: ReviewCenter-Web-AccessTokens-List
+        title: >-
+          The Web subsystem shall show the tokens of the signed-in user with their expiry and last use.
+        justification: |
+          The owner decides from expiry and last use which token to keep and which to revoke.
+        children:
+          - ReviewCenter-AccountPage-TokensCard
+          - ReviewCenter-AccountPage-TokensCard-List
+          - ReviewCenter-AccountPage-TokensCard-NoValue
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-Web-AccessTokens-Revoke
+        title: >-
+          The Web subsystem shall let a signed-in user revoke a personal access token.
+        justification: |
+          A token that leaks or is no longer needed must be taken back by its owner.
+        children:
+          - ReviewCenter-AccountPage-TokenRevoke
+          - ReviewCenter-AccountPage-TokenRevoke-NoButton
+          - ReviewCenter-AccountPage-TokenRevoke-ExpiredToken
+        tests:
           - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
+
+      - id: ReviewCenter-Web-AccessTokens-HelpTopic
+        title: >-
+          The Web subsystem shall explain the personal access tokens and the API in a help topic.
+        justification: |
+          A help topic tells how a token is used and what it cannot do.
+        children:
+          - ReviewCenter-HelpPage-ApiTokensTopic
+          - ReviewCenter-HelpPage-ApiTokensTopic-Bearer
+          - ReviewCenter-HelpPage-ApiTokensTopic-Endpoints
+          - ReviewCenter-HelpPage-ApiTokensTopic-ReviewMark
+          - ReviewCenter-HelpPage-ApiTokensTopic-NeverSigns
+          - ReviewCenter-HelpPage-ApiTokensTopic-Errors
+        tests:
           - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-Web-AccessTokens-HelpLink
+        title: >-
+          The Web subsystem shall link from the account page to the help topic about the tokens.
+        justification: |
+          The help topic must be one click away from where the tokens are managed.
+        children:
+          - ReviewCenter-AccountPage-TokensCard-HelpLink
 
       - id: ReviewCenter-Web-EvidenceSettings
         title: >-
-          The Web subsystem shall let only whoever administers a project (a system administrator or a project admin of
-          it) open the evidence settings page of the project from an Evidence settings button on the project page, and
-          show anybody else the page of a project that does not exist; shall show there the switches for anonymous
-          access to the evidence index and the attestation PDFs and for the content of the PDFs, with the defaults,
-          the regulatory warnings, the summary of what is left out and the exposure warning shown as the switches are
-          changed; shall save the switches together, record the change in the audit trail of the project, and refuse a
-          save over a change made by someone else or after the right was lost; and shall explain the settings in a
-          help topic.
+          The Web subsystem shall let only whoever administers a project, a system administrator or a project admin of
+          it, open the evidence settings page of the project from an Evidence settings button on the project page.
         justification: |
           Opening evidence to anonymous readers and reducing what a PDF contains are decisions with regulatory
-          consequences, so they belong to the people who answer for the project, are shown with their consequences
-          before they are saved, and are accountable afterwards. The behavior needs a live connection, so it is
-          verified by the component tests of the units.
+          consequences, so they belong to the people who answer for the project. The behavior needs a live
+          connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsLink
           - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+        tests:
+          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+
+      - id: ReviewCenter-Web-EvidenceSettings-HiddenProject
+        title: >-
+          The Web subsystem shall show anybody else who opens the evidence settings page the page of a project that
+          does not exist.
+        justification: |
+          The page must not reveal a project to a user who may not administer it.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+        tests:
+          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+
+      - id: ReviewCenter-Web-EvidenceSettings-Switches
+        title: >-
+          The Web subsystem shall show on the evidence settings page the switches for anonymous access to the evidence
+          index and the attestation PDFs and for the content of the PDFs, with their defaults.
+        justification: |
+          The administrator must see the current state of every decision before changing it.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSwitches
-          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
-          - ReviewCenter-ProjectPage-EvidenceSettingsSave
-          - ReviewCenter-ProjectPage-EvidenceSettingsConflict
-          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost
-          - ReviewCenter-HelpPage-EvidenceSettingsTopic
         tests:
           - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
-          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+
+      - id: ReviewCenter-Web-EvidenceSettings-RegulatoryWarnings
+        title: >-
+          The Web subsystem shall show the regulatory warnings on the evidence settings page as the switches are
+          changed.
+        justification: |
+          The consequences of a decision are shown before it is saved.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+
+      - id: ReviewCenter-Web-EvidenceSettings-LeftOutSummary
+        title: >-
+          The Web subsystem shall show the summary of what is left out of the PDFs on the evidence settings page as the
+          switches are changed.
+        justification: |
+          The administrator must see what a reader of the PDF will miss.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+
+      - id: ReviewCenter-Web-EvidenceSettings-ExposureWarning
+        title: >-
+          The Web subsystem shall show the exposure warning on the evidence settings page as the switches are changed.
+        justification: |
+          The administrator must see what becomes readable without signing in.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+
+      - id: ReviewCenter-Web-EvidenceSettings-Save
+        title: >-
+          The Web subsystem shall save the evidence switches together.
+        justification: |
+          Switches that depend on each other must not be saved one by one.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave
+        tests:
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+
+      - id: ReviewCenter-Web-EvidenceSettings-Audit
+        title: >-
+          The Web subsystem shall record a change of the evidence switches in the audit trail of the project.
+        justification: |
+          Decisions with regulatory consequences must be accountable afterwards.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave
+        tests:
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+
+      - id: ReviewCenter-Web-EvidenceSettings-Conflict
+        title: >-
+          The Web subsystem shall refuse a save of the evidence switches over a change made by someone else.
+        justification: |
+          A save that overwrites a change nobody saw would undo a decision unnoticed.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsConflict
+
+      - id: ReviewCenter-Web-EvidenceSettings-RightLost
+        title: >-
+          The Web subsystem shall refuse a save of the evidence switches after the right to administer the project was
+          lost.
+        justification: |
+          A page that stays open must not let a user who lost the right keep deciding.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost
+
+      - id: ReviewCenter-Web-EvidenceSettings-Topic
+        title: >-
+          The Web subsystem shall explain the evidence settings in a help topic at /help/evidence-settings.
+        justification: |
+          The administrator needs the meaning of each switch before changing it.
+        children:
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-AnonymousSwitches
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-IndexAlone
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-ContentSwitches
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-ContentScope
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-AuditRecord
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic-Screenshots
+        tests:
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
 
       - id: ReviewCenter-Web-ChecklistTemplate
         title: >-
-          The Web subsystem shall let only whoever administers a project (a system administrator or a project admin of
-          it) open the checklist template page of the project from a Checklist button on the project page, and
-          show anybody else the page of a project that does not exist; shall show on the project page a line that says
-          which checklist new reviews start with; shall let the administrator export the current and the built-in
-          default checklist, import a definition by pasting or from a file, check it with every error and its path
-          shown, preview it and its differences from the current checklist, replace the checklist of the project after
-          a confirmation that says that existing reviews keep their checklist, and reset it to the built-in default;
-          shall record every change in the audit trail of the project, and refuse a change over a change made by
-          someone else or after the right was lost; and shall explain the template in a help topic.
+          The Web subsystem shall let only whoever administers a project, a system administrator or a project admin of
+          it, open the checklist template page of the project from a Checklist button on the project page.
         justification: |
-          The checklist is how a formal review shows what was examined, and projects in a regulated setting need their
-          own wording. Letting the people who answer for the project change it, with the consequences and the
-          differences shown before they confirm, with the existing reviews untouched, and accountable afterwards, makes
-          that possible without access to the server. The behavior needs a live connection, so it is verified by the
-          component tests of the units, and the whole journey by a system test.
+          The checklist is how a formal review shows what was examined, so changing it belongs to the people who answer
+          for the project. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-ChecklistLink
           - ReviewCenter-ProjectPage-ChecklistAccess
-          - ReviewCenter-ProjectPage-ChecklistExport
-          - ReviewCenter-ProjectPage-ChecklistImport
-          - ReviewCenter-ProjectPage-ChecklistPreview
-          - ReviewCenter-ProjectPage-ChecklistReplace
-          - ReviewCenter-ProjectPage-ChecklistReset
-          - ReviewCenter-ProjectPage-ChecklistConflict
-          - ReviewCenter-ProjectPage-ChecklistRightLost
-          - ReviewCenter-HelpPage-ChecklistTemplateTopic
         tests:
           - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
           - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+
+      - id: ReviewCenter-Web-ChecklistTemplate-HiddenProject
+        title: >-
+          The Web subsystem shall show anybody else who opens the checklist template page the page of a project that
+          does not exist.
+        justification: |
+          The page must not reveal a project to a user who may not administer it.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistAccess
+        tests:
+          - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+
+      - id: ReviewCenter-Web-ChecklistTemplate-StartLine
+        title: >-
+          The Web subsystem shall show on the project page a line that says which checklist new reviews start with.
+        justification: |
+          A user who creates a review must know which questions it will contain.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistLink
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ExportCurrent
+        title: >-
+          The Web subsystem shall let the administrator of a project export the current checklist of the project.
+        justification: |
+          An export is the starting point for a change and the way to keep a copy.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistExport
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ExportDefault
+        title: >-
+          The Web subsystem shall let the administrator of a project export the built-in default checklist.
+        justification: |
+          The default is the base of every own wording, so it must be available to start from.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistExport
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ImportPaste
+        title: >-
+          The Web subsystem shall let the administrator of a project import a checklist definition by pasting it.
+        justification: |
+          Pasting is the quickest way to bring in a definition.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistImport
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ImportFile
+        title: >-
+          The Web subsystem shall let the administrator of a project import a checklist definition from a file.
+        justification: |
+          A definition is kept as a file in a repository, so it must be taken from one.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistImport
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Validation
+        title: >-
+          The Web subsystem shall check an imported checklist definition and show every error with its path.
+        justification: |
+          An administrator must be able to correct all errors in one pass.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistImport
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Preview
+        title: >-
+          The Web subsystem shall show a preview of an imported checklist definition.
+        justification: |
+          The administrator sees how the checklist will look before it replaces the current one.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistPreview
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Differences
+        title: >-
+          The Web subsystem shall show the differences of an imported checklist definition from the current checklist.
+        justification: |
+          The administrator confirms a change knowing what changes.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistPreview
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Replace
+        title: >-
+          The Web subsystem shall let the administrator of a project replace the checklist of the project with an
+          imported definition.
+        justification: |
+          Projects in a regulated setting need their own wording without access to the server.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistReplace
+        tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Confirmation
+        title: >-
+          The Web subsystem shall ask for a confirmation before the checklist is replaced that says that existing
+          reviews keep their checklist.
+        justification: |
+          The administrator must know that the change does not touch reviews that are under way.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistReplace
+        tests:
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Reset
+        title: >-
+          The Web subsystem shall let the administrator of a project reset the checklist of the project to the built-in
+          default.
+        justification: |
+          An own wording that is no longer wanted must be able to go.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistReset
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Audit
+        title: >-
+          The Web subsystem shall record every change of the checklist in the audit trail of the project.
+        justification: |
+          The checklist shows what was examined, so a change of it must be accountable afterwards.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistReplace
+        tests:
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Conflict
+        title: >-
+          The Web subsystem shall refuse a change of the checklist over a change made by someone else.
+        justification: |
+          A change that overwrites a change nobody saw would undo it unnoticed.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistConflict
+
+      - id: ReviewCenter-Web-ChecklistTemplate-RightLost
+        title: >-
+          The Web subsystem shall refuse a change of the checklist after the right to administer the project was lost.
+        justification: |
+          A page that stays open must not let a user who lost the right keep changing the checklist.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistRightLost
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Topic
+        title: >-
+          The Web subsystem shall explain the checklist template in a help topic.
+        justification: |
+          The administrator needs to know how export, import, replacing, and resetting work and what they leave alone.
+        children:
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-ReviewsKeepCopy
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-Export
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-Import
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-VersionLabel
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-ReplaceReset
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-AuditRecord
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic-ExampleNotCompliant
+        tests:
           - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
 
       - id: ReviewCenter-Web-DueDate
         title: >-
           The Web subsystem shall let a user give a review an optional due date, stated as a calendar day in UTC, when
-          creating it from files, from a repository, or from a plan (one date for all the planned reviews and one for
-          each), show the due date in the header of a review with an Overdue badge while it is past and the review
-          is not approved, and let the administrators of the project and the creator of the review, and nobody else,
-          change or clear the date of a review that is not locked, showing the message of the rule when a date is
-          refused.
+          creating it from files.
         justification: |
-          A lead plans reviews with dates and must see at a glance which are late. The pages must state the time basis
-          so that nobody reads the date in another zone, and must not offer a change that the rules refuse. The
-          behavior needs a live connection, so it is verified by the component tests of the units, and the whole
-          journey by a system test.
+          A lead plans reviews with dates. The pages must state the time basis so that nobody reads the date in another
+          zone. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-NewReviewDueDate
-          - ReviewCenter-PlanPage-DueDate
-          - ReviewCenter-ReviewPage-DueDate
-          - ReviewCenter-ReviewPage-Overdue
         tests:
           - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
+
+      - id: ReviewCenter-Web-DueDate-Repository
+        title: >-
+          The Web subsystem shall let a user give a review an optional due date when creating it from a repository.
+        justification: |
+          A review from a repository is planned with a date as well.
+        children:
+          - ReviewCenter-ProjectPage-NewReviewDueDate
+
+      - id: ReviewCenter-Web-DueDate-PlanDefault
+        title: >-
+          The Web subsystem shall let a user give all the reviews of a plan one due date.
+        justification: |
+          Planned reviews usually share a date, so the user states it once.
+        children:
+          - ReviewCenter-PlanPage-DueDate
+        tests:
           - PlanPage_Create_DueDates_DefaultAndRowDate
+
+      - id: ReviewCenter-Web-DueDate-PlanRow
+        title: >-
+          The Web subsystem shall let a user give each review of a plan its own due date.
+        justification: |
+          One review of a plan may be due earlier than the others.
+        children:
+          - ReviewCenter-PlanPage-DueDate
+        tests:
+          - PlanPage_Create_DueDates_DefaultAndRowDate
+
+      - id: ReviewCenter-Web-DueDate-Header
+        title: >-
+          The Web subsystem shall show the due date of a review in its header, stated as a calendar day in UTC.
+        justification: |
+          A reader must see when a review is due and in which time basis.
+        children:
+          - ReviewCenter-ReviewPage-DueDate
+        tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-Web-DueDate-Overdue
+        title: >-
+          The Web subsystem shall show an Overdue badge next to the due date while the date is past and the review is
+          not approved.
+        justification: |
+          A lead must see at a glance which reviews are late.
+        children:
+          - ReviewCenter-ReviewPage-Overdue
+        tests:
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+
+      - id: ReviewCenter-Web-DueDate-Change
+        title: >-
+          The Web subsystem shall let the administrators of the project and the creator of the review, and nobody
+          else, change the due date of a review that is not locked.
+        justification: |
+          The date is a commitment, so only those who answer for the review may move it, and a locked review is
+          closed.
+        children:
+          - ReviewCenter-ReviewPage-DueDate
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-Web-DueDate-Clear
+        title: >-
+          The Web subsystem shall let the same users clear the due date of a review that is not locked.
+        justification: |
+          A date that no longer applies must be able to go.
+        children:
+          - ReviewCenter-ReviewPage-DueDate
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-Web-DueDate-Refused
+        title: >-
+          The Web subsystem shall show the message of the rule when a due date is refused.
+        justification: |
+          A user who is refused must be told why and must not be offered a change that the rules refuse.
+        children:
+          - ReviewCenter-ReviewPage-DueDate
+        tests:
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
 
       - id: ReviewCenter-Web-Progress
         title: >-
-          The Web subsystem shall show on the project page, for every review, its stage, its signatures, including those
-          that need to be given again, what blocks it, the people it waits on, its last activity, and its due date with
-          the Overdue badge, a summary of the reviews by stage and the overdue ones, filters by stage, overdue, blocked,
-          and text, sortable columns, and 25 reviews to a page, keep all of it in the query string, and show the same
-          to a read-only auditor of the project and nothing to a user outside it.
+          The Web subsystem shall show on the project page, for every review, its stage.
         justification: |
-          The project page is where a lead starts. It has to show who is holding each review up and let the lead
-          narrow and order the list, with a link that others can open. The behavior needs a live connection, so it is
-          verified by the component tests of the unit, and the whole journey by a system test.
+          The project page is where a lead starts. It has to show who is holding each review up. The behavior needs a
+          live connection, so it is verified by the component tests of the unit.
         children:
           - ReviewCenter-ProjectPage-Progress
-          - ReviewCenter-ProjectPage-Summary
-          - ReviewCenter-ProjectPage-ProgressFilter
-          - ReviewCenter-ProjectPage-ProgressSort
-          - ReviewCenter-ProjectPage-ReadOnly
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
-          - ProjectPage_Render_QueryFilters_NarrowTheTable
-          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+
+      - id: ReviewCenter-Web-Progress-Signatures
+        title: >-
+          The Web subsystem shall show on the project page, for every review, its signatures, including those that need
+          to be given again.
+        justification: |
+          A lead must see who has signed and who has to sign again.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-Blockers
+        title: >-
+          The Web subsystem shall show on the project page, for every review, what blocks it.
+        justification: |
+          A lead must see what stands between a review and its approval.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-WaitingOn
+        title: >-
+          The Web subsystem shall show on the project page, for every review, the people it waits on.
+        justification: |
+          A lead must see who is holding each review up.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-LastActivity
+        title: >-
+          The Web subsystem shall show on the project page, for every review, its last activity.
+        justification: |
+          A review that has been quiet for long needs a nudge.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+        tests:
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-Web-Progress-DueDate
+        title: >-
+          The Web subsystem shall show on the project page, for every review, its due date with the Overdue badge.
+        justification: |
+          A lead must see which reviews are late without opening them.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-Web-Progress-Summary
+        title: >-
+          The Web subsystem shall show on the project page a summary of the reviews by stage and the overdue ones.
+        justification: |
+          A lead reads the state of the project before reading the table.
+        children:
+          - ReviewCenter-ProjectPage-Summary
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-Filters
+        title: >-
+          The Web subsystem shall let a user filter the reviews of the project page by stage, overdue, blocked, and
+          text.
+        justification: |
+          A lead narrows the list to what needs attention.
+        children:
+          - ReviewCenter-ProjectPage-ProgressFilter
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-Web-Progress-Sorting
+        title: >-
+          The Web subsystem shall let a user sort the reviews of the project page by a column of the table.
+        justification: |
+          A lead orders the list by what matters at the moment.
+        children:
+          - ReviewCenter-ProjectPage-ProgressSort
+
+      - id: ReviewCenter-Web-Progress-Paging
+        title: >-
+          The Web subsystem shall show the reviews of the project page 25 to a page.
+        justification: |
+          A project with many reviews must stay quick to load and easy to read.
+        children:
+          - ReviewCenter-ProjectPage-ProgressSort
+
+      - id: ReviewCenter-Web-Progress-QueryString
+        title: >-
+          The Web subsystem shall keep the filters, the sort, and the page of the project page in the query string.
+        justification: |
+          A link that others can open must show the same list.
+        children:
+          - ReviewCenter-ProjectPage-ProgressSort
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-Web-Progress-AuditorView
+        title: >-
+          The Web subsystem shall show the same project page to a read-only auditor of the project.
+        justification: |
+          An auditor must be able to read the progress of the project.
+        children:
+          - ReviewCenter-ProjectPage-ReadOnly
+        tests:
+          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+
+      - id: ReviewCenter-Web-Progress-OutsiderView
+        title: >-
+          The Web subsystem shall show nothing of the project page to a user outside the project.
+        justification: |
+          The page must not reveal a project to a user who may not see it.
+        children:
+          - ReviewCenter-ProjectPage-ReadOnly
+        tests:
+          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
 
       - id: ReviewCenter-Web-FollowUp
         title: >-
-          The Web subsystem shall let a user create a review as a follow-up of an earlier review of the project from
-          the page for a new review, with a preview of what is carried over and a confirmation before open threads are
-          dropped, show on the checklist of a follow-up which answers and section states were carried and from which
-          review, show the earlier Fail of a check that is open again, and show on the review page what a review
-          follows, what follows it and which threads were carried.
+          The Web subsystem shall let a user create a review as a follow-up of an earlier review of the project from the
+          page for a new review.
         justification: |
           Carrying work over only helps when the people see what was carried, from where, and what they still have to
-          decide. The behavior needs a live connection, so it is verified by the component tests of the units, and the
-          whole journey by a system test.
+          decide. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-FollowUp
-          - ReviewCenter-ChecklistPage-CarriedMarks
-          - ReviewCenter-ReviewPage-FollowUp
         tests:
           - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-Web-FollowUp-Preview
+        title: >-
+          The Web subsystem shall show a preview of what is carried over before a follow-up is created.
+        justification: |
+          The user must see what the follow-up takes over before creating it.
+        children:
+          - ReviewCenter-ProjectPage-FollowUp
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-Web-FollowUp-DropConfirmation
+        title: >-
+          The Web subsystem shall ask for a confirmation before open threads are dropped from a follow-up.
+        justification: |
+          Open discussion must not be lost by a single click.
+        children:
+          - ReviewCenter-ProjectPage-FollowUp
+
+      - id: ReviewCenter-Web-FollowUp-CarriedMarks
+        title: >-
+          The Web subsystem shall show on the checklist of a follow-up which answers and section states were carried
+          and from which review.
+        justification: |
+          The reviewers must see what they inherited and from where.
+        children:
+          - ReviewCenter-ChecklistPage-CarriedMarks
+        tests:
           - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-Web-FollowUp-EarlierFail
+        title: >-
+          The Web subsystem shall show on the checklist of a follow-up the earlier Fail of a check that is open again.
+        justification: |
+          The reviewers must see why a check is open again.
+        children:
+          - ReviewCenter-ChecklistPage-CarriedMarks
+        tests:
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-Web-FollowUp-Follows
+        title: >-
+          The Web subsystem shall show on the review page which review it follows.
+        justification: |
+          A reader must find the earlier review.
+        children:
+          - ReviewCenter-ReviewPage-FollowUp
+        tests:
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
+      - id: ReviewCenter-Web-FollowUp-FollowedBy
+        title: >-
+          The Web subsystem shall show on the review page which reviews follow it.
+        justification: |
+          A reader must find the later reviews.
+        children:
+          - ReviewCenter-ReviewPage-FollowUp
+        tests:
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
+      - id: ReviewCenter-Web-FollowUp-CarriedThreads
+        title: >-
+          The Web subsystem shall show on the review page which threads were carried.
+        justification: |
+          A reader must tell a carried thread from a new one.
+        children:
+          - ReviewCenter-ReviewPage-FollowUp
+        tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
 
       - id: ReviewCenter-Web-OidcSignIn
         title: >-
           The Web subsystem shall offer the sign-in with an OpenID Connect provider as a button beside the form for a
-          local account, mark the accounts of the provider on the user list without offering a password for them,
-          replace the password form of their own page by a sentence, offer a confirmation at the provider in place of
-          the password for a signature, and explain all of this in the help topics.
+          local account.
         justification: |
-          People must find the way that suits their account without reading a manual, and the pages must not offer what
-          the rules refuse. The behavior needs a live connection, so it is verified by the component tests of the
-          units and by the tests of the flow.
+          People must find the way that suits their account without reading a manual. The behavior needs a live
+          connection, so it is verified by the component tests of the units and by the tests of the flow.
         children:
           - ReviewCenter-LoginPage-OidcButton
-          - ReviewCenter-UsersPage-ExternalAccount
-          - ReviewCenter-AccountPage-ExternalAccount
-          - ReviewCenter-ReviewPage-ExternalSignature
-          - ReviewCenter-HelpPage-OidcSignIn
+          - ReviewCenter-LoginPage-OidcButton-Error
+          - ReviewCenter-LoginPage-OidcButton-Off
         tests:
           - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
+
+      - id: ReviewCenter-Web-OidcSignIn-UserList
+        title: >-
+          The Web subsystem shall mark the accounts of the OpenID Connect provider on the user list.
+        justification: |
+          An administrator must tell the accounts of the provider from the local accounts.
+        children:
+          - ReviewCenter-UsersPage-ExternalAccount
+
+      - id: ReviewCenter-Web-OidcSignIn-NoPassword
+        title: >-
+          The Web subsystem shall offer no password for the accounts of the OpenID Connect provider on the user list.
+        justification: |
+          The rules refuse a password for such an account, so the page must not offer one.
+        children:
+          - ReviewCenter-UsersPage-ExternalAccount-NoPassword
+
+      - id: ReviewCenter-Web-OidcSignIn-OwnPage
+        title: >-
+          The Web subsystem shall replace the password form of the own page of such an account by a sentence.
+        justification: |
+          The user must be told where the password is managed instead of seeing a form that does not work.
+        children:
+          - ReviewCenter-AccountPage-ExternalAccount
+          - ReviewCenter-AccountPage-ExternalAccount-NoForm
+
+      - id: ReviewCenter-Web-OidcSignIn-Signature
+        title: >-
+          The Web subsystem shall offer a confirmation at the provider in place of the password for a signature of such
+          an account.
+        justification: |
+          The user has no password here, so the provider confirms the identity of the signer.
+        children:
+          - ReviewCenter-ReviewPage-ExternalSignature
+        tests:
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-Web-OidcSignIn-HelpTopics
+        title: >-
+          The Web subsystem shall explain the sign-in with the provider in the help topics.
+        justification: |
+          The user must find the explanation without reading a manual.
+        children:
+          - ReviewCenter-HelpPage-OidcSignIn
+          - ReviewCenter-HelpPage-OidcSignIn-Signing
+          - ReviewCenter-HelpPage-OidcSignIn-ApiTokens
 
       - id: ReviewCenter-Web-BallotExperience
         title: >-
-          The Web subsystem shall keep the answers of the other reviewers hidden on the checklist page, the review
-          page, the project overview, and the history from a reviewer who has not handed in their own ballot, shall
-          offer the reviewer who has handed in the differing answers side by side with a button to discuss them,
-          shall offer Submit ballot, Submit and sign, and Assign me as reviewer where the rules accept them, and shall
-          explain all of this in the help topics.
+          The Web subsystem shall keep the answers of the other reviewers hidden on the checklist page from a reviewer
+          who has not handed in their own ballot.
         justification: |
           The reviewers have to give independent answers and then settle the differences, and the pages must make both
           steps obvious without a manual. The behavior needs a live connection, so it is verified by the component
           tests of the units.
         children:
           - ReviewCenter-ChecklistPage-HiddenBallots
-          - ReviewCenter-ChecklistPage-SideBySide
-          - ReviewCenter-ChecklistPage-SubmitAndSign
-          - ReviewCenter-ChecklistPage-SignConfirm
-          - ReviewCenter-ChecklistPage-AssignMe
-          - ReviewCenter-ReviewPage-BallotMasking
-          - ReviewCenter-ProjectPage-BallotMasking
-          - ReviewCenter-ProjectPage-Ballots
-          - ReviewCenter-HistoryPage-BallotMasking
         tests:
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
-          - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
-          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
-          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-Web-BallotExperience-ReviewPage
+        title: >-
+          The Web subsystem shall keep the answers of the other reviewers hidden on the review page from a reviewer who
+          has not handed in their own ballot.
+        justification: |
+          The review page must not give away what the checklist page hides.
+        children:
+          - ReviewCenter-ReviewPage-BallotMasking
+        tests:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+
+      - id: ReviewCenter-Web-BallotExperience-ProjectOverview
+        title: >-
+          The Web subsystem shall keep the answers of the other reviewers hidden in the project overview from a
+          reviewer who has not handed in their own ballot.
+        justification: |
+          The project overview must not give away what the checklist page hides.
+        children:
+          - ReviewCenter-ProjectPage-BallotMasking
+          - ReviewCenter-ProjectPage-Ballots
+
+      - id: ReviewCenter-Web-BallotExperience-History
+        title: >-
+          The Web subsystem shall keep the answers of the other reviewers hidden in the history from a reviewer who has
+          not handed in their own ballot.
+        justification: |
+          The history must not give away what the checklist page hides.
+        children:
+          - ReviewCenter-HistoryPage-BallotMasking
+        tests:
           - HistoryPage_HiddenViewer_HidesAnswerDetailsOnly
+
+      - id: ReviewCenter-Web-BallotExperience-SideBySide
+        title: >-
+          The Web subsystem shall offer a reviewer who has handed in their ballot the differing answers side by side.
+        justification: |
+          The reviewers settle the differences, so they must see them next to each other.
+        children:
+          - ReviewCenter-ChecklistPage-SideBySide
+        tests:
+          - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+
+      - id: ReviewCenter-Web-BallotExperience-Discuss
+        title: >-
+          The Web subsystem shall offer a button to discuss a differing answer.
+        justification: |
+          The way from a difference to its discussion must be one click.
+        children:
+          - ReviewCenter-ChecklistPage-SideBySide
+
+      - id: ReviewCenter-Web-BallotExperience-SubmitAndSign
+        title: >-
+          The Web subsystem shall offer Submit and sign where the rules accept it.
+        justification: |
+          A reviewer who is done should not have to take two steps where one is allowed.
+        children:
+          - ReviewCenter-ChecklistPage-SubmitAndSign
+          - ReviewCenter-ChecklistPage-SignConfirm
+        tests:
+          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
+
+      - id: ReviewCenter-Web-BallotExperience-AssignMe
+        title: >-
+          The Web subsystem shall offer Assign me as reviewer where the rules accept it.
+        justification: |
+          A user who wants to take part must be able to join without asking someone to assign them.
+        children:
+          - ReviewCenter-ChecklistPage-AssignMe
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-Web-BallotExperience-HelpTopics
+        title: >-
+          The Web subsystem shall explain the ballot steps in the help topics.
+        justification: |
+          The reviewers have to understand the steps without a manual. The topic that explains how to read a review
+          covers the own ballot, the submission, and the hidden conclusion.
+        children:
+          - ReviewCenter-HelpPage-ReadingReviewTopic
+          - ReviewCenter-HelpPage-ReadingReviewTopic-ConclusionHidden
+          - ReviewCenter-HelpPage-InboxTopic-HiddenBallots
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
 
       - id: ReviewCenter-Web-TotpSecondFactor
         title: >-
-          The Web subsystem shall let a person with a local account set up, use, and turn off the second factor on
-          their own page, ask for the code after the password in a page of its own, ask for the code beside the
-          password in the sign form of a review, show administrators who has a second factor and let a system
-          administrator reset it, and explain all of this in a help topic.
+          The Web subsystem shall let a person with a local account set up the second factor on their own page.
         justification: |
           The pages must make the safe way the easy way and must not offer what the rules refuse, so the person finds
           the way that suits their account without reading a manual.
         children:
-          - ReviewCenter-TotpLoginPage-SecondStepForm
-          - ReviewCenter-LoginPage-TotpExpiredNotice
           - ReviewCenter-AccountPage-Totp
-          - ReviewCenter-UsersPage-TotpReset
-          - ReviewCenter-ReviewPage-SignTotpCode
-          - ReviewCenter-HelpPage-TwoFactorTopic
+          - ReviewCenter-AccountPage-Totp-Start
+          - ReviewCenter-AccountPage-Totp-Secret
+          - ReviewCenter-AccountPage-Totp-Confirm
+          - ReviewCenter-AccountPage-Totp-RecoveryCodes
+          - ReviewCenter-AccountPage-Totp-RecoveryOnce
+          - ReviewCenter-AccountPage-Totp-GiveUp
+          - ReviewCenter-AccountPage-Totp-RecoveryLeft
+          - ReviewCenter-AccountPage-Totp-Regenerate
+          - ReviewCenter-AccountPage-Totp-RegenerateWrongCode
+          - ReviewCenter-AccountPage-Totp-RegenerateWrongCode-NoCodes
+          - ReviewCenter-AccountPage-Totp-ConfirmWrongCode
+          - ReviewCenter-AccountPage-Totp-ConfirmWrongCode-SetupOpen
+          - ReviewCenter-AccountPage-Totp-FieldsEmptied
+          - ReviewCenter-AccountPage-Totp-FeatureOff
+          - ReviewCenter-AccountPage-Totp-TemporaryPassword
+          - ReviewCenter-AccountPage-Totp-External
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
+
+      - id: ReviewCenter-Web-TotpSecondFactor-TurnOff
+        title: >-
+          The Web subsystem shall let a person with a local account turn off the second factor on their own page.
+        justification: |
+          A person who no longer wants the second factor must be able to remove it.
+        children:
+          - ReviewCenter-AccountPage-Totp-Disable
+          - ReviewCenter-AccountPage-Totp-DisableWrongCode
+          - ReviewCenter-AccountPage-Totp-DisableWrongCode-StaysOn
+
+      - id: ReviewCenter-Web-TotpSecondFactor-CodePage
+        title: >-
+          The Web subsystem shall ask for the code after the password in a page of its own.
+        justification: |
+          The code is asked for only after the password was right, so a wrong password never reveals that the account
+          has a second factor.
+        children:
+          - ReviewCenter-TotpLoginPage-SecondStepForm
+          - ReviewCenter-TotpLoginPage-SecondStepForm-NoUserName
+          - ReviewCenter-TotpLoginPage-SecondStepForm-WrongCode
+          - ReviewCenter-TotpLoginPage-SecondStepForm-Throttled
+          - ReviewCenter-TotpLoginPage-SecondStepForm-NoPendingSignIn
+          - ReviewCenter-TotpLoginPage-SecondStepForm-OtherAddress
+          - ReviewCenter-LoginPage-TotpExpiredNotice
+          - ReviewCenter-LoginPage-TotpExpiredNotice-NoPasswordError
+          - ReviewCenter-LoginPage-TotpExpiredNotice-WrongPassword
         tests:
           - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
-          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
+
+      - id: ReviewCenter-Web-TotpSecondFactor-CodePage-Antiforgery
+        title: >-
+          The Web subsystem shall put an antiforgery token into the form of the page that asks for the code.
+        justification: |
+          The token stops another site from posting a code on behalf of the person who is signing in. It is added by
+          the server when the page is served, so only the page requested over HTTP shows it.
+        tests:
+          - TotpSignIn_CodePage_PendingSignIn_FormCarriesAntiforgeryToken
+
+      - id: ReviewCenter-Web-TotpSecondFactor-SignatureCode
+        title: >-
+          The Web subsystem shall ask for the code beside the password in the sign form of a review.
+        justification: |
+          A signature is confirmed with the same factors as the sign-in.
+        children:
+          - ReviewCenter-ReviewPage-SignTotpCode
+
+      - id: ReviewCenter-Web-TotpSecondFactor-Visibility
+        title: >-
+          The Web subsystem shall show administrators who has a second factor.
+        justification: |
+          An administrator must see whose second factor can be reset.
+        children:
+          - ReviewCenter-UsersPage-TotpReset
+          - ReviewCenter-UsersPage-TotpReset-FeatureOff
+          - ReviewCenter-UsersPage-TotpReset-External
+
+      - id: ReviewCenter-Web-TotpSecondFactor-Reset
+        title: >-
+          The Web subsystem shall let a system administrator reset the second factor of a user.
+        justification: |
+          A user who lost the device must be able to get back in.
+        children:
+          - ReviewCenter-UsersPage-TotpReset-ResetButton
+          - ReviewCenter-UsersPage-TotpReset-Reset
+          - ReviewCenter-UsersPage-TotpReset-ResetStatus
+          - ReviewCenter-UsersPage-TotpReset-ResetError
+          - ReviewCenter-UsersPage-TotpReset-ResetKept
+          - ReviewCenter-UsersPage-Confirmations
+          - ReviewCenter-UsersPage-Confirmations-ResetSecondClick
+          - ReviewCenter-UsersPage-Confirmations-ResetCancel
+
+      - id: ReviewCenter-Web-TotpSecondFactor-HelpTopic
+        title: >-
+          The Web subsystem shall explain the second factor in a help topic.
+        justification: |
+          The person finds the way that suits their account without reading a manual.
+        children:
+          - ReviewCenter-HelpPage-TwoFactorTopic
+          - ReviewCenter-HelpPage-TwoFactorTopic-SignIn
+          - ReviewCenter-HelpPage-TwoFactorTopic-Recovery
+          - ReviewCenter-HelpPage-TwoFactorTopic-SigningWithCode
+          - ReviewCenter-HelpPage-TwoFactorTopic-TurnOff
+          - ReviewCenter-HelpPage-TwoFactorTopic-Reset
+          - ReviewCenter-HelpPage-TwoFactorTopic-Unaffected
+          - ReviewCenter-HelpPage-TwoFactorTopic-SigningLink
 
       - id: ReviewCenter-Web-Inbox
         title: >-
           The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user in
           eight groups (to answer, disputed, ready to sign, signature no longer counts, replies waiting, failed checks,
-          waiting for others and
-          updates) with a summary, a chip and a New badge on each item, and a button to mark all as read, show the
-          number of reviews that need action on the home page and on an Inbox tab of the header, mark the new comments
-          of a review in its index and its threads, remember on a visit what the user has seen, serve the page only to
-          a signed-in user, and explain all of this in a help topic.
+          waiting for others, and updates).
         justification: |
-          A reviewer should learn from the first page what waits and be led to it, and the marks must show what is new
-          without a second place to look. The help topic explains what the number counts and what clears it.
+          A reviewer should learn from the first page what waits and be led to it.
         children:
-          - ReviewCenter-InboxPage-Access
           - ReviewCenter-InboxPage-Sections
-          - ReviewCenter-InboxPage-Summary
-          - ReviewCenter-InboxPage-MarkAllRead
+          - ReviewCenter-InboxPage-Sections-Project
+          - ReviewCenter-InboxPage-Sections-ChecklistLink
+          - ReviewCenter-InboxPage-Sections-ReviewLink
+          - ReviewCenter-InboxPage-Sections-QuestionLink
+          - ReviewCenter-InboxPage-Sections-DetailLine
+          - ReviewCenter-InboxPage-Sections-DueMark
+          - ReviewCenter-InboxPage-Sections-OverdueMark
+          - ReviewCenter-InboxPage-Sections-EmptyMessage
           - ReviewCenter-InboxPage-Interactive
-          - ReviewCenter-HomePage-InboxCard
-          - ReviewCenter-App-InboxBadge
-          - ReviewCenter-ReviewPage-UnreadMarkers
-          - ReviewCenter-ReviewPage-MarkSeen
-          - ReviewCenter-HelpPage-InboxTopic
         tests:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
+
+      - id: ReviewCenter-Web-Inbox-Summary
+        title: >-
+          The Web subsystem shall show a summary on the inbox page.
+        justification: |
+          The summary tells at a glance how many reviews need action.
+        children:
+          - ReviewCenter-InboxPage-Summary
+          - ReviewCenter-InboxPage-Summary-WaitingCount
+          - ReviewCenter-InboxPage-Summary-WaitingNotAction
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+
+      - id: ReviewCenter-Web-Inbox-Chip
+        title: >-
+          The Web subsystem shall show a chip on each item of the inbox page.
+        justification: |
+          The chip tells what the user is asked to do with the item.
+        children:
+          - ReviewCenter-InboxPage-Sections-Chip
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+
+      - id: ReviewCenter-Web-Inbox-NewBadge
+        title: >-
+          The Web subsystem shall show a New badge on each new item of the inbox page.
+        justification: |
+          The user must see what is new without a second place to look.
+        children:
+          - ReviewCenter-InboxPage-Sections-NewBadge
+
+      - id: ReviewCenter-Web-Inbox-MarkAllRead
+        title: >-
+          The Web subsystem shall offer a button on the inbox page to mark all items as read.
+        justification: |
+          A user who has caught up must be able to clear the marks at once.
+        children:
+          - ReviewCenter-InboxPage-MarkAllRead
+          - ReviewCenter-InboxPage-MarkAllRead-BadgesCleared
+
+      - id: ReviewCenter-Web-Inbox-HomeCount
+        title: >-
+          The Web subsystem shall show the number of reviews that need action on the home page.
+        justification: |
+          The first page must tell what waits.
+        children:
+          - ReviewCenter-HomePage-InboxCard
+          - ReviewCenter-HomePage-InboxCard-NoAction
+
+      - id: ReviewCenter-Web-Inbox-HeaderTab
+        title: >-
+          The Web subsystem shall show the number of reviews that need action on an Inbox tab of the header.
+        justification: |
+          The number must be visible from every page.
+        children:
+          - ReviewCenter-App-InboxBadge
+          - ReviewCenter-App-InboxBadge-Tab
+          - ReviewCenter-App-InboxBadge-HiddenAtZero
+          - ReviewCenter-App-InboxBadge-Capped
+          - ReviewCenter-App-InboxBadge-AccessibleLabel
+          - ReviewCenter-App-InboxBadge-ReadAtStart
+          - ReviewCenter-App-InboxBadge-ReadOnNavigation
+          - ReviewCenter-App-InboxBadge-Cache
+          - ReviewCenter-App-InboxBadge-NoRead
+          - ReviewCenter-App-InboxBadge-ReadFailure
+          - ReviewCenter-App-InboxBadge-ReadFailurePage
+
+      - id: ReviewCenter-Web-Inbox-IndexMarkers
+        title: >-
+          The Web subsystem shall mark the new comments of a review in its thread index.
+        justification: |
+          The marks must show what is new without a second place to look.
+        children:
+          - ReviewCenter-ReviewPage-UnreadMarkers
+
+      - id: ReviewCenter-Web-Inbox-ThreadMarkers
+        title: >-
+          The Web subsystem shall mark the new comments of a review in its threads.
+        justification: |
+          The marks must show what is new where the reader reads.
+        children:
+          - ReviewCenter-ReviewPage-UnreadMarkers
+
+      - id: ReviewCenter-Web-Inbox-SeenOnVisit
+        title: >-
+          The Web subsystem shall remember on a visit to a review what the user has seen.
+        justification: |
+          A comment stops being new once the user has seen it.
+        children:
+          - ReviewCenter-ReviewPage-MarkSeen
+
+      - id: ReviewCenter-Web-Inbox-SignedInOnly
+        title: >-
+          The Web subsystem shall serve the inbox page only to a signed-in user.
+        justification: |
+          The inbox lists the reviews of one user, so nobody else may see it.
+        children:
+          - ReviewCenter-InboxPage-Access
+          - ReviewCenter-InboxPage-Interactive-Challenge
+        tests:
           - WebSubsystem_InboxPage_Unauthenticated_IsChallenged
+
+      - id: ReviewCenter-Web-Inbox-HelpTopic
+        title: >-
+          The Web subsystem shall explain the inbox in a help topic.
+        justification: |
+          The help topic explains what the number counts and what clears it.
+        children:
+          - ReviewCenter-HelpPage-InboxTopic
+          - ReviewCenter-HelpPage-InboxTopic-QuestionForYou
+          - ReviewCenter-HelpPage-InboxTopic-NewMarker
+          - ReviewCenter-HelpPage-InboxTopic-MarkAllRead
+          - ReviewCenter-HelpPage-InboxTopic-HiddenBallots
+          - ReviewCenter-HelpPage-InboxTopic-SeenNotRecorded
 
       - id: ReviewCenter-Web-WhereAreWe
         title: >-
           The Web subsystem shall show on the review page a panel that says where the review stands and what to do
-          next, with each reviewer's ballot and signature, the checks answered differently with a way to discuss them,
-          and the open questions and findings, shall explain to a reviewer whose signature no longer matches the report
-          what changed since the signature and that signing again is the way forward, shall use plain words for this
-          everywhere in the pages and the help topics, and shall keep it all hidden from a reviewer who has not handed
-          in their own ballot.
+          next.
         justification: |
-          People who review together must know the standing without reading every card, and "out of date" is the
-          language of the implementation, not of the reviewer. The behavior needs a live connection, so it is verified
-          by the component tests of the units.
+          People who review together must know the standing without reading every card. The behavior needs a live
+          connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
-          - ReviewCenter-ReviewPage-StatusPanelGuidance
-          - ReviewCenter-ReviewPage-ChangesSinceSigning
-          - ReviewCenter-HelpPage-PlainLanguage
         tests:
           - ReviewStatusPanel_ShowsExactlyOneNextActionButton
+
+      - id: ReviewCenter-Web-WhereAreWe-Ballots
+        title: >-
+          The Web subsystem shall show in the status panel each reviewer's ballot and signature.
+        justification: |
+          The reader sees who is done without opening the checklist.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanel
+
+      - id: ReviewCenter-Web-WhereAreWe-Differences
+        title: >-
+          The Web subsystem shall show in the status panel the checks answered differently, with a way to discuss them.
+        justification: |
+          The differences are what the reviewers have to settle.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanel
+
+      - id: ReviewCenter-Web-WhereAreWe-OpenQuestions
+        title: >-
+          The Web subsystem shall show in the status panel the open questions and findings.
+        justification: |
+          The open questions are what stands between the review and its approval.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanel
+
+      - id: ReviewCenter-Web-WhereAreWe-ChangesSince
+        title: >-
+          The Web subsystem shall explain to a reviewer whose signature no longer matches the report what changed since
+          the signature.
+        justification: |
+          A reviewer who is asked to sign again must see why.
+        children:
+          - ReviewCenter-ReviewPage-ChangesSinceSigning
+        tests:
           - ReviewPage_SignedThenChanged_ExplainsWhatChanged
 
       - id: ReviewCenter-Web-NotificationCard
@@ -929,3 +3004,34 @@ sections:
         tests:
           - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
           - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-Web-WhereAreWe-SignAgain
+        title: >-
+          The Web subsystem shall explain to such a reviewer that signing again is the way forward.
+        justification: |
+          The reviewer must know what to do next.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanelGuidance
+        tests:
+          - ReviewPage_SignedThenChanged_ExplainsWhatChanged
+
+      - id: ReviewCenter-Web-WhereAreWe-PlainWords
+        title: >-
+          The Web subsystem shall use plain words for the state of a signature in the pages and the help topics.
+        justification: |
+          "Out of date" is the language of the implementation, not of the reviewer.
+        children:
+          - ReviewCenter-HelpPage-PlainLanguage
+          - ReviewCenter-HelpPage-PlainLanguage-WhereAreWe
+          - ReviewCenter-HelpPage-PlainLanguage-Changes
+          - ReviewCenter-HelpPage-PlainLanguage-NoOutOfDate
+
+      - id: ReviewCenter-Web-WhereAreWe-Hidden
+        title: >-
+          The Web subsystem shall keep the status panel hidden from a reviewer who has not handed in their own ballot.
+        justification: |
+          The panel shows the ballots of the others, so it must not give away what the checklist page hides.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanel
+        tests:
+          - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads

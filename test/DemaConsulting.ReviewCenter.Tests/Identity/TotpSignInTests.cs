@@ -75,6 +75,26 @@ public class TotpSignInTests
     }
 
     /// <summary>
+    ///     Test that the form of the code page carries an antiforgery token.
+    /// </summary>
+    [Fact]
+    public async Task TotpSignIn_CodePage_PendingSignIn_FormCarriesAntiforgeryToken()
+    {
+        // Arrange: an enrolled account and a browser that is past the password step
+        await using var world = await World.StartAsync();
+        await world.AddEnrolledUserAsync("ann");
+        using var browser = new TestBrowser(world.App);
+        await browser.LoginAsync("ann", TestBrowser.Password);
+
+        // Act: request the code page
+        var page = await browser.GetPageAsync("/login/totp");
+
+        // Assert: the form of the second step holds a token
+        var token = page.QuerySelector("[data-testid='totp-login-form'] input[name='__RequestVerificationToken']");
+        Assert.False(string.IsNullOrEmpty(token?.GetAttribute("value")));
+    }
+
+    /// <summary>
     ///     Test that the challenge cookie is marked Secure when the browser uses https.
     /// </summary>
     [Fact]
