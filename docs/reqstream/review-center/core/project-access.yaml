@@ -3,155 +3,477 @@
 #
 # The ProjectAccess class is the single place that decides who may see, work in, administer, and audit a project.
 # It reads the user and the memberships fresh on every call, so taking rights away works at once.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ProjectAccess Unit Requirements
     requirements:
       - id: ReviewCenter-ProjectAccess-Visibility
         title: >-
-          The ProjectAccess class shall let a user see only the projects the user is a member of, and administer
-          only the projects the user is a project administrator of, shall let neither a non-member nor a
-          project the user does not belong to be seen or administered, and shall treat a member whose stored role
-          is not defined as a non-member, so that such a member sees nothing.
+          The ProjectAccess class shall let a member see the project that the member belongs to.
         justification: |
-          Reviews of one body of work must not be readable by people who have nothing to do with it. One rule in
-          one place keeps every page, route, and service in agreement about who may see what. A role that no code
-          defines must never gain access, so the answer fails closed.
+          Reviews of one body of work must be readable by the people who work on them.
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-Administer
+        title: >-
+          The ProjectAccess class shall let a project administrator administer the project that the project
+          administrator belongs to.
+        justification: |
+          The people who run a project must be able to manage it.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-NotAdministrator
+        title: >-
+          The ProjectAccess class shall not let a member who is not a project administrator administer the project.
+        justification: |
+          Managing a project is not a right of every member.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-NonMember
+        title: >-
+          The ProjectAccess class shall not let a user who is not a member of a project see it.
+        justification: |
+          A project must not be readable by people who have nothing to do with it. One rule in one place keeps every
+          page, route, and service in agreement about who may see what.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-NonMember-Administer
+        title: >-
+          The ProjectAccess class shall not let a user who is not a member of a project administer it.
+        justification: |
+          Administering a project is a stronger right than seeing it, so it needs its own refusal.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-OtherProject
+        title: >-
+          The ProjectAccess class shall not let a member see a project that the member does not belong to.
+        justification: |
+          Membership of one project gives no right in another project.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-OtherProject-Administer
+        title: >-
+          The ProjectAccess class shall not let a member administer a project that the member does not belong to.
+        justification: |
+          Being a project administrator of one project gives no power over another project.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Visibility-UndefinedRole
+        title: >-
+          The ProjectAccess class shall treat a member whose stored role is not defined as a non-member, so that the
+          member sees nothing.
+        justification: |
+          A role that no code defines must never gain access, so the answer fails closed.
+        tests:
+          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
+
+      - id: ReviewCenter-ProjectAccess-Visibility-UndefinedRoleListed
+        title: >-
+          The ProjectAccess class shall not list a project to a member whose stored role is not defined.
+        justification: |
+          The project list must not disclose a project that the member may not see.
+        tests:
+          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
+
+      - id: ReviewCenter-ProjectAccess-Visibility-UndefinedRoleMember
+        title: >-
+          The ProjectAccess class shall not report a member whose stored role is not defined as a member of the
+          project.
+        justification: |
+          Membership questions must fail closed in the same way as the access rights.
+        tests:
           - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
 
       - id: ReviewCenter-ProjectAccess-SystemAdmin
         title: >-
-          The ProjectAccess class shall let an enabled system administrator see and administer every project that
-          exists, and no project that does not exist.
+          The ProjectAccess class shall let an enabled system administrator see every project that exists.
         justification: |
           A system administrator manages the whole installation and must be able to reach every project, for
-          example to add its first members. A project that does not exist has nothing to see, whoever asks.
+          example to add its first members.
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-SystemAdmin-Administer
+        title: >-
+          The ProjectAccess class shall let an enabled system administrator administer every project that exists.
+        justification: |
+          A system administrator is responsible for every project, for example to correct its members.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-SystemAdmin-Missing
+        title: >-
+          The ProjectAccess class shall not let a system administrator see a project that does not exist.
+        justification: |
+          A project that does not exist has nothing to see, whoever asks.
+        tests:
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-SystemAdmin-Missing-Administer
+        title: >-
+          The ProjectAccess class shall not let a system administrator administer a project that does not exist.
+        justification: |
+          There is nothing to administer in a project that does not exist, whoever asks.
+        tests:
           - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
 
       - id: ReviewCenter-ProjectAccess-NoAccount
         title: >-
-          The ProjectAccess class shall give no access at all to a missing actor, to the command line, to a user
-          name that no user has, and to a disabled user, even when that user has a membership or the system
-          administrator right.
+          The ProjectAccess class shall give no access at all to a missing actor.
         justification: |
-          Access follows a live account. An actor that is not an enabled user, including the command line which
-          acts outside any project, must see nothing and be treated like a stranger.
+          Access follows a live account. An actor that is not an enabled user must see nothing and be treated like a
+          stranger.
+        tests:
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-NoAccount-CommandLine
+        title: >-
+          The ProjectAccess class shall give no access at all to the command line.
+        justification: |
+          The command line acts outside any project and must not read one through the access rules.
+        tests:
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-NoAccount-NoName
+        title: >-
+          The ProjectAccess class shall give no access at all to an actor that has no user name.
+        justification: |
+          An actor without a user name is no account.
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
-          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-NoAccount-UnknownUser
+        title: >-
+          The ProjectAccess class shall give no access at all to an actor whose user name no user has.
+        justification: |
+          Access follows a stored account, so a name that no account carries has no rights.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-NoAccount-Disabled
+        title: >-
+          The ProjectAccess class shall give no access at all to a disabled user, even when that user has a membership
+          or the system administrator right.
+        justification: |
+          A disabled account must see nothing, whatever it was granted before.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+          - ProjectAccess_Matrix_DisabledSystemAdmin_GetsNothing
 
       - id: ReviewCenter-ProjectAccess-NotFound
         title: >-
-          The ProjectAccess class shall refuse, when it is asked to require access, a project that is not visible
-          to the actor with the same project not found failure and the same message as a project that does not
-          exist, shall refuse a project administrator action by a member who is no project administrator with the
-          actor not allowed failure, and shall refuse a system administrator action by anyone else with the actor
-          not allowed failure.
+          The ProjectAccess class shall refuse, when it is asked to require view access, a project that is not visible
+          to the actor with the project not found failure.
+        justification: |
+          A hidden project must not reveal that it exists. A member sees the project already, so telling that member
+          that an action is not allowed leaks nothing.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-NotFound-Missing
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require view access, a project that does not exist
+          with the project not found failure.
+        justification: |
+          A missing project is the reference answer that a hidden project must look like.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-NotFound-Same
+        title: >-
+          The ProjectAccess class shall give the same message for a project that is not visible to the actor as for a
+          project that does not exist.
         justification: |
           A different answer for a hidden project and a missing one would let anybody probe which projects exist.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-NotFound-Administer
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require administer access, a project that is not
+          visible to the actor with the project not found failure.
+        justification: |
+          The check to administer must not reveal a hidden project either.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-NotFound-NotAdministrator
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require administer access, a member who is not a
+          project administrator with the actor not allowed failure.
+        justification: |
           A member sees the project already, so telling that member that an action is not allowed leaks nothing.
         tests:
           - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
-          - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
-          - Repositories_OfAnotherProject_CannotBeUsedOrChanged
+
+      - id: ReviewCenter-ProjectAccess-NotFound-NotSystemAdmin
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require the system administrator right, a user who
+          is not a system administrator with the actor not allowed failure.
+        justification: |
+          The right of a system administrator belongs to the installation and not to one project, so there is no
+          project to hide.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
 
       - id: ReviewCenter-ProjectAccess-Contribute
         title: >-
-          The ProjectAccess class shall let a member whose role is User or ProjectAdmin and an enabled system
-          administrator work in a project, shall let a member whose role is Auditor see the project but not work
-          in it, shall treat a stored role that is not defined as no membership at all, and shall refuse, when it
-          is asked to require the right to work, a project that is not visible with the project not found failure
-          and a member who may only read with the actor not allowed failure.
+          The ProjectAccess class shall let a member whose role is User work in the project.
         justification: |
-          A read-only oversight role must be enforced in one place, or every service would have to remember it.
-          The member already sees the project, so telling a read-only member that the action is not allowed
-          leaks nothing, and a role that no code defines must never gain any power.
+          Members create reviews, comment, answer checklists, and sign, so the right to work must follow the role.
         tests:
           - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
-          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-Contribute-ProjectAdmin
+        title: >-
+          The ProjectAccess class shall let a member whose role is ProjectAdmin work in the project.
+        justification: |
+          The people who run a project work in it as well.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Contribute-SystemAdmin
+        title: >-
+          The ProjectAccess class shall let an enabled system administrator work in every project that exists.
+        justification: |
+          A system administrator manages every project and must be able to act in it.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-Contribute-AuditorSees
+        title: >-
+          The ProjectAccess class shall let a member whose role is Auditor see the project.
+        justification: |
+          An auditor must be able to read how the work was done.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
           - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-Contribute-AuditorReadOnly
+        title: >-
+          The ProjectAccess class shall not let a member whose role is Auditor work in the project.
+        justification: |
+          A read-only oversight role must be enforced in one place, or every service would have to remember it.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+          - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-Contribute-UndefinedRole
+        title: >-
+          The ProjectAccess class shall not let a member whose stored role is not defined work in the project.
+        justification: |
+          A role that no code defines must never gain any power.
+        tests:
           - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
-          - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
-          - ReviewOperations_ProjectAdminAndSystemAdmin_AreAllowed
-          - ReviewReads_Auditor_AreAllowed
-          - AccessCoverage_PublicActorMethods_AreAllClassified
-          - ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback
-          - ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback
-          - ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly
-          - ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer
+
+      - id: ReviewCenter-ProjectAccess-Contribute-NotFound
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require the right to work, a project that is not
+          visible to the actor with the project not found failure.
+        justification: |
+          A hidden project must not reveal that it exists.
+        tests:
+          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
+
+      - id: ReviewCenter-ProjectAccess-Contribute-NotAllowed
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require the right to work, a member who may only
+          read with the actor not allowed failure.
+        justification: |
+          The member already sees the project, so telling a read-only member that the action is not allowed leaks
+          nothing.
+        tests:
+          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
 
       - id: ReviewCenter-ProjectAccess-AuditAccess
         title: >-
-          The ProjectAccess class shall let a project administrator, a member whose role is Auditor, and an
-          enabled system administrator read the audit trail of a project, shall refuse any other member with the
-          actor not allowed failure, and shall refuse anybody who cannot see the project with the project not
-          found failure.
+          The ProjectAccess class shall let a project administrator read the audit trail of the project.
         justification: |
           The audit trail records what everybody did in the project, so it is for those who manage or oversee the
-          project and not for every member. A hidden project must not reveal that it exists.
+          project and not for every member.
         tests:
           - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-AuditAccess-Auditor
+        title: >-
+          The ProjectAccess class shall let a member whose role is Auditor read the audit trail of the project.
+        justification: |
+          An auditor oversees the project and needs the record of what was done.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-AuditAccess-SystemAdmin
+        title: >-
+          The ProjectAccess class shall let an enabled system administrator read the audit trail of every project that
+          exists.
+        justification: |
+          A system administrator is responsible for every project and its history.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-AuditAccess-NotAllowed
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require the right to read the audit trail, a member
+          whose role is User with the actor not allowed failure.
+        justification: |
+          The trail records what everybody did, so not every member may read it.
+        tests:
           - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
-          - ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback
-          - ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce
-          - ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-AuditAccess-NotFound
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require the right to read the audit trail, a
+          project that is not visible to the actor with the project not found failure.
+        justification: |
+          A hidden project must not reveal that it exists.
+        tests:
+          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
 
       - id: ReviewCenter-ProjectAccess-TemporaryPassword
         title: >-
-          The ProjectAccess class shall give no access at all to a user whose password is still a temporary one,
-          even when that user has a membership or the system administrator right, until the user has chosen a new
-          password.
+          The ProjectAccess class shall give no access at all to a user whose password is still a temporary one, even
+          when that user has a membership or the system administrator right.
         justification: |
           A temporary password has been handed over by somebody else and may be known to more than one person.
           It may prove who is signing in only well enough to reach the page that replaces it, so until then the
           account must neither see nor change anything in any project.
         tests:
           - ProjectAccess_TemporaryPassword_GivesNoAccessAtAll
-          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
+
+      - id: ReviewCenter-ProjectAccess-TemporaryPassword-Changed
+        title: >-
+          The ProjectAccess class shall give a user whose password is no longer a temporary one the access that the
+          memberships and rights of the user give.
+        justification: |
+          Once the user has chosen a new password, the normal access must return.
+        tests:
+          - ProjectAccess_TemporaryPassword_PasswordNoLongerTemporary_GivesAccessAgain
 
       - id: ReviewCenter-ProjectAccess-Revocation
         title: >-
-          The ProjectAccess class shall look the user and the membership up again on every call and keep nothing
-          between calls, so that a removed membership, a lowered project role, and a disabled account change the
-          next answer.
+          The ProjectAccess class shall stop letting a member see a project at the next call after the membership of
+          the member was removed.
         justification: |
           Taking rights away must work at once, not after a cache expires or a session ends, because it is done
           exactly when somebody must no longer have them.
         tests:
           - ProjectAccess_Revocation_TakesEffectOnTheNextCall
 
+      - id: ReviewCenter-ProjectAccess-Revocation-Demotion
+        title: >-
+          The ProjectAccess class shall stop letting a project administrator administer a project at the next call
+          after the role of the project administrator was lowered.
+        justification: |
+          A lowered role must take its power away at once.
+        tests:
+          - ProjectAccess_Revocation_TakesEffectOnTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-Revocation-Disabled
+        title: >-
+          The ProjectAccess class shall give no access at the next call after the account of a user was disabled.
+        justification: |
+          A disabled account must lose its access at once, whatever it was granted.
+        tests:
+          - ProjectAccess_Revocation_TakesEffectOnTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-Revocation-RoleChange
+        title: >-
+          The ProjectAccess class shall let a change of the role of a member change the next answer for the right to
+          work.
+        justification: |
+          A member who becomes read-only must lose the right to work at once.
+        tests:
+          - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-Revocation-RoleChange-Audit
+        title: >-
+          The ProjectAccess class shall let a change of the role of a member change the next answer for the right to
+          read the audit trail.
+        justification: |
+          An auditor who becomes a user must lose the right to read the audit trail at once.
+        tests:
+          - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
+
       - id: ReviewCenter-ProjectAccess-TokenOwner
         title: >-
-          The ProjectAccess class shall give an actor that came through a personal access token exactly the access
-          of the owner of the token, found by the user name the actor carries, and no more.
+          The ProjectAccess class shall give an actor that came through a personal access token the access of the
+          owner of the token.
         justification: |
-          A script acting for a user must neither see more than the user nor keep seeing what the user has lost,
-          and inheriting the memberships through the user name needs no separate list of rights for tokens.
+          A script acting for a user must see what the user sees, and inheriting the memberships through the user
+          name needs no separate list of rights for tokens.
+        tests:
+          - ProjectAccess_TokenActor_HasTheMembershipsOfItsOwner
+
+      - id: ReviewCenter-ProjectAccess-TokenOwner-NoMore
+        title: >-
+          The ProjectAccess class shall give an actor that came through a personal access token no more access than
+          the owner of the token has.
+        justification: |
+          A script must neither see more than the user nor keep seeing what the user has lost.
         tests:
           - ProjectAccess_TokenActor_HasTheMembershipsOfItsOwner
 
       - id: ReviewCenter-ProjectAccess-List
         title: >-
-          The ProjectAccess class shall list the projects an actor may see, which are all projects for an enabled
-          system administrator, the projects of the memberships for an enabled user, and none for any other actor.
+          The ProjectAccess class shall list every project that exists to an enabled system administrator.
         justification: |
-          The project list is the first page of the application, and a list that showed a hidden project would
-          disclose its existence and name.
+          The project list is the first page of the application, and a system administrator manages every project.
+        tests:
+          - ProjectAccess_ListVisibleProjectsAsync_EachKind_SeesOnlyItsProjects
+
+      - id: ReviewCenter-ProjectAccess-List-Member
+        title: >-
+          The ProjectAccess class shall list to an enabled user only the projects that the user is a member of.
+        justification: |
+          A list that showed a hidden project would disclose its existence and name.
+        tests:
+          - ProjectAccess_ListVisibleProjectsAsync_EachKind_SeesOnlyItsProjects
+
+      - id: ReviewCenter-ProjectAccess-List-NoAccess
+        title: >-
+          The ProjectAccess class shall list no project to an actor that is not an enabled user.
+        justification: |
+          A list that showed a project to a stranger or to a disabled account would disclose its existence and name.
         tests:
           - ProjectAccess_ListVisibleProjectsAsync_EachKind_SeesOnlyItsProjects
           - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
 
       - id: ReviewCenter-ProjectAccess-Dependencies
         title: >-
-          The ProjectAccess class shall refuse to be created without the user store or the project store it reads.
+          The ProjectAccess class shall refuse to be created without the user store it reads.
         justification: |
           An access decision made without its data could only guess, so a missing dependency must fail when the
           service is created and not when the first user is judged.
+        tests:
+          - ProjectAccess_Constructor_NullArguments_Throws
+
+      - id: ReviewCenter-ProjectAccess-Dependencies-ProjectStore
+        title: >-
+          The ProjectAccess class shall refuse to be created without the project store it reads.
+        justification: |
+          The same reason as for the user store: the decision falls at creation and not at the first user.
         tests:
           - ProjectAccess_Constructor_NullArguments_Throws

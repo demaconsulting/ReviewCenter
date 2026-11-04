@@ -14,9 +14,7 @@ here. The rights for the read-only role are verified with the same world plus an
 membership directly in the fake store. The tests that
 prove the call sites (`ProjectAccessGuardTests.cs`) arrange a world with a user, a project administrator, a system
 administrator, and an auditor, call every operation of the review services as the auditor, and check that each
-mutating one is refused with `ActorNotAllowed` and changes nothing, while the reads stay allowed. The guards of the
-web pages (`GuardContributeAsync` and `GuardAuditAsync`) are verified in `ProjectViewGuardTests.cs` over the same
-fakes.
+mutating one is refused with `ActorNotAllowed` and changes nothing, while the reads stay allowed.
 
 #### Test Environment
 
@@ -63,6 +61,12 @@ only the own project, and the others reach nothing. This scenario is tested by
 project, are no system administrator, and have an empty list of projects; even a system administrator cannot see or
 administer a project that does not exist. This scenario is tested by
 `ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing`.
+
+**ProjectAccess_Matrix_DisabledSystemAdmin_GetsNothing**: A system administrator whose account is disabled is asked
+for the rights in the own project and in the other project, whether it is a system administrator, the visible projects,
+and to require the system administrator right. It has no right in either project, is no system administrator, lists no
+project, and the require call fails with `ActorNotAllowed`. This scenario is tested by
+`ProjectAccess_Matrix_DisabledSystemAdmin_GetsNothing`.
 
 **ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess**: A membership whose stored role is not a defined value
 gives no right at all (it is treated as no membership): the project cannot be viewed, contributed to, administered, or
@@ -117,27 +121,6 @@ takes an actor is listed as refused for an auditor, as a read, or as administer 
 test. This scenario is defined in `ProjectAccessGuardTests.cs` and tested by
 `AccessCoverage_PublicActorMethods_AreAllClassified`.
 
-**ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback**,
-**ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback**,
-**ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce**, and
-**ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce**: A member may continue; a read-only
-member gets `false` and no callback, so a page keeps what it showed; a non-member and a missing user get `false` and
-the access-lost callback runs once. These scenarios are defined in `ProjectViewGuardTests.cs` and tested by the tests
-of the same names.
-
-**ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly** and
-**ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer**: The access is revoked right
-after the first lookup of one guard call, using a decorator of the access rules. A read-only member whose membership
-disappears is reported as lost (`false` and the callback once), not as read-only; a member who could work keeps the
-answer of the first lookup and the removal is caught by the next guard. These scenarios are defined in
-`ProjectViewGuardTests.cs` and tested by the tests of the same names.
-
-**ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback**,
-**ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce**, and
-**ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce**: An auditor and a project administrator
-may continue; a plain member and a missing user get `false` and the callback runs once. These scenarios are defined in
-`ProjectViewGuardTests.cs` and tested by the tests of the same names.
-
 **ProjectAccess_Constructor_NullArguments_Throws**: A null user store and a null project store are rejected with an
 `ArgumentNullException`. This scenario is tested by `ProjectAccess_Constructor_NullArguments_Throws`.
 
@@ -146,6 +129,11 @@ administrator but has a temporary password (the must-change flag of `User`) is n
 administer the project, lists no project, and requiring view fails with `ProjectNotFound`. The scenario is defined in
 `MustChangePasswordTests.cs`, which arranges the account over `FakeReviewStore` and `FakeUserStore`, and is tested by
 `ProjectAccess_TemporaryPassword_GivesNoAccessAtAll`.
+
+**ProjectAccess_TemporaryPassword_PasswordNoLongerTemporary_GivesAccessAgain**: The account of the previous scenario,
+which has no access yet, gets its must-change flag cleared in the store. It is then a system administrator, views and
+administers the project, lists exactly that project, and requiring view succeeds. The scenario is defined in
+`MustChangePasswordTests.cs` and tested by `ProjectAccess_TemporaryPassword_PasswordNoLongerTemporary_GivesAccessAgain`.
 
 **UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess**: After the account chose a new password
 the flag is cleared and the account views the project and lists it. This scenario, defined in

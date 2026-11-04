@@ -243,6 +243,12 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdministerLost
           - ReviewCenter-Web-ProjectAccess-SystemAdminRecheck
           - ReviewCenter-Web-ProjectAccess-SystemAdminLost
+          - ReviewCenter-Web-ProjectAccess-ContributeRecheck
+          - ReviewCenter-Web-ProjectAccess-ContributeReadOnly
+          - ReviewCenter-Web-ProjectAccess-ContributeLost
+          - ReviewCenter-Web-ProjectAccess-ContributeConsistent
+          - ReviewCenter-Web-ProjectAccess-AuditRecheck
+          - ReviewCenter-Web-ProjectAccess-AuditLost
           - ReviewCenter-Api-ReadOnlyRole
         tests:
           - ReviewCenter_Auditor_CanReadEverythingAndChangeNothing
@@ -2137,9 +2143,30 @@ sections:
         children:
           - ReviewCenter-Core-ProjectAccess
           - ReviewCenter-ProjectAccess-Visibility
+          - ReviewCenter-ProjectAccess-Visibility-Administer
+          - ReviewCenter-ProjectAccess-Visibility-NotAdministrator
+          - ReviewCenter-ProjectAccess-Visibility-NonMember
+          - ReviewCenter-ProjectAccess-Visibility-NonMember-Administer
+          - ReviewCenter-ProjectAccess-Visibility-OtherProject
+          - ReviewCenter-ProjectAccess-Visibility-OtherProject-Administer
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRole
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRoleListed
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRoleMember
           - ReviewCenter-ProjectAccess-SystemAdmin
+          - ReviewCenter-ProjectAccess-SystemAdmin-Administer
+          - ReviewCenter-ProjectAccess-SystemAdmin-Missing
+          - ReviewCenter-ProjectAccess-SystemAdmin-Missing-Administer
           - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-NotFound-Missing
+          - ReviewCenter-ProjectAccess-NotFound-Same
+          - ReviewCenter-ProjectAccess-NotFound-Administer
+          - ReviewCenter-ProjectAccess-NotFound-NotAdministrator
+          - ReviewCenter-ProjectAccess-NotFound-NotSystemAdmin
           - ReviewCenter-ProjectAccess-Revocation
+          - ReviewCenter-ProjectAccess-Revocation-Demotion
+          - ReviewCenter-ProjectAccess-Revocation-Disabled
+          - ReviewCenter-ProjectAccess-Revocation-RoleChange
+          - ReviewCenter-ProjectAccess-Revocation-RoleChange-Audit
           - ReviewCenter-Web-ProjectAccess
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
@@ -2157,6 +2184,12 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdministerLost
           - ReviewCenter-Web-ProjectAccess-SystemAdminRecheck
           - ReviewCenter-Web-ProjectAccess-SystemAdminLost
+          - ReviewCenter-Web-ProjectAccess-ContributeRecheck
+          - ReviewCenter-Web-ProjectAccess-ContributeReadOnly
+          - ReviewCenter-Web-ProjectAccess-ContributeLost
+          - ReviewCenter-Web-ProjectAccess-ContributeConsistent
+          - ReviewCenter-Web-ProjectAccess-AuditRecheck
+          - ReviewCenter-Web-ProjectAccess-AuditLost
           - ReviewCenter-Api-ProjectAccess
           - ReviewCenter-Api-ProjectAccess-SameAnswer
           - ReviewCenter-Api-ProjectAccess-Served
@@ -2215,6 +2248,12 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AdministerLost
           - ReviewCenter-Web-ProjectAccess-SystemAdminRecheck
           - ReviewCenter-Web-ProjectAccess-SystemAdminLost
+          - ReviewCenter-Web-ProjectAccess-ContributeRecheck
+          - ReviewCenter-Web-ProjectAccess-ContributeReadOnly
+          - ReviewCenter-Web-ProjectAccess-ContributeLost
+          - ReviewCenter-Web-ProjectAccess-ContributeConsistent
+          - ReviewCenter-Web-ProjectAccess-AuditRecheck
+          - ReviewCenter-Web-ProjectAccess-AuditLost
           - ReviewCenter-Storage-Memberships
           - ReviewCenter-Storage-Memberships-OnePerUser
           - ReviewCenter-Storage-Memberships-UnknownProject

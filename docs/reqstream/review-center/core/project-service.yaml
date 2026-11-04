@@ -3,252 +3,965 @@
 #
 # The ProjectService class creates, lists, and reads projects, manages the members of a project, and enforces the
 # project rules and the access rules that belong to projects.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ProjectService Unit Requirements
     requirements:
       - id: ReviewCenter-ProjectService-Create
         title: >-
-          The ProjectService class shall create a project from a name and an optional description, storing the
-          name and description without surrounding white space (an absent description as empty text) together
-          with the creation time.
+          The ProjectService class shall create a project from a name and an optional description.
         justification: |
-          Surrounding white space is never meaningful in a name and would make visually identical projects look
-          different. An empty description is simpler for every caller than an absent one.
+          A project is the unit every review belongs to, so the system needs a way to open one from the little
+          that a person can say about it: what it is called and, if they wish, what it is for.
         tests:
           - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
           - ProjectService_CreateAsync_NullDescription_StoresEmptyDescription
 
+      - id: ReviewCenter-ProjectService-Create-NameTrimmed
+        title: >-
+          The ProjectService class shall store the name of a new project without surrounding white space.
+        justification: |
+          Surrounding white space is never meaningful in a name and would make visually identical projects look
+          different.
+        tests:
+          - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
+
+      - id: ReviewCenter-ProjectService-Create-DescriptionTrimmed
+        title: >-
+          The ProjectService class shall store the description of a new project without surrounding white space.
+        justification: |
+          Surrounding white space is never meaningful in a description either, and would show up as stray blank
+          space wherever the description is displayed.
+        tests:
+          - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
+
+      - id: ReviewCenter-ProjectService-Create-EmptyDescription
+        title: >-
+          The ProjectService class shall store an absent description of a new project as empty text.
+        justification: |
+          An empty description is simpler for every caller than an absent one, because nobody needs a check for
+          the missing value before showing it.
+        tests:
+          - ProjectService_CreateAsync_NullDescription_StoresEmptyDescription
+
+      - id: ReviewCenter-ProjectService-Create-CreationTime
+        title: >-
+          The ProjectService class shall store the time at which a project was created, taken from the clock,
+          with the new project.
+        justification: |
+          The project list and the history show when a project was opened, and a clock that the service owns
+          keeps that time independent of the caller.
+        tests:
+          - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
+
       - id: ReviewCenter-ProjectService-CreateAdmin
         title: >-
-          The ProjectService class shall create a project only for a system administrator, shall give the new
-          project no members, and shall store nothing when another actor asks.
+          The ProjectService class shall create a project only for a system administrator and shall refuse every
+          other actor with the actor-not-allowed rule.
         justification: |
-          A project is a boundary of access, so only the people who run the installation may open one. A new
-          project starts empty so that nobody gains access to it by accident; its members are added on purpose.
+          A project is a boundary of access, so only the people who run the installation may open one.
         tests:
           - ProjectService_CreateAsync_OnlySystemAdmin_NewProjectHasNoMembers
 
+      - id: ReviewCenter-ProjectService-CreateAdmin-NoMembers
+        title: >-
+          The ProjectService class shall give a new project no members.
+        justification: |
+          A new project starts empty so that nobody gains access to it by accident; its members are added on
+          purpose.
+        tests:
+          - ProjectService_CreateAsync_OnlySystemAdmin_NewProjectHasNoMembers
+
+      - id: ReviewCenter-ProjectService-CreateAdmin-NothingStored
+        title: >-
+          The ProjectService class shall store no project and no audit entry when an actor who is not a system
+          administrator asks to create a project.
+        justification: |
+          A refusal must leave no trace of a project, neither a project that nobody may see nor a history entry
+          that claims one was opened.
+        tests:
+          - ProjectService_CreateAsync_NotSystemAdmin_StoresNothing
+
       - id: ReviewCenter-ProjectService-Validation
         title: >-
-          The ProjectService class shall reject a project whose name is blank or longer than 100 characters, or
-          whose description is longer than 1000 characters, with a domain rule exception that names the rule,
-          and shall store nothing.
+          The ProjectService class shall refuse a project whose name is blank with the project-name-invalid rule.
         justification: |
-          A project needs a visible name, and limits keep names and descriptions displayable and within what the
-          database stores. The limits are inclusive, so a name of exactly 100 characters is accepted.
+          A project needs a visible name, because the name is the only way a person tells projects apart.
         tests:
           - ProjectService_CreateAsync_BlankName_ThrowsProjectNameInvalid
+
+      - id: ReviewCenter-ProjectService-Validation-NameLength
+        title: >-
+          The ProjectService class shall refuse a project whose name is longer than 100 characters with the
+          project-name-invalid rule.
+        justification: |
+          A limit keeps names displayable and within what the database stores.
+        tests:
           - ProjectService_CreateAsync_NameLength_LimitIsInclusive
+
+      - id: ReviewCenter-ProjectService-Validation-NameLimit
+        title: >-
+          The ProjectService class shall accept a project whose name is exactly 100 characters long.
+        justification: |
+          The limit is inclusive, so a name that uses all the room it is given is not refused.
+        tests:
+          - ProjectService_CreateAsync_NameLength_LimitIsInclusive
+
+      - id: ReviewCenter-ProjectService-Validation-DescriptionLength
+        title: >-
+          The ProjectService class shall refuse a project whose description is longer than 1000 characters with
+          the project-description-too-long rule.
+        justification: |
+          A limit keeps descriptions displayable and within what the database stores.
+        tests:
           - ProjectService_CreateAsync_DescriptionTooLong_ThrowsDescriptionTooLong
+
+      - id: ReviewCenter-ProjectService-Validation-NothingStored
+        title: >-
+          The ProjectService class shall store no project and no audit entry when it refuses a project because of
+          its name or its description.
+        justification: |
+          A refused request must not leave a half-created project, or a history entry for a project that does not
+          exist.
+        tests:
           - ProjectService_CreateAsync_Rejected_StoresNothing
 
       - id: ReviewCenter-ProjectService-List
         title: >-
-          The ProjectService class shall list the projects the actor may see, ordered by name and, for projects with
-          the same name, by identifier.
+          The ProjectService class shall list only the projects that the actor may see.
+        justification: |
+          A project that the actor may not see must not appear in a list, because the list would give away that
+          it exists.
+        tests:
+          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
+
+      - id: ReviewCenter-ProjectService-List-Order
+        title: >-
+          The ProjectService class shall list the projects ordered by name and, for projects with the same name,
+          by identifier.
         justification: |
           Pages that show projects need a stable, predictable order, and project names are not required to be
           unique, so the identifier decides between projects with the same name.
         tests:
           - ProjectService_ListAsync_SeveralProjects_ReturnsOrderedByNameThenId
-          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
 
       - id: ReviewCenter-ProjectService-Read
         title: >-
-          The ProjectService class shall return a project by its identifier to an actor who may see it, and
-          nothing when no project has that identifier or the actor may not see it.
+          The ProjectService class shall return a project by its identifier to an actor who may see it.
         justification: |
-          Pages reached by a stored link must be able to tell a missing project from an existing one, and must not
-          fail when a project is not found. A hidden project must read exactly like a missing one, so that its
-          existence does not leak.
+          Pages reached by a stored link need the project that the link names.
         tests:
           - ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull
           - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
 
+      - id: ReviewCenter-ProjectService-Read-Unknown
+        title: >-
+          The ProjectService class shall return nothing when no project has the requested identifier.
+        justification: |
+          Pages reached by a stored link must be able to tell a missing project from an existing one, and must not
+          fail when a project is not found.
+        tests:
+          - ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull
+
+      - id: ReviewCenter-ProjectService-Read-Hidden
+        title: >-
+          The ProjectService class shall return nothing, exactly as for a missing project, when the actor may not
+          see the requested project.
+        justification: |
+          A hidden project must read exactly like a missing one, so that its existence does not leak.
+        tests:
+          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
+
       - id: ReviewCenter-ProjectService-Members
         title: >-
-          The ProjectService class shall let an administrator of a project and a system administrator add an
-          existing user to the project with a project role, change the role of a member, remove a member, and list
-          the members of the project ordered by user name, and shall refuse every other actor: a plain member of
-          the project with an actor-not-allowed rule, and an actor who cannot see the project as if the project
-          did not exist.
+          The ProjectService class shall add an existing user to a project with a project role.
         justification: |
-          Membership decides who may see a project. The administrators of a project know best who belongs on it,
-          so they manage its members without waiting for a system administrator. A person outside the project
-          learns nothing about it, not even that it exists.
+          Membership decides who may see a project, so a person who should work on a project must be able to be
+          added to it with the role that fits what they do.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+          - ProjectService_AddMemberAsync_ExistingUser_StoresMembershipWithTheRole
+
+      - id: ReviewCenter-ProjectService-Members-ChangeRole
+        title: >-
+          The ProjectService class shall change the project role of a member.
+        justification: |
+          What a person does on a project changes over time, and their rights must change with it without taking
+          them off the project and putting them back.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectService-Members-Remove
+        title: >-
+          The ProjectService class shall remove a member from a project.
+        justification: |
+          People leave projects, and a person who has left must lose the access that the membership gave.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+          - ProjectService_RemoveMemberAsync_Member_RemovesTheMembership
+
+      - id: ReviewCenter-ProjectService-Members-List
+        title: >-
+          The ProjectService class shall list the members of a project.
+        justification: |
+          Administrators can only manage the team if they can see who belongs to it and with which role.
+        tests:
+          - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+
+      - id: ReviewCenter-ProjectService-Members-ListOrder
+        title: >-
+          The ProjectService class shall list the members of a project ordered by user name.
+        justification: |
+          A page that shows the team needs a stable, predictable order that does not change from one visit to the
+          next.
         tests:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
           - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+
+      - id: ReviewCenter-ProjectService-Members-ProjectAdmin
+        title: >-
+          The ProjectService class shall let an administrator of a project manage the members of that project.
+        justification: |
+          The administrators of a project know best who belongs on it, so they manage its members without waiting
+          for a system administrator.
+        tests:
           - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+          - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+
+      - id: ReviewCenter-ProjectService-Members-SystemAdmin
+        title: >-
+          The ProjectService class shall let a system administrator manage the members of every project.
+        justification: |
+          System administrators are responsible for every project, including one whose own administrators are
+          gone.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectService-Members-PlainMember
+        title: >-
+          The ProjectService class shall refuse a plain member of a project every member operation with the
+          actor-not-allowed rule.
+        justification: |
+          Only administrators manage the members, and a plain member who tries is told that the action is not
+          theirs to take.
+        tests:
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+
+      - id: ReviewCenter-ProjectService-Members-Hidden
+        title: >-
+          The ProjectService class shall refuse an actor who cannot see a project every member operation on it
+          with the project-not-found rule, as if the project did not exist.
+        justification: |
+          A person outside the project learns nothing about it, not even that it exists.
+        tests:
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
 
       - id: ReviewCenter-ProjectService-MemberRules
         title: >-
-          The ProjectService class shall refuse, with a domain rule exception that names the rule, to add a user
-          who is already a member, to change or remove a membership that does not exist, to add a user that does
-          not exist, and to act on a project that does not exist, and shall change nothing in each case.
+          The ProjectService class shall refuse to add a user who is already a member with the membership-exists
+          rule.
         justification: |
-          A repeated or mistaken request must fail visibly and leave the access rights as they were, and a role
-          outside the defined roles must never be stored.
+          A repeated request must fail visibly rather than silently succeed, and must leave the existing role as
+          it was.
         tests:
           - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused
+
+      - id: ReviewCenter-ProjectService-MemberRules-RoleChangeNoMembership
+        title: >-
+          The ProjectService class shall refuse to change the role of a user who is not a member with the
+          membership-not-found rule.
+        justification: |
+          A mistaken request must fail visibly and must not create a membership by the back door.
+        tests:
+          - ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberRules-RemoveNoMembership
+        title: >-
+          The ProjectService class shall refuse to remove a user who is not a member with the
+          membership-not-found rule.
+        justification: |
+          A mistaken request must fail visibly rather than report a removal that never happened.
+        tests:
+          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberRules-UnknownUser
+        title: >-
+          The ProjectService class shall refuse to add a user name that does not exist with the user-not-found
+          rule.
+        justification: |
+          A misspelled name must fail visibly, so that the administrator can correct it.
+        tests:
+          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberRules-UnknownProject
+        title: >-
+          The ProjectService class shall refuse every member operation on a project that does not exist with the
+          project-not-found rule.
+        justification: |
+          A stale link or a mistyped identifier must fail visibly instead of acting on some other project.
+        tests:
+          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ProjectService_MemberActions_UnknownProject_ThrowsProjectNotFound
+
+      - id: ReviewCenter-ProjectService-MemberRules-NothingChanged
+        title: >-
+          The ProjectService class shall change no membership, no user, and no member audit entry other than the
+          failed attempt when it refuses a member operation because of one of these rules.
+        justification: |
+          A refusal must leave the access rights as they were, so that a failed request cannot half-succeed.
+        tests:
+          - ProjectService_Members_RuleViolations_ChangeNothing
+
+      - id: ReviewCenter-ProjectService-MemberRules-UndefinedRole
+        title: >-
+          The ProjectService class shall refuse a project role that is not one of the defined roles with an
+          argument-out-of-range error in each operation that stores a role, namely adding a member, changing a role,
+          and creating an account.
+        justification: |
+          A role outside the defined roles must never be stored, because no rule could say what it allows. The three
+          operations store the same role value, so one rule covers them; the tests show it row by row.
+        tests:
+          - ProjectService_MemberActions_UndefinedRole_ThrowsArgumentOutOfRange
 
       - id: ReviewCenter-ProjectService-AuditorRole
         title: >-
-          The ProjectService class shall let the same actors that manage the members assign the read-only Auditor
-          role when it adds a member, creates a member account, and changes the role of a member, shall record the
-          role name in the audit entry, shall refuse to change a member to Auditor with the member-has-open-review-work
-          rule that names the reviews while the member holds an unsigned or out-of-date slot, as primary or
-          alternate, on a review of the project that is not approved, and shall refuse every member management
-          operation by an Auditor.
+          The ProjectService class shall let the actors who manage the members assign the read-only Auditor role
+          when they add a member.
         justification: |
-          An oversight role is of no use if nobody can be given it, but a reviewer who is still named in a slot
-          would be unable to sign, and the review would wait for somebody who can no longer act. Telling the
-          administrator which reviews hold the member lets that be resolved first.
+          An oversight role is of no use if nobody can be given it, and an Auditor must be able to join a project
+          straight away, without first being given another role.
         tests:
           - ProjectService_Members_AuditorRole_IsAssignedAndAudited
-          - ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview
-          - ProjectService_SetMemberRoleAsync_OutOfDateSlot_RefusesAuditor
-          - ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor
-          - ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused
           - ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember
+
+      - id: ReviewCenter-ProjectService-AuditorRole-Account
+        title: >-
+          The ProjectService class shall let the actors who manage the members assign the Auditor role when they
+          create a member account.
+        justification: |
+          A new person who is brought onto a project to oversee it must be able to get their account as an
+          Auditor, without a second step that could be forgotten.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_Auditor_CreatesAuditorAndAuditsTheRole
+
+      - id: ReviewCenter-ProjectService-AuditorRole-ChangeRole
+        title: >-
+          The ProjectService class shall let the actors who manage the members change the role of a member to
+          Auditor when the member holds no open review work.
+        justification: |
+          A member who only needs to oversee the project from now on must be able to be given the read-only role.
+        tests:
+          - ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor
+          - ProjectService_Members_AuditorRole_IsAssignedAndAudited
+
+      - id: ReviewCenter-ProjectService-AuditorRole-Audit
+        title: >-
+          The ProjectService class shall record the name of the assigned Auditor role in the audit entry of the
+          member operation.
+        justification: |
+          The history must show who was given which role, and the read-only role is the one an auditor looks for.
+        tests:
+          - ProjectService_Members_AuditorRole_IsAssignedAndAudited
+          - ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor
+          - ProjectService_CreateMemberAccountAsync_Auditor_CreatesAuditorAndAuditsTheRole
+
+      - id: ReviewCenter-ProjectService-AuditorRole-OpenWork
+        title: >-
+          The ProjectService class shall refuse to change a member to Auditor with the
+          member-has-open-review-work rule while the member holds an unsigned slot, as primary or alternate, on a
+          review of the project that is not approved.
+        justification: |
+          A reviewer who is still named in a slot would be unable to sign once they became an Auditor, and the
+          review would wait for somebody who can no longer act.
+        tests:
+          - ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview
           - ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused
+
+      - id: ReviewCenter-ProjectService-AuditorRole-OutOfDate
+        title: >-
+          The ProjectService class shall refuse to change a member to Auditor with the
+          member-has-open-review-work rule while the member holds an out-of-date slot on a review of the project
+          that is not approved.
+        justification: |
+          A slot that is out of date also holds the review back, because its reviewer would have to sign again
+          and could no longer do so as an Auditor.
+        tests:
+          - ProjectService_SetMemberRoleAsync_OutOfDateSlot_RefusesAuditor
+
+      - id: ReviewCenter-ProjectService-AuditorRole-ReviewNames
+        title: >-
+          The ProjectService class shall name the reviews that hold the member in the message of the
+          member-has-open-review-work refusal.
+        justification: |
+          Telling the administrator which reviews hold the member lets that be resolved first.
+        tests:
+          - ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview
+
+      - id: ReviewCenter-ProjectService-AuditorRole-Refused
+        title: >-
+          The ProjectService class shall refuse every member management operation by an actor whose own role in
+          the project is Auditor.
+        justification: |
+          An Auditor reads and does not manage, so the role must not be a way to change who belongs to the
+          project.
+        tests:
           - ProjectService_MemberManagement_Auditor_IsRefused
 
       - id: ReviewCenter-ProjectService-MemberLookup
         title: >-
-          The ProjectService class shall add a member only by the exact user name, ignoring surrounding white
-          space and letter case, shall offer no way to search or list users, and shall answer a name that does
-          not exist and the name of a disabled user with the same rule and the same message, and a removal or
-          role change for an unknown name and for a user who is not a member with the same rule and the same
-          message.
+          The ProjectService class shall add a member by the exact user name, ignoring surrounding white space
+          and letter case.
         justification: |
-          A project administrator is not a system administrator and must not be able to browse the user base or
-          to find out which accounts exist by trying names. One answer for every unusable name leaves a
-          misspelled name as the only thing the administrator can learn from a failure.
+          An administrator must name a person unambiguously, and a name typed with a stray blank or another case
+          should still find the person that was meant.
         tests:
           - ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberLookup-PartialName
+        title: >-
+          The ProjectService class shall find no user when the name given for a new member is only a part of a
+          user name.
+        justification: |
+          A project administrator must not be able to browse the user base by trying the first letters of names.
+        tests:
+          - ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberLookup-NoListing
+        title: >-
+          The ProjectService class shall offer no operation that searches or lists users.
+        justification: |
+          A project administrator is not a system administrator and must not be able to browse the user base
+          through the service that manages a project.
+        tests:
+          - ProjectService_PublicOperations_NeverReturnUsers
+
+      - id: ReviewCenter-ProjectService-MemberLookup-UnusableName
+        title: >-
+          The ProjectService class shall answer the name of a user that does not exist and the name of a disabled
+          user with the same rule and the same message.
+        justification: |
+          One answer for every unusable name leaves a misspelled name as the only thing the administrator can
+          learn from a failure, so the answer does not reveal which accounts exist.
+        tests:
+          - ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-MemberLookup-NotMemberName
+        title: >-
+          The ProjectService class shall answer a removal or a role change for an unknown name and for a user who
+          is not a member with the same rule and the same message.
+        justification: |
+          The answer must not reveal which accounts exist by telling an unknown name from a known user who just
+          is not on the project.
+        tests:
           - ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable
 
       - id: ReviewCenter-ProjectService-AddThrottle
         title: >-
-          The ProjectService class shall refuse an actor who is not a system administrator with a too-many-attempts
-          rule once the actor has failed ten times within ten minutes to add or create a member, counting each
-          actor separately and reserving each attempt atomically before the user is looked up, so that attempts
-          made at the same time cannot exceed the limit, shall accept attempts again when the ten minutes have
-          passed, and shall never refuse a system administrator for this reason.
+          The ProjectService class shall refuse an actor who is not a system administrator with the
+          too-many-attempts rule once the actor has failed ten times within ten minutes to add a member.
         justification: |
           Trying names one after the other is the only way left to find out which accounts exist. A limit on
-          failures per actor makes that slow and visible, while system administrators, who may list the users
-          anyway, are not hindered. Reserving the attempt before the lookup closes the gap in which many parallel
-          attempts would all pass a check that has not yet seen their failures.
+          failures per actor makes that slow and visible.
         tests:
           - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+
+      - id: ReviewCenter-ProjectService-AddThrottle-Create
+        title: >-
+          The ProjectService class shall refuse the creation of a member account with the too-many-attempts rule
+          for an actor who has failed ten times within ten minutes.
+        justification: |
+          Creating an account must not be a way around the limit on adding members.
+        tests:
+          - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+
+      - id: ReviewCenter-ProjectService-AddThrottle-CreateFailures
+        title: >-
+          The ProjectService class shall count a failed creation of a member account because of a taken user name
+          as a failed attempt.
+        justification: |
+          A taken name also reveals that an account exists, so trying names through the creation must be limited
+          like trying names through the adding of members.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenNames_AreCountedAsFailedAttempts
+
+      - id: ReviewCenter-ProjectService-AddThrottle-PerActor
+        title: >-
+          The ProjectService class shall count the failed attempts of each actor separately.
+        justification: |
+          The guessing of one person must not lock out another administrator who works honestly.
+        tests:
+          - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+
+      - id: ReviewCenter-ProjectService-AddThrottle-Window
+        title: >-
+          The ProjectService class shall accept the attempts of an actor again when ten minutes have passed since
+          the failed attempts.
+        justification: |
+          The limit is a rate and not a ban, so an administrator who made mistakes can work again after a while.
+        tests:
+          - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+
+      - id: ReviewCenter-ProjectService-AddThrottle-Concurrent
+        title: >-
+          The ProjectService class shall admit no more than ten failed attempts of an actor that are made at the
+          same time.
+        justification: |
+          Attempts made in parallel would otherwise all pass a check that has not yet seen their failures, and the
+          limit would mean nothing.
+        tests:
           - ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly
-          - ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled
+
+      - id: ReviewCenter-ProjectService-AddThrottle-LookupError
+        title: >-
+          The ProjectService class shall count an attempt whose user lookup fails with an error as a failed
+          attempt.
+        justification: |
+          An error in the lookup must not be a way around the limit.
+        tests:
           - ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted
+
+      - id: ReviewCenter-ProjectService-AddThrottle-Successes
+        title: >-
+          The ProjectService class shall not count a successful addition of a member or a successful creation of
+          an account against the limit.
+        justification: |
+          Honest work must not lock out an administrator.
+        tests:
           - ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit
+          - ProjectService_AddMemberAsync_Success_DoesNotCountAgainstTheLimit
+
+      - id: ReviewCenter-ProjectService-AddThrottle-SystemAdmin
+        title: >-
+          The ProjectService class shall never refuse a system administrator with the too-many-attempts rule.
+        justification: |
+          System administrators may list the users anyway, so the limit would hinder them and protect nothing.
+        tests:
+          - ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled
+          - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
 
       - id: ReviewCenter-ProjectService-LastAdmin
         title: >-
-          The ProjectService class shall refuse, with a last-project-administrator rule, to let an administrator
-          of a project remove or demote the last enabled administrator of the project, including the actor
-          themselves, shall not count a disabled administrator as another administrator, shall let a system
-          administrator do it, and shall change and audit nothing when it refuses.
+          The ProjectService class shall refuse an administrator of a project, with the last-project-administrator
+          rule, to remove the last enabled administrator of the project, including the actor themselves.
         justification: |
           A project without an administrator can no longer be managed except by a system administrator, and a
           project administrator who removes the last administrator, perhaps by mistake, would lock the project
-          members out of their own team. System administrators remain responsible for every project, so the rule
-          does not bind them.
+          members out of their own team.
         tests:
           - ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin
+
+      - id: ReviewCenter-ProjectService-LastAdmin-Demote
+        title: >-
+          The ProjectService class shall refuse an administrator of a project, with the last-project-administrator
+          rule, to change the role of the last enabled administrator of the project to another role, including
+          Auditor.
+        justification: |
+          A demotion takes the last administrator away just as a removal does.
+        tests:
+          - ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin
+          - ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused
+
+      - id: ReviewCenter-ProjectService-LastAdmin-DisabledAdmin
+        title: >-
+          The ProjectService class shall not count a disabled administrator of a project as another administrator.
+        justification: |
+          A disabled account cannot manage the project, so the last administrator who can must not be taken away.
+        tests:
+          - ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin
+
+      - id: ReviewCenter-ProjectService-LastAdmin-SystemAdmin
+        title: >-
+          The ProjectService class shall let a system administrator remove the last administrator of a project.
+        justification: |
+          System administrators remain responsible for every project, so the rule does not bind them.
+        tests:
           - ProjectService_RemoveMemberAsync_SystemAdminAndDisabledTarget_AreNotBlocked
+
+      - id: ReviewCenter-ProjectService-LastAdmin-SystemAdminDemote
+        title: >-
+          The ProjectService class shall let a system administrator change the role of the last administrator of a
+          project to another role.
+        justification: |
+          System administrators remain responsible for every project, so the rule does not bind them when they
+          change a role either.
+        tests:
+          - ProjectService_SetMemberRoleAsync_SystemAdminDemotesLastProjectAdmin_IsAllowed
+
+      - id: ReviewCenter-ProjectService-LastAdmin-NothingChanged
+        title: >-
+          The ProjectService class shall change and audit nothing when it refuses to remove or demote the last
+          administrator of a project.
+        justification: |
+          A refusal must leave the project as it was, with its administrator and without a history entry for a
+          change that did not happen.
+        tests:
+          - ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin
 
       - id: ReviewCenter-ProjectService-CreateMemberAccount
         title: >-
           The ProjectService class shall let an administrator of a project and a system administrator create a
-          local account together with its membership of the project in one step, shall never make the account a
-          system administrator, shall give it a random temporary password of sixteen characters that must be
-          changed at the first sign-in, shall return that password only to the caller and never include it in the
-          text of the returned value, and shall refuse a taken or
-          invalid user name or display name without creating an account or a membership.
+          local account together with its membership of the project with the given role.
         justification: |
           A project administrator who needs to bring a new person onto the project should not depend on a system
-          administrator, but the power to create accounts must not become a way to gain system rights. A password
-          chosen by the system cannot be weak or reused, and one that the person must replace is known to nobody
-          else afterwards.
+          administrator.
         tests:
           - ProjectService_CreateMemberAccountAsync_ProjectAdmin_CreatesNoSystemAdministrator
           - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
-          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-NoSystemAdmin
+        title: >-
+          The ProjectService class shall never make a created account a system administrator.
+        justification: |
+          The power to create accounts must not become a way to gain system rights.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_ProjectAdmin_CreatesNoSystemAdministrator
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordLength
+        title: >-
+          The ProjectService class shall give a created account a temporary password of sixteen characters.
+        justification: |
+          A password chosen by the system cannot be weak, and sixteen characters are more than the minimum that
+          a person must choose themselves.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordRandom
+        title: >-
+          The ProjectService class shall give each created account a different random temporary password.
+        justification: |
+          A password that is reused or can be guessed is known to somebody else, so each account gets its own.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordChange
+        title: >-
+          The ProjectService class shall require the person to change the temporary password at the first
+          sign-in.
+        justification: |
+          A password that the person must replace is known to nobody else afterwards.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordReturned
+        title: >-
+          The ProjectService class shall return the temporary password to the caller of the creation.
+        justification: |
+          The caller has to hand the password to the new person, and this is the only time it is known.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordHashed
+        title: >-
+          The ProjectService class shall store only a hash of the temporary password.
+        justification: |
+          A password that is stored as it is would be a leak for everybody who can read the user records.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-PasswordText
+        title: >-
+          The ProjectService class shall leave the temporary password out of the text of the returned value.
+        justification: |
+          A result that is logged or printed must not leak the password.
+        tests:
           - NewMemberAccount_ToString_DoesNotContainTemporaryPassword
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-NameTaken
+        title: >-
+          The ProjectService class shall refuse the creation of an account whose user name is already taken with
+          the user-name-taken rule.
+        justification: |
+          User names are unique, so a second account with the same name would make a sign-in ambiguous.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-NameInvalid
+        title: >-
+          The ProjectService class shall refuse the creation of an account with an invalid user name with the
+          user-name-invalid rule.
+        justification: |
+          A sign-in name that cannot be typed or shown properly is of no use to the person.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-DisplayNameInvalid
+        title: >-
+          The ProjectService class shall refuse the creation of an account with an invalid display name with the
+          display-name-invalid rule.
+        justification: |
+          A person who has no readable name cannot be recognized in a list of members.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount-NothingCreated
+        title: >-
+          The ProjectService class shall create no account and no membership when it refuses the creation of an
+          account.
+        justification: |
+          A refusal must not leave behind a person who has an account but no place on the project, or the other
+          way round.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
 
       - id: ReviewCenter-ProjectService-Audit
         title: >-
-          The ProjectService class shall record the creation of a project in the audit trail, in the same
-          transaction as the project, naming the actor and the project name.
+          The ProjectService class shall record the creation of a project in the audit trail, naming the actor and
+          the project name.
         justification: |
-          The history of the system must show who created which project, and a project without its entry (or an
-          entry without its project) would make the history untrue.
+          The history of the system must show who created which project.
         tests:
           - ProjectService_CreateAsync_Project_RecordsProjectCreated
 
       - id: ReviewCenter-ProjectService-MemberAudit
         title: >-
-          The ProjectService class shall record the adding of a member, the change of the role of a member, the
-          removal of a member, and the creation of an account for a project in the audit trail, in the same
-          transaction as the change, naming the actor, the user, and the role, and carrying the identifier of the
-          project, shall never record a temporary password, and shall record every failed attempt to add or create
-          a member, also of a system administrator, with the user name that was tried and the project.
+          The ProjectService class shall record the adding of a member in the audit trail, naming the actor, the
+          user, the role, and the project.
         justification: |
           Who may see a project is the most important fact about its confidentiality, so every change to it must
-          be in the history, found by project, and must be true: no change without its entry and no entry without
-          its change. A trail that holds a password would be a leak, and the failed attempts are the trace of
-          somebody searching for user names.
+          be in the history and be found by project.
         tests:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
-          - ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject
+          - ProjectService_MemberChanges_AreAuditedWithActorUserRoleAndProject
+
+      - id: ReviewCenter-ProjectService-MemberAudit-RoleChange
+        title: >-
+          The ProjectService class shall record the change of the role of a member in the audit trail, naming the
+          actor, the user, the new role, and the project.
+        justification: |
+          A change of role changes what a person may do in the project, so it belongs in the history.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberChanges_AreAuditedWithActorUserRoleAndProject
+
+      - id: ReviewCenter-ProjectService-MemberAudit-Removal
+        title: >-
+          The ProjectService class shall record the removal of a member in the audit trail, naming the actor, the
+          user, and the project.
+        justification: |
+          The end of a person's access to a project belongs in the history as much as its start.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_MemberChanges_AreAuditedWithActorUserRoleAndProject
+
+      - id: ReviewCenter-ProjectService-MemberAudit-Account
+        title: >-
+          The ProjectService class shall record the creation of a member account in the audit trail, naming the
+          actor, the user, the role, and the project.
+        justification: |
+          A new account that gets access to a project belongs in the history of that project.
+        tests:
           - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+          - ProjectService_MemberChanges_AreAuditedWithActorUserRoleAndProject
+
+      - id: ReviewCenter-ProjectService-MemberAudit-NoPassword
+        title: >-
+          The ProjectService class shall never record a temporary password in the audit trail.
+        justification: |
+          A trail that holds a password would be a leak for everybody who may read the history.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-MemberAudit-FailedAdd
+        title: >-
+          The ProjectService class shall record every failed attempt to add a member in the audit trail, with the
+          user name that was tried and the project.
+        justification: |
+          The failed attempts are the trace of somebody searching for user names.
+        tests:
+          - ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject
+          - ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly
+
+      - id: ReviewCenter-ProjectService-MemberAudit-FailedAccount
+        title: >-
+          The ProjectService class shall record every failed attempt to create a member account in the audit
+          trail, with the user name that was tried and the project.
+        justification: |
+          A taken name tried through the creation is as much a trace of somebody searching for names as a name
+          tried through the adding of members.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_TakenName_AuditsTheFailedAttempt
+
+      - id: ReviewCenter-ProjectService-MemberAudit-FailedSystemAdmin
+        title: >-
+          The ProjectService class shall record a failed attempt of a system administrator to add a member in the
+          audit trail, although no limit applies to a system administrator.
+        justification: |
+          The guesses of a system administrator are traces too, and the history must not depend on who made them.
+        tests:
+          - ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject
 
       - id: ReviewCenter-ProjectService-IndependentReviewersSetting
         title: >-
-          The ProjectService class shall keep for each project the setting that requires independent reviewers, on
-          for a new project, shall let only an administrator of the project or a system administrator change it, and
-          never an actor that came through a personal access token, shall change it only when the value that the
-          caller saw is still the stored one and refuse with the RecordChanged rule otherwise, shall change and record
-          nothing when the new value equals the one the caller saw, and shall record a change in the audit trail as
-          project.independent-reviewers-changed, in the same transaction as the change, with the old and the new
-          value.
+          The ProjectService class shall keep for each project the setting that requires independent reviewers,
+          on for a new project.
         justification: |
-          Whether the author of a review may also review it is a rule of the project, and a project that has to
-          let one person do both needs a way to say so. Only the people who administer the project may relax the rule,
-          the change must be in the history, and a caller who saw an old value must not overwrite a newer one without
-          noticing.
+          Whether the author of a review may also review it is a rule of the project, and a project starts with
+          the strict rule.
         tests:
           - ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-Change
+        title: >-
+          The ProjectService class shall let an administrator of the project and a system administrator change the
+          setting that requires independent reviewers.
+        justification: |
+          A project that has to let one person do both roles needs a way to say so, and the people who administer
+          the project are the ones to decide it.
+        tests:
           - ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-PlainMember
+        title: >-
+          The ProjectService class shall refuse a plain member of the project the change of the setting that
+          requires independent reviewers with the actor-not-allowed rule.
+        justification: |
+          Only the people who administer the project may relax the rule.
+        tests:
           - ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-Hidden
+        title: >-
+          The ProjectService class shall refuse an actor who cannot see the project the change of the setting that
+          requires independent reviewers with the project-not-found rule.
+        justification: |
+          A person outside the project learns nothing about it, not even that it exists.
+        tests:
+          - ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-ApiToken
+        title: >-
+          The ProjectService class shall refuse an actor that came through a personal access token the change of
+          the setting that requires independent reviewers with the actor-not-allowed rule, even for an
+          administrator.
+        justification: |
+          A token that leaks must not be able to relax the rules of a project.
+        tests:
+          - ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-Stale
+        title: >-
+          The ProjectService class shall refuse the change of the setting that requires independent reviewers
+          with the RecordChanged rule when the value that the caller saw is no longer the stored one.
+        justification: |
+          A caller who saw an old value must not overwrite a newer one without noticing.
+        tests:
           - ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-Unchanged
+        title: >-
+          The ProjectService class shall change and record nothing when the new value of the setting that
+          requires independent reviewers equals the value that the caller saw.
+        justification: |
+          A change that changes nothing must leave no history that suggests a decision was taken.
+        tests:
+          - ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting-Audit
+        title: >-
+          The ProjectService class shall record a change of the setting that requires independent reviewers in
+          the audit trail as project.independent-reviewers-changed, with the old and the new value.
+        justification: |
+          A rule of the project that was relaxed must be in the history, with what it was and what it became.
+        tests:
+          - ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits
 
       - id: ReviewCenter-ProjectService-ReviewRuleSwitches
         title: >-
-          The ProjectService class shall switch each review rule of a project with SetReviewRuleAsync, shall keep the
-          two further rules (authors answering the checklist of their own review, and the person who reopened a
-          review signing it again) on for a new project, shall let only an administrator of the project or a system
-          administrator change a rule, and never an actor that came through a personal access token, shall change a
-          rule only when the value that the caller saw is still the stored one and refuse with the RecordChanged rule
-          otherwise, shall change and record nothing when the new value equals the one the caller saw, shall record a
-          change of a further rule in the audit trail as project.review-rule-changed with the property name and the
-          old and the new value, shall keep recording a change of the independence rule as
-          project.independent-reviewers-changed, and shall keep SetRequireIndependentReviewersAsync working as before.
+          The ProjectService class shall let an administrator of the project and a system administrator switch
+          each review rule of the project.
         justification: |
-          One method with one set of guards for every rule keeps the rules of changing a switch identical, so that
-          adding a rule cannot weaken them. The independence rule keeps its audit action, so that the history of
-          existing projects stays readable by the same name.
+          One method with one set of guards for every rule keeps the rules of changing a switch identical, so
+          that adding a rule cannot weaken them.
         tests:
-          - ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn
           - ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail
           - ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction
-          - ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused
-          - ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged
           - ProjectService_SetReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-NewProject
+        title: >-
+          The ProjectService class shall keep the two further review rules, authors answering the checklist of
+          their own review and the person who reopened a review signing it again, on for a new project.
+        justification: |
+          A new project must start strict, so that a rule is relaxed on purpose and never by omission.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-PlainMember
+        title: >-
+          The ProjectService class shall refuse a plain member of the project the change of a review rule with
+          the actor-not-allowed rule.
+        justification: |
+          Only the people who administer the project may change a rule.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-Hidden
+        title: >-
+          The ProjectService class shall refuse an actor who cannot see the project the change of a review rule
+          with the project-not-found rule.
+        justification: |
+          A person outside the project learns nothing about it, not even that it exists.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-ApiToken
+        title: >-
+          The ProjectService class shall refuse an actor that came through a personal access token the change of
+          a review rule with the actor-not-allowed rule, even for an administrator.
+        justification: |
+          A token that leaks must not be able to relax the rules of a project.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-Stale
+        title: >-
+          The ProjectService class shall refuse the change of a review rule with the RecordChanged rule when the
+          value that the caller saw is no longer the stored one.
+        justification: |
+          A caller who saw an old value must not overwrite a newer one without noticing.
+        tests:
+          - ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-Unchanged
+        title: >-
+          The ProjectService class shall change and record nothing when the new value of a review rule equals the
+          value that the caller saw.
+        justification: |
+          A change that changes nothing must leave no history that suggests a decision was taken.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-Audit
+        title: >-
+          The ProjectService class shall record a change of a further review rule in the audit trail as
+          project.review-rule-changed, with the property name and the old and the new value.
+        justification: |
+          A rule of the project that was relaxed must be in the history, with what it was and what it became.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-IndependenceAudit
+        title: >-
+          The ProjectService class shall record a change of the independence rule in the audit trail as
+          project.independent-reviewers-changed.
+        justification: |
+          The independence rule keeps its audit action, so that the history of existing projects stays readable by
+          the same name.
+        tests:
+          - ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction

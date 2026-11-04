@@ -1013,6 +1013,367 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
+    ///     Test that a name of 1 to 40 letters, digits, dots, underscores, and dashes that starts with a letter or
+    ///     digit is registered as entered.
+    /// </summary>
+    /// <param name="name">The valid name.</param>
+    [Theory]
+    [InlineData("a")]
+    [InlineData("9")]
+    [InlineData("Repo.1_x-y")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public async Task RepositoryService_CreateAsync_ValidName_Registers(string name)
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+
+        // Act: register a repository under the name
+        var created = await f.Service.CreateAsync(
+            name, "https://example.com/r.git", null, null, _admin, TestContext.Current.CancellationToken);
+
+        // Assert: the name is stored as entered, in the default project, with one audit entry
+        Assert.Equal(name, created.Name);
+        Assert.Equal(AuditTestExtensions.DefaultProjectId, created.ProjectId);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a location of 500 characters is accepted and one of 501 characters is refused.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAsync_LocationLength_HasInclusiveLimit()
+    {
+        // Arrange: a fixture and locations of exactly 500 and of 501 characters
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string prefix = "https://example.com/";
+        var atLimit = prefix + new string('a', RepositoryService.MaxLocationLength - prefix.Length);
+        var tooLong = atLimit + "a";
+
+        // Act: register at the limit, then one character beyond it
+        var created = await f.Service.CreateAsync("repo", atLimit, null, null, _admin, cancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("longer", tooLong, null, null, _admin, cancellationToken));
+
+        // Assert: the first is stored as entered, the second is refused, and nothing else was stored
+        Assert.Equal(500, atLimit.Length);
+        Assert.Equal(atLimit, created.Location);
+        Assert.Equal(DomainRule.RepositoryLocationInvalid, exception.Rule);
+        Assert.Single(f.Store.Audits);
+        Assert.Single(await f.Service.ListAsync(_admin, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a changed location is held to the same rules as a registered one and that a refused change
+    ///     leaves the repository as it was.
+    /// </summary>
+    /// <param name="location">The location that is not allowed.</param>
+    [Theory]
+    [InlineData("ssh://git@example.com/r.git")]
+    [InlineData("-x")]
+    [InlineData("https://user@example.com/r.git")]
+    [InlineData("https://example.com/r.git?token=abc")]
+    [InlineData("")]
+    public async Task RepositoryService_UpdateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid(string location)
+    {
+        // Arrange: a fixture with a registered repository
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", null, null, _admin, cancellationToken);
+
+        // Act: change the location to one that is not allowed
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", location, null, TokenChange.Keep, _admin, cancellationToken));
+
+        // Assert: the rule is named, the location is as before, and only the creation was audited
+        Assert.Equal(DomainRule.RepositoryLocationInvalid, exception.Rule);
+        Assert.Equal("https://example.com/r.git", (await f.Service.GetAccessAsync(created.Id, cancellationToken)).Location);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a user name with a control character is refused and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAsync_UserNameWithControlCharacter_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: register a repository whose user name holds a bell character
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("repo", "https://example.com/r.git", "sv\u0007c", null, _admin, cancellationToken));
+
+        // Assert: the rule is named and nothing is stored or audited
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+        Assert.Empty(f.Store.Audits);
+        Assert.Empty(await f.Service.ListAsync(_admin, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a user name of 200 characters is accepted and one of 201 characters is refused.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAsync_UserNameLength_HasInclusiveLimit()
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: register with a user name of 200 characters, then one with 201
+        var created = await f.Service.CreateAsync(
+            "repo", "https://example.com/r.git", new string('u', RepositoryService.MaxUsernameLength), null, _admin, cancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync(
+                "longer", "https://example.com/r2.git", new string('u', RepositoryService.MaxUsernameLength + 1), null, _admin, cancellationToken));
+
+        // Assert: the first is stored with the whole user name, the second is refused, and nothing else was stored
+        Assert.False(created.HasToken);
+        Assert.Equal(200, (await f.Service.GetAccessAsync(created.Id, cancellationToken)).Username!.Length);
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a token with a control character is refused and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAsync_TokenWithControlCharacter_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: register a repository whose token holds a bell character
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("repo", "https://example.com/r.git", "svc", "tok\u0007en", _admin, cancellationToken));
+
+        // Assert: the rule is named and nothing is stored or audited
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+        Assert.Empty(f.Store.Audits);
+        Assert.Empty(await f.Service.ListAsync(_admin, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a token of 1000 characters is accepted and one of 1001 characters is refused.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAsync_TokenLength_HasInclusiveLimit()
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: register with a token of 1000 characters, then one with 1001
+        var created = await f.Service.CreateAsync(
+            "repo", "https://example.com/r.git", "svc", new string('x', RepositoryService.MaxTokenLength), _admin, cancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync(
+                "longer", "https://example.com/r2.git", "svc", new string('x', RepositoryService.MaxTokenLength + 1), _admin, cancellationToken));
+
+        // Assert: the first is stored with the whole token, the second is refused without the token in the message,
+        // and nothing else was stored
+        Assert.True(created.HasToken);
+        Assert.Equal(1000, (await f.Service.GetAccessAsync(created.Id, cancellationToken)).Token!.Length);
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+        Assert.DoesNotContain(new string('x', 20), exception.Message, StringComparison.Ordinal);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that replacing the token stores the new token only in encrypted form and the old one is gone.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_UpdateAsync_ReplaceToken_StoresTheNewTokenEncrypted()
+    {
+        // Arrange: a private repository
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string newToken = "n3w-T0ken-value";
+        var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", "svc", Secret, _admin, cancellationToken);
+        var before = f.Store.StoredToken(created.Id);
+
+        // Act: replace the token
+        var updated = await f.Service.UpdateAsync(
+            created.Id, "repo", "https://example.com/r.git", "svc", TokenChange.Replace(newToken), _admin, cancellationToken);
+
+        // Assert: the stored text is another encrypted text, not the plain token, and the new token is the one in use
+        var stored = f.Store.StoredToken(created.Id);
+        Assert.True(updated.HasToken);
+        Assert.NotNull(stored);
+        Assert.NotEqual(before, stored);
+        Assert.NotEqual(newToken, stored);
+        Assert.DoesNotContain(newToken, stored, StringComparison.Ordinal);
+        Assert.Equal(newToken, (await f.Service.GetAccessAsync(created.Id, cancellationToken)).Token);
+    }
+
+    /// <summary>
+    ///     Test that clearing the token removes the stored token and the access data carries none.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_UpdateAsync_ClearToken_RemovesTheStoredToken()
+    {
+        // Arrange: a private repository
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", "svc", Secret, _admin, cancellationToken);
+
+        // Act: clear the token
+        var updated = await f.Service.UpdateAsync(
+            created.Id, "repo", "https://example.com/r.git", "svc", TokenChange.Clear, _admin, cancellationToken);
+
+        // Assert: no token is flagged or stored, and the access data has none
+        Assert.False(updated.HasToken);
+        Assert.Null(f.Store.StoredToken(created.Id));
+        Assert.Null((await f.Service.GetAccessAsync(created.Id, cancellationToken)).Token);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator lists, changes, disables, and enables a repository of its own project,
+    ///     and that the audit entries name the project administrator.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_ProjectAdministrator_ChangesEnablesAndDisablesOwnRepositories()
+    {
+        // Arrange: a fixture and a repository registered by the project administrator
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var padm = new Actor("padm", "Padm");
+        var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", null, null, padm, cancellationToken);
+
+        // Act: list, change, disable, and enable it as the project administrator
+        var listed = await f.Service.ListAsync(padm, cancellationToken);
+        var renamed = await f.Service.UpdateAsync(
+            created.Id, "renamed", "https://example.com/r2.git", null, TokenChange.Keep, padm, cancellationToken);
+        var disabled = await f.Service.SetEnabledAsync(created.Id, false, padm, cancellationToken);
+        var enabled = await f.Service.SetEnabledAsync(created.Id, true, padm, cancellationToken);
+
+        // Assert: each step worked and every audit entry names the project administrator
+        Assert.Equal([created.Id], listed.Select(r => r.Id));
+        Assert.Equal(("renamed", "https://example.com/r2.git"), (renamed.Name, renamed.Location));
+        Assert.False(disabled.Enabled);
+        Assert.True(enabled.Enabled);
+        Assert.Equal(
+            ["repository.created", "repository.updated", "repository.disabled", "repository.enabled"],
+            f.Store.Audits.Select(a => a.Action).ToArray());
+        Assert.All(f.Store.Audits, audit => Assert.Equal("padm", audit.ActorUsername));
+    }
+
+    /// <summary>
+    ///     Test that an administrator who is disabled after a first successful call is refused on every operation of
+    ///     the same service instance.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_AdminOnly_RechecksTheActorOnEveryCall()
+    {
+        // Arrange: a system administrator who registers a repository, and then is disabled
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await f.Users.CreateAsync("late", "Late", UserRole.Admin, Password, cancellationToken);
+        var late = new Actor("late", "Late");
+        var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", null, null, late, cancellationToken);
+        await f.Users.SetEnabledAsync("late", false, _admin, cancellationToken);
+
+        // Act: try every operation again with the same service
+        var create = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("other", "https://example.com/o.git", null, null, late, cancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(
+                created.Id, "repo", "https://example.com/r2.git", null, TokenChange.Keep, late, cancellationToken));
+        var disable = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.SetEnabledAsync(created.Id, false, late, cancellationToken));
+        var list = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.ListAsync(late, cancellationToken));
+
+        // Assert: each is refused as for something that does not exist, and nothing changed
+        Assert.Equal(DomainRule.ProjectNotFound, create.Rule);
+        Assert.Equal(DomainRule.RepositoryNotFound, update.Rule);
+        Assert.Equal(DomainRule.RepositoryNotFound, disable.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, list.Rule);
+        Assert.Single(f.Store.Audits);
+        Assert.True((await f.Store.GetAsync(created.Id, cancellationToken))!.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that the enabled repositories are offered to a member of the project and refused, as a missing
+    ///     project, to a user who cannot see it.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_ListEnabledAsync_UserWhoCannotSeeTheProject_IsRefused()
+    {
+        // Arrange: an enabled repository, a user who is no member, and a disabled system administrator
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var open = await f.Service.CreateAsync("open", "https://example.com/o.git", null, null, _admin, cancellationToken);
+        await f.Users.CreateAsync("out", "Out", UserRole.Reviewer, Password, cancellationToken);
+        await f.Users.CreateAsync("gone", "Gone", UserRole.Admin, Password, cancellationToken);
+        await f.Users.SetEnabledAsync("gone", false, _admin, cancellationToken);
+
+        // Act: list the enabled repositories as the member, the non-member, an unknown user, and the disabled one
+        var member = await f.Service.ListEnabledAsync(new Actor("rev", "Rev"), AuditTestExtensions.DefaultProjectId, cancellationToken);
+        var refused = new List<DomainRule>();
+        foreach (var name in new[] { "out", "nobody", "gone" })
+        {
+            var exception = await Assert.ThrowsAsync<DomainRuleException>(
+                () => f.Service.ListEnabledAsync(new Actor(name, name), AuditTestExtensions.DefaultProjectId, cancellationToken));
+            refused.Add(exception.Rule);
+        }
+
+        // Assert: the member sees the repository and the others are told that the project does not exist
+        Assert.Equal([new RepositorySummary(open.Id, "open")], member);
+        Assert.Equal([DomainRule.ProjectNotFound, DomainRule.ProjectNotFound, DomainRule.ProjectNotFound], refused);
+    }
+
+    /// <summary>
+    ///     Test that the enabled repositories offered for a project are those of that project only.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_ListEnabledAsync_OtherProjectRepository_IsNotOffered()
+    {
+        // Arrange: a repository in the default project and one in a second project
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var other = await f.Projects.AddProjectAsync(new Project { Name = "Gemini" }, cancellationToken);
+        var own = await f.Service.CreateAsync("own", "https://example.com/o.git", null, null, _admin, cancellationToken);
+        var foreign = await f.Service.CreateAsync(
+            other.Id, "foreign", "https://example.com/g.git", null, null, _admin, cancellationToken);
+
+        // Act: list the enabled repositories of each project
+        var ofOwn = await f.Service.ListEnabledAsync(_admin, AuditTestExtensions.DefaultProjectId, cancellationToken);
+        var ofOther = await f.Service.ListEnabledAsync(_admin, other.Id, cancellationToken);
+
+        // Assert: each list holds only the repository of its project
+        Assert.Equal([new RepositorySummary(own.Id, "own")], ofOwn);
+        Assert.Equal([new RepositorySummary(foreign.Id, "foreign")], ofOther);
+    }
+
+    /// <summary>
+    ///     Test that each repository audit entry carries the project that owns the repository.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_Changes_AreAuditedWithTheProject()
+    {
+        // Arrange: a fixture with a second project
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var other = await f.Projects.AddProjectAsync(new Project { Name = "Gemini" }, cancellationToken);
+
+        // Act: register in the default project, then register, change, disable, and enable one in the second project
+        await f.Service.CreateAsync("first", "https://example.com/f.git", null, null, _admin, cancellationToken);
+        var created = await f.Service.CreateAsync(
+            other.Id, "second", "https://example.com/s.git", null, null, _admin, cancellationToken);
+        await f.Service.UpdateAsync(
+            created.Id, "renamed", "https://example.com/s.git", null, TokenChange.Keep, _admin, cancellationToken);
+        await f.Service.SetEnabledAsync(created.Id, false, _admin, cancellationToken);
+        await f.Service.SetEnabledAsync(created.Id, true, _admin, cancellationToken);
+
+        // Assert: the first entry names the default project and the other four the second project
+        Assert.Equal(5, f.Store.Audits.Count);
+        Assert.Equal(AuditTestExtensions.DefaultProjectId, f.Store.Audits[0].ProjectId);
+        Assert.All(f.Store.Audits.Skip(1), audit => Assert.Equal(other.Id, audit.ProjectId));
+    }
+
+    /// <summary>
     ///     Test that null arguments are refused.
     /// </summary>
     [Fact]

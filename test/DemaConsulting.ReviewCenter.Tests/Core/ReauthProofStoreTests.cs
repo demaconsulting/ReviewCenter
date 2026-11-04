@@ -55,6 +55,27 @@ public class ReauthProofStoreTests
     }
 
     /// <summary>
+    ///     Test that issuing a new proof after the first was consumed makes the same signature consumable once more.
+    /// </summary>
+    [Fact]
+    public void ReauthProofStore_Issue_AfterConsume_AllowsConsumingAgain()
+    {
+        // Arrange: a proof that was consumed and is refused a second time
+        var store = new ReauthProofStore(new MovableTimeProvider(_start));
+        store.Issue(1, 2, "rev-1", 3);
+        Assert.True(store.TryConsume(1, 2, "rev-1", 3));
+        Assert.False(store.TryConsume(1, 2, "rev-1", 3));
+
+        // Act
+        store.Issue(1, 2, "rev-1", 3);
+
+        // Assert
+        Assert.True(store.Has(1, 2, "rev-1", 3));
+        Assert.True(store.TryConsume(1, 2, "rev-1", 3));
+        Assert.False(store.TryConsume(1, 2, "rev-1", 3));
+    }
+
+    /// <summary>
     ///     Test that a proof is bound to the user, project, review and slot it was issued for, and that a refusal for
     ///     another binding does not spend it.
     /// </summary>
@@ -156,6 +177,53 @@ public class ReauthProofStoreTests
         // Assert
         Assert.True(store.Has(2, 1, "rev-1", 0));
         Assert.False(store.Has(1, 1, "rev-1", 1));
+    }
+
+    /// <summary>
+    ///     Test that a full store makes room with its ended proofs and keeps every live proof.
+    /// </summary>
+    [Fact]
+    public void ReauthProofStore_Full_EndedProofsMakeRoomAndLiveOnesStay()
+    {
+        // Arrange: a full store whose first three proofs ended and whose other proofs are live
+        var clock = new MovableTimeProvider(_start);
+        var store = new ReauthProofStore(clock);
+        for (var slot = 0; slot < 3; slot++)
+        {
+            store.Issue(1, 1, "rev-1", slot);
+        }
+
+        clock.Advance(ReauthProofStore.Lifetime);
+        for (var slot = 3; slot < ReauthProofStore.MaxEntries; slot++)
+        {
+            store.Issue(1, 1, "rev-1", slot);
+            clock.Advance(TimeSpan.FromMilliseconds(1));
+        }
+
+        // Act: three more proofs arrive at the full store
+        for (var extra = 0; extra < 3; extra++)
+        {
+            store.Issue(1, 1, "rev-1", ReauthProofStore.MaxEntries + extra);
+        }
+
+        // Assert: the oldest live proof, the newest old one and the three new ones are all live
+        Assert.True(store.Has(1, 1, "rev-1", 3));
+        Assert.True(store.Has(1, 1, "rev-1", ReauthProofStore.MaxEntries - 1));
+        for (var extra = 0; extra < 3; extra++)
+        {
+            Assert.True(store.Has(1, 1, "rev-1", ReauthProofStore.MaxEntries + extra));
+        }
+    }
+
+    /// <summary>
+    ///     Test that the lifetime of a proof is five minutes and that the store keeps at most 10000 proofs.
+    /// </summary>
+    [Fact]
+    public void ReauthProofStore_Limits_AreFiveMinutesAndTenThousand()
+    {
+        // Arrange, Act, Assert
+        Assert.Equal(TimeSpan.FromMinutes(5), ReauthProofStore.Lifetime);
+        Assert.Equal(10_000, ReauthProofStore.MaxEntries);
     }
 
     /// <summary>

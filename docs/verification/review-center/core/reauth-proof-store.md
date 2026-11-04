@@ -26,6 +26,10 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 and the second consume and a later `Has` find nothing. This scenario is tested by
 `ReauthProofStore_TryConsume_SucceedsExactlyOnce`.
 
+**ReauthProofStore_Issue_AfterConsume_AllowsConsumingAgain**: A proof is consumed once and refused the second time; a
+new proof issued for the same binding is seen and can be consumed once more, and then it is refused again. This
+scenario is tested by `ReauthProofStore_Issue_AfterConsume_AllowsConsumingAgain`.
+
 **ReauthProofStore_OtherBinding_IsRefusedAndKeepsTheProof**: A theory over another user, project, review and slot; each
 is refused and the proof of the right binding can still be consumed. This scenario is tested by
 `ReauthProofStore_OtherBinding_IsRefusedAndKeepsTheProof`.
@@ -38,6 +42,13 @@ the first lifetime would have ended. This scenario is tested by `ReauthProofStor
 
 **ReauthProofStore_Full_DropsExpiredThenOldest**: With a full store one more proof pushes out only the oldest; after the
 lifetime a new proof drops the ended ones. This scenario is tested by `ReauthProofStore_Full_DropsExpiredThenOldest`.
+
+**ReauthProofStore_Full_EndedProofsMakeRoomAndLiveOnesStay**: In a full store whose first three proofs ended, three more
+proofs are accepted and every live proof, the oldest one included, is still live. This scenario is tested by
+`ReauthProofStore_Full_EndedProofsMakeRoomAndLiveOnesStay`.
+
+**ReauthProofStore_Limits_AreFiveMinutesAndTenThousand**: The lifetime of a proof is read as five minutes and the
+maximum number of proofs as 10,000. This scenario is tested by `ReauthProofStore_Limits_AreFiveMinutesAndTenThousand`.
 
 **ReauthProofStore_NullArguments_Throw**: A null clock and a null review identifier in each method raise
 `ArgumentNullException`. This scenario is tested by `ReauthProofStore_NullArguments_Throw`.

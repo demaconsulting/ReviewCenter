@@ -104,6 +104,31 @@ public class MustChangePasswordTests
     }
 
     /// <summary>
+    ///     Test that an account whose password is no longer temporary gets the access of its memberships and rights
+    ///     again.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAccess_TemporaryPassword_PasswordNoLongerTemporary_GivesAccessAgain()
+    {
+        // Arrange: the account is a project administrator and a system administrator, but has no access yet
+        var world = await WorldAsync(isSystemAdmin: true);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("newbie", "Newbie");
+        Assert.False(await world.Access.CanViewAsync(actor, world.Project, cancellationToken));
+
+        // Act
+        await world.SetFlagAsync(false);
+
+        // Assert
+        Assert.True(await world.Access.IsSystemAdminAsync(actor, cancellationToken));
+        Assert.True(await world.Access.CanViewAsync(actor, world.Project, cancellationToken));
+        Assert.True(await world.Access.CanAdministerAsync(actor, world.Project, cancellationToken));
+        var listed = await world.Access.ListVisibleProjectsAsync(actor, cancellationToken);
+        Assert.Equal([world.Project], listed.Select(p => p.Id));
+        await world.Access.RequireViewAsync(actor, world.Project, cancellationToken);
+    }
+
+    /// <summary>
     ///     Test that an account with a temporary password cannot create, list or revoke a personal access token, and
     ///     that a token it already has does not authenticate.
     /// </summary>
@@ -130,6 +155,39 @@ public class MustChangePasswordTests
         Assert.All([create, list, revoke], e => Assert.Equal(DomainRule.PasswordChangeRequired, e.Rule));
         Assert.Equal(TokenFailure.OwnerMustChangePassword, authenticated.Failure);
         Assert.False(authenticated.Succeeded);
+    }
+
+    /// <summary>
+    ///     Test that create, list, revoke, and authentication of a personal access token work again once the flag of
+    ///     the account is cleared.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_TemporaryPasswordCleared_AllowsEveryUse()
+    {
+        // Arrange: an account with a token, flagged to change its password, and refused while it is flagged
+        var world = await WorldAsync(flagged: false);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("newbie", "Newbie");
+        var token = await world.Tokens.CreateAsync(actor, "ci", 30, cancellationToken);
+        await world.SetFlagAsync(true);
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Tokens.CreateAsync(actor, "more", 30, cancellationToken));
+        Assert.Equal(DomainRule.PasswordChangeRequired, refused.Rule);
+
+        // Act: clear the flag, then create, list, authenticate, and revoke
+        await world.SetFlagAsync(false);
+        var second = await world.Tokens.CreateAsync(actor, "more", 30, cancellationToken);
+        var list = await world.Tokens.ListAsync(actor, cancellationToken);
+        var authenticated = await world.Tokens.AuthenticateAsync(token.Value, cancellationToken);
+        await world.Tokens.RevokeAsync(actor, second.Token.Id, cancellationToken);
+        var afterRevoke = await world.Tokens.ListAsync(actor, cancellationToken);
+
+        // Assert: each call works and only the second token ends up revoked
+        Assert.NotEmpty(second.Value);
+        Assert.Equal(2, list.Count);
+        Assert.True(authenticated.Succeeded);
+        Assert.Equal(token.Token.Id, Assert.Single(afterRevoke, t => t.Revoked is null).Id);
+        Assert.Equal(second.Token.Id, Assert.Single(afterRevoke, t => t.Revoked is not null).Id);
     }
 
     /// <summary>
@@ -174,28 +232,46 @@ public class MustChangePasswordTests
     }
 
     /// <summary>
-    ///     Test that an administrator who sets the password of another account makes it temporary, also for an
-    ///     account that was not flagged, and that setting the own password does not.
+    ///     Test that choosing a new password clears the temporary flag of the stored account.
     /// </summary>
     [Fact]
-    public async Task UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn()
+    public async Task UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheTemporaryFlag()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        await world.Users.ChangeOwnPasswordAsync("newbie", Temporary, Chosen, cancellationToken);
+
+        // Assert: the flag is gone and the new password re-authenticates
+        var stored = (await world.UserStore.GetByUsernameAsync("newbie", cancellationToken))!;
+        Assert.False(stored.MustChangePassword);
+        var confirmed = await world.Users.ReauthenticateAsync("newbie", Chosen, cancellationToken);
+        Assert.NotNull(confirmed);
+        Assert.Equal(stored.Id, confirmed.Id);
+    }
+
+    /// <summary>
+    ///     Test that an administrator who sets the password of another account makes it temporary, also for an
+    ///     account that was not flagged.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporary()
     {
         // Arrange: a flagged account and a normal one
         var world = await WorldAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
         await world.Users.CreateAsync("plain", "Plain", false, Temporary, Actor.CommandLine, cancellationToken);
+        Assert.False((await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword);
 
         // Act
         await world.Users.SetPasswordAsync("newbie", Chosen, Actor.CommandLine, cancellationToken);
         await world.Users.SetPasswordAsync("plain", Chosen, Actor.CommandLine, cancellationToken);
-        var other = (await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword;
-        await world.Users.ChangeOwnPasswordAsync("plain", Chosen, "a password of my own", cancellationToken);
-        await world.Users.SetPasswordAsync("plain", "my own second password", new Actor("plain", "Plain"), cancellationToken);
 
-        // Assert: the flag stays set for the flagged account and is set for the normal one; an own change leaves it off
+        // Assert: the flag stays set for the flagged account and is set for the normal one
         Assert.True((await world.UserStore.GetByUsernameAsync("newbie", cancellationToken))!.MustChangePassword);
-        Assert.True(other);
-        Assert.False((await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword);
+        Assert.True((await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword);
     }
 
     /// <summary>

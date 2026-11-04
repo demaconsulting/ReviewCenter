@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Security.Cryptography;
+using System.Text;
 using DemaConsulting.ReviewCenter.Core;
 
 namespace DemaConsulting.ReviewCenter.Tests.Core;
@@ -54,6 +56,29 @@ public class TotpChallengeStoreTests
         Assert.DoesNotContain(first, challenge.TokenHash, StringComparison.Ordinal);
         Assert.Equal("ann", challenge.Username);
         Assert.Equal("/", challenge.ReturnUrl);
+    }
+
+    /// <summary>
+    ///     Test that the stored challenge holds the SHA-256 hash of the token and not the token.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Issue_Challenge_HoldsOnlyTheHashOfTheToken()
+    {
+        // Arrange: a store with one challenge
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+
+        // Act: see the challenge and take it
+        var peeked = store.Peek(token, "10.0.0.1");
+        var taken = store.Take(token, "10.0.0.1");
+
+        // Assert: both carry the lowercase hexadecimal SHA-256 hash of the token, not the token
+        var expected = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        Assert.NotNull(peeked);
+        Assert.NotNull(taken);
+        Assert.Equal(expected, peeked.TokenHash);
+        Assert.Equal(expected, taken.TokenHash);
+        Assert.NotEqual(token, peeked.TokenHash);
     }
 
     /// <summary>
@@ -273,10 +298,34 @@ public class TotpChallengeStoreTests
         _clock.Advance(TimeSpan.FromMilliseconds(1));
         var extra = store.Issue("extra", "10.0.0.1", "/");
 
-        // Assert: the cap holds, the newest is there, and the oldest was dropped
-        Assert.True(store.Count() <= TotpChallengeStore.MaxEntries);
+        // Assert: the cap holds exactly, the newest is there, and the oldest was dropped
+        Assert.Equal(TotpChallengeStore.MaxEntries, store.Count());
         Assert.NotNull(store.Peek(extra, "10.0.0.1"));
         Assert.Null(store.Peek(first, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that issuing into a full store drops the ended challenges first.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Issue_WhenFullOfEndedChallenges_DropsEndedAndStores()
+    {
+        // Arrange: a full store whose challenges have all ended but were not removed yet
+        var store = new TotpChallengeStore(_clock);
+        for (var i = 0; i < TotpChallengeStore.MaxEntries; i++)
+        {
+            store.Issue("filler" + i, "10.0.0.1", "/");
+        }
+
+        _clock.Advance(TotpChallengeStore.Lifetime);
+        Assert.Equal(TotpChallengeStore.MaxEntries, store.Count());
+
+        // Act: issue one more
+        var token = store.Issue("ann", "10.0.0.1", "/");
+
+        // Assert: every ended challenge was dropped, and only the new one is held
+        Assert.Equal(1, store.Count());
+        Assert.NotNull(store.Peek(token, "10.0.0.1"));
     }
 
     /// <summary>
@@ -300,6 +349,31 @@ public class TotpChallengeStoreTests
         Assert.Equal(0, store.Count());
         Assert.Null(store.Peek(token, "10.0.0.1"));
         Assert.Null(store.Take(token, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that a challenge taken before the invalidation of its user is refused even when the check ran for
+    ///     almost the whole lifetime and another invalidation ran in between.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_InvalidatedLongBeforeTheReturn_IsStillRefused()
+    {
+        // Arrange: a taken challenge, its user invalidated, almost the whole lifetime passes, another user invalidated
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+        store.InvalidateUser("ann");
+        _clock.Advance(TotpChallengeStore.Lifetime - TimeSpan.FromSeconds(1));
+        store.InvalidateUser("bob");
+        Assert.Equal(2, store.TombstoneCount());
+
+        // Act: the check ends and gives the challenge back
+        var kept = store.Return(challenge!);
+
+        // Assert: refused, and nothing is stored
+        Assert.False(kept);
+        Assert.Equal(0, store.Count());
+        Assert.Null(store.Peek(token, "10.0.0.1"));
     }
 
     /// <summary>
@@ -439,6 +513,18 @@ public class TotpChallengeStoreTests
         // Assert: the older one is refused although ann was never invalidated, the newer one is kept
         Assert.False(keptInFlight);
         Assert.True(keptLater);
+    }
+
+    /// <summary>
+    ///     Test that the lifetime is five minutes, the cap is 10000 and a challenge ends at the fifth wrong code.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Limits_AreFiveMinutesTenThousandAndFiveFailures()
+    {
+        // Arrange, Act, Assert
+        Assert.Equal(TimeSpan.FromMinutes(5), TotpChallengeStore.Lifetime);
+        Assert.Equal(10_000, TotpChallengeStore.MaxEntries);
+        Assert.Equal(5, TotpChallengeStore.MaxFailures);
     }
 
     /// <summary>

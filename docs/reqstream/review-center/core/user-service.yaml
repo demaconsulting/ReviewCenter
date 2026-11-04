@@ -3,360 +3,1439 @@
 #
 # The UserService class creates users and checks their sign-in: it enforces the user name, display name, and password
 # rules, keeps only a password hash, authenticates with a lockout after repeated failures, enables and disables users,
-# sets the system administrator right, changes passwords, and protects the last enabled system administrator.
+# sets the system administrator right, changes passwords, and protects the last enabled system administrator. It also
+# records the changes and the failed sign-ins in the audit trail, handles the temporary password, the last sign-in, the
+# accounts of an external identity provider, and the password step of a sign-in with a second factor.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: UserService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # User name
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Username
         title: >-
-          The UserService class shall accept as a user name 3 to 50 characters made only of letters, digits,
-          full stops, underscores, and hyphens, and shall reject any other user name, and a user name that is
-          already taken in any letter case, storing nothing.
+          The UserService class shall accept a user name made only of letters, digits, full stops, underscores, and
+          hyphens.
         justification: |
-          A user name is typed at every sign-in and shown in the record. A restricted alphabet keeps names
-          readable and unambiguous, and treating letter case as insignificant stops two people from holding names
-          that look alike.
+          A user name is typed at every sign-in and shown in the record, and a restricted alphabet keeps names readable
+          and unambiguous.
         tests:
           - UserService_CreateAsync_ValidUsername_Creates
+
+      - id: ReviewCenter-UserService-Username-MinLength
+        title: >-
+          The UserService class shall accept a user name of exactly 3 characters.
+        justification: |
+          A short name is still a name, so the lower limit must be inclusive.
+        tests:
+          - UserService_CreateAsync_UsernameOfThreeCharacters_Creates
+
+      - id: ReviewCenter-UserService-Username-MaxLength
+        title: >-
+          The UserService class shall accept a user name of exactly 50 characters.
+        justification: |
+          The cap bounds the stored name, and the upper limit must be inclusive.
+        tests:
+          - UserService_CreateAsync_UsernameOfFiftyCharacters_Creates
+
+      - id: ReviewCenter-UserService-Username-Characters
+        title: >-
+          The UserService class shall reject a user name that holds a character other than letters, digits, full
+          stops, underscores, and hyphens, with the UserNameInvalid rule.
+        justification: |
+          Spaces, markup, and letters outside the alphabet make names unreadable or ambiguous in the record.
+        tests:
           - UserService_CreateAsync_InvalidUsername_ThrowsUserNameInvalid
+
+      - id: ReviewCenter-UserService-Username-TooShort
+        title: >-
+          The UserService class shall reject a user name that is missing, empty, or shorter than 3 characters, with
+          the UserNameInvalid rule.
+        justification: |
+          A very short name is easy to mistake for another one.
+        tests:
+          - UserService_CreateAsync_UsernameShorterThanThree_ThrowsUserNameInvalid
+
+      - id: ReviewCenter-UserService-Username-TooLong
+        title: >-
+          The UserService class shall reject a user name longer than 50 characters, with the UserNameInvalid rule.
+        justification: |
+          A name of any length would break the layout and the stored record.
+        tests:
+          - UserService_CreateAsync_UsernameLongerThanFifty_ThrowsUserNameInvalid
+
+      - id: ReviewCenter-UserService-Username-Taken
+        title: >-
+          The UserService class shall reject a user name that is already taken in any letter case, with the
+          UserNameTaken rule.
+        justification: |
+          Treating letter case as insignificant stops two people from holding names that look alike.
+        tests:
           - UserService_CreateAsync_DuplicateUsernameOtherCase_ThrowsUserNameTaken
 
+      - id: ReviewCenter-UserService-Username-NothingStored
+        title: >-
+          The UserService class shall store nothing when it rejects a user name.
+        justification: |
+          A refused name must not leave a half-made user behind.
+        tests:
+          - UserService_CreateAsync_RejectedUsername_StoresNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Display name
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-DisplayName
         title: >-
-          The UserService class shall require a display name of 1 to 100 characters after trimming and shall
-          store it trimmed.
+          The UserService class shall store a display name without the white space at its start and end.
         justification: |
-          The display name is the human-readable name shown next to comments and answers, so it must not be
-          blank, and stray white space has no meaning in it.
+          The display name is the human-readable name shown next to comments and answers, and stray white space has no
+          meaning in it.
         tests:
-          - UserService_CreateAsync_DisplayName_IsTrimmedAndLimited
+          - UserService_CreateAsync_DisplayNameWithPadding_StoresItTrimmed
 
+      - id: ReviewCenter-UserService-DisplayName-MinLength
+        title: >-
+          The UserService class shall accept a display name of 1 character after trimming.
+        justification: |
+          A single letter is a valid name, so the lower limit must be inclusive.
+        tests:
+          - UserService_CreateAsync_DisplayNameOfOneCharacter_Creates
+
+      - id: ReviewCenter-UserService-DisplayName-MaxLength
+        title: >-
+          The UserService class shall accept a display name of 100 characters after trimming.
+        justification: |
+          The cap bounds what is shown next to comments, and the upper limit must be inclusive.
+        tests:
+          - UserService_CreateAsync_DisplayNameOfHundredCharacters_Creates
+
+      - id: ReviewCenter-UserService-DisplayName-Empty
+        title: >-
+          The UserService class shall reject a display name that is missing or empty after trimming, with the
+          DisplayNameInvalid rule.
+        justification: |
+          A blank name shows nobody next to a comment.
+        tests:
+          - UserService_CreateAsync_DisplayNameBlank_ThrowsDisplayNameInvalid
+
+      - id: ReviewCenter-UserService-DisplayName-TooLong
+        title: >-
+          The UserService class shall reject a display name longer than 100 characters after trimming, with the
+          DisplayNameInvalid rule.
+        justification: |
+          A long name breaks the layout and the stored record.
+        tests:
+          - UserService_CreateAsync_DisplayNameLongerThanHundred_ThrowsDisplayNameInvalid
+
+      - id: ReviewCenter-UserService-DisplayName-NothingStored
+        title: >-
+          The UserService class shall store nothing when it rejects a display name.
+        justification: |
+          A refused name must not leave a half-made user behind.
+        tests:
+          - UserService_CreateAsync_RejectedDisplayName_StoresNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Password
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Password
         title: >-
-          The UserService class shall require a password of 12 to 128 characters, without composition rules and
-          without trimming it, and shall reject any other password, storing nothing.
+          The UserService class shall accept a password of 12 to 128 characters.
         justification: |
-          Length is what makes a password hard to guess, and the upper limit keeps the cost of hashing bounded.
+          Length is what makes a password hard to guess, so a password of a usable length must be accepted.
+        tests:
+          - UserService_CreateAsync_PasswordInPolicyRange_CreatesAndAuthenticates
+
+      - id: ReviewCenter-UserService-Password-MinLength
+        title: >-
+          The UserService class shall accept a password of exactly 12 characters.
+        justification: |
+          The lower limit of the password length must be inclusive.
+        tests:
+          - UserService_CreateAsync_PasswordOfTwelveCharacters_Creates
+
+      - id: ReviewCenter-UserService-Password-MaxLength
+        title: >-
+          The UserService class shall accept a password of exactly 128 characters.
+        justification: |
+          The upper limit of the password length must be inclusive.
+        tests:
+          - UserService_CreateAsync_PasswordOfHundredTwentyEightCharacters_Creates
+
+      - id: ReviewCenter-UserService-Password-TooShort
+        title: >-
+          The UserService class shall reject a password shorter than 12 characters, with the PasswordInvalid rule.
+        justification: |
+          A short password is easy to guess.
+        tests:
+          - UserService_CreateAsync_PasswordOfElevenCharacters_ThrowsPasswordInvalid
+
+      - id: ReviewCenter-UserService-Password-TooLong
+        title: >-
+          The UserService class shall reject a password longer than 128 characters, with the PasswordInvalid rule.
+        justification: |
+          The cap keeps the cost of hashing bounded.
+        tests:
+          - UserService_CreateAsync_PasswordOfHundredTwentyNineCharacters_ThrowsPasswordInvalid
+
+      - id: ReviewCenter-UserService-Password-NoComposition
+        title: >-
+          The UserService class shall accept a password of one repeated letter, without a demand for a mix of
+          character kinds.
+        justification: |
+          Length, not composition, makes a password strong, and composition rules only push people to predictable
+          choices.
+        tests:
+          - UserService_CreateAsync_PasswordOfOneRepeatedLetter_Creates
+
+      - id: ReviewCenter-UserService-Password-Missing
+        title: >-
+          The UserService class shall reject a missing password, with the PasswordInvalid rule.
+        justification: |
+          A user without a password cannot be checked at the next sign-in.
+        tests:
+          - UserService_CreateAsync_PasswordMissing_ThrowsPasswordInvalid
+
+      - id: ReviewCenter-UserService-Password-NotTrimmed
+        title: >-
+          The UserService class shall keep the white space at the start and end of a password.
+        justification: |
           A password with spaces at its ends is a different password, so it must not be altered.
         tests:
-          - UserService_CreateAsync_PasswordLength_FollowsPolicy
-          - UserService_CreateAsync_MissingPasswordOrWhiteSpacePadding_FollowsLengthRule
+          - UserService_CreateAsync_PasswordOfTwelveSpaces_IsKeptUntrimmed
 
+      - id: ReviewCenter-UserService-Password-NothingStored
+        title: >-
+          The UserService class shall store nothing when it rejects a password.
+        justification: |
+          A refused password must not leave a half-made user behind.
+        tests:
+          - UserService_CreateAsync_RejectedPassword_StoresNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Create
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Create
         title: >-
-          The UserService class shall create an enabled user, a system administrator only when it is asked to,
-          storing a hash of the password and never the password itself.
+          The UserService class shall create a user who is enabled.
         justification: |
-          A copy of the database must not reveal the passwords, and the system administrator right must never be
-          given by default, because it reaches every project.
+          A new user must be able to sign in at once.
+        tests:
+          - UserService_CreateAsync_NewUser_IsEnabled
+
+      - id: ReviewCenter-UserService-Create-Administrator
+        title: >-
+          The UserService class shall make the new user a system administrator when it is asked to.
+        justification: |
+          The system administrator right is given on purpose, to the person who has to manage the service.
+        tests:
+          - UserService_CreateAsync_AdministratorRequested_CreatesSystemAdministrator
+
+      - id: ReviewCenter-UserService-Create-NoAdministratorByDefault
+        title: >-
+          The UserService class shall make the new user a system administrator only when it is asked to.
+        justification: |
+          The system administrator right reaches every project, so it must never be given by default.
+        tests:
+          - UserService_CreateAsync_AdministratorNotRequested_CreatesPlainUser
+
+      - id: ReviewCenter-UserService-Create-PasswordHash
+        title: >-
+          The UserService class shall store a hash of the password and never the password itself.
+        justification: |
+          A copy of the database must not reveal the passwords.
         tests:
           - UserService_CreateAsync_StoresHashNotPassword
+
+      - id: ReviewCenter-UserService-Create-Arguments
+        title: >-
+          The UserService class shall refuse to be built without a user store, a password hasher, or a time provider.
+        justification: |
+          A missing dependency must fail at once and visibly, not later in the middle of a sign-in.
+        tests:
           - UserService_Constructor_NullArguments_Throws
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Authenticate
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Authenticate
         title: >-
-          The UserService class shall return the user, found by user name in any letter case, when the password
-          is right and the user is enabled, and nothing in every other case, taking about the same effort for an
-          unknown user name.
+          The UserService class shall return the user when the password is right and the user is enabled.
         justification: |
-          Sign-in must not tell an attacker which part was wrong, so one answer covers an unknown user, a wrong
-          password, and a disabled user, and checking a password hash even for an unknown name keeps the time
-          taken from revealing which names exist.
+          A sign-in needs the right password of an enabled user.
         tests:
-          - UserService_AuthenticateAsync_RightWrongAndUnknown_OnlyRightSucceeds
+          - UserService_AuthenticateAsync_RightPassword_ReturnsTheUser
+
+      - id: ReviewCenter-UserService-Authenticate-AnyCase
+        title: >-
+          The UserService class shall find the user by the user name in any letter case.
+        justification: |
+          User names are case-insensitive, so a person who types another letter case must still get in.
+        tests:
+          - UserService_AuthenticateAsync_UserNameInOtherCase_ReturnsTheUser
+
+      - id: ReviewCenter-UserService-Authenticate-WrongPassword
+        title: >-
+          The UserService class shall return nothing for a wrong, empty, or missing password.
+        justification: |
+          A wrong password must give no information and no access.
+        tests:
+          - UserService_AuthenticateAsync_WrongPassword_ReturnsNull
+
+      - id: ReviewCenter-UserService-Authenticate-UnknownUser
+        title: >-
+          The UserService class shall return nothing for an unknown user name.
+        justification: |
+          An unknown name must get the same answer as a wrong password, so that the answer does not tell which names
+          exist.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUser_ReturnsNull
+
+      - id: ReviewCenter-UserService-Authenticate-DisabledUser
+        title: >-
+          The UserService class shall return nothing for a disabled user, even with the right password.
+        justification: |
+          One answer covers every refusal, so a disabled user learns nothing from the answer.
+        tests:
           - UserService_AuthenticateAsync_DisabledUser_ReturnsNullUntilEnabled
 
+      - id: ReviewCenter-UserService-Authenticate-SameEffort
+        title: >-
+          The UserService class shall verify a password hash for an unknown user name as it does for a known user.
+        justification: |
+          Checking a hash even for an unknown name keeps the time taken from revealing which names exist.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUser_VerifiesAHashLikeAKnownUser
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Lockout
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Lockout
         title: >-
-          The UserService class shall lock a user out for 5 minutes after 5 failed sign-ins in a row, refusing
-          even the right password while the lockout lasts without counting that attempt, and shall reset the count
-          of failures after a successful sign-in.
+          The UserService class shall lock a user out after 5 failed sign-ins in a row and not before.
         justification: |
-          A lockout limits how many passwords can be tried against one account. A success between failures shows
-          that the real user is present, so it starts the count again.
+          A lockout limits how many passwords can be tried against one account.
         tests:
-          - UserService_AuthenticateAsync_FiveFailures_LockForFiveMinutes
+          - UserService_AuthenticateAsync_FifthFailureInARow_LocksTheUser
+
+      - id: ReviewCenter-UserService-Lockout-Duration
+        title: >-
+          The UserService class shall end the lockout of a user 5 minutes after it began, and not one second earlier.
+        justification: |
+          The wait must be short enough to be tolerable and long enough to make guessing slow.
+        tests:
+          - UserService_AuthenticateAsync_Lockout_LastsExactlyFiveMinutes
+
+      - id: ReviewCenter-UserService-Lockout-LockedRefused
+        title: >-
+          The UserService class shall refuse the right password of a user while the lockout lasts.
+        justification: |
+          A guess that happens to be right must not open a locked account.
+        tests:
+          - UserService_AuthenticateAsync_LockedUser_RightPasswordIsRefused
+
+      - id: ReviewCenter-UserService-Lockout-LockedNotCounted
+        title: >-
+          The UserService class shall leave the count of failures and the end of the lockout as they were for an
+          attempt while the lockout lasts.
+        justification: |
+          Attempts at a locked account must not extend the lockout for ever.
+        tests:
+          - UserService_AuthenticateAsync_LockedUser_AttemptsAreNotCounted
+
+      - id: ReviewCenter-UserService-Lockout-ResetOnSuccess
+        title: >-
+          The UserService class shall reset the count of failures after a successful sign-in.
+        justification: |
+          A success between failures shows that the real user is present, so it starts the count again.
+        tests:
           - UserService_AuthenticateAsync_SuccessBetweenFailures_ResetsCounter
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Enabled
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Enabled
         title: >-
-          The UserService class shall let a user be disabled and enabled again, and shall not let a disabled user
-          sign in.
+          The UserService class shall let a user be disabled.
         justification: |
-          Disabling takes access away from a person who has left or is not trusted, without deleting the user
-          and so without losing the record of what the user did.
+          Disabling takes access away from a person who has left or is not trusted, without deleting the user and so
+          without losing the record of what the user did.
+        tests:
+          - UserService_SetEnabledAsync_False_DisablesTheUser
+
+      - id: ReviewCenter-UserService-Enabled-Enable
+        title: >-
+          The UserService class shall let a disabled user be enabled again, so that the user can sign in.
+        justification: |
+          A mistake or a return must be reversible.
         tests:
           - UserService_AuthenticateAsync_DisabledUser_ReturnsNullUntilEnabled
-          - UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Last administrator
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-LastAdmin
         title: >-
-          The UserService class shall refuse to disable or demote the last enabled system administrator, while
-          allowing it when another enabled system administrator remains.
+          The UserService class shall refuse to disable the last enabled system administrator, with the LastAdmin
+          rule.
         justification: |
-          Without an enabled system administrator nobody could create projects or manage users and members, and
-          the only way out would be to edit the database.
+          Without an enabled system administrator nobody could create projects or manage users and members, and the
+          only way out would be to edit the database.
         tests:
-          - UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected
-          - UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin
-          - UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept
+          - UserService_SetEnabledAsync_LastEnabledAdministrator_IsRefused
 
+      - id: ReviewCenter-UserService-LastAdmin-Demote
+        title: >-
+          The UserService class shall refuse to take the system administrator right away from the last enabled system
+          administrator, with the LastAdmin rule.
+        justification: |
+          Taking the right away has the same effect as disabling the account, so it needs the same protection.
+        tests:
+          - UserService_SetSystemAdminAsync_LastEnabledAdministrator_IsRefused
+
+      - id: ReviewCenter-UserService-LastAdmin-OtherAdminRemains
+        title: >-
+          The UserService class shall allow disabling a system administrator, or taking the right away from one, while
+          another enabled system administrator remains.
+        justification: |
+          The protection must not block the normal changes of administrators.
+        tests:
+          - UserService_SetEnabledAndSetSystemAdmin_AnotherEnabledAdministrator_AllowTheChange
+
+      - id: ReviewCenter-UserService-LastAdmin-DisabledNotCounted
+        title: >-
+          The UserService class shall not count a disabled system administrator as a remaining one.
+        justification: |
+          A disabled administrator cannot act, so it does not keep the service manageable.
+        tests:
+          - UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Change of the own password
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-ChangePassword
         title: >-
-          The UserService class shall change the password of a user only when the current password is given
-          correctly and the new password follows the password rules, counting a wrong current password as a
-          failed sign-in for the lockout, and shall, for a user whose second factor is on, refuse the change that
-          comes without the proof of the second factor, count that refusal and leave the password and the failure
-          counter as they were.
+          The UserService class shall change the password of a user when the current password is given correctly and
+          the new password follows the password rules.
         justification: |
-          Whoever sits at a signed-in session must not be able to take over the account without knowing the
-          password, and the change must not be a free way to guess it. A change that needs the password alone must
-          not be a way round the second factor, so it fails closed.
+          Only a person who knows the password may change it, and the new password must be as good as any other.
         tests:
-          - UserService_ChangeOwnPasswordAsync_NeedsCurrentPasswordAndPolicy
-          - UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut
-          - UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter
-          - UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges
+          - UserService_ChangeOwnPasswordAsync_CorrectCurrentPassword_ChangesThePassword
 
+      - id: ReviewCenter-UserService-ChangePassword-WrongCurrent
+        title: >-
+          The UserService class shall refuse a change when the current password is wrong, with the
+          CurrentPasswordIncorrect rule, leaving the password as it was.
+        justification: |
+          Whoever sits at a signed-in session must not be able to take over the account without knowing the password.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_WrongCurrentPassword_IsRefusedAndKeepsThePassword
+
+      - id: ReviewCenter-UserService-ChangePassword-NewPasswordRules
+        title: >-
+          The UserService class shall refuse a change when the new password breaks the password rules, with the
+          PasswordInvalid rule, leaving the password as it was.
+        justification: |
+          The rules hold for every way to set a password.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_NewPasswordBreakingTheRules_IsRefused
+
+      - id: ReviewCenter-UserService-ChangePassword-WrongCurrentCounts
+        title: >-
+          The UserService class shall count a wrong current password as a failed sign-in for the lockout.
+        justification: |
+          The change must not be a free way to guess a password.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_WrongCurrentPassword_CountsOneFailure
+          - UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCounts
+
+      - id: ReviewCenter-UserService-ChangePassword-SecondFactorRefused
+        title: >-
+          The UserService class shall refuse a change that comes without the proof of the second factor, for a user
+          whose second factor is on, with the TotpCodeIncorrect rule.
+        justification: |
+          A password alone must not be a way round the second factor, so the change fails closed.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter
+
+      - id: ReviewCenter-UserService-ChangePassword-SecondFactorNothingChanged
+        title: >-
+          The UserService class shall leave the password hash and the failure counter as they were when it refuses a
+          change for a missing second factor.
+        justification: |
+          Only a complete proof may change the password, and a refusal must not count as a wrong guess.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter
+
+      - id: ReviewCenter-UserService-ChangePassword-SecondFactorRefusalAudited
+        title: >-
+          The UserService class shall record the refusal of a change for a missing second factor in the audit trail.
+        justification: |
+          The attempt must show up in the trail, because it is a sign of somebody who knows the password but not the
+          second factor.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter
+
+      - id: ReviewCenter-UserService-ChangePassword-SecondFactorOff
+        title: >-
+          The UserService class shall change the password with the current password alone when the second factor is
+          switched off.
+        justification: |
+          The feature switch must really switch the proof of the second factor off.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_EnrolledUserWithTheFeatureOff_ChangesThePassword
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Password set by an administrator
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-SetPassword
         title: >-
-          The UserService class shall set a new password for a user, without knowing the old one, when the new
-          password follows the password rules, and shall end a lockout of that user.
+          The UserService class shall set a new password for a user without knowing the old one.
         justification: |
-          An administrator must be able to help a user who forgot the password, and a new password is a fresh
-          start for the account.
+          An administrator must be able to help a user who forgot the password.
         tests:
-          - UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout
+          - UserService_SetPasswordAsync_NewPassword_ReplacesThePassword
 
+      - id: ReviewCenter-UserService-SetPassword-Rules
+        title: >-
+          The UserService class shall refuse a new password that breaks the password rules, with the PasswordInvalid
+          rule, leaving the password as it was.
+        justification: |
+          The rules hold for every way to set a password.
+        tests:
+          - UserService_SetPasswordAsync_PasswordBreakingTheRules_IsRefused
+
+      - id: ReviewCenter-UserService-SetPassword-EndsLockout
+        title: >-
+          The UserService class shall end a lockout of the user and clear the count of failed sign-ins when it sets a
+          password.
+        justification: |
+          A new password is a fresh start for the account.
+        tests:
+          - UserService_SetPasswordAsync_LockedUser_EndsTheLockout
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # System administrator right
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-SetSystemAdmin
         title: >-
-          The UserService class shall give a user the system administrator right and take it away again, by user
-          name, and shall report the user that does not exist as a user not found rule violation.
+          The UserService class shall give a user the system administrator right, by user name.
         justification: |
-          The system administrator right reaches every project and every user, so it is the one right that
-          changes who may do what everywhere, and it must be changed on purpose, for a known user.
+          The system administrator right reaches every project and every user, so it must be given on purpose, to a
+          known user.
         tests:
-          - UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept
-          - UserService_Changes_UnknownUser_ThrowUserNotFound
+          - UserService_SetSystemAdminAsync_Promote_GivesTheRight
 
+      - id: ReviewCenter-UserService-SetSystemAdmin-Remove
+        title: >-
+          The UserService class shall take the system administrator right away from a user, by user name.
+        justification: |
+          A right that cannot be taken away again would be a permanent risk.
+        tests:
+          - UserService_SetSystemAdminAsync_Demote_TakesTheRightAway
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Unknown user
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-NotFound
         title: >-
-          The UserService class shall report a change of a user that does not exist as a user not found rule
-          violation.
+          The UserService class shall report a change of a user that does not exist with the UserNotFound rule, for each
+          of these changes: enabling, disabling, the role, the system administrator right, the own password, and a set
+          password.
         justification: |
-          A request that names nobody must fail visibly instead of appearing to succeed.
+          A request that names nobody must fail visibly instead of appearing to succeed. The changes share one rule,
+          shown row by row by the test.
         tests:
           - UserService_Changes_UnknownUser_ThrowUserNotFound
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit of the changes of users
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Audit
         title: >-
-          The UserService class shall record creating a user, enabling, disabling, changing the system
-          administrator right, setting a password as an administrator, changing one's own password, and unlocking
-          a user in the audit trail, in the same transaction as the change, naming the actor (the command line for a
-          user created from it), and never recording a password.
+          The UserService class shall record the creation of a user in the audit trail, with the action user.created
+          and the user name.
         justification: |
-          Changes of accounts and rights are what an auditor looks for first, and a password in a history that
-          cannot be edited could never be removed.
+          Changes of accounts are what an auditor looks for first.
         tests:
-          - UserService_AdministrationEvents_AreRecordedWithoutPasswords
-          - UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine
-          - UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits
+          - UserService_CreateAsync_NewUser_RecordsUserCreated
 
+      - id: ReviewCenter-UserService-Audit-Enable
+        title: >-
+          The UserService class shall record enabling a user in the audit trail, with the action user.enabled and the
+          user name.
+        justification: |
+          Giving access back to an account is a change an auditor looks for.
+        tests:
+          - UserService_SetEnabledAsync_True_RecordsUserEnabled
+
+      - id: ReviewCenter-UserService-Audit-Disable
+        title: >-
+          The UserService class shall record disabling a user in the audit trail, with the action user.disabled and
+          the user name.
+        justification: |
+          Taking access away from an account is a change an auditor looks for.
+        tests:
+          - UserService_SetEnabledAsync_False_RecordsUserDisabled
+
+      - id: ReviewCenter-UserService-Audit-AdminChange
+        title: >-
+          The UserService class shall record a change of the system administrator right in the audit trail, with the
+          action user.admin-changed and the old and the new value.
+        justification: |
+          Changes of rights matter most to an auditor.
+        tests:
+          - UserService_SetSystemAdminAsync_Promote_RecordsTheOldAndTheNewValue
+
+      - id: ReviewCenter-UserService-Audit-AdminPassword
+        title: >-
+          The UserService class shall record setting a password as an administrator in the audit trail, with the
+          action user.password-set-by-admin and the user name.
+        justification: |
+          A password set by somebody else must be visible in the trail.
+        tests:
+          - UserService_SetPasswordAsync_ByAdministrator_RecordsPasswordSetByAdmin
+
+      - id: ReviewCenter-UserService-Audit-OwnPassword
+        title: >-
+          The UserService class shall record a change of the own password in the audit trail, with the action
+          user.password-changed and the user as the actor.
+        justification: |
+          The person changed the password, so the trail names that person.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_NewPassword_RecordsPasswordChangedByTheUser
+
+      - id: ReviewCenter-UserService-Audit-Unlock
+        title: >-
+          The UserService class shall record unlocking a user in the audit trail, with the action user.unlocked and
+          the name of the unlocked user.
+        justification: |
+          The right to unlock is the administrator's alone, and the trail must show who used it.
+        tests:
+          - UserService_UnlockAsync_SystemAdministrator_RecordsUserUnlocked
+
+      - id: ReviewCenter-UserService-Audit-Actor
+        title: >-
+          The UserService class shall name the actor of each administrative change of a user in the audit trail.
+        justification: |
+          The trail must say who made the change.
+        tests:
+          - UserService_AdministrationEvents_NameTheActor
+
+      - id: ReviewCenter-UserService-Audit-CommandLine
+        title: >-
+          The UserService class shall name the command line as the actor of a user created from it.
+        justification: |
+          The command line has no person, so the trail names it as such.
+        tests:
+          - UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine
+
+      - id: ReviewCenter-UserService-Audit-NoPassword
+        title: >-
+          The UserService class shall never record a password, or a hash of one, in an audit entry of a change of a
+          user.
+        justification: |
+          A password in a history that cannot be edited could never be removed.
+        tests:
+          - UserService_AdministrationEvents_NeverRecordAPassword
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit of failed sign-ins
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-SignInAudit
         title: >-
-          The UserService class shall record a failed sign-in (wrong password, disabled account, unknown user), an
-          attempt on a locked account, and the lockout of an account in the audit trail on a best-effort basis, with
-          the typed user name of an unknown user cleaned and capped to the length of a user name, without recording
-          a password, with attempts on a locked account, failures of a disabled account, and failures for an unknown
-          user recorded at most once per minute, name and reason, and without ever letting a failure of the trail
-          change the result of the sign-in.
+          The UserService class shall record a failed sign-in with a wrong password in the audit trail, naming the
+          user.
         justification: |
-          Failed sign-ins show attempts to break in, but the trail must not let an unauthenticated caller fill it
-          with text of their choice or with an unlimited number of rows, and a failing trail must not lock
-          everybody out. The typed name of an unknown user shows what an attacker tried; it is cleaned to one line
-          and capped, so it cannot forge entries. Wrong passwords are bounded by the lockout and are recorded every
-          time. A right password on a disabled account is not counted by the lockout, so those failures are
-          coalesced like those of locked and unknown accounts.
+          Failed sign-ins show attempts to break in. Wrong passwords are bounded by the lockout, so they are recorded
+          every time.
         tests:
-          - UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft
-          - UserService_AuthenticateAsync_UnknownUser_RecordsCleanedCappedTypedNameWithoutPassword
-          - UserService_AuthenticateAsync_UnknownUserRepeated_RecordsOneEntryPerWindow
           - UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword
-          - UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled
-          - UserService_AuthenticateAsync_DisabledAccountRepeated_RecordsOneEntryPerWindow
+
+      - id: ReviewCenter-UserService-SignInAudit-NoPassword
+        title: >-
+          The UserService class shall never record the typed password in the audit entry of a failed sign-in.
+        justification: |
+          A typed password may be the real password of somebody, and a trail cannot be edited.
+        tests:
+          - UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword
           - UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnce
+          - UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserEntry
+
+      - id: ReviewCenter-UserService-SignInAudit-DisabledAccount
+        title: >-
+          The UserService class shall record a sign-in on a disabled account in the audit trail as a failure with the
+          reason account disabled.
+        justification: |
+          The right password on a disabled account is a signal that somebody tries to come back.
+        tests:
+          - UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled
+
+      - id: ReviewCenter-UserService-SignInAudit-UnknownUser
+        title: >-
+          The UserService class shall record a sign-in for an unknown user in the audit trail with the typed user name
+          and no user.
+        justification: |
+          The names that an attacker tried show what the attacker knows.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserEntry
+
+      - id: ReviewCenter-UserService-SignInAudit-TypedNameCleaned
+        title: >-
+          The UserService class shall record the typed user name of an unknown user on one line, with the control
+          characters replaced.
+        justification: |
+          A typed name with line breaks could forge entries in the trail.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUserWithLineBreaks_RecordsTheTypedNameOnOneLine
+
+      - id: ReviewCenter-UserService-SignInAudit-TypedNameCapped
+        title: >-
+          The UserService class shall cap the typed user name of an unknown user in the audit entry to the length of a
+          user name.
+        justification: |
+          An unbounded typed text could fill the trail.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUserWithLongName_RecordsTheTypedNameCapped
+
+      - id: ReviewCenter-UserService-SignInAudit-LockedAccount
+        title: >-
+          The UserService class shall record an attempt on a locked account in the audit trail as a failure with the
+          reason account locked.
+        justification: |
+          Attempts at a locked account are attempts to break in.
+        tests:
           - UserService_AuthenticateAsync_LockedAccount_RecordsSignInLockedOncePerWindow
+
+      - id: ReviewCenter-UserService-SignInAudit-Lockout
+        title: >-
+          The UserService class shall record the lockout of an account in the audit trail once, when the fifth failure
+          locks it.
+        justification: |
+          A lockout is an event of its own, and it must show once.
+        tests:
+          - UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnce
+
+      - id: ReviewCenter-UserService-SignInAudit-UnknownUserOnce
+        title: >-
+          The UserService class shall record failures for the same unknown user name at most once per minute, in any
+          letter case.
+        justification: |
+          A caller who has not signed in must not be able to fill the trail with an unlimited number of rows.
+        tests:
+          - UserService_AuthenticateAsync_UnknownUserRepeated_RecordsOneEntryPerWindow
+
+      - id: ReviewCenter-UserService-SignInAudit-DisabledOnce
+        title: >-
+          The UserService class shall record failures of the same disabled account at most once per minute.
+        justification: |
+          The lockout does not count them, so they are coalesced like the failures for an unknown user.
+        tests:
+          - UserService_AuthenticateAsync_DisabledAccountRepeated_RecordsOneEntryPerWindow
+
+      - id: ReviewCenter-UserService-SignInAudit-LockedOnce
+        title: >-
+          The UserService class shall record attempts on the same locked account at most once per minute.
+        justification: |
+          The lockout does not bound the attempts that it refuses, so they are coalesced.
+        tests:
+          - UserService_AuthenticateAsync_LockedAccountRepeated_RecordsOneEntryPerWindow
+
+      - id: ReviewCenter-UserService-SignInAudit-TrailFailure
+        title: >-
+          The UserService class shall give the result of the sign-in check unchanged, without throwing, when the audit
+          trail fails.
+        justification: |
+          A failing trail must not lock everybody out.
+        tests:
           - UserService_AuthenticateAsync_AuditStoreFails_StillRefusesAndDoesNotThrow
+
+      - id: ReviewCenter-UserService-SignInAudit-NoAuditService
+        title: >-
+          The UserService class shall check a sign-in when it was built without an audit service.
+        justification: |
+          The audit trail is optional for a user service.
+        tests:
           - UserService_AuthenticateAsync_NoAuditService_Works
 
+      - id: ReviewCenter-UserService-SignInAudit-CounterNoEntry
+        title: >-
+          The UserService class shall keep the update of the failure counter of a user out of the audit entries of the
+          user store.
+        justification: |
+          A counter update is not an administrative event of the user.
+        tests:
+          - UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Re-authentication
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-ReauthAudit
         title: >-
-          The UserService class shall offer a re-authentication check that works like a sign-in check, including the
-          lockout, and shall record its failures (wrong password, disabled account, locked account, unknown user)
-          under a re-authentication action that is different from the sign-in action, without recording a
-          password, and with failures of a disabled or locked account recorded at most once per minute, account and
-          reason.
+          The UserService class shall offer a re-authentication check that returns the user for the right password of
+          an enabled user.
         justification: |
-          A signature asks for the password again, and guessing it there is as dangerous as at sign-in. The trail
-          must show where the failed attempt happened, which the sign-in action alone cannot tell. The reason is
-          part of the once-per-minute key, so a disabled account and a locked account of one name both show.
+          A signature asks for the password again, so the service must check it again.
         tests:
-          - UserService_ReauthenticateAsync_WrongPasswordAndLockedAccount_RecordSignatureReauthFailed
+          - UserService_ReauthenticateAsync_RightPassword_ReturnsTheUser
+
+      - id: ReviewCenter-UserService-ReauthAudit-WrongPassword
+        title: >-
+          The UserService class shall record a failed re-authentication with a wrong password in the audit trail.
+        justification: |
+          Guessing a password at a signature is as dangerous as guessing it at a sign-in.
+        tests:
+          - UserService_ReauthenticateAsync_WrongPassword_RecordsSignatureReauthFailed
+
+      - id: ReviewCenter-UserService-ReauthAudit-LockedAccount
+        title: >-
+          The UserService class shall record a re-authentication on a locked account in the audit trail.
+        justification: |
+          An attempt at a locked account is an attempt to break in, whether it comes at a sign-in or at a signature.
+        tests:
+          - UserService_ReauthenticateAsync_LockedAccount_RecordsSignatureReauthFailed
+
+      - id: ReviewCenter-UserService-ReauthAudit-DisabledAccount
+        title: >-
+          The UserService class shall record a re-authentication on a disabled account in the audit trail.
+        justification: |
+          An attempt at a disabled account is a signal, whether it comes at a sign-in or at a signature.
+        tests:
+          - UserService_ReauthenticateAsync_DisabledAccount_RecordsSignatureReauthFailed
+
+      - id: ReviewCenter-UserService-ReauthAudit-UnknownUser
+        title: >-
+          The UserService class shall record a re-authentication for an unknown user in the audit trail.
+        justification: |
+          The names that an attacker tried show what the attacker knows, at a signature as at a sign-in.
+        tests:
+          - UserService_ReauthenticateAsync_UnknownUser_RecordsSignatureReauthFailed
+
+      - id: ReviewCenter-UserService-ReauthAudit-Lockout
+        title: >-
+          The UserService class shall lock the account out after 5 failed re-authentications in a row, recording the
+          lockout once.
+        justification: |
+          A signature is as easy to guess at as a sign-in unless it shares the lockout.
+        tests:
+          - UserService_ReauthenticateAsync_FifthFailure_LocksTheAccountOut
+
+      - id: ReviewCenter-UserService-ReauthAudit-Action
+        title: >-
+          The UserService class shall record the failures of a re-authentication under an action that is different
+          from the action of a failed sign-in.
+        justification: |
+          The trail must show where the attempt happened, which the sign-in action alone cannot tell.
+        tests:
+          - UserService_ReauthenticateAsync_Failures_AreNotRecordedAsSignInFailures
+
+      - id: ReviewCenter-UserService-ReauthAudit-NoPassword
+        title: >-
+          The UserService class shall never record the typed password in the audit entry of a failed
+          re-authentication.
+        justification: |
+          A typed password may be the real password of somebody, and a trail cannot be edited.
+        tests:
+          - UserService_ReauthenticateAsync_Failures_NeverRecordThePassword
+
+      - id: ReviewCenter-UserService-ReauthAudit-DisabledOnce
+        title: >-
+          The UserService class shall record failed re-authentications of the same disabled account at most once per
+          minute.
+        justification: |
+          The lockout does not count them, so they are coalesced.
+        tests:
           - UserService_ReauthenticateAsync_DisabledAccountRepeated_RecordsOneSignatureReauthFailedPerWindow
+
+      - id: ReviewCenter-UserService-ReauthAudit-LockedOnce
+        title: >-
+          The UserService class shall record failed re-authentications of the same locked account at most once per
+          minute.
+        justification: |
+          The lockout does not bound the attempts that it refuses, so they are coalesced.
+        tests:
+          - UserService_ReauthenticateAsync_LockedAccountRepeated_RecordsOneEntryPerWindow
+
+      - id: ReviewCenter-UserService-ReauthAudit-BothReasons
+        title: >-
+          The UserService class shall record a disabled and a locked failure of one account within the same minute as
+          two entries.
+        justification: |
+          The reason is part of the once-per-minute key, so one reason does not hide the other.
+        tests:
           - UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Temporary password
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-TemporaryPassword
         title: >-
-          The UserService class shall let a user whose password is a temporary one sign in, so that the user can
-          reach the page that replaces it, shall refuse that user a re-authentication for a signature and record the
-          refusal in the audit trail with the reason that a password change is pending, shall refuse a new password
-          that is the same as the temporary one and keep the temporary state in that case, and shall end the
-          temporary state when the user changes the own password.
+          The UserService class shall let a user whose password is a temporary one sign in.
         justification: |
-          A temporary password has been handed over by somebody else, so it is good enough to prove who arrives at
-          the password page but not to confirm a signature, which is a personal statement. The state must end only
-          when the person has really chosen a password of their own.
+          The user must be able to reach the page that replaces the temporary password.
         tests:
           - UserService_AuthenticateAsync_TemporaryPassword_SignsIn
+
+      - id: ReviewCenter-UserService-TemporaryPassword-ReauthRefused
+        title: >-
+          The UserService class shall refuse a user whose password is a temporary one a re-authentication for a
+          signature.
+        justification: |
+          A temporary password has been handed over by somebody else, so it is no personal statement.
+        tests:
           - UserService_ReauthenticateAsync_TemporaryPassword_IsRefusedAndAudited
-          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
+
+      - id: ReviewCenter-UserService-TemporaryPassword-ReauthAudited
+        title: >-
+          The UserService class shall record the refusal of that re-authentication in the audit trail with the reason
+          that a password change is pending.
+        justification: |
+          The trail must say why the signature was refused.
+        tests:
+          - UserService_ReauthenticateAsync_TemporaryPassword_IsRefusedAndAudited
+
+      - id: ReviewCenter-UserService-TemporaryPassword-SameRefused
+        title: >-
+          The UserService class shall refuse a new password that is the same as the temporary one, with the
+          PasswordInvalid rule.
+        justification: |
+          The temporary state must end with a real choice of the person.
+        tests:
           - UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag
+
+      - id: ReviewCenter-UserService-TemporaryPassword-SameKeepsFlag
+        title: >-
+          The UserService class shall keep the temporary state when it refuses a new password that is the same as the
+          temporary one.
+        justification: |
+          The user must still change the password.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag
+
+      - id: ReviewCenter-UserService-TemporaryPassword-EndsOnChange
+        title: >-
+          The UserService class shall end the temporary state when the user changes the own password.
+        justification: |
+          The state must end only when the person has really chosen a password of their own.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheTemporaryFlag
 
       - id: ReviewCenter-UserService-AdminPasswordIsTemporary
         title: >-
-          The UserService class shall make the password that a system administrator sets for another user a
-          temporary one, so that the user has to change it at the next sign-in, also for a user who had no temporary
-          password before, shall not do so when the actor sets the password of the own account, and shall keep an
-          account of a provider without a password.
+          The UserService class shall make the password that an administrator or the command line sets for another
+          user a temporary one.
         justification: |
-          An administrator who types a password knows it, so the user must replace it before using the account. A
-          person who sets the own password has chosen it and needs no second change. The rule is in the service, so
-          every caller gets it.
+          An administrator who types a password knows it, so the user must replace it before using the account.
         tests:
-          - UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn
-          - UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange
-          - UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange
-          - UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange
-          - UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused
+          - UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporary
+          - UserService_SetPasswordAsync_OtherUserByAdministratorOrCommandLine_ForcesAChange
 
+      - id: ReviewCenter-UserService-AdminPasswordIsTemporary-OwnAccount
+        title: >-
+          The UserService class shall not make the password temporary when the actor sets the password of the own
+          account, whatever the letter case of the name.
+        justification: |
+          A person who sets the own password has chosen it and needs no second change.
+        tests:
+          - UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange
+
+      - id: ReviewCenter-UserService-AdminPasswordIsTemporary-OwnClearsPending
+        title: >-
+          The UserService class shall end a pending forced change when the actor sets the password of the own account.
+        justification: |
+          The person has chosen a password, so nothing is left to change.
+        tests:
+          - UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange
+
+      - id: ReviewCenter-UserService-AdminPasswordIsTemporary-ApiTokenActor
+        title: >-
+          The UserService class shall treat an actor that acts through an API token as another party, so that the
+          password it sets is temporary even for the user the token belongs to.
+        justification: |
+          A token is not the person, and a password set through it is not chosen by the person.
+        tests:
+          - UserService_SetPasswordAsync_ApiTokenActorWithTheUserName_ForcesAChange
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Last sign-in
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-LastSignIn
         title: >-
-          The UserService class shall store the time of the last successful sign-in of a user, by password without
-          a second factor, by the completed second factor, and by a provider, and shall store nothing for a failed
-          sign-in, a password step that still waits for the second factor, or a re-authentication for a signature.
+          The UserService class shall store the time of the last successful sign-in of a user who signs in with a
+          password and no second factor.
         justification: |
-          An administrator who reviews who still has access needs to see which accounts are not used any more. Only a
-          sign-in that opened a session counts, so a guessed password cannot make an unused account look active.
+          An administrator who reviews who still has access needs to see which accounts are not used any more.
         tests:
-          - UserService_AuthenticatePasswordAsync_SuccessOnly_RecordsLastSignIn
-          - UserService_SignInExternalAsync_AcceptedOnly_RecordsLastSignIn
-          - TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen
-          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
-          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
-          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - UserService_AuthenticateAsync_RightPassword_StoresTheTimeOfTheSignIn
 
+      - id: ReviewCenter-UserService-LastSignIn-Failed
+        title: >-
+          The UserService class shall store no time for a failed sign-in.
+        justification: |
+          A guessed password must not make an unused account look active.
+        tests:
+          - UserService_AuthenticateAsync_WrongPassword_StoresNoSignInTime
+
+      - id: ReviewCenter-UserService-LastSignIn-Reauthentication
+        title: >-
+          The UserService class shall store no time for a re-authentication for a signature.
+        justification: |
+          A fresh proof for an action is not a sign-in.
+        tests:
+          - UserService_ReauthenticatePasswordAsync_RightPassword_StoresNoSignInTime
+
+      - id: ReviewCenter-UserService-LastSignIn-SecondFactor
+        title: >-
+          The UserService class shall store the time of the last sign-in when the second factor of a sign-in is
+          completed.
+        justification: |
+          Only a sign-in that opened a session counts as a sign-in.
+        tests:
+          - UserService_RecordSignInAsync_KnownUser_StoresTheTimeOfTheSignIn
+
+      - id: ReviewCenter-UserService-LastSignIn-WaitingSecondFactor
+        title: >-
+          The UserService class shall store no time for a password step that still waits for the second factor.
+        justification: |
+          A password step that waits for the code has not opened a session yet.
+        tests:
+          - UserService_AuthenticatePasswordAsync_EnrolledUser_StoresNoSignInTime
+
+      - id: ReviewCenter-UserService-LastSignIn-Provider
+        title: >-
+          The UserService class shall store the time of the last sign-in of an account that signs in at a provider.
+        justification: |
+          Accounts of a provider must show unused accounts as well as local accounts.
+        tests:
+          - UserService_SignInExternalAsync_AcceptedSignIn_StoresTheTimeOfTheSignIn
+
+      - id: ReviewCenter-UserService-LastSignIn-ProviderRefused
+        title: >-
+          The UserService class shall store no time for a refused sign-in of a disabled account at a provider.
+        justification: |
+          A refused sign-in opened no session.
+        tests:
+          - UserService_SignInExternalAsync_DisabledAccount_StoresNoSignInTime
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Locked status
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-LockedStatus
         title: >-
-          The UserService class shall offer a check that tells whether a user is locked out at a given time, which is
-          the case until the end of the lockout and no longer.
+          The UserService class shall tell that a user is locked out at a given time until the end of the lockout.
         justification: |
-          The page that shows the lockout and the sign-in that refuses a locked user must use one rule, or the page
-          could show a user as free who cannot sign in.
+          The page that shows the lockout and the sign-in that refuses a locked user must use one rule.
         tests:
-          - UserService_IsLocked_Lockout_IsLockedUntilItsEnd
+          - UserService_IsLocked_RunningLockout_IsLocked
 
+      - id: ReviewCenter-UserService-LockedStatus-Ended
+        title: >-
+          The UserService class shall tell that a user is no longer locked out at the end instant of the lockout.
+        justification: |
+          The end of the lockout is exclusive, so the user is free from that instant on.
+        tests:
+          - UserService_IsLocked_LockoutAtItsEnd_IsNotLocked
+
+      - id: ReviewCenter-UserService-LockedStatus-NoLockout
+        title: >-
+          The UserService class shall tell that a user without a lockout is not locked out.
+        justification: |
+          No lockout means that the user is free.
+        tests:
+          - UserService_IsLocked_NoLockout_IsNotLocked
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Unlock
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-Unlock
         title: >-
-          The UserService class shall let a system administrator end the lockout of a user by user identifier,
-          clearing the count of failed sign-ins, record that in the audit trail as an unlock of the named user,
-          refuse every other actor, and report an unknown user as a user not found rule violation.
+          The UserService class shall let a system administrator end the lockout of a user, by user identifier.
         justification: |
-          A person who mistyped the password has to wait out the lockout unless an administrator can end it. The
-          right is the administrator's alone, and the trail shows who used it.
+          A person who mistyped the password has to wait out the lockout unless an administrator can end it.
         tests:
-          - UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits
-          - UserService_UnlockAsync_NotAllowedOrUnknown_IsRefused
+          - UserService_UnlockAsync_SystemAdministrator_EndsTheLockout
 
+      - id: ReviewCenter-UserService-Unlock-ClearsCount
+        title: >-
+          The UserService class shall clear the count of failed sign-ins of the user when an administrator unlocks the
+          user.
+        justification: |
+          The next failure must not lock the user out again at once.
+        tests:
+          - UserService_UnlockAsync_SystemAdministrator_ClearsTheCountOfFailedSignIns
+
+      - id: ReviewCenter-UserService-Unlock-ActorNotAllowed
+        title: >-
+          The UserService class shall refuse an actor that is not an enabled system administrator, that has a
+          temporary password, or that acts through an API token, with the ActorNotAllowed rule.
+        justification: |
+          The right to unlock is the administrator's alone.
+        tests:
+          - UserService_UnlockAsync_ActorThatIsNotAnEnabledAdministrator_IsRefused
+
+      - id: ReviewCenter-UserService-Unlock-NothingChanged
+        title: >-
+          The UserService class shall leave the lockout, the count of failures, and the audit trail as they were when
+          it refuses an actor.
+        justification: |
+          A refusal must not half work.
+        tests:
+          - UserService_UnlockAsync_RefusedActor_ChangesAndAuditsNothing
+
+      - id: ReviewCenter-UserService-Unlock-NotFound
+        title: >-
+          The UserService class shall report an unknown user identifier with the UserNotFound rule.
+        justification: |
+          A request that names nobody must fail visibly.
+        tests:
+          - UserService_UnlockAsync_UnknownUserIdentifier_ThrowsUserNotFound
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Sign-in with an external identity provider
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-ExternalSignIn
         title: >-
-          The UserService class shall find the account of an identity at a provider by the issuer and the subject
-          only, never by a name or an e-mail address, create the account on the first sign-in as an enabled user who is
-          not a system administrator and has no project, refuse the sign-in of a disabled account, refuse a missing
-          identity or one that is longer than the stored limits, and record the creation in the audit trail.
+          The UserService class shall find the account of an identity at a provider by the issuer and the subject.
         justification: |
-          A name that a person chooses at the provider is no proof of who they are, so only the pair that the provider
-          guarantees may find an account. A new person has no rights until somebody who may give them does so, and the
-          limits keep a hostile provider answer out of the database.
+          The pair of issuer and subject is what the provider guarantees about a person.
         tests:
           - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
+
+      - id: ReviewCenter-UserService-ExternalSignIn-OnlyIssuerSubject
+        title: >-
+          The UserService class shall not find the account of an identity by a name, or by another subject or issuer.
+        justification: |
+          A name that a person chooses at the provider is no proof of who the person is.
+        tests:
           - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
-          - UserService_SignInExternalAsync_MissingIdentity_IsInvalid
-          - UserService_SignInExternalAsync_IdentityLengthLimits_AreEnforced
+
+      - id: ReviewCenter-UserService-ExternalSignIn-Create
+        title: >-
+          The UserService class shall create the account on the first sign-in of an identity, once, keeping its issuer
+          and subject.
+        justification: |
+          A new person needs an account, and the next sign-in must find the same one.
+        tests:
+          - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
+
+      - id: ReviewCenter-UserService-ExternalSignIn-Enabled
+        title: >-
+          The UserService class shall create the account of a provider as an enabled user.
+        justification: |
+          The person may use the account at once.
+        tests:
+          - UserService_SignInExternalAsync_FirstSignIn_CreatesAnEnabledUser
+
+      - id: ReviewCenter-UserService-ExternalSignIn-NotAdministrator
+        title: >-
+          The UserService class shall create the account of a provider as a user who is not a system administrator.
+        justification: |
+          A new person has no rights until somebody who may give them does so.
+        tests:
+          - UserService_SignInExternalAsync_FirstSignIn_CreatesNoSystemAdministrator
+
+      - id: ReviewCenter-UserService-ExternalSignIn-Audit
+        title: >-
+          The UserService class shall record the creation of the account of a provider in the audit trail, with the
+          action account.oidc-created and the host of the issuer.
+        justification: |
+          Account creation is what an auditor looks for first, and the host shows which provider the person came from.
+        tests:
+          - UserService_SignInExternalAsync_FirstSignIn_RecordsAccountOidcCreated
+
+      - id: ReviewCenter-UserService-ExternalSignIn-Disabled
+        title: >-
+          The UserService class shall refuse the sign-in of a disabled account of a provider, leaving the account
+          unchanged.
+        justification: |
+          Disabling an account must hold at every door.
+        tests:
           - UserService_SignInExternalAsync_DisabledAccount_IsRefused
 
+      - id: ReviewCenter-UserService-ExternalSignIn-MissingIdentity
+        title: >-
+          The UserService class shall refuse a sign-in with a missing or empty issuer or subject.
+        justification: |
+          Without both there is no identity.
+        tests:
+          - UserService_SignInExternalAsync_MissingIdentity_IsInvalid
+
+      - id: ReviewCenter-UserService-ExternalSignIn-IssuerMaxLength
+        title: >-
+          The UserService class shall accept an issuer of exactly 512 characters.
+        justification: |
+          The limit of the stored issuer must be inclusive.
+        tests:
+          - UserService_SignInExternalAsync_IssuerOfMaximumLength_SignsIn
+
+      - id: ReviewCenter-UserService-ExternalSignIn-IssuerTooLong
+        title: >-
+          The UserService class shall refuse an issuer longer than 512 characters.
+        justification: |
+          The limit keeps a hostile answer of a provider out of the database.
+        tests:
+          - UserService_SignInExternalAsync_IssuerOverTheLimit_IsInvalid
+
+      - id: ReviewCenter-UserService-ExternalSignIn-SubjectMaxLength
+        title: >-
+          The UserService class shall accept a subject of exactly 256 characters.
+        justification: |
+          The limit of the stored subject must be inclusive.
+        tests:
+          - UserService_SignInExternalAsync_SubjectOfMaximumLength_SignsIn
+
+      - id: ReviewCenter-UserService-ExternalSignIn-SubjectTooLong
+        title: >-
+          The UserService class shall refuse a subject longer than 256 characters.
+        justification: |
+          The limit keeps a hostile answer of a provider out of the database.
+        tests:
+          - UserService_SignInExternalAsync_SubjectOverTheLimit_IsInvalid
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Names of the account of an external identity provider
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-ExternalCreate
         title: >-
-          The UserService class shall give the account of a provider a display name that is cleaned of control
-          characters and cut to the limit, and a user name that is made from the suggestion of the provider by keeping
-          only the allowed characters and the length limit, and that is unique.
+          The UserService class shall make the user name of the account of a provider from the suggestion of the
+          provider by keeping only letters, digits, full stops, underscores, and hyphens.
         justification: |
-          The names come from another system and may hold anything, so they are cleaned before they are stored and
-          shown.
+          The names come from another system and may hold anything, so they are cleaned before they are stored.
         tests:
           - UserService_SignInExternalAsync_Candidate_IsReducedToAValidUsername
+
+      - id: ReviewCenter-UserService-ExternalCreate-NameFallback
+        title: >-
+          The UserService class shall use the user name user when the suggestion of the provider holds no allowed
+          character or is missing.
+        justification: |
+          A user name must exist, whatever the provider suggests.
+        tests:
+          - UserService_SignInExternalAsync_CandidateWithNothingUsable_UsesTheNameUser
+
+      - id: ReviewCenter-UserService-ExternalCreate-ShortName
+        title: >-
+          The UserService class shall put user- before a suggested user name that is shorter than 3 characters.
+        justification: |
+          The user name must reach the minimum length of a user name.
+        tests:
+          - UserService_SignInExternalAsync_ShortCandidate_IsPrefixedWithUser
+
+      - id: ReviewCenter-UserService-ExternalCreate-NameLength
+        title: >-
+          The UserService class shall cut a suggested user name to 44 characters, which leaves room for a number within
+          the 50 characters of a user name.
+        justification: |
+          A number that makes the name unique must still fit.
+        tests:
+          - UserService_SignInExternalAsync_LongCandidate_IsCutToFortyFourCharacters
+
+      - id: ReviewCenter-UserService-ExternalCreate-DisplayNameClean
+        title: >-
+          The UserService class shall clean the display name from the provider of control characters and extra white
+          space, and trim it.
+        justification: |
+          Shown text must not hold hidden or forged characters.
+        tests:
           - UserService_SignInExternalAsync_DisplayName_IsSanitized
+
+      - id: ReviewCenter-UserService-ExternalCreate-DisplayNameFallback
+        title: >-
+          The UserService class shall use the made user name as the display name when the display name from the
+          provider is blank or missing.
+        justification: |
+          A display name must exist, whatever the provider sends.
+        tests:
+          - UserService_SignInExternalAsync_BlankDisplayName_UsesTheUserName
+
+      - id: ReviewCenter-UserService-ExternalCreate-DisplayNameLength
+        title: >-
+          The UserService class shall cut the display name from the provider to the display name limit.
+        justification: |
+          A long name breaks the layout and the stored record.
+        tests:
           - UserService_SignInExternalAsync_LongDisplayName_IsBounded
 
       - id: ReviewCenter-UserService-UsernameCollision
         title: >-
-          The UserService class shall, when the user name made for a new account of a provider is taken, add a number
-          to it, and when no such name is free use a generated name from the identity, numbered the same way when a
-          local account holds that name too, so that the sign-in does not fail because of a name and never uses the
-          account that holds the name.
+          The UserService class shall add a number to the made user name of a new account of a provider when that name
+          is taken.
         justification: |
-          Two people can have the same name at a provider, and a person can have the name of a local account, even the
-          generated one. Neither may be refused for that, and neither may get another person's account.
+          Two people can have the same name at a provider, and neither may be refused for that.
         tests:
-          - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
+          - UserService_SignInExternalAsync_SuggestedNameTaken_AddsANumber
+
+      - id: ReviewCenter-UserService-UsernameCollision-IdentityName
+        title: >-
+          The UserService class shall use a generated name made from the identity when no numbered variant of the made
+          user name is free.
+        justification: |
+          A person must not be refused a sign-in because of a name.
+        tests:
           - UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity
+
+      - id: ReviewCenter-UserService-UsernameCollision-IdentityNameTaken
+        title: >-
+          The UserService class shall use the first numbered variant of the generated name when the generated name is
+          taken.
+        justification: |
+          A person must not be refused a sign-in because even the generated name is taken.
+        tests:
           - UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant
+
+      - id: ReviewCenter-UserService-UsernameCollision-LocalAccountName
+        title: >-
+          The UserService class shall number the generated name the same way when a local account holds that name.
+        justification: |
+          A local account that happens to hold the generated name must not block a person.
+        tests:
           - UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant
 
+      - id: ReviewCenter-UserService-UsernameCollision-NeverTakesOver
+        title: >-
+          The UserService class shall never sign in to the account that holds a taken name.
+        justification: |
+          Nobody may get the account of another person because the names are alike.
+        tests:
+          - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # No password for the account of an external identity provider
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-ExternalNoPassword
         title: >-
-          The UserService class shall refuse to authenticate, to confirm for a signature, to change the password of,
-          and to set the password of an account of a provider, so that the account has no password at all.
+          The UserService class shall refuse to authenticate an account of a provider with any password, leaving the
+          count of failures at zero.
         justification: |
-          An account that is managed by a provider must not have a second way in, which could be guessed or set by
-          somebody who does not pass the rules of the provider.
+          An account that is managed by a provider must not have a second way in, which could be guessed.
         tests:
-          - UserService_ExternalAccount_EveryPasswordPathIsRefused
+          - UserService_ExternalAccount_Authenticate_IsRefused
 
+      - id: ReviewCenter-UserService-ExternalNoPassword-Confirm
+        title: >-
+          The UserService class shall refuse to confirm a signature for an account of a provider with a password.
+        justification: |
+          A signature must not be confirmed with a password that the account is not meant to have.
+        tests:
+          - UserService_ExternalAccount_ConfirmForASignature_IsRefused
+
+      - id: ReviewCenter-UserService-ExternalNoPassword-ChangePassword
+        title: >-
+          The UserService class shall refuse to change the password of an account of a provider.
+        justification: |
+          An account that is managed by a provider must not get a password of its own.
+        tests:
+          - UserService_ExternalAccount_ChangeOwnPassword_IsRefused
+
+      - id: ReviewCenter-UserService-ExternalNoPassword-SetPassword
+        title: >-
+          The UserService class shall refuse to set the password of an account of a provider, leaving it without a
+          password hash.
+        justification: |
+          An administrator must not give an account of a provider a way in that bypasses the provider.
+        tests:
+          - UserService_ExternalAccount_SetPassword_IsRefused
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Second factor
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-UserService-SecondFactorRequired
         title: >-
-          The UserService class shall check the password of an account with a second factor without opening a session
-          and report that the code is still required, shall refuse a disabled account, shall not clear the counter of
-          wrong attempts for the password alone, and shall let the older sign-in and confirmation paths fail for such
-          an account, so that no path can sign in with the password alone.
+          The UserService class shall report that the code is still required when the password of an account with a
+          second factor is right.
         justification: |
-          A password step that signs in would make the second factor optional for the attacker. The step is split so
-          that the page can ask for the code, and the old paths are closed so that they cannot be used to avoid it.
+          The page must ask for the code, so the password step reports that a second step follows.
         tests:
-          - UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactorAndKeepsTheCounter
-          - UserService_AuthenticateAndReauthenticate_EnrolledUser_FailClosed
+          - UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactor
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-KeepsCounter
+        title: >-
+          The UserService class shall leave the count of failures as it is when the password of an account with a
+          second factor is right.
+        justification: |
+          Guessing codes with a known password must still end in the lockout.
+        tests:
+          - UserService_AuthenticatePasswordAsync_EnrolledUser_KeepsTheCountOfFailures
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-DisabledRefused
+        title: >-
+          The UserService class shall refuse a disabled account that has a second factor.
+        justification: |
+          Disabling an account must hold, whatever the factors of the account are.
+        tests:
+          - UserService_AuthenticatePasswordAsync_DisabledEnrolledUser_IsRefused
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-SignInFailsClosed
+        title: >-
+          The UserService class shall refuse the sign-in check by password alone for an account with a second factor.
+        justification: |
+          A caller that does not know about the second factor must not let a password through.
+        tests:
+          - UserService_AuthenticateAsync_EnrolledUser_FailsClosed
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-ReauthFailsClosed
+        title: >-
+          The UserService class shall refuse the re-authentication by password alone for an account with a second
+          factor.
+        justification: |
+          A signature must not be confirmed with a password alone for an account that has a second factor.
+        tests:
+          - UserService_ReauthenticateAsync_EnrolledUser_FailsClosed
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-NotRequired
+        title: >-
+          The UserService class shall sign in with the password alone an account that has no active second factor, or
+          when the feature is switched off, or when there is no store of second factors.
+        justification: |
+          Only an active second factor adds a step to the sign-in.
+        tests:
           - UserService_AuthenticateAsync_NoSecondFactorOrFeatureOff_SignsInWithThePassword
           - UserService_AuthenticatePasswordAsync_WithoutTotpStore_NeverAsksForTheSecondFactor
+
+      - id: ReviewCenter-UserService-SecondFactorRequired-WrongPassword
+        title: >-
+          The UserService class shall answer a wrong password the same for an account with a second factor and for one
+          without.
+        justification: |
+          The answer must not reveal which accounts have a second factor.
+        tests:
           - UserService_AuthenticatePasswordAsync_WrongPassword_LooksTheSameWithAndWithoutSecondFactor
-          - UserService_AuthenticatePasswordAsync_DisabledEnrolledUser_IsRefused
 
       - id: ReviewCenter-UserService-SecondFactorLockout
         title: >-
-          The UserService class shall count a wrong code with the wrong passwords in one counter with one lockout, let
-          the second factor ask whether an account is locked, and refuse the check of a password for a locked account.
+          The UserService class shall count a wrong code together with the wrong passwords in one counter that leads
+          to one lockout.
         justification: |
-          The counter is kept with the user, so the codes and the passwords share the five attempts, and a locked
-          account must not even have its password checked.
+          The attempts are shared, so codes and passwords together have only five tries.
+        tests:
+          - UserService_RegisterSecondFactorFailureAsync_WrongCodesAndPasswords_ShareOneCounter
+
+      - id: ReviewCenter-UserService-SecondFactorLockout-IsLocked
+        title: >-
+          The UserService class shall tell the second factor whether an account is locked out.
+        justification: |
+          The second factor must not check a code for a locked account.
+        tests:
+          - UserService_IsLockedOutAsync_LockedAndFreeAccounts_TellsWhetherLocked
+
+      - id: ReviewCenter-UserService-SecondFactorLockout-ConfirmLocked
+        title: >-
+          The UserService class shall refuse to confirm the password of a locked account.
+        justification: |
+          A locked account must not even have its password checked.
+        tests:
+          - UserService_ConfirmPasswordAsync_LockedAccount_IsRefused
+
+      - id: ReviewCenter-UserService-SecondFactorLockout-ConfirmPassword
+        title: >-
+          The UserService class shall confirm the password of an account that has a second factor by the password
+          alone, leaving the count of failures as it is.
+        justification: |
+          A confirmation proves the password only, and it must not hide guessing from the counter.
         tests:
           - UserService_ConfirmPasswordAsync_ChecksThePasswordOnly
-          - UserService_ConfirmPasswordAsync_LockedAccount_IsRefused
