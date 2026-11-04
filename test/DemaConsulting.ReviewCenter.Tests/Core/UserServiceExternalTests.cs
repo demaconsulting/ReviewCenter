@@ -80,6 +80,58 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
+    ///     Test that the first sign-in of an identity creates an enabled account.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_FirstSignIn_CreatesAnEnabledUser()
+    {
+        // Arrange
+        var (service, _) = Create();
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(result.User!.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that the first sign-in of an identity creates an account that is not a system administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_FirstSignIn_CreatesNoSystemAdministrator()
+    {
+        // Arrange
+        var (service, _) = Create();
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.False(result.User!.IsSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Test that the first sign-in of an identity records the creation of the account with the host of the issuer.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_FirstSignIn_RecordsAccountOidcCreated()
+    {
+        // Arrange
+        var (service, store) = Create();
+
+        // Act
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        var audit = Assert.Single(store.Audits);
+        Assert.Equal("account.oidc-created", audit.Action);
+        Assert.Equal("issuer idp.example", audit.Detail);
+    }
+
+    /// <summary>
     ///     Test that the account is found by issuer and subject exactly: another subject or another issuer is another
     ///     person, and an account with the same name, display name or e-mail address is never linked.
     /// </summary>
@@ -105,8 +157,7 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
-    ///     Test that a user name that the provider suggests is reduced to the characters of a user name and is
-    ///     replaced when nothing usable is left.
+    ///     Test that a user name that the provider suggests is reduced to the characters of a user name.
     /// </summary>
     /// <param name="candidate">The suggested name.</param>
     /// <param name="expected">The user name of the account.</param>
@@ -114,11 +165,6 @@ public class UserServiceExternalTests
     [InlineData("olive", "olive")]
     [InlineData("Olive.O_x-9", "Olive.O_x-9")]
     [InlineData("<b>mal</b>", "bmalb")] // cspell:disable-line
-    [InlineData("\u00e9\u00e9\u00e9", "user")]
-    [InlineData(null, "user")]
-    [InlineData("", "user")]
-    [InlineData("a", "user-a")]
-    [InlineData("0123456789012345678901234567890123456789012345678901234567", "01234567890123456789012345678901234567890123")]
     public async Task UserService_SignInExternalAsync_Candidate_IsReducedToAValidUsername(string? candidate, string expected)
     {
         // Arrange
@@ -132,16 +178,70 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
+    ///     Test that the user name <c>user</c> is used when the suggestion holds no allowed character or is missing.
+    /// </summary>
+    /// <param name="candidate">The suggested name.</param>
+    [Theory]
+    [InlineData("\u00e9\u00e9\u00e9")]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task UserService_SignInExternalAsync_CandidateWithNothingUsable_UsesTheNameUser(string? candidate)
+    {
+        // Arrange
+        var (service, _) = Create();
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", candidate, "Name", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal("user", result.User!.Username);
+    }
+
+    /// <summary>
+    ///     Test that <c>user-</c> is put before a suggested user name that is shorter than the minimum length.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_ShortCandidate_IsPrefixedWithUser()
+    {
+        // Arrange
+        var (service, _) = Create();
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, "sub-1", "a", "Name", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal("user-a", result.User!.Username);
+    }
+
+    /// <summary>
+    ///     Test that a long suggested user name is cut to 44 characters.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_LongCandidate_IsCutToFortyFourCharacters()
+    {
+        // Arrange: a candidate of 58 characters
+        var (service, _) = Create();
+        const string Candidate = "0123456789012345678901234567890123456789012345678901234567";
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, "sub-1", Candidate, "Name", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(58, Candidate.Length);
+        Assert.Equal(Candidate[..44], result.User!.Username);
+    }
+
+    /// <summary>
     ///     Test that a display name is cleaned (control, invisible formatting and bidirectional characters removed, white
-    ///     space collapsed, length bounded) and replaced by the user name when nothing is left.
+    ///     space collapsed) and trimmed.
     /// </summary>
     /// <param name="name">The name that the provider gives.</param>
     /// <param name="expected">The expected display name.</param>
     [Theory]
     [InlineData("  Eve\r\n\u202EMallory   Jr  ", "Eve Mallory Jr")]
     [InlineData("Zero\u200BWidth", "ZeroWidth")]
-    [InlineData("   ", "olive")]
-    [InlineData(null, "olive")]
     public async Task UserService_SignInExternalAsync_DisplayName_IsSanitized(string? name, string expected)
     {
         // Arrange
@@ -152,6 +252,44 @@ public class UserServiceExternalTests
 
         // Assert
         Assert.Equal(expected, result.User!.DisplayName);
+    }
+
+    /// <summary>
+    ///     Test that the user name is used as the display name when the display name from the provider is blank or
+    ///     missing.
+    /// </summary>
+    /// <param name="name">The name that the provider gives.</param>
+    [Theory]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task UserService_SignInExternalAsync_BlankDisplayName_UsesTheUserName(string? name)
+    {
+        // Arrange
+        var (service, _) = Create();
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", "olive", name, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal("olive", result.User!.DisplayName);
+    }
+
+    /// <summary>
+    ///     Test that a number is added to the made user name when a local account holds that name.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_SuggestedNameTaken_AddsANumber()
+    {
+        // Arrange: a local account with the suggested name
+        var (service, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("olive", "Olive", UserRole.Reviewer, Password, cancellationToken);
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+
+        // Assert
+        Assert.Equal("olive-2", result.User!.Username);
     }
 
     /// <summary>
@@ -196,25 +334,85 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
-    ///     Test that an issuer or subject one character over its limit is refused, and one at the limit is accepted.
+    ///     Test that an issuer of exactly the maximum length is accepted.
     /// </summary>
     [Fact]
-    public async Task UserService_SignInExternalAsync_IdentityLengthLimits_AreEnforced()
+    public async Task UserService_SignInExternalAsync_IssuerOfMaximumLength_SignsIn()
     {
-        // Arrange
+        // Arrange: an issuer of 512 characters
         var (service, _) = Create();
-        var longIssuer = "https://" + new string('a', ReviewLimits.MaxExternalIssuerLength - 8);
-        var longSubject = new string('s', ReviewLimits.MaxExternalSubjectLength);
+        var issuer = "https://" + new string('a', ReviewLimits.MaxExternalIssuerLength - 8);
 
         // Act
-        var atLimit = await service.SignInExternalAsync(longIssuer, longSubject, "olive", "Olive", TestContext.Current.CancellationToken);
-        var issuerOver = await service.SignInExternalAsync(longIssuer + "a", "sub", "olive", "Olive", TestContext.Current.CancellationToken);
-        var subjectOver = await service.SignInExternalAsync(Issuer, longSubject + "s", "olive", "Olive", TestContext.Current.CancellationToken);
+        var result = await service.SignInExternalAsync(
+            issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Equal(ExternalSignInRefusal.None, atLimit.Refusal);
-        Assert.Equal(ExternalSignInRefusal.Invalid, issuerOver.Refusal);
-        Assert.Equal(ExternalSignInRefusal.Invalid, subjectOver.Refusal);
+        Assert.Equal(512, issuer.Length);
+        Assert.Equal(ExternalSignInRefusal.None, result.Refusal);
+        Assert.Equal(issuer, result.User!.ExternalIssuer);
+    }
+
+    /// <summary>
+    ///     Test that an issuer one character over the limit is refused without an account.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_IssuerOverTheLimit_IsInvalid()
+    {
+        // Arrange: an issuer of 513 characters
+        var (service, store) = Create();
+        var issuer = "https://" + new string('a', ReviewLimits.MaxExternalIssuerLength - 7);
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(513, issuer.Length);
+        Assert.Equal(ExternalSignInRefusal.Invalid, result.Refusal);
+        Assert.Null(result.User);
+        Assert.Empty(await store.ListAsync(TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a subject of exactly the maximum length is accepted.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_SubjectOfMaximumLength_SignsIn()
+    {
+        // Arrange: a subject of 256 characters
+        var (service, _) = Create();
+        var subject = new string('s', ReviewLimits.MaxExternalSubjectLength);
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, subject, "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(256, subject.Length);
+        Assert.Equal(ExternalSignInRefusal.None, result.Refusal);
+        Assert.Equal(subject, result.User!.ExternalSubject);
+    }
+
+    /// <summary>
+    ///     Test that a subject one character over the limit is refused without an account.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_SubjectOverTheLimit_IsInvalid()
+    {
+        // Arrange: a subject of 257 characters
+        var (service, store) = Create();
+        var subject = new string('s', ReviewLimits.MaxExternalSubjectLength + 1);
+
+        // Act
+        var result = await service.SignInExternalAsync(
+            Issuer, subject, "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(257, subject.Length);
+        Assert.Equal(ExternalSignInRefusal.Invalid, result.Refusal);
+        Assert.Null(result.User);
+        Assert.Empty(await store.ListAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -337,32 +535,114 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
-    ///     Test that no password sign-in, confirmation of a signature, change or set of a password works for an
-    ///     account of an identity provider, whatever is typed, and that the account is not locked by the attempts.
+    ///     Test that setting a password for an account of an identity provider is refused and leaves it without a
+    ///     password hash.
     /// </summary>
     [Fact]
-    public async Task UserService_ExternalAccount_EveryPasswordPathIsRefused()
+    public async Task UserService_ExternalAccount_SetPassword_IsRefused()
     {
         // Arrange
-        var (service, _) = Create();
-        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+        var (service, store) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
         var admin = new Actor("root", "Root");
 
         // Act
-        var signIn = await service.AuthenticateAsync("olive", string.Empty, TestContext.Current.CancellationToken);
-        var signInHash = await service.AuthenticateAsync("olive", "hash:", TestContext.Current.CancellationToken);
-        var reauth = await service.ReauthenticateAsync("olive", string.Empty, TestContext.Current.CancellationToken);
-        var change = await Assert.ThrowsAsync<DomainRuleException>(() => service.ChangeOwnPasswordAsync(
-            "olive", string.Empty, "another long password", TestContext.Current.CancellationToken));
-        var set = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetPasswordAsync(
-            "olive", "another long password", admin, TestContext.Current.CancellationToken));
+        var set = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetPasswordAsync("olive", "another long password", admin, cancellationToken));
 
         // Assert
-        Assert.Null(signIn);
-        Assert.Null(signInHash);
-        Assert.Null(reauth);
         Assert.Equal(DomainRule.PasswordInvalid, set.Rule);
-        Assert.NotEqual(DomainRule.UserNotFound, change.Rule);
-        Assert.Equal(0, (await service.GetAsync("olive", TestContext.Current.CancellationToken))!.FailedLoginCount);
+        Assert.Equal(string.Empty, (await store.GetByUsernameAsync("olive", cancellationToken))!.PasswordHash);
+    }
+
+    /// <summary>
+    ///     Test that no password signs in an account of an identity provider, whatever is typed, and that the attempts
+    ///     do not count as failures.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ExternalAccount_Authenticate_IsRefused()
+    {
+        // Arrange
+        var (service, store) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+
+        // Act
+        var empty = await service.AuthenticateAsync("olive", string.Empty, cancellationToken);
+        var hashLike = await service.AuthenticateAsync("olive", "hash:", cancellationToken);
+
+        // Assert
+        Assert.Null(empty);
+        Assert.Null(hashLike);
+        Assert.Equal(0, (await store.GetByUsernameAsync("olive", cancellationToken))!.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that no password confirms a signature for an account of an identity provider.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ExternalAccount_ConfirmForASignature_IsRefused()
+    {
+        // Arrange
+        var (service, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+
+        // Act
+        var reauth = await service.ReauthenticateAsync("olive", string.Empty, cancellationToken);
+        var confirmed = await service.ConfirmPasswordAsync("olive", string.Empty, cancellationToken);
+
+        // Assert
+        Assert.Null(reauth);
+        Assert.Null(confirmed);
+    }
+
+    /// <summary>
+    ///     Test that changing the own password of an account of an identity provider is refused and leaves it without
+    ///     a password hash.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ExternalAccount_ChangeOwnPassword_IsRefused()
+    {
+        // Arrange
+        var (service, store) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+
+        // Act
+        var change = await Assert.ThrowsAsync<DomainRuleException>(() => service.ChangeOwnPasswordAsync(
+            "olive", string.Empty, "another long password", cancellationToken));
+
+        // Assert: refused like a wrong current password, and nothing is stored
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, change.Rule);
+        var stored = (await store.GetByUsernameAsync("olive", cancellationToken))!;
+        Assert.Equal(string.Empty, stored.PasswordHash);
+        Assert.Equal(0, stored.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that the refused sign-in of a disabled account of an identity provider leaves the stored time of the
+    ///     last sign-in as it was.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_DisabledAccount_StoresNoSignInTime()
+    {
+        // Arrange: the first sign-in an hour before the account is disabled and signs in again
+        var store = new FakeUserStore();
+        var start = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var clock = new MovableTimeProvider(start);
+        var service = new UserService(store, new FakePasswordHasher(), clock);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+        await service.SetEnabledAsync("olive", false, new Actor("root", "Root"), cancellationToken);
+        clock.Advance(TimeSpan.FromHours(1));
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", cancellationToken);
+
+        // Assert: refused, and the stored time is still that of the first sign-in
+        Assert.Equal(ExternalSignInRefusal.Disabled, result.Refusal);
+        Assert.Equal(start, (await store.GetByUsernameAsync("olive", cancellationToken))!.LastSignInUtc);
     }
 }

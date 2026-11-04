@@ -278,7 +278,22 @@ levels of the same guard are tested by `ProjectViewGuard_GuardAdminister_Project
 `ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce`,
 `ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback`,
 `ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce` and
-`ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. On the pages, a member opens the page,
+`ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. The contribute level lets a member
+continue (`ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback`); a read-only member gets `false` and no
+callback, so a page keeps what it showed
+(`ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback`); a non-member and a missing user get `false`
+and the access-lost callback runs once
+(`ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce` and
+`ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce`). The access is revoked right after the
+first lookup of one guard call, using a decorator of the access rules: a read-only member whose membership disappears is
+reported as lost, not as read-only
+(`ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly`), and a member who could work keeps the
+answer of the first lookup, the removal being caught by the next guard
+(`ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer`). The audit level lets an
+auditor and a project administrator continue
+(`ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback`); a plain member and a missing user get
+`false` and the callback runs once (`ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce` and
+`ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce`). On the pages, a member opens the page,
 the
 membership is removed in the store, and an action is triggered; the page then shows the page for a missing project and
 none of the data it had loaded, which is tested by `ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData`,

@@ -28,9 +28,18 @@ sections:
           projects can be created and found again, and a project is created only by a system administrator.
         children:
           - ReviewCenter-ProjectService-Create
+          - ReviewCenter-ProjectService-Create-NameTrimmed
+          - ReviewCenter-ProjectService-Create-DescriptionTrimmed
+          - ReviewCenter-ProjectService-Create-EmptyDescription
+          - ReviewCenter-ProjectService-Create-CreationTime
           - ReviewCenter-ProjectService-CreateAdmin
+          - ReviewCenter-ProjectService-CreateAdmin-NoMembers
+          - ReviewCenter-ProjectService-CreateAdmin-NothingStored
           - ReviewCenter-ProjectService-List
+          - ReviewCenter-ProjectService-List-Order
           - ReviewCenter-ProjectService-Read
+          - ReviewCenter-ProjectService-Read-Unknown
+          - ReviewCenter-ProjectService-Read-Hidden
         tests:
           - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
 
@@ -55,29 +64,129 @@ sections:
           installation or to leave the project without anybody to manage it.
         children:
           - ReviewCenter-ProjectAccess-Visibility
+          - ReviewCenter-ProjectAccess-Visibility-Administer
+          - ReviewCenter-ProjectAccess-Visibility-NotAdministrator
+          - ReviewCenter-ProjectAccess-Visibility-NonMember
+          - ReviewCenter-ProjectAccess-Visibility-NonMember-Administer
+          - ReviewCenter-ProjectAccess-Visibility-OtherProject
+          - ReviewCenter-ProjectAccess-Visibility-OtherProject-Administer
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRole
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRoleListed
+          - ReviewCenter-ProjectAccess-Visibility-UndefinedRoleMember
           - ReviewCenter-ProjectAccess-SystemAdmin
+          - ReviewCenter-ProjectAccess-SystemAdmin-Administer
+          - ReviewCenter-ProjectAccess-SystemAdmin-Missing
+          - ReviewCenter-ProjectAccess-SystemAdmin-Missing-Administer
           - ReviewCenter-ProjectAccess-NoAccount
+          - ReviewCenter-ProjectAccess-NoAccount-CommandLine
+          - ReviewCenter-ProjectAccess-NoAccount-NoName
+          - ReviewCenter-ProjectAccess-NoAccount-UnknownUser
+          - ReviewCenter-ProjectAccess-NoAccount-Disabled
           - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-NotFound-Missing
+          - ReviewCenter-ProjectAccess-NotFound-Same
+          - ReviewCenter-ProjectAccess-NotFound-Administer
+          - ReviewCenter-ProjectAccess-NotFound-NotAdministrator
+          - ReviewCenter-ProjectAccess-NotFound-NotSystemAdmin
           - ReviewCenter-ProjectAccess-Contribute
+          - ReviewCenter-ProjectAccess-Contribute-ProjectAdmin
+          - ReviewCenter-ProjectAccess-Contribute-SystemAdmin
+          - ReviewCenter-ProjectAccess-Contribute-AuditorSees
+          - ReviewCenter-ProjectAccess-Contribute-AuditorReadOnly
+          - ReviewCenter-ProjectAccess-Contribute-UndefinedRole
+          - ReviewCenter-ProjectAccess-Contribute-NotFound
+          - ReviewCenter-ProjectAccess-Contribute-NotAllowed
           - ReviewCenter-ProjectAccess-AuditAccess
+          - ReviewCenter-ProjectAccess-AuditAccess-Auditor
+          - ReviewCenter-ProjectAccess-AuditAccess-SystemAdmin
+          - ReviewCenter-ProjectAccess-AuditAccess-NotAllowed
+          - ReviewCenter-ProjectAccess-AuditAccess-NotFound
           - ReviewCenter-ProjectAccess-TemporaryPassword
+          - ReviewCenter-ProjectAccess-TemporaryPassword-Changed
           - ReviewCenter-ProjectAccess-Revocation
+          - ReviewCenter-ProjectAccess-Revocation-Demotion
+          - ReviewCenter-ProjectAccess-Revocation-Disabled
+          - ReviewCenter-ProjectAccess-Revocation-RoleChange
+          - ReviewCenter-ProjectAccess-Revocation-RoleChange-Audit
           - ReviewCenter-ProjectAccess-TokenOwner
+          - ReviewCenter-ProjectAccess-TokenOwner-NoMore
           - ReviewCenter-ProjectAccess-List
+          - ReviewCenter-ProjectAccess-List-Member
+          - ReviewCenter-ProjectAccess-List-NoAccess
           - ReviewCenter-ProjectAccess-Dependencies
+          - ReviewCenter-ProjectAccess-Dependencies-ProjectStore
           - ReviewCenter-ProjectService-Members
+          - ReviewCenter-ProjectService-Members-ChangeRole
+          - ReviewCenter-ProjectService-Members-Remove
+          - ReviewCenter-ProjectService-Members-List
+          - ReviewCenter-ProjectService-Members-ListOrder
+          - ReviewCenter-ProjectService-Members-ProjectAdmin
+          - ReviewCenter-ProjectService-Members-SystemAdmin
+          - ReviewCenter-ProjectService-Members-PlainMember
+          - ReviewCenter-ProjectService-Members-Hidden
           - ReviewCenter-ProjectService-MemberRules
+          - ReviewCenter-ProjectService-MemberRules-RoleChangeNoMembership
+          - ReviewCenter-ProjectService-MemberRules-RemoveNoMembership
+          - ReviewCenter-ProjectService-MemberRules-UnknownUser
+          - ReviewCenter-ProjectService-MemberRules-UnknownProject
+          - ReviewCenter-ProjectService-MemberRules-NothingChanged
+          - ReviewCenter-ProjectService-MemberRules-UndefinedRole
           - ReviewCenter-ProjectService-MemberLookup
+          - ReviewCenter-ProjectService-MemberLookup-PartialName
+          - ReviewCenter-ProjectService-MemberLookup-NoListing
+          - ReviewCenter-ProjectService-MemberLookup-UnusableName
+          - ReviewCenter-ProjectService-MemberLookup-NotMemberName
           - ReviewCenter-ProjectService-AddThrottle
+          - ReviewCenter-ProjectService-AddThrottle-Create
+          - ReviewCenter-ProjectService-AddThrottle-CreateFailures
+          - ReviewCenter-ProjectService-AddThrottle-PerActor
+          - ReviewCenter-ProjectService-AddThrottle-Window
+          - ReviewCenter-ProjectService-AddThrottle-Concurrent
+          - ReviewCenter-ProjectService-AddThrottle-LookupError
+          - ReviewCenter-ProjectService-AddThrottle-Successes
+          - ReviewCenter-ProjectService-AddThrottle-SystemAdmin
           - ReviewCenter-ProjectService-LastAdmin
+          - ReviewCenter-ProjectService-LastAdmin-Demote
+          - ReviewCenter-ProjectService-LastAdmin-DisabledAdmin
+          - ReviewCenter-ProjectService-LastAdmin-SystemAdmin
+          - ReviewCenter-ProjectService-LastAdmin-SystemAdminDemote
+          - ReviewCenter-ProjectService-LastAdmin-NothingChanged
           - ReviewCenter-ProjectService-CreateMemberAccount
+          - ReviewCenter-ProjectService-CreateMemberAccount-NoSystemAdmin
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordLength
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordRandom
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordChange
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordReturned
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordHashed
+          - ReviewCenter-ProjectService-CreateMemberAccount-PasswordText
+          - ReviewCenter-ProjectService-CreateMemberAccount-NameTaken
+          - ReviewCenter-ProjectService-CreateMemberAccount-NameInvalid
+          - ReviewCenter-ProjectService-CreateMemberAccount-DisplayNameInvalid
+          - ReviewCenter-ProjectService-CreateMemberAccount-NothingCreated
           - ReviewCenter-ProjectService-MemberAudit
+          - ReviewCenter-ProjectService-MemberAudit-RoleChange
+          - ReviewCenter-ProjectService-MemberAudit-Removal
+          - ReviewCenter-ProjectService-MemberAudit-Account
+          - ReviewCenter-ProjectService-MemberAudit-NoPassword
+          - ReviewCenter-ProjectService-MemberAudit-FailedAdd
+          - ReviewCenter-ProjectService-MemberAudit-FailedAccount
+          - ReviewCenter-ProjectService-MemberAudit-FailedSystemAdmin
           - ReviewCenter-ProjectService-AuditorRole
+          - ReviewCenter-ProjectService-AuditorRole-Account
+          - ReviewCenter-ProjectService-AuditorRole-ChangeRole
+          - ReviewCenter-ProjectService-AuditorRole-Audit
+          - ReviewCenter-ProjectService-AuditorRole-OpenWork
+          - ReviewCenter-ProjectService-AuditorRole-OutOfDate
+          - ReviewCenter-ProjectService-AuditorRole-ReviewNames
+          - ReviewCenter-ProjectService-AuditorRole-Refused
           - ReviewCenter-SigningService-AuditorNotReviewer
           - ReviewCenter-SigningService-AuditorNotReviewer-Assign
           - ReviewCenter-SigningService-AuditorNotReviewer-Sign
           - ReviewCenter-SigningService-AuditorNotReviewer-NothingStored
           - ReviewCenter-RepositoryService-Ownership
+          - ReviewCenter-RepositoryService-Ownership-Access
+          - ReviewCenter-RepositoryService-Ownership-Listing
+          - ReviewCenter-RepositoryService-Ownership-ListingProject
           - ReviewCenter-ThreadService-Access
           - ReviewCenter-ChecklistService-Access
           - ReviewCenter-ChecklistService-Access-Section
@@ -88,6 +197,13 @@ sections:
           - ProjectAccess_Revocation_TakesEffectOnTheNextCall
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
           - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
+          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
+          - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
+          - Repositories_OfAnotherProject_CannotBeUsedOrChanged
+          - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
+          - ReviewOperations_ProjectAdminAndSystemAdmin_AreAllowed
+          - ReviewReads_Auditor_AreAllowed
+          - AccessCoverage_PublicActorMethods_AreAllClassified
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
 
       - id: ReviewCenter-Core-EvidenceSettings
@@ -273,6 +389,10 @@ sections:
           nothing on a violation keeps the record free of partial reviews.
         children:
           - ReviewCenter-ProjectService-Validation
+          - ReviewCenter-ProjectService-Validation-NameLength
+          - ReviewCenter-ProjectService-Validation-NameLimit
+          - ReviewCenter-ProjectService-Validation-DescriptionLength
+          - ReviewCenter-ProjectService-Validation-NothingStored
           - ReviewCenter-ReviewService-Id
           - ReviewCenter-ReviewService-Id-Unique
           - ReviewCenter-ReviewService-Id-OtherProject
@@ -525,22 +645,89 @@ sections:
           password handed over by somebody else proves little, so it only opens the way to replacing it.
         children:
           - ReviewCenter-UserService-Username
+          - ReviewCenter-UserService-Username-MinLength
+          - ReviewCenter-UserService-Username-MaxLength
+          - ReviewCenter-UserService-Username-Characters
+          - ReviewCenter-UserService-Username-TooShort
+          - ReviewCenter-UserService-Username-TooLong
+          - ReviewCenter-UserService-Username-Taken
+          - ReviewCenter-UserService-Username-NothingStored
           - ReviewCenter-UserService-DisplayName
+          - ReviewCenter-UserService-DisplayName-MinLength
+          - ReviewCenter-UserService-DisplayName-MaxLength
+          - ReviewCenter-UserService-DisplayName-Empty
+          - ReviewCenter-UserService-DisplayName-TooLong
+          - ReviewCenter-UserService-DisplayName-NothingStored
           - ReviewCenter-UserService-Password
+          - ReviewCenter-UserService-Password-MinLength
+          - ReviewCenter-UserService-Password-MaxLength
+          - ReviewCenter-UserService-Password-TooShort
+          - ReviewCenter-UserService-Password-TooLong
+          - ReviewCenter-UserService-Password-NoComposition
+          - ReviewCenter-UserService-Password-Missing
+          - ReviewCenter-UserService-Password-NotTrimmed
+          - ReviewCenter-UserService-Password-NothingStored
           - ReviewCenter-UserService-Create
+          - ReviewCenter-UserService-Create-Administrator
+          - ReviewCenter-UserService-Create-NoAdministratorByDefault
+          - ReviewCenter-UserService-Create-PasswordHash
+          - ReviewCenter-UserService-Create-Arguments
           - ReviewCenter-UserService-Authenticate
+          - ReviewCenter-UserService-Authenticate-AnyCase
+          - ReviewCenter-UserService-Authenticate-WrongPassword
+          - ReviewCenter-UserService-Authenticate-UnknownUser
+          - ReviewCenter-UserService-Authenticate-DisabledUser
+          - ReviewCenter-UserService-Authenticate-SameEffort
           - ReviewCenter-UserService-Lockout
+          - ReviewCenter-UserService-Lockout-Duration
+          - ReviewCenter-UserService-Lockout-LockedRefused
+          - ReviewCenter-UserService-Lockout-LockedNotCounted
+          - ReviewCenter-UserService-Lockout-ResetOnSuccess
           - ReviewCenter-UserService-Enabled
+          - ReviewCenter-UserService-Enabled-Enable
           - ReviewCenter-UserService-LastAdmin
+          - ReviewCenter-UserService-LastAdmin-Demote
+          - ReviewCenter-UserService-LastAdmin-OtherAdminRemains
+          - ReviewCenter-UserService-LastAdmin-DisabledNotCounted
           - ReviewCenter-UserService-ChangePassword
+          - ReviewCenter-UserService-ChangePassword-WrongCurrent
+          - ReviewCenter-UserService-ChangePassword-NewPasswordRules
+          - ReviewCenter-UserService-ChangePassword-WrongCurrentCounts
+          - ReviewCenter-UserService-ChangePassword-SecondFactorRefused
+          - ReviewCenter-UserService-ChangePassword-SecondFactorNothingChanged
+          - ReviewCenter-UserService-ChangePassword-SecondFactorRefusalAudited
+          - ReviewCenter-UserService-ChangePassword-SecondFactorOff
           - ReviewCenter-UserService-SetPassword
+          - ReviewCenter-UserService-SetPassword-Rules
+          - ReviewCenter-UserService-SetPassword-EndsLockout
           - ReviewCenter-UserService-SetSystemAdmin
+          - ReviewCenter-UserService-SetSystemAdmin-Remove
           - ReviewCenter-UserService-NotFound
           - ReviewCenter-UserService-TemporaryPassword
+          - ReviewCenter-UserService-TemporaryPassword-ReauthRefused
+          - ReviewCenter-UserService-TemporaryPassword-ReauthAudited
+          - ReviewCenter-UserService-TemporaryPassword-SameRefused
+          - ReviewCenter-UserService-TemporaryPassword-SameKeepsFlag
+          - ReviewCenter-UserService-TemporaryPassword-EndsOnChange
           - ReviewCenter-UserService-AdminPasswordIsTemporary
+          - ReviewCenter-UserService-AdminPasswordIsTemporary-OwnAccount
+          - ReviewCenter-UserService-AdminPasswordIsTemporary-OwnClearsPending
+          - ReviewCenter-UserService-AdminPasswordIsTemporary-ApiTokenActor
           - ReviewCenter-UserService-LastSignIn
+          - ReviewCenter-UserService-LastSignIn-Failed
+          - ReviewCenter-UserService-LastSignIn-Reauthentication
+          - ReviewCenter-UserService-LastSignIn-SecondFactor
+          - ReviewCenter-UserService-LastSignIn-WaitingSecondFactor
+          - ReviewCenter-UserService-LastSignIn-Provider
+          - ReviewCenter-UserService-LastSignIn-ProviderRefused
           - ReviewCenter-UserService-LockedStatus
+          - ReviewCenter-UserService-LockedStatus-Ended
+          - ReviewCenter-UserService-LockedStatus-NoLockout
           - ReviewCenter-UserService-Unlock
+          - ReviewCenter-UserService-Unlock-ClearsCount
+          - ReviewCenter-UserService-Unlock-ActorNotAllowed
+          - ReviewCenter-UserService-Unlock-NothingChanged
+          - ReviewCenter-UserService-Unlock-NotFound
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
 
@@ -861,6 +1048,13 @@ sections:
           - ReviewCenter-SigningService-IndependentReviewers-Signing
           - ReviewCenter-SigningService-IndependentReviewers-SettingOff
           - ReviewCenter-ProjectService-IndependentReviewersSetting
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-Change
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-PlainMember
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-Hidden
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-ApiToken
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-Stale
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-Unchanged
+          - ReviewCenter-ProjectService-IndependentReviewersSetting-Audit
         tests:
           - CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign
           - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
@@ -879,6 +1073,14 @@ sections:
           history.
         children:
           - ReviewCenter-ProjectService-ReviewRuleSwitches
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-NewProject
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-PlainMember
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-Hidden
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-ApiToken
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-Stale
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-Unchanged
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-Audit
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-IndependenceAudit
         tests:
           - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
 
@@ -955,6 +1157,13 @@ sections:
           - ReviewCenter-AuditService-ExportFormat
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit
+          - ReviewCenter-ProjectService-MemberAudit-RoleChange
+          - ReviewCenter-ProjectService-MemberAudit-Removal
+          - ReviewCenter-ProjectService-MemberAudit-Account
+          - ReviewCenter-ProjectService-MemberAudit-NoPassword
+          - ReviewCenter-ProjectService-MemberAudit-FailedAdd
+          - ReviewCenter-ProjectService-MemberAudit-FailedAccount
+          - ReviewCenter-ProjectService-MemberAudit-FailedSystemAdmin
           - ReviewCenter-EvidenceSettingsService-Audit
           - ReviewCenter-ProjectChecklistService-Audit
           - ReviewCenter-ProjectChecklistService-Audit-ResetActor
@@ -987,12 +1196,51 @@ sections:
           - ReviewCenter-SigningService-Audit-SignatureDetail
           - ReviewCenter-SigningService-Audit-RefusedNothing
           - ReviewCenter-UserService-Audit
+          - ReviewCenter-UserService-Audit-Enable
+          - ReviewCenter-UserService-Audit-Disable
+          - ReviewCenter-UserService-Audit-AdminChange
+          - ReviewCenter-UserService-Audit-AdminPassword
+          - ReviewCenter-UserService-Audit-OwnPassword
+          - ReviewCenter-UserService-Audit-Unlock
+          - ReviewCenter-UserService-Audit-Actor
+          - ReviewCenter-UserService-Audit-CommandLine
+          - ReviewCenter-UserService-Audit-NoPassword
           - ReviewCenter-UserService-SignInAudit
+          - ReviewCenter-UserService-SignInAudit-NoPassword
+          - ReviewCenter-UserService-SignInAudit-DisabledAccount
+          - ReviewCenter-UserService-SignInAudit-UnknownUser
+          - ReviewCenter-UserService-SignInAudit-TypedNameCleaned
+          - ReviewCenter-UserService-SignInAudit-TypedNameCapped
+          - ReviewCenter-UserService-SignInAudit-LockedAccount
+          - ReviewCenter-UserService-SignInAudit-Lockout
+          - ReviewCenter-UserService-SignInAudit-UnknownUserOnce
+          - ReviewCenter-UserService-SignInAudit-DisabledOnce
+          - ReviewCenter-UserService-SignInAudit-LockedOnce
+          - ReviewCenter-UserService-SignInAudit-TrailFailure
+          - ReviewCenter-UserService-SignInAudit-NoAuditService
+          - ReviewCenter-UserService-SignInAudit-CounterNoEntry
           - ReviewCenter-UserService-ReauthAudit
+          - ReviewCenter-UserService-ReauthAudit-WrongPassword
+          - ReviewCenter-UserService-ReauthAudit-LockedAccount
+          - ReviewCenter-UserService-ReauthAudit-DisabledAccount
+          - ReviewCenter-UserService-ReauthAudit-UnknownUser
+          - ReviewCenter-UserService-ReauthAudit-Lockout
+          - ReviewCenter-UserService-ReauthAudit-Action
+          - ReviewCenter-UserService-ReauthAudit-NoPassword
+          - ReviewCenter-UserService-ReauthAudit-DisabledOnce
+          - ReviewCenter-UserService-ReauthAudit-LockedOnce
+          - ReviewCenter-UserService-ReauthAudit-BothReasons
           - ReviewCenter-SigningService-ReauthAudit
           - ReviewCenter-SigningService-ReauthAudit-Locked
           - ReviewCenter-SigningService-ReauthAudit-NoPassword
           - ReviewCenter-RepositoryService-Audit
+          - ReviewCenter-RepositoryService-Audit-Update
+          - ReviewCenter-RepositoryService-Audit-TokenCleared
+          - ReviewCenter-RepositoryService-Audit-Disabled
+          - ReviewCenter-RepositoryService-Audit-Enabled
+          - ReviewCenter-RepositoryService-Audit-Project
+          - ReviewCenter-RepositoryService-Audit-NoSecret
+          - ReviewCenter-RepositoryService-Audit-NoChange
         tests:
           - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
           - UserService_AdministrationEvents_AreRecordedWithoutPasswords
@@ -1010,13 +1258,88 @@ sections:
           able to use the repositories of another.
         children:
           - ReviewCenter-RepositoryService-Name
+          - ReviewCenter-RepositoryService-Name-Empty
+          - ReviewCenter-RepositoryService-Name-TooLong
+          - ReviewCenter-RepositoryService-Name-FirstCharacter
+          - ReviewCenter-RepositoryService-Name-Characters
+          - ReviewCenter-RepositoryService-Name-Duplicate
+          - ReviewCenter-RepositoryService-Name-OtherProject
           - ReviewCenter-RepositoryService-Location
+          - ReviewCenter-RepositoryService-Location-LoopbackHttp
+          - ReviewCenter-RepositoryService-Location-File
+          - ReviewCenter-RepositoryService-Location-LocalPath
+          - ReviewCenter-RepositoryService-Location-RemoteHttp
+          - ReviewCenter-RepositoryService-Location-LoopbackLookalike
+          - ReviewCenter-RepositoryService-Location-Change
+          - ReviewCenter-RepositoryService-Location-Empty
+          - ReviewCenter-RepositoryService-Location-TooLong
+          - ReviewCenter-RepositoryService-Location-Option
+          - ReviewCenter-RepositoryService-Location-Helper
+          - ReviewCenter-RepositoryService-Location-OtherForm
+          - ReviewCenter-RepositoryService-Location-Malformed
+          - ReviewCenter-RepositoryService-Location-UserInfo
+          - ReviewCenter-RepositoryService-Location-Query
+          - ReviewCenter-RepositoryService-Location-Fragment
           - ReviewCenter-RepositoryService-Credentials
+          - ReviewCenter-RepositoryService-Credentials-LocationChange
+          - ReviewCenter-RepositoryService-Credentials-TokenWithoutUser
+          - ReviewCenter-RepositoryService-Credentials-UserNameRemoved
+          - ReviewCenter-RepositoryService-Credentials-UserNameColon
+          - ReviewCenter-RepositoryService-Credentials-UserNameControl
+          - ReviewCenter-RepositoryService-Credentials-UserNameLength
+          - ReviewCenter-RepositoryService-Credentials-TokenSpace
+          - ReviewCenter-RepositoryService-Credentials-TokenControl
+          - ReviewCenter-RepositoryService-Credentials-TokenLength
+          - ReviewCenter-RepositoryService-Credentials-TokenInName
+          - ReviewCenter-RepositoryService-Credentials-TokenInUserName
+          - ReviewCenter-RepositoryService-Credentials-TokenInLocation
+          - ReviewCenter-RepositoryService-Credentials-TokenInEscapedLocation
+          - ReviewCenter-RepositoryService-Credentials-TokenEscapedHexCase
+          - ReviewCenter-RepositoryService-Credentials-KeptTokenInName
+          - ReviewCenter-RepositoryService-Credentials-KeptTokenInUserName
+          - ReviewCenter-RepositoryService-Credentials-KeptTokenInLocation
+          - ReviewCenter-RepositoryService-Credentials-KeptTokenInEscapedLocation
+          - ReviewCenter-RepositoryService-Credentials-TokenCase
+          - ReviewCenter-RepositoryService-Credentials-MessageHidesToken
+          - ReviewCenter-RepositoryService-Credentials-RefusalChangesNothing
+          - ReviewCenter-RepositoryService-Credentials-KeptUnreadable
+          - ReviewCenter-RepositoryService-Credentials-ClearedNotCompared
           - ReviewCenter-RepositoryService-Token
+          - ReviewCenter-RepositoryService-Token-Keep
+          - ReviewCenter-RepositoryService-Token-Replace
+          - ReviewCenter-RepositoryService-Token-ReplaceEmpty
+          - ReviewCenter-RepositoryService-Token-Clear
+          - ReviewCenter-RepositoryService-Token-WriteOnly
+          - ReviewCenter-RepositoryService-Token-TextForm
           - ReviewCenter-RepositoryService-Admin
+          - ReviewCenter-RepositoryService-Admin-Register
+          - ReviewCenter-RepositoryService-Admin-Change
+          - ReviewCenter-RepositoryService-Admin-SetEnabled
+          - ReviewCenter-RepositoryService-Admin-ProjectAdmin
+          - ReviewCenter-RepositoryService-Admin-ProjectAdmin-Register
+          - ReviewCenter-RepositoryService-Admin-ProjectAdmin-Change
+          - ReviewCenter-RepositoryService-Admin-ProjectAdmin-SetEnabled
+          - ReviewCenter-RepositoryService-Admin-Member
+          - ReviewCenter-RepositoryService-Admin-Member-Register
+          - ReviewCenter-RepositoryService-Admin-Member-Change
+          - ReviewCenter-RepositoryService-Admin-Member-SetEnabled
+          - ReviewCenter-RepositoryService-Admin-NotVisible
+          - ReviewCenter-RepositoryService-Admin-UnknownUser
+          - ReviewCenter-RepositoryService-Admin-DisabledUser
+          - ReviewCenter-RepositoryService-Admin-RefusalChangesNothing
+          - ReviewCenter-RepositoryService-Admin-Recheck
           - ReviewCenter-RepositoryService-Ownership
+          - ReviewCenter-RepositoryService-Ownership-Access
+          - ReviewCenter-RepositoryService-Ownership-Listing
+          - ReviewCenter-RepositoryService-Ownership-ListingProject
           - ReviewCenter-RepositoryService-Disable
+          - ReviewCenter-RepositoryService-Disable-Listed
+          - ReviewCenter-RepositoryService-Disable-NameOnly
+          - ReviewCenter-RepositoryService-Disable-Access
           - ReviewCenter-RepositoryService-Access
+          - ReviewCenter-RepositoryService-Access-Consistent
+          - ReviewCenter-RepositoryService-Access-Unreadable
+          - ReviewCenter-RepositoryService-Access-UnreadableMessage
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
 
@@ -1777,13 +2100,59 @@ sections:
           signature in the service keeps the rule in force for every route that is ever added.
         children:
           - ReviewCenter-PersonalAccessTokenService-Create
+          - ReviewCenter-PersonalAccessTokenService-Create-Prefix
+          - ReviewCenter-PersonalAccessTokenService-Create-ValueFormat
+          - ReviewCenter-PersonalAccessTokenService-Create-ValueUnique
+          - ReviewCenter-PersonalAccessTokenService-Create-HashOnly
+          - ReviewCenter-PersonalAccessTokenService-Create-DisplayId
+          - ReviewCenter-PersonalAccessTokenService-Create-DisplayIdIndependent
+          - ReviewCenter-PersonalAccessTokenService-Create-DisplayIdRandom
+          - ReviewCenter-PersonalAccessTokenService-Create-ValueOnce
+          - ReviewCenter-PersonalAccessTokenService-Create-NameTrimmed
+          - ReviewCenter-PersonalAccessTokenService-Create-NameEmpty
+          - ReviewCenter-PersonalAccessTokenService-Create-NameControl
+          - ReviewCenter-PersonalAccessTokenService-Create-NameLength
+          - ReviewCenter-PersonalAccessTokenService-Create-NameTooLong
+          - ReviewCenter-PersonalAccessTokenService-Create-UnknownOwner
+          - ReviewCenter-PersonalAccessTokenService-Create-DisabledOwner
+          - ReviewCenter-PersonalAccessTokenService-Create-ListUnknownOwner
           - ReviewCenter-PersonalAccessTokenService-Expiry
+          - ReviewCenter-PersonalAccessTokenService-Expiry-Days30
+          - ReviewCenter-PersonalAccessTokenService-Expiry-Days365
+          - ReviewCenter-PersonalAccessTokenService-Expiry-Other
+          - ReviewCenter-PersonalAccessTokenService-Expiry-Expired
           - ReviewCenter-PersonalAccessTokenService-Limit
+          - ReviewCenter-PersonalAccessTokenService-Limit-Revoked
+          - ReviewCenter-PersonalAccessTokenService-Limit-Expired
           - ReviewCenter-PersonalAccessTokenService-Authenticate
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-Unknown
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-HashRecheck
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-Malformed
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-Revoked
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-OwnerDisabled
+          - ReviewCenter-PersonalAccessTokenService-Authenticate-OwnerLockedOut
           - ReviewCenter-PersonalAccessTokenService-LastUsed
+          - ReviewCenter-PersonalAccessTokenService-LastUsed-WithinFiveMinutes
+          - ReviewCenter-PersonalAccessTokenService-LastUsed-AfterFiveMinutes
+          - ReviewCenter-PersonalAccessTokenService-LastUsed-Burst
           - ReviewCenter-PersonalAccessTokenService-Revoke
+          - ReviewCenter-PersonalAccessTokenService-Revoke-OtherUser
+          - ReviewCenter-PersonalAccessTokenService-Revoke-Missing
+          - ReviewCenter-PersonalAccessTokenService-Revoke-AlreadyRevoked
+          - ReviewCenter-PersonalAccessTokenService-Revoke-ApiTokenCreate
+          - ReviewCenter-PersonalAccessTokenService-Revoke-ApiToken
           - ReviewCenter-PersonalAccessTokenService-TemporaryPassword
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-List
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Revoke
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Authenticate
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Cleared
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Cleared-List
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Cleared-Revoke
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword-Cleared-Authenticate
           - ReviewCenter-PersonalAccessTokenService-Audit
+          - ReviewCenter-PersonalAccessTokenService-Audit-Revoked
+          - ReviewCenter-PersonalAccessTokenService-Audit-NoValue
+          - ReviewCenter-PersonalAccessTokenService-Audit-Expiry
           - ReviewCenter-SigningService-ApiToken
           - ReviewCenter-SigningService-ApiToken-Message
           - ReviewCenter-SigningService-ApiToken-SlotChange
@@ -1812,9 +2181,33 @@ sections:
           to an account that the provider only vouches for.
         children:
           - ReviewCenter-UserService-ExternalSignIn
+          - ReviewCenter-UserService-ExternalSignIn-OnlyIssuerSubject
+          - ReviewCenter-UserService-ExternalSignIn-Create
+          - ReviewCenter-UserService-ExternalSignIn-Enabled
+          - ReviewCenter-UserService-ExternalSignIn-NotAdministrator
+          - ReviewCenter-UserService-ExternalSignIn-Audit
+          - ReviewCenter-UserService-ExternalSignIn-Disabled
+          - ReviewCenter-UserService-ExternalSignIn-MissingIdentity
+          - ReviewCenter-UserService-ExternalSignIn-IssuerMaxLength
+          - ReviewCenter-UserService-ExternalSignIn-IssuerTooLong
+          - ReviewCenter-UserService-ExternalSignIn-SubjectMaxLength
+          - ReviewCenter-UserService-ExternalSignIn-SubjectTooLong
           - ReviewCenter-UserService-ExternalCreate
+          - ReviewCenter-UserService-ExternalCreate-NameFallback
+          - ReviewCenter-UserService-ExternalCreate-ShortName
+          - ReviewCenter-UserService-ExternalCreate-NameLength
+          - ReviewCenter-UserService-ExternalCreate-DisplayNameClean
+          - ReviewCenter-UserService-ExternalCreate-DisplayNameFallback
+          - ReviewCenter-UserService-ExternalCreate-DisplayNameLength
           - ReviewCenter-UserService-UsernameCollision
+          - ReviewCenter-UserService-UsernameCollision-IdentityName
+          - ReviewCenter-UserService-UsernameCollision-IdentityNameTaken
+          - ReviewCenter-UserService-UsernameCollision-LocalAccountName
+          - ReviewCenter-UserService-UsernameCollision-NeverTakesOver
           - ReviewCenter-UserService-ExternalNoPassword
+          - ReviewCenter-UserService-ExternalNoPassword-Confirm
+          - ReviewCenter-UserService-ExternalNoPassword-ChangePassword
+          - ReviewCenter-UserService-ExternalNoPassword-SetPassword
           - ReviewCenter-SigningService-ExternalReauth
           - ReviewCenter-SigningService-ExternalReauth-Binding
           - ReviewCenter-SigningService-ExternalReauth-Spent
@@ -1828,9 +2221,18 @@ sections:
           - ReviewCenter-SigningService-ExternalReauth-ConfirmableReviewer
           - ReviewCenter-SigningService-ExternalReauth-ConfirmableRefused
           - ReviewCenter-ReauthProofStore-SingleUse
+          - ReviewCenter-ReauthProofStore-SingleUse-Spent
+          - ReviewCenter-ReauthProofStore-SingleUse-Reissue
           - ReviewCenter-ReauthProofStore-Binding
+          - ReviewCenter-ReauthProofStore-Binding-Kept
+          - ReviewCenter-ReauthProofStore-Binding-Clock
+          - ReviewCenter-ReauthProofStore-Binding-ReviewId
           - ReviewCenter-ReauthProofStore-Expiry
+          - ReviewCenter-ReauthProofStore-Expiry-Lifetime
+          - ReviewCenter-ReauthProofStore-Expiry-Renewed
           - ReviewCenter-ReauthProofStore-Bounded
+          - ReviewCenter-ReauthProofStore-Bounded-Oldest
+          - ReviewCenter-ReauthProofStore-Bounded-Ended
         tests:
           - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
           - SigningService_SignAsync_ExternalUserWithProof_SignsOnce
@@ -1849,23 +2251,147 @@ sections:
           that was written earlier.
         children:
           - ReviewCenter-TotpService-Enrollment
+          - ReviewCenter-TotpService-Enrollment-Pending
+          - ReviewCenter-TotpService-Enrollment-Replace
+          - ReviewCenter-TotpService-Enrollment-Password
+          - ReviewCenter-TotpService-Enrollment-PasswordNothingStored
+          - ReviewCenter-TotpService-Enrollment-AlreadyOn
+          - ReviewCenter-TotpService-Enrollment-Confirm
+          - ReviewCenter-TotpService-Enrollment-Window
+          - ReviewCenter-TotpService-Enrollment-Expired
+          - ReviewCenter-TotpService-Enrollment-WrongCode
+          - ReviewCenter-TotpService-Enrollment-WrongCodePending
+          - ReviewCenter-TotpService-Enrollment-NothingStarted
+          - ReviewCenter-TotpService-Enrollment-RecoveryCodes
+          - ReviewCenter-TotpService-Enrollment-Cancel
+          - ReviewCenter-TotpService-Enrollment-CancelKeepsOn
           - ReviewCenter-TotpService-Availability
+          - ReviewCenter-TotpService-Availability-TemporaryPassword
+          - ReviewCenter-TotpService-Availability-ApiToken
+          - ReviewCenter-TotpService-Availability-FeatureOff
+          - ReviewCenter-TotpService-Availability-Message
+          - ReviewCenter-TotpService-Availability-OperationsApiToken
+          - ReviewCenter-TotpService-Availability-OperationsFeatureOff
+          - ReviewCenter-TotpService-Availability-Status
+          - ReviewCenter-TotpService-Availability-NullArguments
           - ReviewCenter-TotpService-Verify
+          - ReviewCenter-TotpService-Verify-OutsideWindow
+          - ReviewCenter-TotpService-Verify-User
+          - ReviewCenter-TotpService-Verify-Refusal
+          - ReviewCenter-TotpService-Verify-ChallengeInvalid
+          - ReviewCenter-TotpService-Verify-DisabledUser
+          - ReviewCenter-TotpService-Verify-ForeignClientKept
+          - ReviewCenter-TotpService-Verify-FeatureOff
+          - ReviewCenter-TotpService-Verify-UnreadableSecret
+          - ReviewCenter-TotpService-Verify-Invalidated
+          - ReviewCenter-TotpService-Verify-LastSignIn
           - ReviewCenter-TotpService-Replay
+          - ReviewCenter-TotpService-Replay-Concurrent
+          - ReviewCenter-TotpService-Replay-Enrollment
           - ReviewCenter-TotpService-RecoveryCodes
+          - ReviewCenter-TotpService-RecoveryCodes-Strength
+          - ReviewCenter-TotpService-RecoveryCodes-Hashed
+          - ReviewCenter-TotpService-RecoveryCodes-SignIn
+          - ReviewCenter-TotpService-RecoveryCodes-Spelling
+          - ReviewCenter-TotpService-RecoveryCodes-Once
+          - ReviewCenter-TotpService-RecoveryCodes-Concurrent
+          - ReviewCenter-TotpService-RecoveryCodes-OtherUser
+          - ReviewCenter-TotpService-RecoveryCodes-Replace
+          - ReviewCenter-TotpService-RecoveryCodes-ReplaceStopsOld
+          - ReviewCenter-TotpService-RecoveryCodes-ReplaceNeedsAppCode
+          - ReviewCenter-TotpService-RecoveryCodes-ReplacePassword
+          - ReviewCenter-TotpService-RecoveryCodes-ReplaceCode
+          - ReviewCenter-TotpService-RecoveryCodes-UnreadableSecret
           - ReviewCenter-TotpService-Disable
+          - ReviewCenter-TotpService-Disable-RecoveryCode
+          - ReviewCenter-TotpService-Disable-WrongPassword
+          - ReviewCenter-TotpService-Disable-WrongCode
+          - ReviewCenter-TotpService-Disable-NotEnrolled
+          - ReviewCenter-TotpService-Disable-RecoveryCodesDeleted
+          - ReviewCenter-TotpService-Disable-PendingSignIns
           - ReviewCenter-TotpService-AdminReset
+          - ReviewCenter-TotpService-AdminReset-NotAdmin
+          - ReviewCenter-TotpService-AdminReset-ApiToken
+          - ReviewCenter-TotpService-AdminReset-DisabledAdmin
+          - ReviewCenter-TotpService-AdminReset-UnknownUser
+          - ReviewCenter-TotpService-AdminReset-NotEnrolled
+          - ReviewCenter-TotpService-AdminReset-PendingSignIns
+          - ReviewCenter-TotpService-AdminReset-EnrolledList
           - ReviewCenter-TotpService-Lockout
+          - ReviewCenter-TotpService-Lockout-Locked
+          - ReviewCenter-TotpService-Lockout-Setup
+          - ReviewCenter-TotpService-Lockout-Removal
+          - ReviewCenter-TotpService-Lockout-Signature
+          - ReviewCenter-TotpService-Lockout-Shared
+          - ReviewCenter-TotpService-Lockout-Cleared
+          - ReviewCenter-TotpService-Lockout-PasswordAlone
           - ReviewCenter-TotpService-ChangePassword
+          - ReviewCenter-TotpService-ChangePassword-RecoveryCode
+          - ReviewCenter-TotpService-ChangePassword-RecoveryCodeOnce
+          - ReviewCenter-TotpService-ChangePassword-NoCode
+          - ReviewCenter-TotpService-ChangePassword-WrongCode
+          - ReviewCenter-TotpService-ChangePassword-WrongPassword
+          - ReviewCenter-TotpService-ChangePassword-Reused
+          - ReviewCenter-TotpService-ChangePassword-Counted
+          - ReviewCenter-TotpService-ChangePassword-ClearedAfterProof
+          - ReviewCenter-TotpService-ChangePassword-Lockout
+          - ReviewCenter-TotpService-ChangePassword-PasswordOnly
+          - ReviewCenter-TotpService-ChangePassword-ApiToken
+          - ReviewCenter-TotpService-ChangePassword-NotEnrolled
+          - ReviewCenter-TotpService-ChangePassword-FeatureOff
+          - ReviewCenter-TotpService-ChangePassword-TemporaryPassword
+          - ReviewCenter-TotpService-ChangePassword-UnreadableSecret
+          - ReviewCenter-TotpService-ChangePassword-UnreadableRecovery
+          - ReviewCenter-TotpService-ChangePassword-Concurrent
           - ReviewCenter-TotpService-Audit
+          - ReviewCenter-TotpService-Audit-Removed
+          - ReviewCenter-TotpService-Audit-Reset
+          - ReviewCenter-TotpService-Audit-RecoveryRegenerated
+          - ReviewCenter-TotpService-Audit-RecoveryUsed
+          - ReviewCenter-TotpService-Audit-WrongCode
           - ReviewCenter-TotpService-NoSecretLeak
+          - ReviewCenter-TotpService-NoSecretLeak-ErrorMessages
+          - ReviewCenter-TotpService-NoSecretLeak-ShownOnce
           - ReviewCenter-TotpChallengeStore-SingleUse
+          - ReviewCenter-TotpChallengeStore-SingleUse-Concurrent
+          - ReviewCenter-TotpChallengeStore-SingleUse-Token
+          - ReviewCenter-TotpChallengeStore-SingleUse-Unique
+          - ReviewCenter-TotpChallengeStore-SingleUse-Hash
+          - ReviewCenter-TotpChallengeStore-SingleUse-Unknown
+          - ReviewCenter-TotpChallengeStore-SingleUse-Retry
+          - ReviewCenter-TotpChallengeStore-SingleUse-Limit
           - ReviewCenter-TotpChallengeStore-Binding
+          - ReviewCenter-TotpChallengeStore-Binding-Kept
+          - ReviewCenter-TotpChallengeStore-Binding-NoAddress
           - ReviewCenter-TotpChallengeStore-Expiry
+          - ReviewCenter-TotpChallengeStore-Expiry-Lifetime
+          - ReviewCenter-TotpChallengeStore-Expiry-Returned
           - ReviewCenter-TotpChallengeStore-Bounded
+          - ReviewCenter-TotpChallengeStore-Bounded-Oldest
+          - ReviewCenter-TotpChallengeStore-Bounded-Ended
+          - ReviewCenter-TotpChallengeStore-Bounded-ReturnEnded
+          - ReviewCenter-TotpChallengeStore-Bounded-ReturnFull
+          - ReviewCenter-TotpChallengeStore-Bounded-InvalidationAge
+          - ReviewCenter-TotpChallengeStore-Bounded-InvalidationCount
           - ReviewCenter-TotpChallengeStore-Invalidate
+          - ReviewCenter-TotpChallengeStore-Invalidate-CaseInsensitive
+          - ReviewCenter-TotpChallengeStore-Invalidate-OtherUsers
+          - ReviewCenter-TotpChallengeStore-Invalidate-TakenBefore
+          - ReviewCenter-TotpChallengeStore-Invalidate-TakenAfter
+          - ReviewCenter-TotpChallengeStore-Invalidate-OtherUserReturn
+          - ReviewCenter-TotpChallengeStore-Invalidate-Arguments
+          - ReviewCenter-TotpChallengeStore-Invalidate-Clock
           - ReviewCenter-UserService-SecondFactorRequired
+          - ReviewCenter-UserService-SecondFactorRequired-KeepsCounter
+          - ReviewCenter-UserService-SecondFactorRequired-DisabledRefused
+          - ReviewCenter-UserService-SecondFactorRequired-SignInFailsClosed
+          - ReviewCenter-UserService-SecondFactorRequired-ReauthFailsClosed
+          - ReviewCenter-UserService-SecondFactorRequired-NotRequired
+          - ReviewCenter-UserService-SecondFactorRequired-WrongPassword
           - ReviewCenter-UserService-SecondFactorLockout
+          - ReviewCenter-UserService-SecondFactorLockout-IsLocked
+          - ReviewCenter-UserService-SecondFactorLockout-ConfirmLocked
+          - ReviewCenter-UserService-SecondFactorLockout-ConfirmPassword
           - ReviewCenter-SigningService-TotpReauth
           - ReviewCenter-SigningService-TotpReauth-PasswordFirst
           - ReviewCenter-SigningService-TotpReauth-RecoveryRefused

@@ -106,6 +106,34 @@ public class ProjectAccessTests
     }
 
     /// <summary>
+    ///     Test that a disabled system administrator has no right in any project and is no system administrator.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAccess_Matrix_DisabledSystemAdmin_GetsNothing()
+    {
+        // Arrange: ann is a system administrator whose account is disabled (root stays enabled)
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.Users.SetEnabledAsync("ann", false, Actor.CommandLine, cancellationToken);
+        var actor = new Actor("ann", "ann");
+
+        // Act
+        var own = await RightsAsync(world, actor, world.Own);
+        var other = await RightsAsync(world, actor, world.Other);
+        var isAdmin = await world.Access.IsSystemAdminAsync(actor, cancellationToken);
+        var listed = await world.Access.ListVisibleProjectsAsync(actor, cancellationToken);
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireSystemAdminAsync(actor, cancellationToken));
+
+        // Assert
+        Assert.Equal(string.Empty, own);
+        Assert.Equal(string.Empty, other);
+        Assert.False(isAdmin);
+        Assert.Empty(listed);
+        Assert.Equal(DomainRule.ActorNotAllowed, refused.Rule);
+    }
+
+    /// <summary>
     ///     Test that the listing contains everything for a system administrator, only the member projects for a
     ///     member and nothing for a non-member.
     /// </summary>
@@ -242,6 +270,34 @@ public class ProjectAccessTests
         Assert.All(refused, rule => Assert.Equal(DomainRule.ActorNotAllowed, rule));
         Assert.Empty(await world.Store.ListMembershipsAsync(created.Id, cancellationToken));
         Assert.Empty(await world.Projects.ListMembersAsync(new Actor("root", "Root"), created.Id, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an actor who is not a system administrator cannot create a project and leaves no project and no
+    ///     audit entry.
+    /// </summary>
+    /// <param name="name">The user name of the refused actor.</param>
+    [Theory]
+    [InlineData("padm")]
+    [InlineData("usr")]
+    [InlineData("out")]
+    [InlineData("off")]
+    public async Task ProjectService_CreateAsync_NotSystemAdmin_StoresNothing(string name)
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectsBefore = (await world.Store.ListProjectsAsync(cancellationToken)).Count;
+        var auditsBefore = world.Store.Audits.Count;
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.CreateAsync("New", null, new Actor(name, name), cancellationToken));
+
+        // Assert: refused, and neither a project nor an audit entry was stored
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Equal(projectsBefore, (await world.Store.ListProjectsAsync(cancellationToken)).Count);
+        Assert.Equal(auditsBefore, world.Store.Audits.Count);
     }
 
     /// <summary>

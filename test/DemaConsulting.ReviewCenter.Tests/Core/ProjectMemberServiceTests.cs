@@ -187,8 +187,9 @@ public class ProjectMemberServiceTests
             new Actor("pb", "pb"), world.Project, "carol", ProjectRole.User, cancellationToken);
         for (var i = 0; i < ProjectService.MaxFailedAttempts + 2; i++)
         {
-            await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            var systemAdminFailure = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
                 new Actor("root", "root"), world.Project, $"guess-{i}", ProjectRole.User, cancellationToken));
+            Assert.Equal(DomainRule.UserNotFound, systemAdminFailure.Rule);
         }
 
         // Assert: stopped with the throttle rule, and the others are not
@@ -367,9 +368,10 @@ public class ProjectMemberServiceTests
         var failures = world.AuditStore.Entries.Where(e => e.Action == "project.member-add-failed").ToList();
         Assert.Equal(2, failures.Count);
         Assert.All(failures, e => Assert.Equal(world.Project, e.ProjectId));
-        Assert.Contains("ghost", failures[0].Detail, StringComparison.Ordinal);
+        Assert.Equal("user name 'ghost'", failures[0].Detail);
         Assert.Contains("pa", failures[0].ActorName, StringComparison.Ordinal);
-        Assert.Contains("phantom", failures[1].Detail, StringComparison.Ordinal);
+        Assert.Equal("user name 'phantom'", failures[1].Detail);
+        Assert.Contains("root", failures[1].ActorName, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -529,6 +531,341 @@ public class ProjectMemberServiceTests
     }
 
     /// <summary>
+    ///     Test that adding an existing user stores exactly one membership with the requested role.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_ExistingUser_StoresMembershipWithTheRole()
+    {
+        // Arrange: carol is no member yet
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var before = (await world.MembershipsAsync()).Count;
+        Assert.Null(await world.RoleOfAsync("carol"));
+
+        // Act: a project administrator adds carol as a project administrator
+        var added = await world.Projects.AddMemberAsync(
+            new Actor("pa", "pa"), world.Project, "carol", ProjectRole.ProjectAdmin, cancellationToken);
+
+        // Assert: the returned member and the stored membership carry the role, and nothing else was added
+        Assert.Equal("carol", added.Username);
+        Assert.Equal(ProjectRole.ProjectAdmin, added.Role);
+        Assert.Equal(world.Ids["carol"], added.UserId);
+        Assert.Equal(ProjectRole.ProjectAdmin, await world.RoleOfAsync("carol"));
+        Assert.Equal(before + 1, (await world.MembershipsAsync()).Count);
+    }
+
+    /// <summary>
+    ///     Test that removing a member deletes only that membership.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_RemoveMemberAsync_Member_RemovesTheMembership()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var before = (await world.MembershipsAsync()).Count;
+
+        // Act: a project administrator removes the plain member
+        await world.Projects.RemoveMemberAsync(new Actor("pa", "pa"), world.Project, "mem", cancellationToken);
+
+        // Assert: that membership is gone, the others are untouched
+        Assert.Null(await world.RoleOfAsync("mem"));
+        Assert.Equal(before - 1, (await world.MembershipsAsync()).Count);
+        Assert.Equal(ProjectRole.ProjectAdmin, await world.RoleOfAsync("pa"));
+        Assert.Equal(ProjectRole.ProjectAdmin, await world.RoleOfAsync("pb"));
+    }
+
+    /// <summary>
+    ///     Test that every member operation on a project that does not exist is refused as a missing project and
+    ///     changes nothing.
+    /// </summary>
+    /// <param name="action">One of add, remove, role, create or list.</param>
+    [Theory]
+    [InlineData("add")]
+    [InlineData("remove")]
+    [InlineData("role")]
+    [InlineData("create")]
+    [InlineData("list")]
+    public async Task ProjectService_MemberActions_UnknownProject_ThrowsProjectNotFound(string action)
+    {
+        // Arrange: a world and the counts of everything an action could change
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var memberships = await world.MembershipsAsync();
+        var users = (await world.UserStore.ListAsync(cancellationToken)).Count;
+        var reviewAudits = world.Store.Audits.Count;
+        var userAudits = world.UserStore.Audits.Count;
+        var auditEntries = world.AuditStore.Entries.Count;
+
+        // Act: a system administrator acts on a project that does not exist
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => RunAsync(world, new Actor("root", "root"), action, 9999));
+
+        // Assert: refused as a missing project, and nothing was stored
+        Assert.Equal(DomainRule.ProjectNotFound, exception.Rule);
+        Assert.Equal(memberships, await world.MembershipsAsync());
+        Assert.Equal(users, (await world.UserStore.ListAsync(cancellationToken)).Count);
+        Assert.Null(await world.UserStore.GetByUsernameAsync("fresh", cancellationToken));
+        Assert.Equal(reviewAudits, world.Store.Audits.Count);
+        Assert.Equal(userAudits, world.UserStore.Audits.Count);
+        Assert.Equal(auditEntries, world.AuditStore.Entries.Count);
+    }
+
+    /// <summary>
+    ///     Test that member operations refused by a rule leave the memberships, the users and the audit entries
+    ///     unchanged, except for the record of the failed attempt to add an unknown user.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_Members_RuleViolations_ChangeNothing()
+    {
+        // Arrange: a world and the counts of everything an operation could change
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pa = new Actor("pa", "pa");
+        var memberships = await world.MembershipsAsync();
+        var users = (await world.UserStore.ListAsync(cancellationToken)).Count;
+        var reviewAudits = world.Store.Audits.Count;
+        var userAudits = world.UserStore.Audits.Count;
+        var auditEntries = world.AuditStore.Entries.Count;
+
+        // Act: a double add, a removal and a role change without a membership, an unknown user
+        var doubled = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.AddMemberAsync(pa, world.Project, "mem", ProjectRole.User, cancellationToken));
+        var removal = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.RemoveMemberAsync(pa, world.Project, "out", cancellationToken));
+        var roleChange = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.SetMemberRoleAsync(pa, world.Project, "out", ProjectRole.User, cancellationToken));
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.AddMemberAsync(pa, world.Project, "nobody-here", ProjectRole.User, cancellationToken));
+
+        // Assert: each rule, and nothing stored but the one failed attempt
+        Assert.Equal(DomainRule.MembershipExists, doubled.Rule);
+        Assert.Equal(DomainRule.MembershipNotFound, removal.Rule);
+        Assert.Equal(DomainRule.MembershipNotFound, roleChange.Rule);
+        Assert.Equal(DomainRule.UserNotFound, unknown.Rule);
+        Assert.Equal(memberships, await world.MembershipsAsync());
+        Assert.Equal(users, (await world.UserStore.ListAsync(cancellationToken)).Count);
+        Assert.Equal(reviewAudits, world.Store.Audits.Count);
+        Assert.Equal(userAudits, world.UserStore.Audits.Count);
+        var added = world.AuditStore.Entries.Skip(auditEntries).ToList();
+        Assert.Equal("project.member-add-failed", Assert.Single(added).Action);
+    }
+
+    /// <summary>
+    ///     Test that a project role outside the defined roles is refused and nothing is stored.
+    /// </summary>
+    /// <param name="action">One of add, role or create.</param>
+    [Theory]
+    [InlineData("add")]
+    [InlineData("role")]
+    [InlineData("create")]
+    public async Task ProjectService_MemberActions_UndefinedRole_ThrowsArgumentOutOfRange(string action)
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pa = new Actor("pa", "pa");
+        var memberships = await world.MembershipsAsync();
+        var users = (await world.UserStore.ListAsync(cancellationToken)).Count;
+        var undefined = (ProjectRole)99;
+
+        // Act
+        Task task = action switch
+        {
+            "add" => world.Projects.AddMemberAsync(pa, world.Project, "carol", undefined, cancellationToken),
+            "role" => world.Projects.SetMemberRoleAsync(pa, world.Project, "mem", undefined, cancellationToken),
+            _ => world.Projects.CreateMemberAccountAsync(
+                pa, world.Project, "fresh", "Fresh", undefined, cancellationToken)
+        };
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => task);
+
+        // Assert: no membership and no account was stored
+        Assert.Equal(memberships, await world.MembershipsAsync());
+        Assert.Equal(users, (await world.UserStore.ListAsync(cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that a member account can be created as an Auditor and that the audit entry names the role.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_CreateMemberAccountAsync_Auditor_CreatesAuditorAndAuditsTheRole()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        var created = await world.Projects.CreateMemberAccountAsync(
+            new Actor("pa", "pa"), world.Project, "fresh", "Fresh Auditor", ProjectRole.Auditor, cancellationToken);
+
+        // Assert: the member and the stored membership are an Auditor, and one entry names the role
+        Assert.Equal(ProjectRole.Auditor, created.Member.Role);
+        Assert.Equal(ProjectRole.Auditor, await world.RoleOfAsync("fresh"));
+        var draft = Assert.Single(world.UserStore.Audits, d => d.Action == "project.account-created");
+        Assert.Contains("role Auditor", draft.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the service offers no operation that returns users, so nobody can browse them through it.
+    /// </summary>
+    [Fact]
+    public void ProjectService_PublicOperations_NeverReturnUsers()
+    {
+        // Arrange: the types an operation may hand back, none of which is a user
+        var allowed = new[]
+        {
+            typeof(void), typeof(bool), typeof(Project), typeof(ProjectMember), typeof(NewMemberAccount)
+        };
+
+        // Act: the result type of every public operation, without the task and the list around it
+        var operations = typeof(ProjectService)
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance
+                        | System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(method => (method.Name, Result: Unwrap(method.ReturnType)))
+            .ToList();
+
+        // Assert: there are operations, and each hands back only one of the allowed types
+        Assert.NotEmpty(operations);
+        Assert.All(operations, operation => Assert.Contains(operation.Result, allowed));
+        Assert.DoesNotContain(operations, operation => operation.Result == typeof(User));
+    }
+
+    /// <summary>
+    ///     Test that failed creations of an account because of a taken name count against the limit.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_CreateMemberAccountAsync_TakenNames_AreCountedAsFailedAttempts()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pa = new Actor("pa", "pa");
+
+        // Act: ten creations with a taken name, then one more
+        for (var i = 0; i < ProjectService.MaxFailedAttempts; i++)
+        {
+            var taken = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.CreateMemberAccountAsync(
+                pa, world.Project, "OUT", "Whoever", ProjectRole.User, cancellationToken));
+            Assert.Equal(DomainRule.UserNameTaken, taken.Rule);
+        }
+
+        var stopped = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.CreateMemberAccountAsync(
+            pa, world.Project, "fresh", "Fresh", ProjectRole.User, cancellationToken));
+
+        // Assert: the eleventh is stopped, and exactly the ten failures were recorded
+        Assert.Equal(DomainRule.TooManyAttempts, stopped.Rule);
+        Assert.Equal(
+            ProjectService.MaxFailedAttempts,
+            world.AuditStore.Entries.Count(e => e.Action == "project.member-add-failed"));
+    }
+
+    /// <summary>
+    ///     Test that a successful addition of a member does not count against the limit.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_Success_DoesNotCountAgainstTheLimit()
+    {
+        // Arrange: nine failed attempts, one short of the limit
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pa = new Actor("pa", "pa");
+        for (var i = 0; i < ProjectService.MaxFailedAttempts - 1; i++)
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+                pa, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken));
+        }
+
+        // Act: a success, the tenth failure, and one more attempt
+        await world.Projects.AddMemberAsync(pa, world.Project, "carol", ProjectRole.User, cancellationToken);
+        var tenth = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            pa, world.Project, "guess-last", ProjectRole.User, cancellationToken));
+        var stopped = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            pa, world.Project, "guess-over", ProjectRole.User, cancellationToken));
+
+        // Assert: the tenth failure was still allowed, the next attempt is stopped
+        Assert.Equal(DomainRule.UserNotFound, tenth.Rule);
+        Assert.Equal(DomainRule.TooManyAttempts, stopped.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator can demote the last project administrator.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetMemberRoleAsync_SystemAdminDemotesLastProjectAdmin_IsAllowed()
+    {
+        // Arrange: pa is the only enabled administrator
+        var world = await WorldAsync(withSecondAdmin: false);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        var changed = await world.Projects.SetMemberRoleAsync(
+            new Actor("root", "root"), world.Project, "pa", ProjectRole.User, cancellationToken);
+
+        // Assert: the role was changed and the change was audited once
+        Assert.Equal(ProjectRole.User, changed.Role);
+        Assert.Equal(ProjectRole.User, await world.RoleOfAsync("pa"));
+        Assert.Single(world.Store.Audits, d => d.Action == "project.member-role-changed");
+    }
+
+    /// <summary>
+    ///     Test that each member change is audited with the actor, the user, the role and the project.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_MemberChanges_AreAuditedWithActorUserRoleAndProject()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pa = new Actor("pa", "pa");
+        var reviewAudits = world.Store.Audits.Count;
+        var userAudits = world.UserStore.Audits.Count;
+
+        // Act: add, change the role, remove, and create an account
+        await world.Projects.AddMemberAsync(pa, world.Project, "carol", ProjectRole.User, cancellationToken);
+        await world.Projects.SetMemberRoleAsync(
+            pa, world.Project, "carol", ProjectRole.ProjectAdmin, cancellationToken);
+        await world.Projects.RemoveMemberAsync(pa, world.Project, "carol", cancellationToken);
+        await world.Projects.CreateMemberAccountAsync(
+            pa, world.Project, "fresh", "Fresh", ProjectRole.User, cancellationToken);
+
+        // Assert: exactly these entries, each by the actor and with the project
+        var drafts = world.Store.Audits.Skip(reviewAudits).Concat(world.UserStore.Audits.Skip(userAudits)).ToList();
+        Assert.Equal(
+            [
+                ("project.member-added", "user 'carol', role User"),
+                ("project.member-role-changed", "user 'carol', role ProjectAdmin"),
+                ("project.member-removed", "user 'carol'"),
+                ("project.account-created", "user 'fresh', role User, temporary password")
+            ],
+            drafts.Select(d => (d.Action, d.Detail)));
+        Assert.All(drafts, d => Assert.Equal("pa", d.ActorUsername));
+        Assert.All(drafts, d => Assert.Equal(world.Project, d.ProjectId));
+    }
+
+    /// <summary>
+    ///     Test that a failed creation of an account is audited with the tried name and the project.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_CreateMemberAccountAsync_TakenName_AuditsTheFailedAttempt()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var before = world.AuditStore.Entries.Count;
+
+        // Act: the name is taken by another user
+        var taken = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.CreateMemberAccountAsync(
+            new Actor("pa", "pa"), world.Project, "OUT", "Whoever", ProjectRole.User, cancellationToken));
+
+        // Assert: refused, and exactly one entry records the tried name and the project
+        Assert.Equal(DomainRule.UserNameTaken, taken.Rule);
+        var entry = Assert.Single(world.AuditStore.Entries.Skip(before));
+        Assert.Equal("project.member-add-failed", entry.Action);
+        Assert.Equal(world.Project, entry.ProjectId);
+        Assert.Equal("user name 'OUT'", entry.Detail);
+    }
+
+    /// <summary>
     ///     Test that the project service refuses missing dependencies.
     /// </summary>
     [Fact]
@@ -550,33 +887,60 @@ public class ProjectMemberServiceTests
     }
 
     /// <summary>
+    ///     Reduces the return type of an operation to what it hands back: without the task and the list around it.
+    /// </summary>
+    /// <param name="type">The return type.</param>
+    /// <returns>The type of the result, or <c>void</c> when the task has none.</returns>
+    private static Type Unwrap(Type type)
+    {
+        if (type == typeof(Task))
+        {
+            return typeof(void);
+        }
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            type = type.GetGenericArguments()[0];
+        }
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IReadOnlyList<>))
+        {
+            type = type.GetGenericArguments()[0];
+        }
+
+        return type;
+    }
+
+    /// <summary>
     ///     Runs one action on the members of the project.
     /// </summary>
     /// <param name="world">The arranged world.</param>
     /// <param name="actor">The actor.</param>
     /// <param name="action">One of add, remove, role, create or list.</param>
+    /// <param name="projectId">The project to act on, or <c>null</c> for the project of the world.</param>
     /// <returns>A task that completes when the action did.</returns>
-    private static async Task RunAsync(World world, Actor actor, string action)
+    private static async Task RunAsync(World world, Actor actor, string action, int? projectId = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var project = projectId ?? world.Project;
         switch (action)
         {
             case "add":
-                await world.Projects.AddMemberAsync(actor, world.Project, "carol", ProjectRole.User, cancellationToken);
+                await world.Projects.AddMemberAsync(actor, project, "carol", ProjectRole.User, cancellationToken);
                 break;
             case "remove":
-                await world.Projects.RemoveMemberAsync(actor, world.Project, "mem", cancellationToken);
+                await world.Projects.RemoveMemberAsync(actor, project, "mem", cancellationToken);
                 break;
             case "role":
                 await world.Projects.SetMemberRoleAsync(
-                    actor, world.Project, "mem", ProjectRole.ProjectAdmin, cancellationToken);
+                    actor, project, "mem", ProjectRole.ProjectAdmin, cancellationToken);
                 break;
             case "create":
                 await world.Projects.CreateMemberAccountAsync(
-                    actor, world.Project, "fresh", "Fresh", ProjectRole.User, cancellationToken);
+                    actor, project, "fresh", "Fresh", ProjectRole.User, cancellationToken);
                 break;
             default:
-                await world.Projects.ListMembersAsync(actor, world.Project, cancellationToken);
+                await world.Projects.ListMembersAsync(actor, project, cancellationToken);
                 break;
         }
     }

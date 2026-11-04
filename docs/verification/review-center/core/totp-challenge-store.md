@@ -34,6 +34,10 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 characters, differ, and the stored challenge holds only a hash, the user name, and the return address. This scenario
 is tested by `TotpChallengeStore_Issue_ReturnsRandomUrlSafeTokens`.
 
+**TotpChallengeStore_Issue_Challenge_HoldsOnlyTheHashOfTheToken**: A challenge is issued, then seen and taken with its
+token. Both the seen and the taken challenge carry the lowercase hexadecimal SHA-256 hash of the token, which differs
+from the token itself. This scenario is tested by `TotpChallengeStore_Issue_Challenge_HoldsOnlyTheHashOfTheToken`.
+
 **TotpChallengeStore_Take_Twice_GivesTheChallengeOnlyOnce**: Taking a challenge twice gives it only the first time and
 it is gone afterwards. This scenario is tested by `TotpChallengeStore_Take_Twice_GivesTheChallengeOnlyOnce`.
 
@@ -67,8 +71,17 @@ challenges of that user and keeps the challenge of another user. This scenario i
 scenario is tested by `TotpChallengeStore_Return_AfterTheLifetime_EndsTheChallenge`.
 
 **TotpChallengeStore_Issue_BeyondTheCap_StaysWithinTheCapAndDropsTheOldest**: A full store accepts one more challenge,
-stays within the cap, keeps the newest, and drops the oldest. This scenario is tested by
+holds exactly the cap, keeps the newest, and drops the oldest. This scenario is tested by
 `TotpChallengeStore_Issue_BeyondTheCap_StaysWithinTheCapAndDropsTheOldest`.
+
+**TotpChallengeStore_Issue_WhenFullOfEndedChallenges_DropsEndedAndStores**: A full store whose challenges have all
+ended but were not removed yet accepts one more challenge; every ended challenge is dropped, the count is one, and the
+new challenge can be seen. This scenario is tested by
+`TotpChallengeStore_Issue_WhenFullOfEndedChallenges_DropsEndedAndStores`.
+
+**TotpChallengeStore_Limits_AreFiveMinutesTenThousandAndFiveFailures**: The lifetime of a challenge is read as five
+minutes, the cap as 10,000 challenges, and the maximum number of failures as five. This scenario is tested by
+`TotpChallengeStore_Limits_AreFiveMinutesTenThousandAndFiveFailures`.
 
 **TotpChallengeStore_NullArguments_Throw**: Null arguments raise `ArgumentNullException`. This scenario is tested by
 `TotpChallengeStore_NullArguments_Throw`.
@@ -76,6 +89,11 @@ stays within the cap, keeps the newest, and drops the oldest. This scenario is t
 **TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored**: A challenge is taken, its user is invalidated
 (in another case) while the code is being checked, and giving it back is refused and stores nothing. This scenario is
 tested by `TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored`.
+
+**TotpChallengeStore_Return_InvalidatedLongBeforeTheReturn_IsStillRefused**: A challenge is taken, its user is
+invalidated, almost the whole lifetime passes, and another user is invalidated; the store remembers both invalidations,
+giving the challenge back is refused, nothing is stored, and the token finds nothing. This scenario is tested by
+`TotpChallengeStore_Return_InvalidatedLongBeforeTheReturn_IsStillRefused`.
 
 **TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores**: Invalidating another user does not stop a taken
 challenge from being given back. This scenario is tested by

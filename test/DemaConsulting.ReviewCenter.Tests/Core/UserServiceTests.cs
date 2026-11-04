@@ -50,13 +50,37 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that valid user names, at the length limits and with every allowed character, are accepted.
+    ///     Reads a user back from the store, as the service stored it.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <param name="username">The user name.</param>
+    /// <returns>The stored user.</returns>
+    private static async Task<User> StoredAsync(FakeUserStore store, string username)
+    {
+        return (await store.GetByUsernameAsync(username, TestContext.Current.CancellationToken))!;
+    }
+
+    /// <summary>
+    ///     Fails a sign-in five times in a row, which locks the account.
+    /// </summary>
+    /// <param name="service">The service.</param>
+    /// <param name="username">The user name.</param>
+    private static async Task LockAsync(UserService service, string username)
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await service.AuthenticateAsync(username, "wrong password!", TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Test that user names made of the allowed characters are accepted and the user is created enabled.
     /// </summary>
     /// <param name="username">The user name.</param>
     [Theory]
-    [InlineData("abc")]
     [InlineData("A.b_c-9")]
-    [InlineData("12345678901234567890123456789012345678901234567890")]
+    [InlineData("Ann.Lee1")]
+    [InlineData("ANN_lee-2")]
     public async Task UserService_CreateAsync_ValidUsername_Creates(string username)
     {
         // Arrange: a service
@@ -72,29 +96,130 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that invalid user names are refused and nothing is stored.
+    ///     Test that a user name with a character other than letters, digits, full stops, underscores and hyphens
+    ///     is refused with the user-name-invalid rule.
     /// </summary>
     /// <param name="username">The invalid user name.</param>
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("ab")]
     [InlineData("a b")]
     [InlineData("a@b")]
     [InlineData("\u00e9\u00e9\u00e9")]
-    [InlineData("123456789012345678901234567890123456789012345678901")]
-    public async Task UserService_CreateAsync_InvalidUsername_ThrowsUserNameInvalid(string? username)
+    public async Task UserService_CreateAsync_InvalidUsername_ThrowsUserNameInvalid(string username)
     {
         // Arrange: a service
-        var (service, store, _) = Create();
+        var (service, _, _) = Create();
 
         // Act: create the user
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.CreateAsync(username, "Name", UserRole.Reviewer, Password, TestContext.Current.CancellationToken));
 
-        // Assert: the rule is named and nothing is stored
+        // Assert: the rule is named
         Assert.Equal(DomainRule.UserNameInvalid, exception.Rule);
-        Assert.Empty(await store.ListAsync(TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a user name of exactly 3 characters is accepted and stored.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_UsernameOfThreeCharacters_Creates()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: create a user with a 3-character name
+        var user = await service.CreateAsync("a.b", "Name", false, Password, cancellationToken);
+
+        // Assert: the user is returned and exactly one user is stored under that name
+        Assert.Equal("a.b", user.Username);
+        var stored = Assert.Single(await store.ListAsync(cancellationToken));
+        Assert.Equal("a.b", stored.Username);
+    }
+
+    /// <summary>
+    ///     Test that a user name of exactly 50 characters is accepted and stored.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_UsernameOfFiftyCharacters_Creates()
+    {
+        // Arrange: a service and a 50-character name
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var username = new string('a', 50);
+
+        // Act: create the user
+        var user = await service.CreateAsync(username, "Name", false, Password, cancellationToken);
+
+        // Assert: the user is returned and exactly one user is stored under that name
+        Assert.Equal(username, user.Username);
+        var stored = Assert.Single(await store.ListAsync(cancellationToken));
+        Assert.Equal(username, stored.Username);
+    }
+
+    /// <summary>
+    ///     Test that a missing, empty or too short user name is refused with the user-name-invalid rule.
+    /// </summary>
+    /// <param name="username">The user name that is shorter than 3 characters.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("ab")]
+    public async Task UserService_CreateAsync_UsernameShorterThanThree_ThrowsUserNameInvalid(string? username)
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+
+        // Act: create the user
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(username, "Name", false, Password, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.UserNameInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a user name of 51 characters is refused with the user-name-invalid rule.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_UsernameLongerThanFifty_ThrowsUserNameInvalid()
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: create a user with a 51-character name
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync(new string('a', 51), "Name", false, Password, cancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.UserNameInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that refusing an invalid user name and a taken one stores nothing and leaves the first user as it was.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_RejectedUsername_StoresNothing()
+    {
+        // Arrange: a service with one user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        var before = await StoredAsync(store, "ann");
+        var auditsBefore = store.Audits.Count;
+
+        // Act: create users with an invalid name and with a name taken in another case
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("a b", "Other", false, Password, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ANN", "Other", false, "another long password", cancellationToken));
+
+        // Assert: only the first user is stored, unchanged, and nothing was audited
+        var stored = Assert.Single(await store.ListAsync(cancellationToken));
+        Assert.Equal("ann", stored.Username);
+        Assert.Equal(before.DisplayName, stored.DisplayName);
+        Assert.Equal(before.PasswordHash, stored.PasswordHash);
+        Assert.Equal(auditsBefore, store.Audits.Count);
     }
 
     /// <summary>
@@ -116,85 +241,279 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that the display name is trimmed, must not be empty and has an inclusive length limit.
+    ///     Test that a display name with leading and trailing white space is stored trimmed.
     /// </summary>
     [Fact]
-    public async Task UserService_CreateAsync_DisplayName_IsTrimmedAndLimited()
+    public async Task UserService_CreateAsync_DisplayNameWithPadding_StoresItTrimmed()
     {
         // Arrange: a service
-        var (service, _, _) = Create();
+        var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // Act: create users with padded, blank, longest and too long display names
-        var padded = await service.CreateAsync("padded", "  Ann Lee  ", UserRole.Reviewer, Password, cancellationToken);
-        var blank = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.CreateAsync("blank", "   ", UserRole.Reviewer, Password, cancellationToken));
-        var missing = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.CreateAsync("missing", null, UserRole.Reviewer, Password, cancellationToken));
-        var longest = await service.CreateAsync(
-            "longest", new string('n', ReviewLimits.MaxDisplayNameLength), UserRole.Reviewer, Password, cancellationToken);
-        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.CreateAsync(
-                "too.long", new string('n', ReviewLimits.MaxDisplayNameLength + 1), UserRole.Reviewer, Password, cancellationToken));
+        // Act: create a user with a padded display name
+        await service.CreateAsync("padded", "  Ann Lee  ", UserRole.Reviewer, Password, cancellationToken);
 
-        // Assert: trimmed, the rule is named for the bad ones, and the longest allowed one is stored
-        Assert.Equal("Ann Lee", padded.DisplayName);
-        Assert.Equal(DomainRule.DisplayNameInvalid, blank.Rule);
-        Assert.Equal(DomainRule.DisplayNameInvalid, missing.Rule);
-        Assert.Equal(DomainRule.DisplayNameInvalid, tooLong.Rule);
-        Assert.Equal(ReviewLimits.MaxDisplayNameLength, longest.DisplayName.Length);
+        // Assert: the stored display name is trimmed
+        Assert.Equal("Ann Lee", (await StoredAsync(store, "padded")).DisplayName);
     }
 
     /// <summary>
-    ///     Test the password policy: 12 to 128 characters, no other rule, and not trimmed.
+    ///     Test that a display name of one character after trimming is accepted and stored trimmed.
     /// </summary>
-    /// <param name="length">The password length.</param>
-    /// <param name="valid">Whether the password is accepted.</param>
-    [Theory]
-    [InlineData(11, false)]
-    [InlineData(12, true)]
-    [InlineData(128, true)]
-    [InlineData(129, false)]
-    public async Task UserService_CreateAsync_PasswordLength_FollowsPolicy(int length, bool valid)
+    [Fact]
+    public async Task UserService_CreateAsync_DisplayNameOfOneCharacter_Creates()
     {
-        // Arrange: a service and a password of the given length
-        var (service, _, _) = Create();
-        var password = new string('p', length);
+        // Arrange: a service
+        var (service, store, _) = Create();
+
+        // Act: create a user whose display name is one character between spaces
+        await service.CreateAsync("ann", " x ", false, Password, TestContext.Current.CancellationToken);
+
+        // Assert: the stored display name is the one character
+        Assert.Equal("x", (await StoredAsync(store, "ann")).DisplayName);
+    }
+
+    /// <summary>
+    ///     Test that a display name of 100 characters after trimming is accepted and stored trimmed.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_DisplayNameOfHundredCharacters_Creates()
+    {
+        // Arrange: a service and a 100-character display name between spaces
+        var (service, store, _) = Create();
+        var name = new string('n', 100);
 
         // Act: create the user
-        var task = service.CreateAsync("ann", "Ann", UserRole.Reviewer, password, TestContext.Current.CancellationToken);
+        await service.CreateAsync("ann", " " + name + " ", false, Password, TestContext.Current.CancellationToken);
 
-        // Assert: accepted or refused for the password
-        if (valid)
-        {
-            Assert.Equal("ann", (await task).Username);
-        }
-        else
-        {
-            var exception = await Assert.ThrowsAsync<DomainRuleException>(() => task);
-            Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
-        }
+        // Assert: all 100 characters are stored
+        Assert.Equal(name, (await StoredAsync(store, "ann")).DisplayName);
     }
 
     /// <summary>
-    ///     Test that a missing password and spaces-only padding are handled by the length rule alone.
+    ///     Test that a missing, empty or blank display name is refused with the display-name-invalid rule.
+    /// </summary>
+    /// <param name="displayName">The display name that is empty after trimming.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UserService_CreateAsync_DisplayNameBlank_ThrowsDisplayNameInvalid(string? displayName)
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+
+        // Act: create the user
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", displayName, false, Password, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.DisplayNameInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a display name of 101 characters after trimming is refused with the display-name-invalid rule.
     /// </summary>
     [Fact]
-    public async Task UserService_CreateAsync_MissingPasswordOrWhiteSpacePadding_FollowsLengthRule()
+    public async Task UserService_CreateAsync_DisplayNameLongerThanHundred_ThrowsDisplayNameInvalid()
+    {
+        // Arrange: a service and a 101-character display name between spaces
+        var (service, _, _) = Create();
+        var name = " " + new string('n', 101) + " ";
+
+        // Act: create the user
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", name, false, Password, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.DisplayNameInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that refusing a blank display name and a too long one stores and audits nothing.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_RejectedDisplayName_StoresNothing()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: create users with a blank and with a 101-character display name
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("blank", "   ", false, Password, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("long", new string('n', 101), false, Password, cancellationToken));
+
+        // Assert: no user is stored and nothing was audited
+        Assert.Empty(await store.ListAsync(cancellationToken));
+        Assert.Empty(store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a password of exactly 12 characters is accepted.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfTwelveCharacters_Creates()
+    {
+        // Arrange: a service and a password of 12 characters
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var password = new string('p', 12);
+
+        // Act: create the user
+        var user = await service.CreateAsync("ann", "Ann", UserRole.Reviewer, password, cancellationToken);
+
+        // Assert: the user is created
+        Assert.Equal("ann", user.Username);
+    }
+
+    /// <summary>
+    ///     Test that a password inside the policy range is accepted and signs the new user in.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordInPolicyRange_CreatesAndAuthenticates()
     {
         // Arrange: a service
         var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // Act: create with no password, and with a 12-character password made of spaces
-        var missing = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.CreateAsync("ann", "Ann", UserRole.Reviewer, null, cancellationToken));
-        var spaces = await service.CreateAsync("bob", "Bob", UserRole.Reviewer, new string(' ', 12), cancellationToken);
+        // Act: create the user with a password of 21 characters, then sign in with it
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        var signedIn = await service.AuthenticateAsync("ann", Password, cancellationToken);
 
-        // Assert: the missing one is refused, the spaces are taken as they are
-        Assert.Equal(DomainRule.PasswordInvalid, missing.Rule);
-        Assert.Equal("bob", spaces.Username);
-        Assert.NotNull(await service.AuthenticateAsync("bob", new string(' ', 12), cancellationToken));
+        // Assert: the sign-in returns the user
+        Assert.Equal("ann", signedIn?.Username);
+    }
+
+    /// <summary>
+    ///     Test that a password of exactly 128 characters is accepted and only its hash is stored.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfHundredTwentyEightCharacters_Creates()
+    {
+        // Arrange: a service and a password of 128 characters
+        var (service, store, _) = Create();
+        var password = new string('p', 128);
+
+        // Act: create the user
+        await service.CreateAsync("ann", "Ann", false, password, TestContext.Current.CancellationToken);
+
+        // Assert: the user is stored with the hash of the whole password
+        Assert.Equal("hash:" + password, (await StoredAsync(store, "ann")).PasswordHash);
+    }
+
+    /// <summary>
+    ///     Test that a password of 11 characters is refused with the password-invalid rule.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfElevenCharacters_ThrowsPasswordInvalid()
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+
+        // Act: create a user with a password of 11 characters
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, new string('p', 11), TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a password of 129 characters is refused with the password-invalid rule.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfHundredTwentyNineCharacters_ThrowsPasswordInvalid()
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: create a user with a password of 129 characters
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, new string('p', 129), cancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a password of one repeated letter is accepted, because only its length is checked.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfOneRepeatedLetter_Creates()
+    {
+        // Arrange: a service and a password with no digit, upper-case letter or symbol
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var password = new string('a', 20);
+
+        // Act: create the user and sign in with the password
+        await service.CreateAsync("ann", "Ann", false, password, cancellationToken);
+        var signedIn = await service.AuthenticateAsync("ann", password, cancellationToken);
+
+        // Assert: the sign-in returns the user
+        Assert.Equal("ann", signedIn?.Username);
+    }
+
+    /// <summary>
+    ///     Test that a missing password is refused with the password-invalid rule.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordMissing_ThrowsPasswordInvalid()
+    {
+        // Arrange: a service
+        var (service, _, _) = Create();
+
+        // Act: create a user without a password
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, null, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a refused password stores and audits nothing.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_RejectedPassword_StoresNothing()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: create users with no password, with 11 characters and with 129 characters
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, null, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, new string('p', 11), cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.CreateAsync("ann", "Ann", false, new string('p', 129), cancellationToken));
+
+        // Assert: no user is stored and nothing was audited
+        Assert.Empty(await store.ListAsync(cancellationToken));
+        Assert.Empty(store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that a password of 12 spaces is kept as it is, not trimmed.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_PasswordOfTwelveSpaces_IsKeptUntrimmed()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var spaces = new string(' ', 12);
+
+        // Act: create a user with a 12-character password made of spaces
+        await service.CreateAsync("bob", "Bob", UserRole.Reviewer, spaces, cancellationToken);
+
+        // Assert: the spaces are hashed as they are and sign the user in
+        Assert.Equal("hash:" + spaces, (await StoredAsync(store, "bob")).PasswordHash);
+        Assert.NotNull(await service.AuthenticateAsync("bob", spaces, cancellationToken));
     }
 
     /// <summary>
@@ -216,28 +535,155 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that the right password signs in, in any case of the user name, and a wrong password, an unknown
-    ///     user and a missing password do not.
+    ///     Test that a created user without the administrator request is stored enabled.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticateAsync_RightWrongAndUnknown_OnlyRightSucceeds()
+    public async Task UserService_CreateAsync_NewUser_IsEnabled()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+
+        // Act: create a user
+        await service.CreateAsync("ann", "Ann", false, Password, TestContext.Current.CancellationToken);
+
+        // Assert: the stored user is enabled
+        Assert.True((await StoredAsync(store, "ann")).Enabled);
+    }
+
+    /// <summary>
+    ///     Test that a user created with the administrator request is stored as a system administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_AdministratorRequested_CreatesSystemAdministrator()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+
+        // Act: create a user and ask for the administrator right
+        await service.CreateAsync("root", "Root", true, Password, TestContext.Current.CancellationToken);
+
+        // Assert: the stored user is a system administrator
+        Assert.True((await StoredAsync(store, "root")).IsSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Test that a user created without the administrator request is stored as a plain user.
+    /// </summary>
+    [Fact]
+    public async Task UserService_CreateAsync_AdministratorNotRequested_CreatesPlainUser()
+    {
+        // Arrange: a service
+        var (service, store, _) = Create();
+
+        // Act: create a user and do not ask for the administrator right
+        await service.CreateAsync("ann", "Ann", false, Password, TestContext.Current.CancellationToken);
+
+        // Assert: the stored user is not a system administrator
+        Assert.False((await StoredAsync(store, "ann")).IsSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Test that the right password signs the user in and returns that user.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_RightPassword_ReturnsTheUser()
+    {
+        // Arrange: a service with a user
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var created = await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: sign in with the right password
+        var user = await service.AuthenticateAsync("ann", Password, cancellationToken);
+
+        // Assert: the user is returned
+        Assert.NotNull(user);
+        Assert.Equal(created.Id, user.Id);
+        Assert.Equal("ann", user.Username);
+    }
+
+    /// <summary>
+    ///     Test that the user is found by a user name written in another letter case.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_UserNameInOtherCase_ReturnsTheUser()
+    {
+        // Arrange: a service with a user
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var created = await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: sign in with the user name in upper case
+        var user = await service.AuthenticateAsync("ANN", Password, cancellationToken);
+
+        // Assert: the user is returned
+        Assert.NotNull(user);
+        Assert.Equal(created.Id, user.Id);
+    }
+
+    /// <summary>
+    ///     Test that a wrong, empty or missing password returns nothing.
+    /// </summary>
+    /// <param name="password">The password to try.</param>
+    [Theory]
+    [InlineData("wrong password!")]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task UserService_AuthenticateAsync_WrongPassword_ReturnsNull(string? password)
     {
         // Arrange: a service with a user
         var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("Ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
 
-        // Act: try the right password, a wrong one, an unknown user and no password
-        var right = await service.AuthenticateAsync("ann", Password, cancellationToken);
-        var wrong = await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        var unknown = await service.AuthenticateAsync("nobody", Password, cancellationToken);
-        var none = await service.AuthenticateAsync("ann", null, cancellationToken);
+        // Act: try the password
+        var user = await service.AuthenticateAsync("ann", password, cancellationToken);
 
-        // Assert: only the right password gives the user
-        Assert.Equal("Ann", right?.Username);
-        Assert.Null(wrong);
-        Assert.Null(unknown);
-        Assert.Null(none);
+        // Assert: nothing is returned
+        Assert.Null(user);
+    }
+
+    /// <summary>
+    ///     Test that an unknown user name returns nothing.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_UnknownUser_ReturnsNull()
+    {
+        // Arrange: a service with a user
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: sign in with an unknown user name and a password that is right for another user
+        var user = await service.AuthenticateAsync("nobody", Password, cancellationToken);
+
+        // Assert: nothing is returned
+        Assert.Null(user);
+    }
+
+    /// <summary>
+    ///     Test that a wrong password of an unknown user costs one hash verification, as it does for a known user.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_UnknownUser_VerifiesAHashLikeAKnownUser()
+    {
+        // Arrange: a service over a hasher that counts verifications, with a user
+        var hasher = new CountingHasher();
+        var service = new UserService(new FakeUserStore(), hasher, new MovableTimeProvider(_now));
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: count the verifications of a wrong password for the known user and for an unknown one
+        hasher.VerifyCalls = 0;
+        await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        var known = hasher.VerifyCalls;
+        hasher.VerifyCalls = 0;
+        await service.AuthenticateAsync("nobody", "wrong password!", cancellationToken);
+        var unknown = hasher.VerifyCalls;
+
+        // Assert: one verification each
+        Assert.Equal(1, known);
+        Assert.Equal(1, unknown);
     }
 
     /// <summary>
@@ -264,41 +710,110 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that the fifth consecutive failure locks the account for five minutes, that a locked account
-    ///     refuses even the right password, and that it works again afterwards.
+    ///     Test that four failures in a row do not lock the account and that the fifth one does.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticateAsync_FiveFailures_LockForFiveMinutes()
+    public async Task UserService_AuthenticateAsync_FifthFailureInARow_LocksTheUser()
     {
         // Arrange: a service with a user
-        var (service, _, clock) = Create();
+        var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
 
-        // Act: fail four times (still not locked), once more, and try the right password while locked
+        // Act: fail four times and sign in, then fail five times and try the right password
         for (var i = 0; i < 4; i++)
         {
             await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
         }
 
+        var lockAfterFour = (await StoredAsync(store, "ann")).LockoutUntil;
         var beforeLock = await service.AuthenticateAsync("ann", Password, cancellationToken);
-        for (var i = 0; i < 5; i++)
-        {
-            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        }
-
+        await LockAsync(service, "ann");
+        var lockAfterFive = (await StoredAsync(store, "ann")).LockoutUntil;
         var locked = await service.AuthenticateAsync("ann", Password, cancellationToken);
+
+        // Assert: four failures do not lock (and the right password signs in), the fifth one does
+        Assert.Null(lockAfterFour);
+        Assert.NotNull(beforeLock);
+        Assert.NotNull(lockAfterFive);
+        Assert.Null(locked);
+    }
+
+    /// <summary>
+    ///     Test that a lockout ends exactly five minutes after it began, not one second earlier.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_Lockout_LastsExactlyFiveMinutes()
+    {
+        // Arrange: a user locked out at the start instant
+        var (service, store, clock) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        await LockAsync(service, "ann");
+        var lockoutUntil = (await StoredAsync(store, "ann")).LockoutUntil;
+
+        // Act: try the right password one second before the end of the lockout and at its end
         clock.Advance(TimeSpan.FromMinutes(4) + TimeSpan.FromSeconds(59));
         var almost = await service.AuthenticateAsync("ann", Password, cancellationToken);
         clock.Advance(TimeSpan.FromSeconds(1));
         var after = await service.AuthenticateAsync("ann", Password, cancellationToken);
 
-        // Assert: four failures do not lock (and the right password resets them), five do, the lock lasts
-        // exactly five minutes
-        Assert.NotNull(beforeLock);
-        Assert.Null(locked);
+        // Assert: the lockout was set to five minutes, refused before and open at its end
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), lockoutUntil);
         Assert.Null(almost);
         Assert.NotNull(after);
+    }
+
+    /// <summary>
+    ///     Test that the right password is refused while the lockout lasts.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_LockedUser_RightPasswordIsRefused()
+    {
+        // Arrange: a locked-out user
+        var (service, _, clock) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        await LockAsync(service, "ann");
+        clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: try the right password twice
+        var first = await service.AuthenticateAsync("ann", Password, cancellationToken);
+        var second = await service.AuthenticateAsync("ann", Password, cancellationToken);
+
+        // Assert: both are refused
+        Assert.Null(first);
+        Assert.Null(second);
+    }
+
+    /// <summary>
+    ///     Test that attempts while the lockout lasts leave the failure count and the end of the lockout as they were.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_LockedUser_AttemptsAreNotCounted()
+    {
+        // Arrange: a user locked out at the start instant; the fifth failure restarts the count
+        var (service, store, clock) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        await LockAsync(service, "ann");
+        var locked = await StoredAsync(store, "ann");
+        clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: three attempts while locked: a wrong password, the right one, and the right one in another case
+        var wrong = await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        var right = await service.AuthenticateAsync("ann", Password, cancellationToken);
+        var otherCase = await service.AuthenticateAsync("ANN", Password, cancellationToken);
+
+        // Assert: all refused, and the stored count and end of the lockout are as right after the lockout
+        Assert.Equal(0, locked.FailedLoginCount);
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), locked.LockoutUntil);
+        Assert.Null(wrong);
+        Assert.Null(right);
+        Assert.Null(otherCase);
+        var after = await StoredAsync(store, "ann");
+        Assert.Equal(locked.FailedLoginCount, after.FailedLoginCount);
+        Assert.Equal(locked.LockoutUntil, after.LockoutUntil);
     }
 
     /// <summary>
@@ -333,32 +848,95 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that the last enabled administrator cannot be disabled or demoted, while another one can.
+    ///     Test that disabling the last enabled administrator is refused with the last-administrator rule.
     /// </summary>
     [Fact]
-    public async Task UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected()
+    public async Task UserService_SetEnabledAsync_LastEnabledAdministrator_IsRefused()
     {
         // Arrange: a service with one administrator
-        var (service, _, _) = Create();
+        var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("root", "Root", UserRole.Admin, Password, cancellationToken);
 
-        // Act: disable and demote the only administrator, add a second one, then do both to the first
+        // Act: disable the only administrator
         var disable = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetEnabledAsync("root", false, cancellationToken));
-        var demote = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetRoleAsync("root", UserRole.Reviewer, cancellationToken));
-        await service.CreateAsync("second", "Second", UserRole.Admin, Password, cancellationToken);
-        await service.SetRoleAsync("root", UserRole.Reviewer, cancellationToken);
-        var lastAgain = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetEnabledAsync("second", false, cancellationToken));
 
-        // Assert: the first two were refused, the demotion with a second administrator worked, and the second
-        // one is now protected
+        // Assert: the rule is named and the administrator is still enabled
         Assert.Equal(DomainRule.LastAdmin, disable.Rule);
+        Assert.True((await StoredAsync(store, "root")).Enabled);
+    }
+
+    /// <summary>
+    ///     Test that disabling a user stores the user as disabled.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetEnabledAsync_False_DisablesTheUser()
+    {
+        // Arrange: a service with an enabled user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: disable the user
+        await service.SetEnabledAsync("ann", false, cancellationToken);
+
+        // Assert: the stored user is disabled
+        Assert.False((await StoredAsync(store, "ann")).Enabled);
+    }
+
+    /// <summary>
+    ///     Test that demoting the last enabled administrator is refused with the last-administrator rule.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetSystemAdminAsync_LastEnabledAdministrator_IsRefused()
+    {
+        // Arrange: a service with one administrator
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, cancellationToken);
+
+        // Act: demote the only administrator
+        var demote = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetSystemAdminAsync("root", false, Actor.CommandLine, cancellationToken));
+
+        // Assert: the rule is named and the user is still an administrator
         Assert.Equal(DomainRule.LastAdmin, demote.Rule);
-        Assert.Equal(DomainRule.LastAdmin, lastAgain.Rule);
-        Assert.False((await service.GetAsync("root", cancellationToken))!.IsSystemAdmin);
+        Assert.True((await StoredAsync(store, "root")).IsSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator can be disabled or demoted while another enabled one remains.
+    /// </summary>
+    /// <param name="change">The change: <c>disable</c> or <c>demote</c>.</param>
+    [Theory]
+    [InlineData("disable")]
+    [InlineData("demote")]
+    public async Task UserService_SetEnabledAndSetSystemAdmin_AnotherEnabledAdministrator_AllowTheChange(string change)
+    {
+        // Arrange: two enabled administrators
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, cancellationToken);
+        await service.CreateAsync("ann", "Ann", true, Password, cancellationToken);
+
+        // Act: disable or demote one of them
+        if (change == "disable")
+        {
+            await service.SetEnabledAsync("ann", false, cancellationToken);
+        }
+        else
+        {
+            await service.SetSystemAdminAsync("ann", false, Actor.CommandLine, cancellationToken);
+        }
+
+        // Assert: only the one administrator changed, the other one is as it was
+        var ann = await StoredAsync(store, "ann");
+        var root = await StoredAsync(store, "root");
+        Assert.Equal(change != "disable", ann.Enabled);
+        Assert.Equal(change == "disable", ann.IsSystemAdmin);
+        Assert.True(root.Enabled);
+        Assert.True(root.IsSystemAdmin);
     }
 
     /// <summary>
@@ -383,28 +961,92 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that changing the own password needs the current one and applies the policy.
+    ///     Test that a change with the right current password stores the new password, which then signs in while the
+    ///     old one does not.
     /// </summary>
     [Fact]
-    public async Task UserService_ChangeOwnPasswordAsync_NeedsCurrentPasswordAndPolicy()
+    public async Task UserService_ChangeOwnPasswordAsync_CorrectCurrentPassword_ChangesThePassword()
     {
         // Arrange: a service with a user
-        var (service, _, _) = Create();
+        var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
 
-        // Act: change with a wrong current password, with a short new password, and correctly
-        var wrong = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ChangeOwnPasswordAsync("ann", "wrong password!", "another long password", cancellationToken));
-        var tooShort = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ChangeOwnPasswordAsync("ann", Password, "short", cancellationToken));
+        // Act: change the password with the right current one
         await service.ChangeOwnPasswordAsync("ann", Password, "another long password", cancellationToken);
 
-        // Assert: only the correct change took effect
-        Assert.Equal(DomainRule.CurrentPasswordIncorrect, wrong.Rule);
-        Assert.Equal(DomainRule.PasswordInvalid, tooShort.Rule);
+        // Assert: the new hash is stored, the new password signs in and the old one does not
+        Assert.Equal("hash:another long password", (await StoredAsync(store, "ann")).PasswordHash);
         Assert.Null(await service.AuthenticateAsync("ann", Password, cancellationToken));
         Assert.NotNull(await service.AuthenticateAsync("ann", "another long password", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a wrong current password is refused with the current-password-incorrect rule and the stored
+    ///     password hash stays as it was.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ChangeOwnPasswordAsync_WrongCurrentPassword_IsRefusedAndKeepsThePassword()
+    {
+        // Arrange: a service with a user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        var hashBefore = (await StoredAsync(store, "ann")).PasswordHash;
+
+        // Act: change the password with a wrong current one
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ChangeOwnPasswordAsync("ann", "wrong password!", "another long password", cancellationToken));
+
+        // Assert: the rule is named and the stored hash is the same
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, exception.Rule);
+        Assert.Equal(hashBefore, (await StoredAsync(store, "ann")).PasswordHash);
+    }
+
+    /// <summary>
+    ///     Test that a new password that breaks the password rules is refused with the password-invalid rule and the
+    ///     stored password hash stays as it was.
+    /// </summary>
+    /// <param name="length">The length of the new password, or <c>null</c> for a missing one.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData(11)]
+    [InlineData(129)]
+    public async Task UserService_ChangeOwnPasswordAsync_NewPasswordBreakingTheRules_IsRefused(int? length)
+    {
+        // Arrange: a service with a user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        var hashBefore = (await StoredAsync(store, "ann")).PasswordHash;
+        var newPassword = length is { } count ? new string('n', count) : null;
+
+        // Act: change the password with the right current one and the bad new one
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ChangeOwnPasswordAsync("ann", Password, newPassword, cancellationToken));
+
+        // Assert: the rule is named and the stored hash is the same
+        Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
+        Assert.Equal(hashBefore, (await StoredAsync(store, "ann")).PasswordHash);
+    }
+
+    /// <summary>
+    ///     Test that one wrong current password counts as one failed sign-in.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ChangeOwnPasswordAsync_WrongCurrentPassword_CountsOneFailure()
+    {
+        // Arrange: a service with a user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: change the password with a wrong current one
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.ChangeOwnPasswordAsync("ann", "wrong password!", "another long password", cancellationToken));
+
+        // Assert: one failure is stored
+        Assert.Equal(1, (await StoredAsync(store, "ann")).FailedLoginCount);
     }
 
     /// <summary>
@@ -434,90 +1076,150 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that an administrator can set a password without the current one, and that it ends a lockout.
+    ///     Test that setting a new password replaces the password: the new one signs in and the old one does not.
     /// </summary>
     [Fact]
-    public async Task UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout()
+    public async Task UserService_SetPasswordAsync_NewPassword_ReplacesThePassword()
     {
-        // Arrange: a locked-out user
+        // Arrange: a service with a user
         var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
-        for (var i = 0; i < 5; i++)
-        {
-            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        }
 
-        // Act: set a short password, then a valid one
-        var tooShort = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetPasswordAsync("ann", "short", cancellationToken));
+        // Act: set a new password
         await service.SetPasswordAsync("ann", "another long password", cancellationToken);
 
-        // Assert: the policy applies, and the user signs in with the new password at once
-        Assert.Equal(DomainRule.PasswordInvalid, tooShort.Rule);
+        // Assert: the new password signs in at once and the old one does not
+        Assert.NotNull(await service.AuthenticateAsync("ann", "another long password", cancellationToken));
+        Assert.Null(await service.AuthenticateAsync("ann", Password, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a new password that breaks the password rules is refused with the password-invalid rule and the
+    ///     stored password hash stays as it was.
+    /// </summary>
+    /// <param name="length">The length of the new password, or <c>null</c> for a missing one.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData(11)]
+    [InlineData(129)]
+    public async Task UserService_SetPasswordAsync_PasswordBreakingTheRules_IsRefused(int? length)
+    {
+        // Arrange: a service with a user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        var hashBefore = (await StoredAsync(store, "ann")).PasswordHash;
+        var newPassword = length is { } count ? new string('n', count) : null;
+
+        // Act: set the bad password
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetPasswordAsync("ann", newPassword, cancellationToken));
+
+        // Assert: the rule is named and the stored hash is the same
+        Assert.Equal(DomainRule.PasswordInvalid, exception.Rule);
+        Assert.Equal(hashBefore, (await StoredAsync(store, "ann")).PasswordHash);
+    }
+
+    /// <summary>
+    ///     Test that setting a password ends the lockout of the user and clears the failure count.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_LockedUser_EndsTheLockout()
+    {
+        // Arrange: a locked-out user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+        await LockAsync(service, "ann");
+        var lockedUntil = (await StoredAsync(store, "ann")).LockoutUntil;
+
+        // Act: set a new password
+        await service.SetPasswordAsync("ann", "another long password", cancellationToken);
+
+        // Assert: the lockout was running, is now ended and the count is clear, so the new password signs in
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), lockedUntil);
+        var stored = await StoredAsync(store, "ann");
+        Assert.Null(stored.LockoutUntil);
+        Assert.Equal(0, stored.FailedLoginCount);
         Assert.NotNull(await service.AuthenticateAsync("ann", "another long password", cancellationToken));
     }
 
     /// <summary>
     ///     Test that every change of an unknown user is refused as not found.
     /// </summary>
-    [Fact]
-    public async Task UserService_Changes_UnknownUser_ThrowUserNotFound()
+    /// <param name="change">The kind of change that is tried.</param>
+    [Theory]
+    [InlineData("disable")]
+    [InlineData("enable")]
+    [InlineData("role")]
+    [InlineData("systemAdmin")]
+    [InlineData("ownPassword")]
+    [InlineData("password")]
+    public async Task UserService_Changes_UnknownUser_ThrowUserNotFound(string change)
     {
         // Arrange: a service without users
         var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // Act: change an unknown user in each way
-        var enabled = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetEnabledAsync("nobody", false, cancellationToken));
-        var role = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetRoleAsync("nobody", UserRole.Admin, cancellationToken));
-        var own = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ChangeOwnPasswordAsync("nobody", Password, Password, cancellationToken));
-        var set = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetPasswordAsync("nobody", Password, cancellationToken));
+        // Act: change an unknown user in the given way
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => change switch
+        {
+            "disable" => service.SetEnabledAsync("nobody", false, cancellationToken),
+            "enable" => service.SetEnabledAsync("nobody", true, cancellationToken),
+            "role" => service.SetRoleAsync("nobody", UserRole.Admin, cancellationToken),
+            "systemAdmin" => service.SetSystemAdminAsync("nobody", true, Actor.CommandLine, cancellationToken),
+            "ownPassword" => service.ChangeOwnPasswordAsync("nobody", Password, Password, cancellationToken),
+            _ => service.SetPasswordAsync("nobody", Password, cancellationToken)
+        });
 
-        // Assert: all name the missing user
-        Assert.All([enabled, role, own, set], exception => Assert.Equal(DomainRule.UserNotFound, exception.Rule));
+        // Assert: the rule names the missing user
+        Assert.Equal(DomainRule.UserNotFound, exception.Rule);
     }
 
     /// <summary>
-    ///     Test that a promotion is stored and that the last enabled system administrator cannot be demoted,
-    ///     disabled or locked out of the role.
+    ///     Test that the system administrator right can be taken away from one of two administrators.
     /// </summary>
     [Fact]
-    public async Task UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept()
+    public async Task UserService_SetSystemAdminAsync_Demote_TakesTheRightAway()
     {
-        // Arrange: a service with one system administrator and a plain user
-        var (service, _, _) = Create();
+        // Arrange: a service with two system administrators
+        var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
-        await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        await service.CreateAsync("ann", "Ann", true, Password, Actor.CommandLine, cancellationToken);
 
-        // Act: the only administrator cannot be demoted or disabled
-        var demote = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetSystemAdminAsync("root", false, Actor.CommandLine, cancellationToken));
-        var disable = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetEnabledAsync("root", false, Actor.CommandLine, cancellationToken));
-
-        // Act: with a second administrator the first can be demoted
-        await service.SetSystemAdminAsync("ann", true, Actor.CommandLine, cancellationToken);
+        // Act: demote one of them
         await service.SetSystemAdminAsync("root", false, Actor.CommandLine, cancellationToken);
 
-        // Assert
-        Assert.Equal(DomainRule.LastAdmin, demote.Rule);
-        Assert.Equal(DomainRule.LastAdmin, disable.Rule);
-        Assert.True((await service.GetAsync("ann", cancellationToken))!.IsSystemAdmin);
-        Assert.False((await service.GetAsync("root", cancellationToken))!.IsSystemAdmin);
+        // Assert: the demoted user lost the right and the other one kept it
+        Assert.False((await StoredAsync(store, "root")).IsSystemAdmin);
+        Assert.True((await StoredAsync(store, "ann")).IsSystemAdmin);
     }
 
     /// <summary>
-    ///     Test that a successful password sign-in stores the time, that a failed one and a re-authentication do
-    ///     not, and that a user who never signed in has none.
+    ///     Test that a promotion by user name stores the system administrator right.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticatePasswordAsync_SuccessOnly_RecordsLastSignIn()
+    public async Task UserService_SetSystemAdminAsync_Promote_GivesTheRight()
+    {
+        // Arrange: a service with a plain user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+
+        // Act: promote the user
+        await service.SetSystemAdminAsync("ann", true, Actor.CommandLine, cancellationToken);
+
+        // Assert: the stored user is a system administrator
+        Assert.True((await StoredAsync(store, "ann")).IsSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Test that a successful password sign-in stores the time of the sign-in and adds no audit entry.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_RightPassword_StoresTheTimeOfTheSignIn()
     {
         // Arrange: a user who never signed in, and a clock that moves
         var (service, store, clock) = Create();
@@ -525,145 +1227,284 @@ public class UserServiceTests
         await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
         var created = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
 
-        // Act: a wrong password, a re-authentication, then a sign-in five minutes later
-        await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        var afterFailure = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
-        await service.ReauthenticatePasswordAsync("ann", Password, cancellationToken);
-        var afterReauth = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+        // Act: sign in five minutes later
         clock.Advance(TimeSpan.FromMinutes(5));
         var auditsBefore = store.Audits.Count;
         await service.AuthenticateAsync("ann", Password, cancellationToken);
         var afterSuccess = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
 
-        // Assert: only the sign-in stored the time of the sign-in, and storing it added no audit entry
+        // Assert: the time of the sign-in is stored, and storing it added no audit entry
         Assert.Null(created);
-        Assert.Null(afterFailure);
-        Assert.Null(afterReauth);
         Assert.Equal(_now + TimeSpan.FromMinutes(5), afterSuccess);
         Assert.Equal(auditsBefore, store.Audits.Count);
     }
 
     /// <summary>
-    ///     Test that an OIDC sign-in stores the time, and that a refused one of a disabled account does not.
+    ///     Test that a failed sign-in stores no time of a sign-in.
     /// </summary>
     [Fact]
-    public async Task UserService_SignInExternalAsync_AcceptedOnly_RecordsLastSignIn()
+    public async Task UserService_AuthenticateAsync_WrongPassword_StoresNoSignInTime()
+    {
+        // Arrange: a user who never signed in
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: sign in with a wrong password
+        await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+
+        // Assert: no time of a sign-in is stored
+        Assert.Null((await StoredAsync(store, "ann")).LastSignInUtc);
+    }
+
+    /// <summary>
+    ///     Test that a re-authentication with the right password stores no time of a sign-in.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ReauthenticatePasswordAsync_RightPassword_StoresNoSignInTime()
+    {
+        // Arrange: a user who never signed in
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, cancellationToken);
+
+        // Act: re-authenticate with the right password
+        var step = await service.ReauthenticatePasswordAsync("ann", Password, cancellationToken);
+
+        // Assert: the user is returned but no time of a sign-in is stored
+        Assert.Equal("ann", step.User?.Username);
+        Assert.Null((await StoredAsync(store, "ann")).LastSignInUtc);
+    }
+
+    /// <summary>
+    ///     Test that the first and a later accepted sign-in of an account at a provider store the time of the sign-in.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_AcceptedSignIn_StoresTheTimeOfTheSignIn()
     {
         // Arrange: an account that is created by its first sign-in
         var (service, store, clock) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // Act: the first sign-in, a later one, and one after the account was disabled
+        // Act: the first sign-in and, an hour later, a second one
         var first = (await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken)).User!;
+        var afterFirst = (await store.GetByUsernameAsync(first.Username, cancellationToken))!.LastSignInUtc;
         clock.Advance(TimeSpan.FromHours(1));
         await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken);
         var afterLater = (await store.GetByUsernameAsync(first.Username, cancellationToken))!.LastSignInUtc;
-        await service.SetEnabledAsync(first.Username, false, Actor.CommandLine, cancellationToken);
-        clock.Advance(TimeSpan.FromHours(1));
-        var refused = await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken);
-        var afterRefused = (await store.GetByUsernameAsync(first.Username, cancellationToken))!.LastSignInUtc;
 
-        // Assert
+        // Assert: the time of each accepted sign-in is stored
+        Assert.Equal(_now, afterFirst);
         Assert.Equal(_now + TimeSpan.FromHours(1), afterLater);
-        Assert.Null(refused.User);
-        Assert.Equal(afterLater, afterRefused);
     }
 
     /// <summary>
-    ///     Test that a lockout counts as locked exactly until its end time.
+    ///     Test that a lockout that is still running counts as locked, up to one second before its end.
     /// </summary>
     [Fact]
-    public void UserService_IsLocked_Lockout_IsLockedUntilItsEnd()
+    public void UserService_IsLocked_RunningLockout_IsLocked()
     {
-        // Arrange: users with no lockout, a running one and an ended one
-        var none = new User();
+        // Arrange: users whose lockouts end one minute from now and at the start instant
         var running = new User { LockoutUntil = _now + TimeSpan.FromMinutes(1) };
         var ended = new User { LockoutUntil = _now };
 
-        // Act and assert: only the running lockout counts; the end instant itself is no longer locked
-        Assert.False(UserService.IsLocked(none, _now));
+        // Act and assert: the running lockout counts, and so does one that ends one second later
         Assert.True(UserService.IsLocked(running, _now));
-        Assert.False(UserService.IsLocked(ended, _now));
         Assert.True(UserService.IsLocked(ended, _now - TimeSpan.FromSeconds(1)));
     }
 
     /// <summary>
-    ///     Test that a system administrator can unlock a user, that the counter and the lockout are cleared, that
-    ///     the change is audited and that the user can sign in at once.
+    ///     Test that a lockout is no longer a lockout at its end instant.
     /// </summary>
     [Fact]
-    public async Task UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits()
+    public void UserService_IsLocked_LockoutAtItsEnd_IsNotLocked()
+    {
+        // Arrange: a user whose lockout ends at the start instant
+        var ended = new User { LockoutUntil = _now };
+
+        // Act and assert: at that instant the user is not locked
+        Assert.False(UserService.IsLocked(ended, _now));
+    }
+
+    /// <summary>
+    ///     Test that a user without a lockout is not locked.
+    /// </summary>
+    [Fact]
+    public void UserService_IsLocked_NoLockout_IsNotLocked()
+    {
+        // Arrange: a user with no lockout
+        var none = new User { LockoutUntil = null };
+
+        // Act and assert: the user is not locked
+        Assert.False(UserService.IsLocked(none, _now));
+    }
+
+    /// <summary>
+    ///     Test that an unlock by a system administrator is audited as an unlock of the named user.
+    /// </summary>
+    [Fact]
+    public async Task UserService_UnlockAsync_SystemAdministrator_RecordsUserUnlocked()
     {
         // Arrange: a locked-out user and an administrator
         var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         var root = await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
         var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
-        for (var i = 0; i < 5; i++)
-        {
-            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        }
-
-        var locked = (await store.GetByUsernameAsync("ann", cancellationToken))!;
+        await LockAsync(service, "ann");
 
         // Act
         await service.UnlockAsync(new Actor(root.Username, root.DisplayName), ann.Id, cancellationToken);
 
-        // Assert: cleared, audited with the actor, and the right password works again
-        var unlocked = (await store.GetByUsernameAsync("ann", cancellationToken))!;
-        Assert.NotNull(locked.LockoutUntil);
-        Assert.Null(unlocked.LockoutUntil);
-        Assert.Equal(0, unlocked.FailedLoginCount);
+        // Assert: one entry of the unlock, with the actor and the user
         var audit = Assert.Single(store.Audits, entry => entry.Action == "user.unlocked");
         Assert.Equal("root", audit.ActorUsername);
         Assert.Equal("user 'ann'", audit.Detail);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator ends the lockout of a user, who then signs in at once.
+    /// </summary>
+    [Fact]
+    public async Task UserService_UnlockAsync_SystemAdministrator_EndsTheLockout()
+    {
+        // Arrange: a locked-out user and an administrator
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        await LockAsync(service, "ann");
+        var locked = (await StoredAsync(store, "ann")).LockoutUntil;
+
+        // Act: unlock the user by identifier
+        await service.UnlockAsync(new Actor(root.Username, root.DisplayName), ann.Id, cancellationToken);
+
+        // Assert: the lockout was running, is now ended, and the right password works at the same instant
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), locked);
+        Assert.Null((await StoredAsync(store, "ann")).LockoutUntil);
         Assert.NotNull(await service.AuthenticateAsync("ann", Password, cancellationToken));
     }
 
     /// <summary>
-    ///     Test that only an enabled system administrator who is not signed in through an API token and has no
-    ///     temporary password can unlock, and that nothing is audited or changed otherwise.
+    ///     Test that an unlock by a system administrator clears the count of failed sign-ins.
     /// </summary>
     [Fact]
-    public async Task UserService_UnlockAsync_NotAllowedOrUnknown_IsRefused()
+    public async Task UserService_UnlockAsync_SystemAdministrator_ClearsTheCountOfFailedSignIns()
     {
-        // Arrange: a locked user, an ordinary user, an administrator with a temporary password
+        // Arrange: a user with four failed sign-ins, and an administrator
         var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        for (var i = 0; i < 4; i++)
+        {
+            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        }
+
+        var before = (await StoredAsync(store, "ann")).FailedLoginCount;
+
+        // Act: unlock the user
+        await service.UnlockAsync(new Actor(root.Username, root.DisplayName), ann.Id, cancellationToken);
+
+        // Assert: the count was four and is now zero
+        Assert.Equal(4, before);
+        Assert.Equal(0, (await StoredAsync(store, "ann")).FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that an actor who is not an enabled system administrator without a temporary password, or who acts
+    ///     through an API token, is refused with the actor-not-allowed rule.
+    /// </summary>
+    /// <param name="actorKind">The kind of actor that tries to unlock.</param>
+    [Theory]
+    [InlineData("ordinary")]
+    [InlineData("unknown")]
+    [InlineData("commandLine")]
+    [InlineData("apiToken")]
+    [InlineData("temporaryPassword")]
+    [InlineData("disabledAdministrator")]
+    public async Task UserService_UnlockAsync_ActorThatIsNotAnEnabledAdministrator_IsRefused(string actorKind)
+    {
+        // Arrange: a locked user, an ordinary user, an administrator with a temporary password and a disabled one
+        var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
         var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
         await service.CreateAsync("tmp", "Tmp", true, Password, Actor.CommandLine, cancellationToken);
         await service.SetPasswordAsync("tmp", Password, Actor.CommandLine, cancellationToken);
-        for (var i = 0; i < 5; i++)
+        await service.CreateAsync("dis", "Dis", true, Password, Actor.CommandLine, cancellationToken);
+        await service.SetEnabledAsync("dis", false, Actor.CommandLine, cancellationToken);
+        await LockAsync(service, "ann");
+        var actor = actorKind switch
         {
-            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
-        }
-
-        // Act: a non-admin, an unknown actor, the command line, an API token and a temporary password
-        var refused = new List<DomainRuleException>
-        {
-            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("ann", "Ann"), ann.Id, cancellationToken)),
-            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("nobody", "Nobody"), ann.Id, cancellationToken)),
-            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(Actor.CommandLine, ann.Id, cancellationToken)),
-            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("root", "Root") { ApiTokenId = "t1" }, ann.Id, cancellationToken)),
-            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("tmp", "Tmp"), ann.Id, cancellationToken))
+            "ordinary" => new Actor("ann", "Ann"),
+            "unknown" => new Actor("nobody", "Nobody"),
+            "commandLine" => Actor.CommandLine,
+            "apiToken" => new Actor("root", "Root") { ApiTokenId = "t1" },
+            "temporaryPassword" => new Actor("tmp", "Tmp"),
+            _ => new Actor("dis", "Dis")
         };
-        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.UnlockAsync(new Actor("root", "Root"), 9999, cancellationToken));
 
-        // Assert: every refusal names the right rule, and the user is still locked and nothing was audited
-        Assert.All(refused, exception => Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule));
-        Assert.Equal(DomainRule.UserNotFound, unknown.Rule);
-        Assert.NotNull((await store.GetByUsernameAsync("ann", cancellationToken))!.LockoutUntil);
+        // Act: try to unlock the user
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.UnlockAsync(actor, ann.Id, cancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a refused actor leaves the lockout and the failure count as they were and adds no audit entry.
+    /// </summary>
+    [Fact]
+    public async Task UserService_UnlockAsync_RefusedActor_ChangesAndAuditsNothing()
+    {
+        // Arrange: a user locked out at the start instant (the fifth failure restarts the count) and an ordinary user
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        await LockAsync(service, "ann");
+        var locked = await StoredAsync(store, "ann");
+        var auditsBefore = store.Audits.Count;
+
+        // Act: the locked user tries to unlock the own account
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.UnlockAsync(new Actor("ann", "Ann"), ann.Id, cancellationToken));
+
+        // Assert: the rule is named, the lockout and the count are as before, and no entry was recorded
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Equal(0, locked.FailedLoginCount);
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), locked.LockoutUntil);
+        var after = await StoredAsync(store, "ann");
+        Assert.Equal(locked.FailedLoginCount, after.FailedLoginCount);
+        Assert.Equal(locked.LockoutUntil, after.LockoutUntil);
+        Assert.Equal(auditsBefore, store.Audits.Count);
         Assert.DoesNotContain(store.Audits, entry => entry.Action == "user.unlocked");
     }
 
     /// <summary>
-    ///     Test that a password set by somebody else is temporary, that setting the own password is not, and that a
-    ///     later change of the own password ends the temporary state.
+    ///     Test that an identifier that no user has is refused with the user-not-found rule.
     /// </summary>
     [Fact]
-    public async Task UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange()
+    public async Task UserService_UnlockAsync_UnknownUserIdentifier_ThrowsUserNotFound()
+    {
+        // Arrange: a service with an administrator
+        var (service, _, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+
+        // Act: unlock an identifier that no user has
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.UnlockAsync(new Actor("root", "Root"), 9999, cancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.UserNotFound, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a password set by another user, an administrator or the command line, is temporary.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_OtherUserByAdministratorOrCommandLine_ForcesAChange()
     {
         // Arrange: two users
         var (service, store, _) = Create();
@@ -677,14 +1518,11 @@ public class UserServiceTests
         var byAdmin = (await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword;
         await service.SetPasswordAsync("root", "yet another password", Actor.CommandLine, cancellationToken);
         var byCommandLine = (await store.GetByUsernameAsync("root", cancellationToken))!.MustChangePassword;
-        await service.ChangeOwnPasswordAsync("ann", "another long password", "my own new password", cancellationToken);
-        var afterOwnChange = (await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword;
 
         // Assert
         Assert.False(created);
         Assert.True(byAdmin);
         Assert.True(byCommandLine);
-        Assert.False(afterOwnChange);
     }
 
     /// <summary>
@@ -727,27 +1565,22 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that an API-token actor with the name of the user is not "the own row", and that an external user
-    ///     cannot get a password.
+    ///     Test that an API-token actor with the name of the user is not "the own row", so the password it sets is
+    ///     temporary.
     /// </summary>
     [Fact]
-    public async Task UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused()
+    public async Task UserService_SetPasswordAsync_ApiTokenActorWithTheUserName_ForcesAChange()
     {
-        // Arrange: a local user and an external one
+        // Arrange: a local user
         var (service, store, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
         await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
-        var external = (await service.SignInExternalAsync("https://idp", "sub-1", "oidc", "Oidc", cancellationToken)).User!;
 
-        // Act
+        // Act: set the password through an API token that carries the name of the user
         await service.SetPasswordAsync("ann", "another long password", new Actor("ann", "Ann") { ApiTokenId = "t1" }, cancellationToken);
-        var refused = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetPasswordAsync(external.Username, "another long password", Actor.CommandLine, cancellationToken));
 
         // Assert
         Assert.True((await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword);
-        Assert.Equal(DomainRule.PasswordInvalid, refused.Rule);
-        Assert.Equal(string.Empty, (await store.GetByUsernameAsync(external.Username, cancellationToken))!.PasswordHash);
     }
 
     /// <summary>
@@ -760,5 +1593,29 @@ public class UserServiceTests
         Assert.Throws<ArgumentNullException>(() => new UserService(null!, new FakePasswordHasher(), TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => new UserService(new FakeUserStore(), null!, TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => new UserService(new FakeUserStore(), new FakePasswordHasher(), null!));
+    }
+
+    /// <summary>
+    ///     A password hasher that counts how often a hash is verified.
+    /// </summary>
+    private sealed class CountingHasher : IPasswordHasher
+    {
+        /// <summary>
+        ///     Gets or sets the number of calls of <see cref="Verify"/> since the count was last reset.
+        /// </summary>
+        public int VerifyCalls { get; set; }
+
+        /// <inheritdoc />
+        public string Hash(string password)
+        {
+            return "hash:" + password;
+        }
+
+        /// <inheritdoc />
+        public bool Verify(string hash, string password)
+        {
+            VerifyCalls++;
+            return hash == "hash:" + password;
+        }
     }
 }

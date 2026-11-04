@@ -105,7 +105,8 @@ command line, a user name that no user has, a disabled user, and a user that sti
 (`User.MustChangePassword`): such a user has no access to anything, a system administrator flag included, until the
 password is changed. The private `RoleOfAsync` returns `Administer` for
 an enabled system administrator when the project exists, otherwise the level given by the role of the membership
-(`ProjectAdmin` is `Administer`, `User` is `Contribute`, and `Auditor` or any role that is not defined is `Read`), or
+(`ProjectAdmin` is `Administer`, `User` is `Contribute`, `Auditor` is `Read`, and a role that is not defined gives
+nothing, the same as no membership), or
 nothing when there is no membership. An actor that came through a personal access token carries the user name of the
 token owner, so it gets the access of the owner by this lookup and needs no rule of its own.
 
