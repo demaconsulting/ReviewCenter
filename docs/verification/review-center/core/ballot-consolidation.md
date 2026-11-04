@@ -132,6 +132,10 @@ tested by `BallotConsolidation_IsComplete_MissingAnswer_False`.
 **BallotConsolidation_IsComplete_NaSectionSkipsItems_True**: A section that the ballot marks as not applicable needs no
 answers. This scenario is tested by `BallotConsolidation_IsComplete_NaSectionSkipsItems_True`.
 
+**BallotConsolidation_IsComplete_Status_DoesNotChangeTheAnswer**: A theory: a draft and a submitted ballot that answer
+every check are both complete, and a draft and a submitted ballot that leave a check unanswered are both not complete.
+This scenario is tested by `BallotConsolidation_IsComplete_Status_DoesNotChangeTheAnswer`.
+
 **BallotProjection_Consolidate_NoChecklist_ReturnsNull**: A record without a checklist has no consolidated view. This
 scenario is tested by `BallotProjection_Consolidate_NoChecklist_ReturnsNull`.
 

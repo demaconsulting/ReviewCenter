@@ -321,8 +321,7 @@ sections:
           The test must not depend on whether the ballot was submitted already, so that a draft can be asked whether it
           is ready.
         tests:
-          - BallotConsolidation_IsComplete_AllAnswered_True
-          - BallotConsolidation_IsComplete_MissingAnswer_False
+          - BallotConsolidation_IsComplete_Status_DoesNotChangeTheAnswer
 
       - id: ReviewCenter-BallotConsolidation-BallotState
         title: >-
@@ -344,7 +343,7 @@ sections:
 
       - id: ReviewCenter-BallotConsolidation-Arguments
         title: >-
-          The BallotConsolidation class shall refuse a null checklist.
+          The BallotConsolidation class shall refuse a null checklist when it consolidates ballots.
         justification: |
           Missing input has no meaningful standing. Refusing it at the door keeps a wrong call from being mistaken for
           an empty review.
@@ -353,7 +352,7 @@ sections:
 
       - id: ReviewCenter-BallotConsolidation-Arguments-NullBallots
         title: >-
-          The BallotConsolidation class shall refuse a null list of ballots.
+          The BallotConsolidation class shall refuse a null list of ballots when it consolidates them.
         justification: |
           Missing input must not be mistaken for a review without ballots.
         tests:
@@ -361,7 +360,8 @@ sections:
 
       - id: ReviewCenter-BallotConsolidation-Arguments-NullBallot
         title: >-
-          The BallotConsolidation class shall refuse a list of ballots that holds a null ballot.
+          The BallotConsolidation class shall refuse a list of ballots that holds a null ballot when it consolidates
+          them.
         justification: |
           A missing ballot has no standing and must not be skipped silently.
         tests:
@@ -369,7 +369,8 @@ sections:
 
       - id: ReviewCenter-BallotConsolidation-Arguments-DuplicateSlot
         title: >-
-          The BallotConsolidation class shall refuse a list of ballots that holds two ballots of one slot.
+          The BallotConsolidation class shall refuse a list of ballots that holds two ballots of one slot when it
+          consolidates them.
         justification: |
           A repeated slot would let one outcome overwrite another and hide a dispute.
         tests:

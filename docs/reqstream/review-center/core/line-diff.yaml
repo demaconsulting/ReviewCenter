@@ -244,10 +244,25 @@ sections:
 
       - id: ReviewCenter-LineDiff-Segments-NoChanges
         title: >-
-          The LineDiff class shall give one gap for rows without a change, the row itself for a single row, and no
-          segment for no rows.
+          The LineDiff class shall give one gap for rows without a change.
         justification: |
-          A file without a change has nothing to show, but a file of one row is shown as it is.
+          A file without a change has nothing to show, so its rows are collapsed into one gap.
+        tests:
+          - LineDiff_Segment_NoChanges_OneGapOrNothing
+
+      - id: ReviewCenter-LineDiff-Segments-NoChangesSingleRow
+        title: >-
+          The LineDiff class shall give the row itself, not a gap, for a single row without a change.
+        justification: |
+          A file of one row is shown as it is, because a gap of one row would cost more attention than the row.
+        tests:
+          - LineDiff_Segment_NoChanges_OneGapOrNothing
+
+      - id: ReviewCenter-LineDiff-Segments-NoRows
+        title: >-
+          The LineDiff class shall give no segment for no rows.
+        justification: |
+          Nothing is left to show for an empty file, so no region or gap may be invented.
         tests:
           - LineDiff_Segment_NoChanges_OneGapOrNothing
 
@@ -294,13 +309,21 @@ sections:
 
       - id: ReviewCenter-LineDiff-Segments-Arguments
         title: >-
-          The LineDiff class shall reject a null list of rows with an ArgumentNullException and a negative number of
-          context rows with an ArgumentOutOfRangeException.
+          The LineDiff class shall reject a null list of rows with an ArgumentNullException.
         justification: |
-          Missing or impossible input has no regions, and refusing it keeps a wrong call from being mistaken for a file
-          without changes.
+          Missing input has no regions, and refusing it keeps a wrong call from being mistaken for a file without
+          changes.
         tests:
-          - LineDiff_Compute_NullArgument_ThrowsArgumentNullException
+          - LineDiff_Segment_InvalidArguments_Throw
+
+      - id: ReviewCenter-LineDiff-Segments-ArgumentsContext
+        title: >-
+          The LineDiff class shall reject a negative number of context rows with an ArgumentOutOfRangeException.
+        justification: |
+          A negative number of context rows has no meaning, and refusing it keeps a wrong call from being mistaken for
+          no context.
+        tests:
+          - LineDiff_Segment_InvalidArguments_Throw
 
       - id: ReviewCenter-LineDiff-Pairing
         title: >-
