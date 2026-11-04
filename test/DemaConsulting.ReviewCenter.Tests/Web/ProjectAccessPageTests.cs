@@ -136,8 +136,7 @@ public class ProjectAccessPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a project the user is no member of looks like a project that does not exist, on the project
-    ///     page and on the page for a new review.
+    ///     Test that a project the user is no member of looks like a project that does not exist on the project page.
     /// </summary>
     [Fact]
     public async Task ProjectPage_Render_NonMember_LooksLikeAMissingProject()
@@ -150,7 +149,6 @@ public class ProjectAccessPageTests : PageTestBase
         // Act
         var project = RenderProject(apollo);
         var missing = RenderProject(999);
-        var newReview = Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, apollo));
 
         // Assert: the message is the one for a missing project and nothing of the project is shown
         Assert.Equal(
@@ -158,7 +156,27 @@ public class ProjectAccessPageTests : PageTestBase
             project.Find("[data-testid='project-not-found']").TextContent.Replace(apollo.ToString(), "#"));
         Assert.DoesNotContain("Apollo", project.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Secret", project.Markup, StringComparison.Ordinal);
-        Assert.NotEmpty(newReview.FindAll("[data-testid='project-not-found']"));
+    }
+
+    /// <summary>
+    ///     Test that a project the user is no member of looks like a project that does not exist on the page for a
+    ///     new review, which shows the message and no form.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_Render_NonMember_LooksLikeAMissingProject()
+    {
+        // Arrange: Apollo exists, and the outsider is signed in
+        var (_, _, apollo, _) = await ArrangeAsync();
+        SignInAs("out", "Out", UserRole.Reviewer);
+
+        // Act
+        var newReview = Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, apollo));
+        var missing = Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, 999));
+
+        // Assert: the message is the one for a missing project, and there is no form
+        Assert.Equal(
+            missing.Find("[data-testid='project-not-found']").TextContent.Replace("999", "#"),
+            newReview.Find("[data-testid='project-not-found']").TextContent.Replace(apollo.ToString(), "#"));
         Assert.Empty(newReview.FindAll("[data-testid='new-review-form']"));
     }
 
@@ -207,7 +225,9 @@ public class ProjectAccessPageTests : PageTestBase
         Assert.Equal("Make member", cut.Find("[data-testid='member-toggle-role-out']").TextContent);
         Assert.NotEmpty(cut.FindAll("[data-testid='member-remove-mem']"));
         Assert.Contains("no members", empty.Find("[data-testid='members-empty']").TextContent, StringComparison.Ordinal);
-        Assert.NotEmpty(cut.FindAll("[data-testid='repositories-link']"));
+        Assert.Contains(
+            "only system administrators can see it", empty.Find("[data-testid='members-empty']").TextContent, StringComparison.Ordinal);
+        Assert.Equal($"/projects/{apollo}/repositories", cut.Find("[data-testid='repositories-link']").GetAttribute("href"));
     }
 
     /// <summary>
@@ -260,7 +280,7 @@ public class ProjectAccessPageTests : PageTestBase
         // Assert: the membership and the row are gone, and the page says that the project has no members
         Assert.Null(await Store.GetMembershipAsync(member, apollo, TestContext.Current.CancellationToken));
         Assert.Empty(cut.FindAll("[data-testid='member-row-mem']"));
-        Assert.NotEmpty(cut.FindAll("[data-testid='members-empty']"));
+        Assert.Contains("only system administrators can see it", cut.Find("[data-testid='members-empty']").TextContent, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -17,54 +17,194 @@ sections:
     requirements:
       - id: ReviewCenter-ProjectPage-Show
         title: >-
-          The ProjectPage unit shall show the name and description of the project, or the same not-found message
-          when the project does not exist and when the user may not see it, without showing anything of the project.
+          The ProjectPage unit shall show the name and the description of a project to a user who may see it.
         justification: |
-          A stored or mistyped link must lead to a clear answer rather than to an error page. A project the user is
-          no member of must be indistinguishable from a missing one, so the page does not reveal that the project
-          exists. The same holds for the page of a new review of the project.
+          The page is the entry to the work of one project, so a user who may see the project must first see which
+          project it is.
+        tests:
+          - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
+
+      - id: ReviewCenter-ProjectPage-Show-Missing
+        title: >-
+          The ProjectPage unit shall show a not-found message and nothing of a project for a project that does not
+          exist.
+        justification: |
+          A stored or mistyped link must lead to a clear answer rather than to an error page.
         tests:
           - ProjectPage_Render_UnknownProject_ShowsNotFound
-          - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
+
+      - id: ReviewCenter-ProjectPage-Show-Hidden
+        title: >-
+          The ProjectPage unit shall show to a user who may not see a project the same not-found message as for a
+          missing project, and nothing of the project.
+        justification: |
+          A project the user is no member of must be indistinguishable from a missing one, so the page does not
+          reveal that the project exists.
+        tests:
           - ProjectPage_Render_NonMember_LooksLikeAMissingProject
+
+      - id: ReviewCenter-ProjectPage-Show-NewReviewHidden
+        title: >-
+          The ProjectPage unit shall show on the page for a new review to a user who may not see the project the same
+          not-found message as for a missing project, and no form.
+        justification: |
+          The page for a new review must not reveal the project either, and must not offer a form that would be
+          refused.
+        tests:
+          - NewReviewPage_Render_NonMember_LooksLikeAMissingProject
 
       - id: ReviewCenter-ProjectPage-Members
         title: >-
-          The ProjectPage unit shall show whoever administers the project (a system administrator or a project admin
-          of it), and nobody else, a Members section with the members of the project, each with a role badge
-          (Project admin or Member), a button that switches the role, and a Remove button, a + Add member button that
-          leads to the page for a new member, an Audit trail button that leads to the audit page of the project, and
-          a message that says that only system administrators can see the project when it has no members, and shall
-          show no list of users.
+          The ProjectPage unit shall show a Members section with the members of the project, each with a role badge,
+          to a system administrator and to a project admin of the project.
         justification: |
-          Membership decides who sees a project, so the people who run the project need to see it at a glance and to
-          change it on the page of the project. Plain members do not manage membership, so they are not shown the
-          section or its buttons. The page offers no list of users, so a project admin cannot browse the accounts of
-          other projects.
+          Membership decides who sees a project, so the people who run the project need to see at a glance who
+          belongs to it.
         tests:
-          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
           - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+
+      - id: ReviewCenter-ProjectPage-Members-Hidden
+        title: >-
+          The ProjectPage unit shall show no Members section to a user who does not administer the project.
+        justification: |
+          The member list is administration data. Plain members do not manage membership, so they are not shown the
+          section.
+        tests:
           - ProjectPage_Render_Member_SeesReviewsButNoMembersSection
           - ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink
 
+      - id: ReviewCenter-ProjectPage-Members-RoleButton
+        title: >-
+          The ProjectPage unit shall show on each member a button that switches the role between member and project
+          admin and is labeled with the new role.
+        justification: |
+          The administrator changes a role where the member is listed, and a label that names the new role tells what
+          the button will do.
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+
+      - id: ReviewCenter-ProjectPage-Members-RemoveButton
+        title: >-
+          The ProjectPage unit shall show a Remove button on each member of the Members section.
+        justification: |
+          A membership is ended where it is listed, so the administrator does not have to look for another page.
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+
+      - id: ReviewCenter-ProjectPage-Members-AddButton
+        title: >-
+          The ProjectPage unit shall show to whoever administers the project a + Add member button that leads to the
+          page for a new member of the project.
+        justification: |
+          Adding members starts on the page of the project, and the page for a new member is where the user to add is
+          named.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+          - ProjectPage_AddMember_ButtonLeadsToNewMemberPage_WhichAddsTheNamedUser
+
+      - id: ReviewCenter-ProjectPage-Members-AddButtonHidden
+        title: >-
+          The ProjectPage unit shall show no + Add member button to a user who does not administer the project.
+        justification: |
+          The page must not offer what the rules refuse to a plain member.
+        tests:
+          - ProjectPage_Render_Member_SeesReviewsButNoMembersSection
+
+      - id: ReviewCenter-ProjectPage-Members-AuditLink
+        title: >-
+          The ProjectPage unit shall show an Audit trail button that leads to the audit page of the project to a user
+          who administers or audits the project.
+        justification: |
+          The audit trail is for the people who answer for the project, so they reach it from the page of the
+          project.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+          - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
+
+      - id: ReviewCenter-ProjectPage-Members-AuditLinkHidden
+        title: >-
+          The ProjectPage unit shall show no Audit trail button to a plain member of the project.
+        justification: |
+          A plain member may not read the audit trail, so the page does not offer it.
+        tests:
+          - ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink
+
+      - id: ReviewCenter-ProjectPage-Members-Empty
+        title: >-
+          The ProjectPage unit shall say, when a project has no members, that only system administrators can see the
+          project.
+        justification: |
+          An empty list would otherwise look like an error, and the message tells the administrator why nobody but a
+          system administrator can open the project.
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+
+      - id: ReviewCenter-ProjectPage-Members-NoUserList
+        title: >-
+          The ProjectPage unit shall show no list of the users of the system on the page of a project.
+        justification: |
+          The page offers no list of users, so a project admin cannot browse the accounts of other projects.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+
       - id: ReviewCenter-ProjectPage-MemberChange
         title: >-
-          The ProjectPage unit shall let whoever administers the project switch a member between member and project
-          admin and remove a member, show the outcome or the reason for a refusal, including the explanation that
-          the last project admin cannot be removed or demoted, and list the members again afterwards; and shall check
-          on every such action that the user still administers the project and still sees it, and, when not, change
-          nothing and drop the members and the administration buttons, or replace the page with the not-found
-          message when the user also lost the view of the project.
+          The ProjectPage unit shall switch a member between member and project admin when the role button of the
+          member is used, so that the list shows the new role.
         justification: |
-          Members are changed rarely and the outcome next to the list tells the administrator what changed. A
-          project must keep an administrator, so the refusal is explained on the page. An open page keeps its state
-          after the user is demoted or removed, and the member names are for administrators only, so a failed check
-          clears them instead of showing an error above them.
+          The button must do what its label says, and the list must show the new role afterwards.
         tests:
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
           - ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves
+
+      - id: ReviewCenter-ProjectPage-MemberChange-Remove
+        title: >-
+          The ProjectPage unit shall remove a member from the project when the Remove button of the member is used,
+          so that the list no longer shows the member.
+        justification: |
+          Ending a membership is the purpose of the button, and the list must not show a member who is gone.
+        tests:
+          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+          - ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves
+
+      - id: ReviewCenter-ProjectPage-MemberChange-Outcome
+        title: >-
+          The ProjectPage unit shall show the outcome of a role change or of a removal next to the list of members.
+        justification: |
+          Members are changed rarely, and the outcome next to the list tells the administrator what changed.
+        tests:
+          - ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange
+
+      - id: ReviewCenter-ProjectPage-MemberChange-LastAdmin
+        title: >-
+          The ProjectPage unit shall refuse to let the last project admin remove or demote the own membership, show
+          the explanation next to the list, and leave the membership unchanged.
+        justification: |
+          A project must keep an administrator, so the refusal is explained on the page instead of leaving the
+          administrator to guess why nothing happened.
+        tests:
           - ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing
+
+      - id: ReviewCenter-ProjectPage-MemberChange-SelfRemoval
+        title: >-
+          The ProjectPage unit shall let a project admin remove the own membership when another project admin exists.
+        justification: |
+          The rule protects the last administrator only, so an administrator who is not the last may leave.
+        tests:
           - ProjectPage_MemberChange_SecondAdminExists_AdminMayRemoveSelf
+
+      - id: ReviewCenter-ProjectPage-MemberChange-NoRight
+        title: >-
+          The ProjectPage unit shall change nothing when a role change or a removal is requested by a user who no
+          longer administers the project.
+        justification: |
+          An open page keeps its state after the user is demoted or removed, so the right is checked when the action
+          runs and not when the page was opened.
+        tests:
           - ProjectPage_MemberChange_ProjectAdminMembershipRevoked_ShowsNotFoundAndChangesNothing
           - ProjectPage_MemberChange_ProjectAdminDemoted_DropsMembersKeepsReviews
           - ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews
@@ -72,197 +212,815 @@ sections:
           - ProjectPage_ToggleRole_SystemAdminDemoted_ChangesNothingAndDropsMembers
           - ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
 
+      - id: ReviewCenter-ProjectPage-MemberChange-DropMembers
+        title: >-
+          The ProjectPage unit shall drop the Members section and the administration buttons, and keep the reviews,
+          when the user lost the right to administer the project but may still see it.
+        justification: |
+          The member names are for administrators only, so a failed check clears them instead of showing an error
+          above them, and the page must not keep offering what is refused now.
+        tests:
+          - ProjectPage_MemberChange_ProjectAdminDemoted_DropsMembersKeepsReviews
+          - ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews
+          - ProjectPage_ToggleRole_SystemAdminDemoted_ChangesNothingAndDropsMembers
+
+      - id: ReviewCenter-ProjectPage-MemberChange-NotFound
+        title: >-
+          The ProjectPage unit shall replace the page by the not-found message when the user lost the right to see the
+          project.
+        justification: |
+          A project the user may no longer see must read like a missing one, and nothing of it may stay on the page.
+        tests:
+          - ProjectPage_MemberChange_ProjectAdminMembershipRevoked_ShowsNotFoundAndChangesNothing
+          - ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData
+          - ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+
       - id: ReviewCenter-ProjectPage-AddMember
         title: >-
-          The ProjectPage unit shall provide the page /projects/{project}/members/new, which shows whoever
-          administers the project a form with the user name to type exactly and a project admin choice, with a
-          Cancel button and a Create a new account button, and no list of users to pick from, adds the existing user
-          with that exact name with the chosen role and returns to the project, gives one and the same message for a
-          missing, a disabled, and an unknown name without adding anything and keeping what was typed, tells that a
-          user is a member already, shows the not-found message and no form to anybody else, and, when the right is
-          lost while the page is open, adds nothing and drops the form.
+          The ProjectPage unit shall show to whoever administers the project, on the page
+          /projects/{project}/members/new, a form with a user name field and a project admin choice.
         justification: |
-          Typing the exact name keeps the add function from being a way to browse the users of the installation,
-          and one message for every name that cannot be added keeps it from telling which names exist. The form is
-          for administrators only and is checked again at the submission, because the page may have been open for a
-          long time.
+          The administrator names the user to add and the role of the user on the page for a new member.
         tests:
           - NewMemberPage_Render_Administrator_ShowsFormWithoutUserList
-          - NewMemberPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm
+
+      - id: ReviewCenter-ProjectPage-AddMember-CancelButton
+        title: >-
+          The ProjectPage unit shall show on the page for a new member a Cancel button that leads back to the project.
+        justification: |
+          Leaving the page without adding anybody must be possible.
+        tests:
+          - NewMemberPage_Render_Administrator_ShowsFormWithoutUserList
+
+      - id: ReviewCenter-ProjectPage-AddMember-AccountButton
+        title: >-
+          The ProjectPage unit shall show on the page for a new member a Create a new account button that links to the
+          page for a new account of the project.
+        justification: |
+          A person who has no account can be added in one flow.
+        tests:
+          - NewMemberPage_Render_Administrator_ShowsFormWithoutUserList
+
+      - id: ReviewCenter-ProjectPage-AddMember-NoUserList
+        title: >-
+          The ProjectPage unit shall show no list of the users of the system on the page for a new member.
+        justification: |
+          Typing the name keeps the add function from being a way to browse the users of the installation, so only the
+          typed name may select a user.
+        tests:
+          - NewMemberPage_Render_Administrator_ShowsFormWithoutUserList
+
+      - id: ReviewCenter-ProjectPage-AddMember-AddsUser
+        title: >-
+          The ProjectPage unit shall add to the project the existing user whose name was typed, with the role that was
+          chosen.
+        justification: |
+          This is the purpose of the form: the chosen role decides what the new member may do.
+        tests:
           - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
+
+      - id: ReviewCenter-ProjectPage-AddMember-ReturnsToProject
+        title: >-
+          The ProjectPage unit shall show the project page after a user was added.
+        justification: |
+          The administrator sees the new member in the list of the project.
+        tests:
+          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
+
+      - id: ReviewCenter-ProjectPage-AddMember-UnusableName
+        title: >-
+          The ProjectPage unit shall show one and the same message for a name that does not exist and for the name of a
+          disabled user, and add nobody.
+        justification: |
+          One message for every name that cannot be added keeps the page from telling which names exist.
+        tests:
           - NewMemberPage_Submit_UnusableNames_GiveOneGenericMessageAndAddNothing
+
+      - id: ReviewCenter-ProjectPage-AddMember-NameKept
+        title: >-
+          The ProjectPage unit shall keep the typed name in the field after the user could not be added.
+        justification: |
+          The administrator can correct a typing error instead of typing the name again.
+        tests:
+          - NewMemberPage_Submit_UnusableNames_GiveOneGenericMessageAndAddNothing
+
+      - id: ReviewCenter-ProjectPage-AddMember-AlreadyMember
+        title: >-
+          The ProjectPage unit shall show a message for a user who already is a member and leave the role of the member
+          unchanged.
+        justification: |
+          A second add must not silently change a role.
+        tests:
           - NewMemberPage_Submit_AlreadyMember_ShowsMessageAndKeepsTheRole
+
+      - id: ReviewCenter-ProjectPage-AddMember-NotFound
+        title: >-
+          The ProjectPage unit shall show on the page for a new member the not-found message and no form to a user who
+          does not administer the project, and for a project that does not exist.
+        justification: |
+          The page must not reveal the project, and must not offer what is refused.
+        tests:
+          - NewMemberPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm
+
+      - id: ReviewCenter-ProjectPage-AddMember-RightLost
+        title: >-
+          The ProjectPage unit shall add nobody and drop the form when the user loses the right to administer the
+          project while the page for a new member is open.
+        justification: |
+          The form is checked again at the submission, because the page may have been open for a long time.
+        tests:
           - NewMemberPage_Submit_RightLostWhileOpen_AddsNothingAndDropsTheForm
+
+      - id: ReviewCenter-ProjectPage-AddMember-OtherProject
+        title: >-
+          The ProjectPage unit shall drop the typed name and the old project when the page for a new member is reused
+          for another project.
+        justification: |
+          Input for one project must never be submitted for another.
+        tests:
           - NewMemberPage_Load_OtherProject_DropsWhatWasTypedAndTheProject
-          - ProjectPage_AddMember_ButtonLeadsToNewMemberPage_WhichAddsTheNamedUser
 
       - id: ReviewCenter-ProjectPage-CreateAccount
         title: >-
-          The ProjectPage unit shall provide the page /projects/{project}/members/account, which shows whoever
-          administers the project a form with a user name, a display name, and a project admin choice, creates the
-          account together with its membership, shows the generated temporary password once, with the user name and
-          a Copy button that says whether the copy worked, until Done is pressed, shows a message next to the form
-          and creates nothing for a taken or invalid name, shows the not-found message and no form to anybody else,
-          and, when the right is lost while the page is open, creates nothing and drops the form and the password.
+          The ProjectPage unit shall show to whoever administers the project, on the page
+          /projects/{project}/members/account, a form with a user name field, a display name field, and a project
+          admin choice.
         justification: |
-          A person who has no account cannot be added to a project, so a project admin must be able to create one,
-          but only as part of adding it to the own project. The password is made by the application, and shown once
-          and only in the memory of the page, so nobody chooses it, writes it down in the system, or can read it
-          again; losing the right drops it at once.
+          A person who has no account cannot be added to a project, so the administrator describes the new person on
+          this page.
         tests:
           - NewMemberAccountPage_Render_Administrator_ShowsTheForm
-          - NewMemberAccountPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-BackButton
+        title: >-
+          The ProjectPage unit shall show on the page for a new account a Cancel button that leads back to the page for
+          a new member.
+        justification: |
+          The flow can be left without creating anything.
+        tests:
+          - NewMemberAccountPage_Render_Administrator_ShowsTheForm
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-CreatesAccount
+        title: >-
+          The ProjectPage unit shall create the account of the typed names together with the membership in the project,
+          with the role that was chosen.
+        justification: |
+          The new person can work in the project at once, but only in the project of the administrator who made the
+          account.
+        tests:
           - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-TempPassword
+        title: >-
+          The ProjectPage unit shall show the generated temporary password with the user name in a box that says that
+          it is shown only once.
+        justification: |
+          The password is made by the application, so nobody chooses it. The administrator must pass it on and must
+          know that it cannot be read again.
+        tests:
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-DoneHides
+        title: >-
+          The ProjectPage unit shall hide the temporary password when the Done button is used.
+        justification: |
+          A password on the screen is a risk once it was passed on.
+        tests:
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-DoneReturns
+        title: >-
+          The ProjectPage unit shall show the project page when the Done button is used.
+        justification: |
+          The administrator continues with the project.
+        tests:
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-CopyButton
+        title: >-
+          The ProjectPage unit shall hand the temporary password to the clipboard of the browser when the Copy button
+          is used, and say "Copied.".
+        justification: |
+          Typing a generated password invites errors.
+        tests:
           - NewMemberAccountPage_Copy_Password_CopiesAndReportsTheResult
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-CopyFailure
+        title: >-
+          The ProjectPage unit shall say "Could not copy; select the password and copy it by hand." when the browser
+          does not copy the password.
+        justification: |
+          The administrator must know to copy the password by hand.
+        tests:
+          - NewMemberAccountPage_Copy_Password_CopiesAndReportsTheResult
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-UnusableName
+        title: >-
+          The ProjectPage unit shall show a message next to the form and create nothing for a user name that is taken
+          or invalid.
+        justification: |
+          The administrator can correct the name, and no half-made account is left behind.
+        tests:
           - NewMemberAccountPage_Submit_TakenOrInvalidName_ShowsMessageAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-NotFound
+        title: >-
+          The ProjectPage unit shall show on the page for a new account the not-found message and no form to a user who
+          does not administer the project, and for a project that does not exist.
+        justification: |
+          The page must not reveal the project, and must not offer what is refused.
+        tests:
+          - NewMemberAccountPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-RightLost
+        title: >-
+          The ProjectPage unit shall create nothing and drop the form when the user loses the right to administer the
+          project while the page for a new account is open.
+        justification: |
+          The form is checked again at the submission, because the page may have been open for a long time.
+        tests:
           - NewMemberAccountPage_Submit_RightLostWhileOpen_CreatesNothingAndDropsTheForm
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-PasswordDropped
+        title: >-
+          The ProjectPage unit shall drop the temporary password and copy nothing when the user loses the right to
+          administer the project while the password is shown.
+        justification: |
+          A password must not stay readable for a user who lost the right to administer the project.
+        tests:
           - NewMemberAccountPage_Copy_RightLostWhilePasswordShown_DropsThePasswordAndCopiesNothing
+
+      - id: ReviewCenter-ProjectPage-CreateAccount-OtherProject
+        title: >-
+          The ProjectPage unit shall drop the typed names and the password when the page for a new account is reused
+          for another project.
+        justification: |
+          Data of one project must never be used for another.
+        tests:
           - NewMemberAccountPage_Load_OtherProject_DropsNamesAndPassword
 
       - id: ReviewCenter-ProjectPage-RepositoriesLink
         title: >-
-          The ProjectPage unit shall show a Repositories button that leads to the repositories page of the project to
-          a system administrator and to a project admin of the project only.
+          The ProjectPage unit shall show to whoever administers the project a Repositories button that leads to the
+          repositories page of the project.
         justification: |
-          Repositories belong to projects, so the project page is where they are reached from. A plain member does
-          not manage them and is not offered a page that would show only a not-found message.
+          Repositories belong to projects, so the project page is where they are reached from.
         tests:
           - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink
+
+      - id: ReviewCenter-ProjectPage-RepositoriesLink-Hidden
+        title: >-
+          The ProjectPage unit shall show no Repositories button to a user who does not administer the project.
+        justification: |
+          A plain member does not manage repositories and is not offered a page that would show only a not-found
+          message.
+        tests:
           - ProjectPage_Render_Member_SeesReviewsButNoMembersSection
 
       - id: ReviewCenter-ProjectPage-Reviews
         title: >-
-          The ProjectPage unit shall list the reviews of the project as rows with a link to each review and its
-          title, without a badge for the stored state, which has only one value.
+          The ProjectPage unit shall list the reviews of the project as rows with a link to each review and its title.
         justification: |
-          The project page is how users reach their reviews and see where each one stands.
+          The project page is how users reach their reviews.
+        tests:
+          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
+
+      - id: ReviewCenter-ProjectPage-Reviews-NoStateBadge
+        title: >-
+          The ProjectPage unit shall show no badge of the stored state of a review.
+        justification: |
+          The stored state has only one value and says nothing, so a badge for it would only crowd the row and could
+          contradict the stage that is derived from the signatures.
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
 
       - id: ReviewCenter-ProjectPage-NewReview
         title: >-
-          The ProjectPage unit shall offer a New review button that opens the page holding the review creation form
-          for that project, so the project page itself shows only the reviews.
+          The ProjectPage unit shall show a + New review button that links to the page for a new review of the project
+          to a user who may contribute to the project.
         justification: |
-          Users mostly come to the project page to pick a review; the creation form is reached on purpose, from a
-          button, instead of crowding the list.
+          Users mostly come to the project page to pick a review, so the creation form is reached on purpose from a
+          button instead of crowding the list.
         tests:
           - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
 
       - id: ReviewCenter-ProjectPage-Approval
         title: >-
-          The ProjectPage unit shall show on each listed review a badge for its stage: Setup while it has no reviewer
-          slot, Approved when it has at least one reviewer slot and every slot has a current signature of approval,
-          Rejected when every slot has a current signature of rejection and the review has its conclusion text, and
-          In review otherwise.
+          The ProjectPage unit shall show the stage Approved on a review that has at least one reviewer slot and whose
+          every slot has a current signature of approval.
         justification: |
-          Users scan the project page to see which reviews are finished and how they ended. The stage is computed from
-          the current record, so a review whose record changed after signing is shown as In review again.
+          Users scan the project page to see which reviews are finished. The stage is derived from the signatures and
+          never stored.
+        tests:
+          - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Approval-Setup
+        title: >-
+          The ProjectPage unit shall show the stage Setup on a review that has no reviewer slot.
+        justification: |
+          A review without a slot cannot be signed yet, and users must see that it is still being set up.
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
           - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Approval-Rejected
+        title: >-
+          The ProjectPage unit shall show the stage Rejected on a review that has at least one reviewer slot, whose
+          every slot has a current signature of rejection, and that has its conclusion text.
+        justification: |
+          A unanimous rejection is an outcome that users must see as clearly as an approval.
+        tests:
           - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
+
+      - id: ReviewCenter-ProjectPage-Approval-InReview
+        title: >-
+          The ProjectPage unit shall show the stage In review on a review that has a reviewer slot and is neither
+          approved nor rejected.
+        justification: |
+          Open work must stay visible on the project page.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Approval-Current
+        title: >-
+          The ProjectPage unit shall count only current signatures for the stage, so that a review whose record changed
+          after it was signed shows the stage In review again.
+        justification: |
+          A signature of an old record approves nothing, so the stage is computed from the current record.
+        tests:
+          - ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain
 
       - id: ReviewCenter-ProjectPage-Progress
         title: >-
-          The ProjectPage unit shall show for each listed review, besides its link, title, and stage, the signatures
-          as given of needed with the number that are out of date, what blocks the approval (a missing checklist, open
-          threads, unanswered checks, disputed checks, a rejection that still needs its conclusion, and no Fail count,
-          as a Fail does not block), the people it waits on, the time of the last activity,
-          and the due date with the Overdue badge of the rule while the review is overdue, all taken from the
-          progress service in one read for the whole project, and shall write the creation date, the last activity,
-          the due date, and their machine-readable time attributes in the invariant culture, in Gregorian digits,
-          whatever culture the request has.
+          The ProjectPage unit shall show for each listed review how many signatures were given of how many are
+          needed, and a dash for a review in Setup.
         justification: |
-          A lead opens the project page to see who is holding each review up. Showing the reason a review is not
-          approved and the names to ask turns the list into a work list, and reading it in one step keeps the page
-          fast for a project with many reviews. A date in the calendar of the visitor's culture (such as the Buddhist
-          year) would disagree with the review page and the API.
+          A lead opens the project page to see how far each review is.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-OutOfDate
+        title: >-
+          The ProjectPage unit shall say for a review in which a signature is out of date that the signature was given
+          and the review changed afterwards.
+        justification: |
+          A signature of an old record must not read as progress.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-NoChecklist
+        title: >-
+          The ProjectPage unit shall name "No checklist" as a blocker of a review that has no checklist.
+        justification: |
+          A review without a checklist cannot be answered, so the lead must see why it does not move.
+        tests:
           - ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked
+
+      - id: ReviewCenter-ProjectPage-Progress-OpenThreads
+        title: >-
+          The ProjectPage unit shall name the number of open threads of a review as a blocker.
+        justification: |
+          Open questions block the approval, so the lead must see how many are open.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-UnansweredChecks
+        title: >-
+          The ProjectPage unit shall name the number of unanswered checks of a review as a blocker.
+        justification: |
+          Unanswered checks block the approval, so the lead must see how many are still open.
+        tests:
+          - ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker
+
+      - id: ReviewCenter-ProjectPage-Progress-DisputedChecks
+        title: >-
+          The ProjectPage unit shall name the number of disputed checks of a review as a blocker to a viewer who may
+          see it.
+        justification: |
+          Disputes must be resolved before the approval, so the lead must see how many there are.
+        tests:
           - ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker
-          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+        title: >-
+          The ProjectPage unit shall name "conclusion needed" as a blocker of a review that lacks its conclusion.
+        justification: |
+          A review ends with a conclusion, so the lead must see which reviews still need one.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
+
+      - id: ReviewCenter-ProjectPage-Progress-NoFailCount
+        title: >-
+          The ProjectPage unit shall not count a check answered Fail as a blocker.
+        justification: |
+          A Fail is a finding, which is a result of the review and not unfinished work.
+        tests:
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-WaitingOn
+        title: >-
+          The ProjectPage unit shall name the people whose signature is still missing on a review.
+        justification: |
+          The lead knows whom to ask, which turns the list into a work list.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-LastActivity
+        title: >-
+          The ProjectPage unit shall show the time of the newest activity on each listed review.
+        justification: |
+          The lead finds the reviews that stand still.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity
+
+      - id: ReviewCenter-ProjectPage-Progress-DueDate
+        title: >-
+          The ProjectPage unit shall show the due date of each listed review, or a dash for a review without one.
+        justification: |
+          The lead sees what is expected when.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-Overdue
+        title: >-
+          The ProjectPage unit shall show an Overdue badge on a review whose due date has passed.
+        justification: |
+          Late work must stand out in the list.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Progress-Culture
+        title: >-
+          The ProjectPage unit shall write the creation date, the last activity, and the due date in the invariant
+          culture, in Gregorian digits, whatever culture the request has.
+        justification: |
+          A date in the calendar of the culture of the visitor (such as the Buddhist year) would disagree with the
+          review page and the API.
+        tests:
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-ProjectPage-Progress-DateAttributes
+        title: >-
+          The ProjectPage unit shall give the creation time and the last activity time as machine-readable time
+          attributes in the invariant culture.
+        justification: |
+          Tools and screen readers read the exact moment, and it must not depend on the culture of the request.
+        tests:
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
       - id: ReviewCenter-ProjectPage-Summary
         title: >-
-          The ProjectPage unit shall show above the reviews a summary of the number of reviews of the project in each
-          stage, including the rejected ones, and the number that are overdue, counted over all reviews and not only
-          the ones that a filter shows.
+          The ProjectPage unit shall show above the reviews a summary of the number of reviews in Setup, In review, and
+          Approved.
         justification: |
-          The summary is the answer to "how are we doing" at one glance, and it must not change when the lead narrows
-          the table.
+          The summary is the answer to "how are we doing" at one glance.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
-          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-ProjectPage-Summary-Rejected
+        title: >-
+          The ProjectPage unit shall show the number of rejected reviews in the summary.
+        justification: |
+          Rejections must not vanish from the count of the project.
+        tests:
           - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
+
+      - id: ReviewCenter-ProjectPage-Summary-Overdue
+        title: >-
+          The ProjectPage unit shall show the number of overdue reviews in the summary.
+        justification: |
+          Late work is the first thing a lead looks for.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-ProjectPage-Summary-AllReviews
+        title: >-
+          The ProjectPage unit shall count all reviews of the project in the summary, and not only the ones that a
+          filter shows.
+        justification: |
+          The summary describes the project, and it must not change when the lead narrows the table.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
 
       - id: ReviewCenter-ProjectPage-ProgressFilter
         title: >-
-          The ProjectPage unit shall let the user narrow the reviews by stage (Setup, In review, Approved, or
-          Rejected), to the overdue ones, to the blocked
-          ones, and by a text that is part of the review identifier or title, and shall keep the choice in the query
-          string of the page (stage, overdue, blocked, q), so that a link or a reload shows the same table, and shall
-          say so when no review matches. A value of the query string that it does not understand shall be ignored,
-          a page that is not a whole number shall show the first page, a page out of range shall be brought into
-          range, and text taken from the query string or from a review shall be shown encoded, never as markup.
+          The ProjectPage unit shall show only the reviews of the stage named in the query value stage (Setup, In
+          review, Approved, or Rejected).
         justification: |
-          A lead who follows up with the team wants "everything that is overdue" or "everything blocked" as a link
-          that can be shared and bookmarked. The address can be typed or forged by anyone, so it must never break the
-          page or inject markup into it.
+          A lead works through one stage at a time, and the choice in the address can be shared and bookmarked.
         tests:
           - ProjectPage_Render_QueryFilters_NarrowTheTable
-          - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
-          - ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView
-          - ProjectPage_Render_InvalidPageValues_ShowAValidPage
-          - ProjectPage_Render_HostileMarkup_IsRenderedEncoded
           - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-Overdue
+        title: >-
+          The ProjectPage unit shall show only the overdue reviews when the query value overdue is 1.
+        justification: |
+          A lead who follows up with the team wants everything that is overdue as a link.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-Blocked
+        title: >-
+          The ProjectPage unit shall show only the blocked reviews when the query value blocked is 1.
+        justification: |
+          Blocked work needs somebody to act, and a lead wants it as a link.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+          - ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked
+          - ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-Text
+        title: >-
+          The ProjectPage unit shall show only the reviews whose identifier or title contains the query value q,
+          ignoring case.
+        justification: |
+          A project can have hundreds of reviews, so the lead must be able to find one by a part of its name.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-NoMatch
+        title: >-
+          The ProjectPage unit shall show a message instead of the table when no review matches the filters.
+        justification: |
+          An empty table looks like an error.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-Ignored
+        title: >-
+          The ProjectPage unit shall ignore a value of the query string that it does not understand and show the
+          default view.
+        justification: |
+          The address can be typed or forged by anyone, and an old or hand-edited link must still show the page.
+        tests:
+          - ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-PageNotNumber
+        title: >-
+          The ProjectPage unit shall show the first page when the query value page is not a whole number.
+        justification: |
+          A damaged link must still show the page instead of failing.
+        tests:
+          - ProjectPage_Render_InvalidPageValues_ShowAValidPage
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-PageRange
+        title: >-
+          The ProjectPage unit shall bring a page number outside the existing pages into range, a number below the
+          first to the first page and a number above the last to the last page.
+        justification: |
+          A link to a page that has disappeared must still show data.
+        tests:
+          - ProjectPage_Render_InvalidPageValues_ShowAValidPage
+          - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter-Encoded
+        title: >-
+          The ProjectPage unit shall show text taken from the query string or from a review encoded, never as markup.
+        justification: |
+          The address can be forged by anyone, so it must never inject markup into the page.
+        tests:
+          - ProjectPage_Render_HostileMarkup_IsRenderedEncoded
 
       - id: ReviewCenter-ProjectPage-ProgressSort
         title: >-
-          The ProjectPage unit shall sort the reviews by identifier, stage, last activity, due date, or signatures,
-          ascending or descending, through headers that are links that toggle the direction, show the reviews 25 to a
-          page, and keep the sort, the direction, the filters, and the page in the query string.
+          The ProjectPage unit shall sort the reviews by identifier, ascending by default and descending when asked.
         justification: |
-          A project can have hundreds of reviews. The lead needs the stalest or the nearest due date first, and the
-          position in the list must survive a reload or a shared link.
+          The identifier order is the natural order of a list of reviews.
         tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
           - ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-Stage
+        title: >-
+          The ProjectPage unit shall sort the reviews by stage in the order Setup, In review, Approved, and by
+          identifier within a stage.
+        justification: |
+          The lead groups the reviews by progress.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-Signatures
+        title: >-
+          The ProjectPage unit shall sort the reviews by the share of signatures given.
+        justification: |
+          The lead finds the reviews that are nearly done or that have not started.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-Activity
+        title: >-
+          The ProjectPage unit shall sort the reviews by the time of the last activity, newest first by default.
+        justification: |
+          The lead finds the reviews that have seen no work for the longest time.
+        tests:
+          - ProjectPage_Render_QuerySortActivity_OrdersByLastActivity
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-Due
+        title: >-
+          The ProjectPage unit shall sort the reviews by due date and put the reviews without a due date last in either
+          direction.
+        justification: |
+          The lead wants the nearest due date first, and a review without a date must not hide the ones with a date.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-Direction
+        title: >-
+          The ProjectPage unit shall take the sort direction from the query value dir (asc or desc) and use the default
+          direction of the column when the value is not understood.
+        justification: |
+          A damaged link must still sort.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+          - ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-HeaderLinks
+        title: >-
+          The ProjectPage unit shall make each column header a link that sorts by the column, toggles the direction of
+          the column that is sorted now, and marks that column with the aria-sort attribute.
+        justification: |
+          Sorting needs no extra control, and assistive technology learns which column is sorted.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-PageSize
+        title: >-
+          The ProjectPage unit shall show the reviews 25 to a page, with the range shown and the total.
+        justification: |
+          A project can have hundreds of reviews, and a page of that size would be slow and hard to scan.
+        tests:
           - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
+
+      - id: ReviewCenter-ProjectPage-ProgressSort-LinksKeepState
+        title: >-
+          The ProjectPage unit shall keep the sort, the direction, the filters, and the page in the query string of
+          every link and of the filter form of the page.
+        justification: |
+          The position in the list must survive a reload or a shared link.
+        tests:
+          - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
+          - ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState
+          - ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState
 
       - id: ReviewCenter-ProjectPage-ReadOnly
         title: >-
           The ProjectPage unit shall show the same table, summary, and filters to a read-only auditor of the project as
-          to a member, offer the auditor no control that creates or plans a review and no list of repositories, and
-          show a user outside the project the page of a project that does not exist.
+          to a member.
         justification: |
-          An auditor reads everything and changes nothing, so the page must not offer what the rules would refuse, and
-          must not fail on the parts that only contributors may see. A project that the user may not see must read
-          like a missing one.
+          An auditor reads everything and changes nothing.
         tests:
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
-          - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-NoControls
+        title: >-
+          The ProjectPage unit shall offer a read-only auditor no control that creates or plans a review, or that
+          administers the project.
+        justification: |
+          The page must not offer what the rules would refuse.
+        tests:
           - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-Notice
+        title: >-
+          The ProjectPage unit shall show a read-only auditor a notice that the project is read-only for the auditor.
+        justification: |
+          The auditor learns why the controls are missing.
+        tests:
+          - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-NoRepositoryRead
+        title: >-
+          The ProjectPage unit shall read no repository of the project for a read-only auditor.
+        justification: |
+          The list of repositories is for contributors, and the page must not fail on the parts that only
+          contributors may see.
+        tests:
+          - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-NewReviewPage
+        title: >-
+          The ProjectPage unit shall show a read-only auditor on the page for a new review the read-only notice instead
+          of the form.
+        justification: |
+          The form would be refused anyway, so it is not offered.
+        tests:
           - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-EmptyProject
+        title: >-
+          The ProjectPage unit shall show on a project without reviews a neutral message, without the invitation to add
+          the first review, to a user who may not contribute.
+        justification: |
+          An auditor cannot add a review, so the invitation would mislead.
+        tests:
+          - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-Stranger
+        title: >-
+          The ProjectPage unit shall show a user outside the project the not-found state and no table.
+        justification: |
+          A project that the user may not see must read like a missing one.
+        tests:
+          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+
+      - id: ReviewCenter-ProjectPage-ReadOnly-OwnRole
+        title: >-
+          The ProjectPage unit shall show a project admin who made the own role auditor the read-only notice and the
+          Audit trail button, and neither the members card nor the + New review button.
+        justification: |
+          The rights are recomputed after a role change, so the page follows the new role at once.
+        tests:
           - ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed
 
       - id: ReviewCenter-ProjectPage-MemberRoles
         title: >-
           The ProjectPage unit shall name the role of every member on the members card as member, auditor, or project
-          admin, change the role only by a choice that names the new role, so that an auditor is never made a project
-          admin by a toggle, offer the auditor role on the pages that add a member and that create an account, refuse
-          to combine it with the project admin role, and show the reason when the role is refused, for example while the
-          member still holds an unsigned review slot, or when the member is the last project admin.
+          admin.
         justification: |
-          A role that is changed by a toggle between two values would turn an auditor into an administrator by
-          accident. Naming the target of every change, and the reason of every refusal, lets the administrator do what
-          was meant and resolve what stands in the way.
+          The administrator sees who may do what in the project.
         tests:
           - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
-          - ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-ExplicitChange
+        title: >-
+          The ProjectPage unit shall change the role of a member only by buttons that name the new role, and offer no
+          toggle for an auditor.
+        justification: |
+          A toggle between two values would turn an auditor into an administrator by accident.
+        tests:
+          - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-AddPageAuditor
+        title: >-
+          The ProjectPage unit shall offer the auditor role on the page for a new member and add the user with that
+          role.
+        justification: |
+          Auditors are added like other members.
+        tests:
           - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-AccountPageAuditor
+        title: >-
+          The ProjectPage unit shall offer the auditor role on the page for a new account and create the account with
+          that role.
+        justification: |
+          Auditors are created like other members.
+        tests:
+          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-AddPageCombination
+        title: >-
+          The ProjectPage unit shall refuse on the page for a new member to combine the project admin role and the
+          auditor role, show "Choose either project admin or auditor, not both.", and add nobody.
+        justification: |
+          An administrator who is read-only has no meaning.
+        tests:
+          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
+          - NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-AccountPageCombination
+        title: >-
+          The ProjectPage unit shall refuse on the page for a new account to combine the project admin role and the
+          auditor role, show "Choose either project admin or auditor, not both.", and create nothing.
+        justification: |
+          An administrator who is read-only has no meaning.
+        tests:
+          - NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-OpenWork
+        title: >-
+          The ProjectPage unit shall refuse to change the role of a member who holds an unsigned review slot, show the
+          reason that names the review, and leave the role unchanged.
+        justification: |
+          The administrator must resolve the open work before the role can change, and the reason tells which work.
+        tests:
+          - ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-LastAdmin
+        title: >-
+          The ProjectPage unit shall refuse to make the last project admin an auditor, show the reason, and leave the
+          role unchanged.
+        justification: |
+          A project without an administrator could not be managed.
+        tests:
+          - ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage
+
+      - id: ReviewCenter-ProjectPage-MemberRoles-OwnRole
+        title: >-
+          The ProjectPage unit shall show a project admin who made the own role member the + New review button and no
+          members card.
+        justification: |
+          The rights are recomputed after a role change, so the page follows the new role at once.
+        tests:
+          - ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed
 
       - id: ReviewCenter-ProjectPage-Selection
         title: >-
@@ -331,46 +1089,119 @@ sections:
 
       - id: ReviewCenter-ProjectPage-SourceChoice
         title: >-
-          The ProjectPage unit shall let the user choose whether the files of a new review are uploaded or come
-          from a repository, with upload as the default, shall show only the controls of the chosen source, and
-          shall offer the repository source only when at least one repository of the project is enabled, saying so
-          otherwise.
+          The ProjectPage unit shall let the user choose on the page for a new review whether the files are uploaded or
+          come from a repository, with upload as the default, and show only the controls of the chosen source.
         justification: |
-          One form serves both sources without clutter. A repository cannot be chosen when the project has none, and
-          the user is told whom to ask.
+          One form serves both sources without clutter.
+        tests:
+          - NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
+
+      - id: ReviewCenter-ProjectPage-SourceChoice-RepositoryOffered
+        title: >-
+          The ProjectPage unit shall offer the repository source only when at least one repository of the project is
+          enabled.
+        justification: |
+          A repository cannot be chosen when the project has none that can be used.
         tests:
           - NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
           - NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
 
+      - id: ReviewCenter-ProjectPage-SourceChoice-NoRepositoryHint
+        title: >-
+          The ProjectPage unit shall say, when no repository of the project is enabled, that the project has no
+          repository and that a project administrator can add one.
+        justification: |
+          The user is told whom to ask instead of finding a disabled choice and guessing.
+        tests:
+          - NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
+
       - id: ReviewCenter-ProjectPage-RepositoryForm
         title: >-
-          The ProjectPage unit shall, for the repository source, offer the enabled repositories of the project by
-          name only, never showing a location, user name, or token, and never a repository of another project, a
-          head revision, an optional baseline revision, and a selection that starts as "**/*", and shall create the
-          review from them and show the review page, or list the skipped links and submodules with a link to the
-          review when there are any.
+          The ProjectPage unit shall offer for the repository source the enabled repositories of the project by name
+          only, never showing a location, user name, or token.
         justification: |
-          Ordinary users choose from the repositories the administrators of the project maintain and must not see
-          how the server reaches the repository, nor the repositories of projects they may not see. The creator is
-          told once which entries were left out.
+          Ordinary users choose from the repositories the administrators of the project maintain and must not see how
+          the server reaches a repository.
         tests:
           - NewReviewPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm-ThisProjectOnly
+        title: >-
+          The ProjectPage unit shall offer no repository of another project for the repository source.
+        justification: |
+          The repositories of projects the user may not see must stay unseen.
+        tests:
           - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
-          - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm-Revisions
+        title: >-
+          The ProjectPage unit shall show for the repository source a head revision field, an optional baseline
+          revision field, and a selection field that starts as "**/*".
+        justification: |
+          These three fields define what is reviewed.
+        tests:
+          - NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
           - NewReviewPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm-Creates
+        title: >-
+          The ProjectPage unit shall create the review from the chosen repository, the head revision, and the baseline
+          revision, and show the review page.
+        justification: |
+          This is the purpose of the form, and the user continues with the new review.
+        tests:
+          - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm-NoBaseline
+        title: >-
+          The ProjectPage unit shall review all selected files at the head revision when no baseline revision is given.
+        justification: |
+          A first review has no earlier revision to compare with.
+        tests:
+          - NewReviewPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm-SkippedEntries
+        title: >-
+          The ProjectPage unit shall list the skipped links and submodules with a link to the review, and not open the
+          review at once, when there are any.
+        justification: |
+          The creator is told once which entries were left out.
+        tests:
           - NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview
 
       - id: ReviewCenter-ProjectPage-RepositoryError
         title: >-
-          The ProjectPage unit shall show the reason when a review from a repository cannot be created, among
-          them that nothing matches the selection, that a revision does not exist, that no repository was
-          chosen, and that the repository was disabled meanwhile, and shall create nothing.
+          The ProjectPage unit shall show the reason and create nothing when no file matching the selection changed
+          between the baseline and the head.
         justification: |
-          The user can fix a wrong revision or selection only when told which one is wrong.
+          The user can fix a wrong selection only when told that nothing matches it.
         tests:
           - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-RepositoryError-BadRevision
+        title: >-
+          The ProjectPage unit shall show a message that names the revision and create nothing when a revision does not
+          exist.
+        justification: |
+          The user can fix a wrong revision only when told which one is wrong.
+        tests:
           - NewReviewPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-RepositoryError-NoneChosen
+        title: >-
+          The ProjectPage unit shall ask for a repository and create nothing when no repository was chosen.
+        justification: |
+          The user must know what is missing.
+        tests:
           - NewReviewPage_CreateForm_NoRepositoryChosen_AsksForOne
+
+      - id: ReviewCenter-ProjectPage-RepositoryError-Disabled
+        title: >-
+          The ProjectPage unit shall show a message that names the repository and create nothing when the repository
+          was disabled after the form was opened.
+        justification: |
+          A disabled repository cannot be used any more, and the user must be told so.
+        tests:
           - NewReviewPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-ProjectPage-NewReviewDueDate
@@ -431,13 +1262,29 @@ sections:
 
       - id: ReviewCenter-ProjectPage-PlanLink
         title: >-
-          The ProjectPage unit shall show a link to the plan page of the project when at least one repository of the
-          project is enabled, and a short note that says whom to ask when none is.
+          The ProjectPage unit shall show the link Plan reviews to the plan page of the project when at least one
+          repository of the project is enabled.
         justification: |
-          Planning starts from the project page. A user must find the way in, and must be told why it is not
-          offered instead of finding no link and guessing.
+          Planning starts from the project page, so a user must find the way in.
         tests:
           - ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository
+
+      - id: ReviewCenter-ProjectPage-PlanLink-Unavailable
+        title: >-
+          The ProjectPage unit shall show instead of the link, when no repository of the project is enabled, a note
+          that says whom to ask.
+        justification: |
+          A user must be told why planning is not offered instead of finding no link and guessing.
+        tests:
+          - ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk
+
+      - id: ReviewCenter-ProjectPage-PlanLink-Disabled
+        title: >-
+          The ProjectPage unit shall not count a disabled repository as enabled for the plan link and its note.
+        justification: |
+          A disabled repository cannot be used for planning, so it must not make the link appear.
+        tests:
+          - ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsLink
         title: >-
@@ -739,13 +1586,50 @@ sections:
       - id: ReviewCenter-ProjectPage-Ballots
         title: >-
           The ProjectPage unit shall show for a review with several reviewer slots how many ballots were handed in of
-          how many the review needs, and the names of the people whose ballot is missing, only a dash for a review with
-          fewer slots, the same counts and names to every viewer, and, for a viewer who has not handed in their own
-          ballot in some review, the note that some details are hidden until they hand it in.
+          how many the review needs.
         justification: |
-          A lead who chases a review needs to see how many ballots are still missing and whose they are, and a
-          reviewer must be told why the dispute counts are not shown instead of reading their absence as agreement. That
-          a ballot is in is progress and no verdict, so it can be shown to all.
+          A lead who chases a review needs to see how many ballots are still missing.
         tests:
           - ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames
+
+      - id: ReviewCenter-ProjectPage-Ballots-Missing
+        title: >-
+          The ProjectPage unit shall name the people whose ballot is missing on a review with several reviewer slots.
+        justification: |
+          The lead knows whom to ask.
+        tests:
+          - ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames
+
+      - id: ReviewCenter-ProjectPage-Ballots-SingleSlot
+        title: >-
+          The ProjectPage unit shall show only a dash for the ballots of a review with fewer than two reviewer slots.
+        justification: |
+          One ballot is no progress to report.
+        tests:
+          - ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames
+
+      - id: ReviewCenter-ProjectPage-Ballots-SameForEveryViewer
+        title: >-
+          The ProjectPage unit shall show the same ballot counts and names to every viewer, also to a viewer who has not
+          handed in their own ballot.
+        justification: |
+          That a ballot is in is progress and no verdict, so it can be shown to all.
+        tests:
+          - ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote
+
+      - id: ReviewCenter-ProjectPage-Ballots-MaskedNote
+        title: >-
+          The ProjectPage unit shall show a viewer who has not handed in their own ballot in some review the note that
+          some details are hidden until they hand it in.
+        justification: |
+          A reviewer must be told why the dispute counts are not shown instead of reading their absence as agreement.
+        tests:
+          - ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote
+
+      - id: ReviewCenter-ProjectPage-Ballots-NoteGone
+        title: >-
+          The ProjectPage unit shall show no such note to a viewer who handed in their own ballot in every review.
+        justification: |
+          Nothing is hidden from this viewer, so the note would mislead.
+        tests:
           - ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote

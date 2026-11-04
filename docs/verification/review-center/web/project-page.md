@@ -224,14 +224,27 @@ the form is submitted again, the review is created from the upload with the date
 link; after a repository is registered, the link goes to `/projects/{id}/plan` and the note is gone. This scenario is
 tested by `ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository`.
 
+**ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk**: A project has no repository. A plain member sees
+the note "Planning reviews needs a repository; ask a project administrator to add one."; a project administrator sees
+"Planning reviews needs a repository; add one with the Repositories button."; neither sees the link. This scenario is
+tested by `ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk`.
+
+**ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote**: The only repository of the project is
+registered and then disabled; the page shows no link and the note. This scenario is tested by
+`ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote`.
+
 **ProjectPage_Render_UnknownProject_ShowsNotFound**: The project page is rendered for an unknown project; the
 not-found message names the identity and no form is shown. This scenario is tested by
 `ProjectPage_Render_UnknownProject_ShowsNotFound`.
 
 **ProjectPage_Render_NonMember_LooksLikeAMissingProject**: A project with a review exists, and a user who is no member
 and no system administrator is signed in. The project page shows the same not-found message as for a missing project
-and neither the name of the project nor its review, and the page for a new review shows the not-found message and no
-form. This scenario is tested by `ProjectPage_Render_NonMember_LooksLikeAMissingProject`.
+and neither the name of the project nor its review. This scenario is tested by
+`ProjectPage_Render_NonMember_LooksLikeAMissingProject`.
+
+**NewReviewPage_Render_NonMember_LooksLikeAMissingProject**: The same user opens the page for a new review of the
+project; it shows the same not-found message as for a missing project and no form. This scenario is tested by
+`NewReviewPage_Render_NonMember_LooksLikeAMissingProject`.
 
 **ProjectPage_Render_Member_SeesReviewsButNoMembersSection**: A member who is no administrator opens the page of the
 project; the review is listed and the New review button is shown, but there is no members list, no add member button,
@@ -252,6 +265,10 @@ the membership is stored with that role. This scenario is tested by
 members are listed with the role and Remove buttons, the add member button and the Audit trail button are shown, and
 no other user is listed. This scenario is tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons`.
 
+**ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink**: A project administrator opens the page of the project; the
+Repositories button is shown and leads to `/projects/{id}/repositories`. This scenario is tested by
+`ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink`.
+
 **ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink**: A plain member sees the reviews, but no members
 section, no add button, and no Audit trail button. This scenario is tested by
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
@@ -264,6 +281,11 @@ gone, the row is gone, and the empty message is shown. This scenario is tested b
 **ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves**: A project administrator makes a member a project admin
 and removes a member; both changes are stored. This scenario is tested by
 `ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves`.
+
+**ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange**: A project administrator makes a member a project
+admin, and then removes the member. After the first change the status reads "'mbr' is now project admin."; after the
+removal it reads "Removed 'mbr' from the project.". This scenario is tested by
+`ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange`.
 
 **ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing**: The only project administrator
 presses Remove on the own row and, in a second run, the role button of the own row. The explanation of the last
@@ -329,6 +351,11 @@ keeps what was typed, and no membership is added. This scenario is tested by
 message is shown and the role of the membership is unchanged. This scenario is tested by
 `NewMemberPage_Submit_AlreadyMember_ShowsMessageAndKeepsTheRole`.
 
+**NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing**: The project admin box and the auditor box
+are both ticked and an existing user is submitted; the page says "Choose either project admin or auditor, not both."
+and the user is no member. This scenario is tested by
+`NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing`.
+
 **NewMemberPage_Submit_RightLostWhileOpen_AddsNothingAndDropsTheForm**: The membership is revoked, the user is demoted
 to plain member, or the session ends without the page knowing, and the form is submitted; nothing is added and the page
 shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
@@ -362,6 +389,11 @@ when the browser refuses, the page says how to go on. This scenario is tested by
 show a message next to the form, keep what was typed, and create nothing. This scenario is tested by
 `NewMemberAccountPage_Submit_TakenOrInvalidName_ShowsMessageAndCreatesNothing`.
 
+**NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing**: The project admin box and the
+auditor box are both ticked and valid names are submitted; the page says "Choose either project admin or auditor, not
+both.", shows no password, and creates neither the account nor a membership. This scenario is tested by
+`NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing`.
+
 **NewMemberAccountPage_Submit_RightLostWhileOpen_CreatesNothingAndDropsTheForm**: The membership is revoked, the user
 is demoted to plain member, or the session ends without the page knowing, and the form is submitted; nothing is
 created and the page shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
@@ -393,6 +425,11 @@ by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval`.
 signed with the right password and one review without slots; the first is listed as "Approved" and the second as
 "Setup". This scenario is tested by `ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview`.
 
+**ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain**: A review whose only slot was signed with the right
+password is listed as "Approved". An administrator reopens it, which changes the record, so the earlier signature is out
+of date. The page then lists the review as "In review" and the row says "1 signed, then the review changed". This
+scenario is tested by `ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain`.
+
 **ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary**: A project has reviews in each stage,
 with a signed slot, an out-of-date signature, open threads, an unanswered check, a Fail answer, a due date, and a past
 due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of date"), its blockers (for example "1 open
@@ -410,12 +447,22 @@ shows the Rejected badge, the summary strip shows "1 rejected" (`project-summary
 in exactly one check and nothing else blocks it. Its blockers cell reads "1 disputed" instead of a dash, and the blocked
 filter lists the review. This scenario is tested by `ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker`.
 
+**ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker**: A review has an unsigned slot and no answer to any check of
+the default checklist. Its blockers cell reads the number of checks of that checklist followed by "unanswered", and the
+blocked filter lists the review. This scenario is tested by `ProjectPage_Render_UnansweredChecks_ShowsCountAsBlocker`.
+
 **ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates**: The current culture and the current UI culture
 are set to `th-TH` (restored afterwards); the test first checks that this culture writes another year than 2025 for a
 2025 date, so it cannot pass vacuously when culture data is missing. The page of the seeded project shows the due date
 `2025-03-03`, a created date and a last activity (`yyyy-MM-dd HH:mm`) that start with `2025-`, and `datetime`
 attributes in the round-trip format with Gregorian digits. This scenario is tested by
 `ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates`.
+
+**ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity**: A review has no audit entry and was created on
+2025-02-01 at 08:30; another review, created earlier, has one audit entry stamped by the fixed clock. The column of the
+first shows `2025-02-01 08:30`, the column of the second shows the time of the entry (`2025-03-04 05:06`), and its
+`datetime` attribute is the round-trip form of that time. This scenario is tested by
+`ProjectPage_Render_LastActivity_ShowsTheTimeOfTheNewestActivity`.
 
 **ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked**: A review is stored without a
 checklist, and another has a checklist with every check answered. The first shows "No checklist" as its blockers and the
@@ -431,6 +478,11 @@ the rows are in that order, and the header of the sorted column links to the opp
 headers link to the ascending order. This scenario is tested by
 `ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle`.
 
+**ProjectPage_Render_QuerySortActivity_OrdersByLastActivity**: Two reviews without audit entries (their creation times
+count) and an old review with a new audit entry are listed with `sort=activity`. The rows are the newest activity first,
+and with `dir=asc` the oldest first. This scenario is tested by
+`ProjectPage_Render_QuerySortActivity_OrdersByLastActivity`.
+
 **ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState**: The page is opened with `sort=id&dir=desc`; the rows
 are in descending order of the identifier, and the filter form carries hidden `sort` (`id`) and `dir` (`desc`) inputs,
 so that applying a filter keeps the order. This scenario is tested by
@@ -439,6 +491,11 @@ so that applying a filter keeps the order. This scenario is tested by
 **ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters**: Thirty reviews are shown 25 to a page with the range
 and the previous and next links, which keep the filters and the sort of the query string. This scenario is tested by
 `ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`.
+
+**ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState**: Thirty reviews are filtered by stage and text and sorted
+by signatures descending, and shown 25 to a page. The next and previous links keep the stage, the text, the sort column
+and the direction. A column header link keeps the stage and the text but not the page, so it starts at the first page.
+This scenario is tested by `ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState`.
 
 **ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView**: The page is opened with an unknown stage, an
 unknown sort, an unknown direction, overdue and blocked values other than `1`, and a page that is text; each is ignored
