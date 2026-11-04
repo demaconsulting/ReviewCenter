@@ -21,9 +21,11 @@
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.Messaging;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Tests.Hosting;
@@ -146,5 +148,37 @@ public class HostingSubsystemTests
         // Assert: the run failed with exit code 1 and the context holds the failure
         Assert.Equal(1, exitCode);
         Assert.Equal(1, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that the running web host has the notification worker only when notifications are enabled, and
+    ///     that the worker is running then.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_NotificationWorker_OnlyEnabledWebHost()
+    {
+        // Arrange: the settings that turn notifications on with the file sender
+        var folder = Path.Combine(Path.GetTempPath(), $"rc-hosting-{Guid.NewGuid():N}");
+        var settings = new Dictionary<string, string?>
+        {
+            ["Notifications:Enabled"] = "true",
+            ["Notifications:Sender"] = "File",
+            ["Notifications:FromAddress"] = "reviewcenter@example.com",
+            ["Notifications:BaseUrl"] = "https://reviewcenter.example.com/",
+            ["Notifications:File:Directory"] = folder
+        };
+
+        // Act: start a host with the settings and one without
+        await using var enabled = await TestWebApp.StartAsync(new CapturingLoggerProvider(), null, ["serve", "--silent"], settings);
+        await using var off = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+
+        // Assert: only the first has the worker, and it was started by the host
+        var worker = Assert.Single(enabled.Services.GetServices<IHostedService>().OfType<NotificationWorker>());
+        Assert.NotNull(worker.ExecuteTask);
+        Assert.Empty(off.Services.GetServices<IHostedService>().OfType<NotificationWorker>());
+        if (Directory.Exists(folder))
+        {
+            Directory.Delete(folder, true);
+        }
     }
 }

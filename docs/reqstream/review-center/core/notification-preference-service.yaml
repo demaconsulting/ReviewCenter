@@ -2,8 +2,9 @@
 # Software Unit Requirements for the NotificationPreferenceService Class
 #
 # The NotificationPreferenceService class lets a user name an e-mail address for notifications and confirm that it is
-# the user's own by typing back a six digit code that was mailed to that address. It sends no other mail. Each
-# requirement states one rule, so that each limit, refusal, and protection has its own test case.
+# the user's own by typing back a six digit code that was mailed to that address. It sends no other mail. It also lets
+# a user with a confirmed address choose the notification mode (None, Daily, or Every), which the dispatcher reads.
+# Each requirement states one rule, so that each limit, refusal, and protection has its own test case.
 
 sections:
   - title: NotificationPreferenceService Unit Requirements
@@ -424,3 +425,185 @@ sections:
           A missing actor is a programming error and must not be treated as an anonymous action.
         tests:
           - NotificationPreferenceService_Actions_NullActor_ThrowsArgumentNull
+          - NotificationPreferenceService_SetMode_NullActor_ThrowsArgumentNull
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeDefaultNone
+        title: >-
+          The NotificationPreferenceService class shall report the mode None for a user who has not chosen a mode.
+        justification: |
+          Notifications are off by default, so a user who never chose a mode must not get any mail.
+        tests:
+          - NotificationPreferenceService_GetStatus_NoRow_ModeNone
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeStatusShown
+        title: >-
+          The NotificationPreferenceService class shall report the stored mode in the status of a user.
+        justification: |
+          The user needs to see which mode is in effect.
+        tests:
+          - NotificationPreferenceService_GetStatus_ModeDaily_ShowsDaily
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeSet
+        title: >-
+          The NotificationPreferenceService class shall store the mode Daily when a user with a confirmed address
+          chooses it.
+        justification: |
+          The daily summary is one of the two ways to be told about news.
+        tests:
+          - NotificationPreferenceService_SetMode_Daily_StoresDaily
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeSetEvery
+        title: >-
+          The NotificationPreferenceService class shall store the mode Every when a user with a confirmed address
+          chooses it.
+        justification: |
+          A user who wants to be told soon after each change needs this mode.
+        tests:
+          - NotificationPreferenceService_SetMode_Every_StoresEvery
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeSetNone
+        title: >-
+          The NotificationPreferenceService class shall store the mode None when a user switches the mail off.
+        justification: |
+          A user must be able to stop the mail without removing the address.
+        tests:
+          - NotificationPreferenceService_SetMode_None_StoresNone
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeNeedsConfirmedAddress
+        title: >-
+          The NotificationPreferenceService class shall refuse a mode other than None for a user who has no confirmed
+          address.
+        justification: |
+          Mail may go only to an address that its owner has shown to be theirs, so a mode needs a confirmed address.
+        tests:
+          - NotificationPreferenceService_SetMode_NoConfirmedAddress_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseApiToken
+        title: >-
+          The NotificationPreferenceService class shall refuse a change of the mode by an actor that signed in with an
+          API token.
+        justification: |
+          Only the interactive session of the person may decide where and when the mail goes.
+        tests:
+          - NotificationPreferenceService_SetMode_ApiTokenActor_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseNotAvailable
+        title: >-
+          While notifications are not available, the NotificationPreferenceService class shall refuse a change of the
+          mode.
+        justification: |
+          A feature that is off must not accept a choice.
+        tests:
+          - NotificationPreferenceService_SetMode_NotAvailable_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseNotAvailable-StoreUntouched
+        title: >-
+          While notifications are not available, the NotificationPreferenceService class shall leave the store
+          untouched when it refuses a change of the mode.
+        justification: |
+          A feature that is off must not read or write data.
+        tests:
+          - NotificationPreferenceService_SetMode_NotAvailable_StoreNotTouched
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseDisabledUser
+        title: >-
+          The NotificationPreferenceService class shall refuse a change of the mode for a disabled user.
+        justification: |
+          A disabled account must not cause mail.
+        tests:
+          - NotificationPreferenceService_SetMode_DisabledUser_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseTemporaryPassword
+        title: >-
+          The NotificationPreferenceService class shall refuse a change of the mode for a user who must still change a
+          temporary password.
+        justification: |
+          A user with a temporary password has not finished signing in and must not be able to cause mail.
+        tests:
+          - NotificationPreferenceService_SetMode_MustChangePassword_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRefuseUnknownValue
+        title: >-
+          The NotificationPreferenceService class shall refuse a mode value that is not None, Daily, or Every.
+        justification: |
+          A value outside the enumeration has no defined behavior and is a programming error.
+        tests:
+          - NotificationPreferenceService_SetMode_UndefinedValue_Throws
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeAudited
+        title: >-
+          The NotificationPreferenceService class shall record a changed mode as an audit entry of the acting user.
+        justification: |
+          A change of when mail goes belongs in the audit trail.
+        tests:
+          - NotificationPreferenceService_SetMode_Changed_AuditEntryWritten
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeAuditNoAddress
+        title: >-
+          The NotificationPreferenceService class shall keep the e-mail address out of the audit entry of a mode
+          change.
+        justification: |
+          The audit trail is kept for a long time and read by many people, so it must hold no personal data.
+        tests:
+          - NotificationPreferenceService_SetMode_Changed_AuditHasNoAddress
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit
+        title: >-
+          The NotificationPreferenceService class shall write no audit entry when the chosen mode is the stored mode.
+        justification: |
+          Saving the same choice again is no change, and an audit entry for it would be noise.
+        tests:
+          - NotificationPreferenceService_SetMode_Same_NoAuditNoChange
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit-NoChange
+        title: >-
+          The NotificationPreferenceService class shall report no change when the chosen mode is the stored mode.
+        justification: |
+          The caller must know that saving the same choice again changed nothing.
+        tests:
+          - NotificationPreferenceService_SetMode_Same_ReportsNoChange
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeUnchangedNoAudit-NoneWithoutRow
+        title: >-
+          The NotificationPreferenceService class shall report no change when the mode None is chosen for a user
+          without a stored mode.
+        justification: |
+          A user who never chose a mode and chooses None has made no change.
+        tests:
+          - NotificationPreferenceService_SetMode_NoneWithoutRow_NoChange
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeEnableMarksBaseline
+        title: >-
+          The NotificationPreferenceService class shall mark the baseline as pending when a user switches a mode on
+          from None.
+        justification: |
+          A user who switches notifications on must not get a mail for the whole backlog, so the items that exist then
+          are recorded as known before any mail is sent.
+        tests:
+          - NotificationPreferenceService_SetMode_NoneToEvery_BaselinePending
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeSwitchKeepsItems
+        title: >-
+          The NotificationPreferenceService class shall keep the notified items when a user switches between Daily and
+          Every.
+        justification: |
+          Items that were notified stay known, so that a switch of the mode does not mail them again.
+        tests:
+          - NotificationPreferenceService_SetMode_DailyToEvery_ItemsKept
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeSwitchKeepsItems-NoBaseline
+        title: >-
+          The NotificationPreferenceService class shall mark no new baseline when a user switches between Daily and
+          Every.
+        justification: |
+          A new baseline would swallow news that arrived before the switch.
+        tests:
+          - NotificationPreferenceService_SetMode_DailyToEvery_NoBaseline
+
+      - id: ReviewCenter-NotificationPreferenceService-ModeRemoveResets
+        title: >-
+          The NotificationPreferenceService class shall return the user to the mode None when the address is removed.
+        justification: |
+          Without an address no mail can be sent, and a later address must start from the default.
+        tests:
+          - NotificationPreferenceService_RemoveAddress_AfterMode_ModeNone

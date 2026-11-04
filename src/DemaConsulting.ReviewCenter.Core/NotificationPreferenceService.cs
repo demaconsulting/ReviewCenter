@@ -32,7 +32,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <param name="ConfirmedAddress">The confirmed address; <c>null</c> when there is none.</param>
 /// <param name="PendingAddress">The address that waits for its code; <c>null</c> when none waits.</param>
 /// <param name="PendingExpired">Whether the time of the code of the waiting address ran out.</param>
-public sealed record NotificationAddressStatus(string? ConfirmedAddress, string? PendingAddress, bool PendingExpired);
+/// <param name="Mode">The notification mode the person chose; <see cref="NotificationMode.None"/> until one is chosen.</param>
+public sealed record NotificationAddressStatus(
+    string? ConfirmedAddress,
+    string? PendingAddress,
+    bool PendingExpired,
+    NotificationMode Mode = NotificationMode.None);
 
 /// <summary>
 ///     The rules of the e-mail address a person enters for notifications: entering it, confirming it with a code that
@@ -180,7 +185,52 @@ public sealed class NotificationPreferenceService
         }
 
         var expired = row.PendingEmail is not null && _clock.GetUtcNow() >= row.PendingCodeExpiresUtc;
-        return new NotificationAddressStatus(row.Email, row.PendingEmail, expired);
+        return new NotificationAddressStatus(row.Email, row.PendingEmail, expired, row.Mode);
+    }
+
+    /// <summary>
+    ///     Sets how the signed-in person wants to be told about news in the inbox.
+    /// </summary>
+    /// <param name="actor">The signed-in person. Must not be null.</param>
+    /// <param name="mode">The mode to set.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the mode changed; <c>false</c> when it already was the given mode.</returns>
+    /// <remarks>
+    ///     A mode other than <see cref="NotificationMode.None"/> needs a confirmed address. Switching on from
+    ///     <see cref="NotificationMode.None"/> marks the items that exist now as already known, so the person is
+    ///     not mailed about the backlog; switching to <see cref="NotificationMode.None"/> forgets what was mailed.
+    ///     The change is audited without the address.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="mode"/> is not a defined value.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.NotificationsNotAvailable"/>, <see cref="DomainRule.ActorNotAllowed"/> or
+    ///     <see cref="DomainRule.NotificationAddressNotConfirmed"/>.
+    /// </exception>
+    public async Task<bool> SetModeAsync(Actor actor, NotificationMode mode, CancellationToken cancellationToken = default)
+    {
+        var user = await LoadUsableAsync(actor, cancellationToken);
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), "The notification mode is not known.");
+        }
+
+        var row = await _store.GetAsync(user.Id, cancellationToken);
+        if (mode != NotificationMode.None && row?.Email is null)
+        {
+            throw new DomainRuleException(
+                DomainRule.NotificationAddressNotConfirmed,
+                "Confirm an e-mail address before you choose how to be notified.");
+        }
+
+        // Without a row the mode is None already
+        if (row is null || row.Mode == mode)
+        {
+            return false;
+        }
+
+        var audit = AuditDraft.By(actor, SettingsChangedAction, $"Notification mode set to {mode}.");
+        return await _store.SetModeAsync(user.Id, mode, _clock.GetUtcNow(), audit, cancellationToken);
     }
 
     /// <summary>

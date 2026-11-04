@@ -90,10 +90,14 @@ input-files:
   - docs/verification/review-center/core/notification-address.md
   - docs/verification/review-center/core/notification-message.md
   - docs/verification/review-center/core/notification-preference-service.md
+  - docs/verification/review-center/core/notification-composer.md
+  - docs/verification/review-center/core/digest-schedule.md
+  - docs/verification/review-center/core/notification-dispatcher.md
   - docs/verification/review-center/messaging.md
   - docs/verification/review-center/messaging/notification-options.md
   - docs/verification/review-center/messaging/smtp-notification-sender.md
   - docs/verification/review-center/messaging/file-notification-sender.md
+  - docs/verification/review-center/messaging/notification-worker.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md

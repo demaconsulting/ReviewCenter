@@ -19,7 +19,7 @@ of the audit store interface together with the `AuditAppender` that serializes a
 of the personal access token store interface; `TotpStore`, the implementation of the second factor store interface;
 `InboxStore`, the implementation of the inbox store interface (what each user has seen of each review);
 `NotificationStore`, the implementation of the notification store interface (the e-mail address for notifications, its
-pending confirmation, and the log of the mails that were sent); and
+pending confirmation, the notification mode, the items already mailed, and the log of the mails that were sent); and
 `DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
@@ -150,14 +150,20 @@ application; the rest of the system sees only the Core store interfaces.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Tells whether its tables exist, reads the preference of a user, reserves a confirmation (the pause and the
-  limits per user, per address, and per server are checked and the pending state and the send log entry are stored in
-  one transaction), aborts a reservation, counts an attempt at the current code, confirms the pending address, and
-  removes the preference. Reserving, confirming, and removing are stored together with their audit entry; aborting and
-  counting an attempt are not audited.
+- *Contract*: Tells whether its tables and columns exist, reads the preference of a user, reserves a confirmation (the
+  pause and the limits per user, per address, and per server are checked and the pending state and the send log entry
+  are stored in one transaction), aborts a reservation, counts an attempt at the current code, confirms the pending
+  address, removes the preference, and sets the notification mode of a user. For the dispatcher it lists the users who
+  chose a mode with their confirmed address, reads the items already notified, applies the outcome of one mail (the
+  items and the state in one transaction), reserves and releases the send log row of a notification mail (the limits
+  per user and per server are checked and the row is stored in one transaction), and counts the mails sent per user
+  and per server. Reserving,
+  confirming, removing, and setting the mode are stored together with their audit entry; aborting, counting an attempt,
+  and applying a mail are not audited. Reserving a notification mail is not audited either.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. Each
   decision with one winner is one transaction or one conditional update. The store holds only the salted hash of a
-  code; a code never reaches it. The send log is kept when an address is removed.
+  code; a code never reaches it. The send log is kept when an address is removed; the notified items are removed with
+  it.
 
 **AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
 
@@ -301,13 +307,35 @@ record digest, because what a person has seen is not a change of a review. The t
 a development database that was created before them is recreated.
 
 **E-mail notification address**: The `NotificationPreferences` table holds one row per user with the confirmed address,
-the pending address, the salted hash of its code, the expiry, and the count of attempts; the `NotificationSendLog` table
-holds one row per mail that was sent, which the limits count. Both are deleted with the user. They are separate tables,
-not columns of `Users`, for the same reason as the second factor. `NotificationStore` reserves a confirmation in one
-serialized transaction that counts the log, decides, and then stores the log entry, the pending state, and the audit
-entry; an attempt is counted and an address is confirmed only by a conditional update. The send log is kept when an
-address is removed. A mail that could not be sent is taken back by an abort, so it costs nothing. The tables have no
-migration: a development database that was created before them is recreated, and until then the store reports itself
+the pending address, the salted hash of its code, the expiry, the count of attempts, the notification mode, and the
+state of the dispatcher (a baseline flag, the start of the current batch, the last digest handled, the count of failed
+sends, and the time of the next attempt); the `NotificationSendLog` table
+holds one row per mail that was sent or is on its way (a confirmation, an update, or a digest), which the limits
+count; the
+`NotifiedItems` table holds one row per user, project, review, section, and kind that has already been mailed (or whose
+mail the server gave up, which the flag `GaveUp` tells), with a
+unique key on those five columns (the kind keeps a "Question for you" item apart from the standing item to answer of the
+same section). The preference rows hold a generation that rises with every change of the mode or of the confirmed
+address. The tables are deleted with the user, and the notified items also with the review. They are separate
+tables, not columns of `Users`, for the same reason as the second factor. `NotificationStore` reserves a confirmation in
+one serialized transaction that counts the log, decides, and then stores the log entry, the pending state, and the audit
+entry; an attempt is counted and an address is confirmed only by a conditional update. A notification mail is reserved
+in the same way, by a serialized transaction that counts the log, decides with the shared `SendLimits` rule, and
+stores the log row before the mail is sent, so concurrent senders inside the one host (the dispatcher and the
+confirmation requests) can not pass the same count, and the limits cover the confirmation mails; the host is a single
+instance, and one host runs the notification worker for a database. A mail that was not sent is released by deleting
+its row. Setting the mode
+stores the mode, the baseline flag, and the audit entry together; changing between `Every` and `Daily` keeps the
+notified items and the baseline flag, and `None` clears the items and the flag. Applying a mail stores the items and
+the state in one transaction, so a failure leaves
+no half result; it starts with a conditional update that requires the mode not to be `None` and the address and the
+generation to be those of the commit, so a mail that was prepared before the user replaced the address, or switched
+the mode off and on again, records no item. The send log is kept when an address is removed. A confirmation mail that
+could not be
+sent is taken back by an abort, and a notification mail by a release, so it costs nothing. The tables and columns have
+no migration: a development database
+that was created before
+them (including one of the first version of the notifications) is recreated, and until then the store reports itself
 as not available.
 
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database

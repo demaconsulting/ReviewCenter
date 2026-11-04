@@ -261,6 +261,7 @@ reviews:
       - "src/**/Hosting/ServerHost.cs"
       - "src/**/Hosting/ServerHostOptions.cs"
       - "test/**/Hosting/ServerHostTests.cs"
+      - "test/**/Hosting/ServerHostNotificationWorkerTests.cs"
 
   - id: ReviewCenter-Hosting-KeyRingProtection
     title: Review of ReviewCenter KeyRingProtection unit implementation
@@ -758,6 +759,7 @@ reviews:
       - "test/**/Web/AccountPageTests.cs"
       - "test/**/Web/AccountTotpPageTests.cs"
       - "test/**/Web/AccountNotificationPageTests.cs"
+      - "test/**/Web/AccountNotificationModeTests.cs"
       - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-UsersPage
@@ -1379,7 +1381,60 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/NotificationPreference.cs"
       - "src/DemaConsulting.ReviewCenter.Core/NotificationSendLogEntry.cs"
       - "src/DemaConsulting.ReviewCenter.Core/INotificationStore.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationMode.cs"
       - "test/**/Core/NotificationPreferenceServiceTests.cs"
+      - "test/**/Core/NotificationPreferenceServiceModeTests.cs"
+
+  - id: ReviewCenter-Core-NotificationComposer
+    title: Review of ReviewCenter NotificationComposer unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/notification-composer.yaml"
+      - "docs/design/review-center/core/notification-composer.md"
+      - "docs/verification/review-center/core/notification-composer.md"
+      - "docs/sysml2/model/review-center/core/notification-composer.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationComposer.cs"
+      - "test/**/Core/NotificationComposerTests.cs"
+
+  - id: ReviewCenter-Core-DigestSchedule
+    title: Review of ReviewCenter DigestSchedule unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/digest-schedule.yaml"
+      - "docs/design/review-center/core/digest-schedule.md"
+      - "docs/verification/review-center/core/digest-schedule.md"
+      - "docs/sysml2/model/review-center/core/digest-schedule.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/DigestSchedule.cs"
+      - "test/**/Core/DigestScheduleTests.cs"
+
+  - id: ReviewCenter-Core-NotificationDispatcher
+    title: Review of ReviewCenter NotificationDispatcher unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/notification-dispatcher.yaml"
+      - "docs/design/review-center/core/notification-dispatcher.md"
+      - "docs/verification/review-center/core/notification-dispatcher.md"
+      - "docs/sysml2/model/review-center/core/notification-dispatcher.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationDispatcher.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationMode.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationRecipient.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationDispatchState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationCommit.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotifiedItem.cs"
+      - "test/**/Core/NotificationDispatcher*Tests.cs"
+      - "test/**/Core/NotificationDispatcherWorld.cs"
 
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation
@@ -1534,6 +1589,7 @@ reviews:
       - "src/**/Messaging/NotificationOptions.cs"
       - "src/**/Messaging/NotificationRegistration.cs"
       - "test/**/Messaging/NotificationOptionsTests.cs"
+      - "test/**/Messaging/NotificationWorkerRegistrationTests.cs"
 
   - id: ReviewCenter-Messaging-SmtpNotificationSender
     title: Review of ReviewCenter SmtpNotificationSender unit implementation
@@ -1565,6 +1621,22 @@ reviews:
       - "docs/sysml2/model/review-center/messaging/file-notification-sender.sysml"
       - "src/**/Messaging/FileNotificationSender.cs"
       - "test/**/Messaging/FileNotificationSenderTests.cs"
+
+  - id: ReviewCenter-Messaging-NotificationWorker
+    title: Review of ReviewCenter NotificationWorker unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/messaging.md
+      - docs/reqstream/review-center/messaging.yaml
+    paths:
+      - "docs/reqstream/review-center/messaging/notification-worker.yaml"
+      - "docs/design/review-center/messaging/notification-worker.md"
+      - "docs/verification/review-center/messaging/notification-worker.md"
+      - "docs/sysml2/model/review-center/messaging/notification-worker.sysml"
+      - "src/**/Messaging/NotificationWorker.cs"
+      - "test/**/Messaging/NotificationWorkerTests.cs"
+      - "test/**/Messaging/StepClock.cs"
 
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
@@ -1743,6 +1815,8 @@ reviews:
       - "docs/sysml2/model/review-center/storage/notification-store.sysml"
       - "src/**/Storage/NotificationStore.cs"
       - "test/**/Storage/NotificationStoreTests.cs"
+      - "test/**/Storage/NotificationStoreModeTests.cs"
+      - "test/**/Storage/NotificationStoreSendTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources

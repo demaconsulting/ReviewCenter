@@ -121,6 +121,20 @@ N/A - standard test environment.
   temporary password, and each change is audited without the address and the code; a message with a line break in
   the subject or the recipient is refused (see the unit tests of `NotificationAddress`, `NotificationMessage`, and
   `NotificationPreferenceService`).
+- A user with a confirmed address chooses when to get e-mail (none by default, a daily summary, or every change); the
+  choice is refused without a confirmed address and to the actors above, is audited without the address, and a newly
+  chosen mode starts after a baseline (see the unit tests of `NotificationPreferenceService`).
+- A notification mail is composed from the items that are new in the inbox of its recipient, holds only the group, the
+  title, the review, and the state of an item and never a detail text or an outcome, is limited in size, has a subject
+  that cannot carry a line break, and links to the review only through the configured address of the server; the
+  summary of the day is due once for each local date from the digest hour on (see the unit tests of
+  `NotificationComposer` and `DigestSchedule`).
+- The dispatcher mails each new inbox item once, as the recipient and only to the confirmed address, records the backlog
+  of a newly chosen mode without a mail, holds back the items of the mode Every for a batch window, sends the summary of
+  the mode Daily once for each date, retries a failed send five times with growing waits, defers a mail beyond the
+  limits (reserved in the shared database before the send), writes a log row for each sent mail, reads the inbox only
+  when something may have changed, and does not let
+  one user's failure stop the others (see the unit tests of `NotificationDispatcher`).
 - The progress of the reviews of a project gives, for each review, the stage derived from its approval status (Setup,
   In review, Approved, Rejected), the signatures given, needed, and out of date, the people it waits on, the blocker
   counts that
@@ -345,6 +359,23 @@ a line break in the subject or the recipient is refused, which is tested by
 `NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue` and
 `NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue`. The tests of the service use an
 in-memory store and sender; the real store is verified in the `Storage` subsystem.
+
+**Notification mode**: The unit tests of `NotificationPreferenceService` verify the subsystem requirements for the
+choice of the mode. A confirmed user chooses a mode and the choice is audited without the address, and a user without
+a confirmed address is refused, which is tested by `CoreSubsystem_NotificationMode_ConfirmedUserChoosesAndIsAudited`.
+The refusals (an API token actor, a feature that is not available, a disabled user, a temporary password, and an
+unknown value) and the baseline of a newly chosen mode are verified by the unit tests, for example
+`NotificationPreferenceService_SetMode_ApiTokenActor_Throws` and
+`NotificationPreferenceService_SetMode_NoneToEvery_BaselinePending`.
+
+**Notification mail and dispatch**: The unit tests of `NotificationComposer`, `DigestSchedule`, and
+`NotificationDispatcher` verify the subsystem requirements for the composition, the scheduling, and the dispatch of
+notification mail. The mail has no detail text and no outcome of the inbox, which is tested by
+`CoreSubsystem_NotificationMail_HasNoInboxDetailOrOutcome`. The summary of the day is sent once for each local date,
+which is tested by `CoreSubsystem_DailyDigest_OnePerLocalDate`. The dispatcher mails the new items of the own inbox of a
+user once, which is tested by `CoreSubsystem_Dispatcher_MailsNewItemsOfOwnInboxOnce`. These tests use the real
+services together with an in-memory store, sender, and clock; the real store is verified in the `Storage` subsystem
+and the loop that calls the dispatcher in the `Messaging` subsystem.
 
 **Inbox**: The unit tests of `InboxService` verify the subsystem requirement for the inbox. The groups To answer,
 Disputed, Ready to sign, Replies waiting, Failed checks, Waiting for others, and Updates, the rule that a reviewer

@@ -64,9 +64,24 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
         try
         {
-            // Touch both tables; a database that was created before them fails with "no such table"
-            _ = await context.NotificationPreferences.AsNoTracking().AnyAsync(cancellationToken);
+            // Touch the tables and the columns of the dispatcher; a database that was created before them fails with
+            // "no such table" or "no such column"
+            _ = await context.NotificationPreferences.AsNoTracking()
+                .Select(p => new
+                {
+                    p.UserId,
+                    p.Mode,
+                    p.BaselinePending,
+                    p.BatchStartedUtc,
+                    p.DigestHandledUtc,
+                    p.FailureCount,
+                    p.NextAttemptUtc,
+                    p.Generation
+                })
+                .Take(1)
+                .ToListAsync(cancellationToken);
             _ = await context.NotificationSendLog.AsNoTracking().AnyAsync(cancellationToken);
+            _ = await context.NotifiedItems.AsNoTracking().Select(i => new { i.Id, i.Kind, i.GaveUp }).Take(1).ToListAsync(cancellationToken);
             return true;
         }
         catch (SqliteException ex) when (IsMissingTable(ex))
@@ -76,15 +91,17 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
     }
 
     /// <summary>
-    ///     Tells whether a database failure is the one of a missing table (SQLite error 1, "no such table"), which is
-    ///     what a database from before e-mail notifications reports. Every other failure is a real fault.
+    ///     Tells whether a database failure is the one of a missing table or column (SQLite error 1, "no such table"
+    ///     or "no such column"), which is what a database from before e-mail notifications reports. Every other
+    ///     failure is a real fault.
     /// </summary>
     /// <param name="exception">The failure.</param>
-    /// <returns><c>true</c> when a table does not exist.</returns>
+    /// <returns><c>true</c> when a table or column does not exist.</returns>
     private static bool IsMissingTable(SqliteException exception)
     {
         return exception.SqliteErrorCode == MissingTableErrorCode
-               && exception.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
+               && (exception.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase)
+                   || exception.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <inheritdoc />
@@ -250,6 +267,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(p => p.Email, p => p.PendingEmail)
+                            .SetProperty(p => p.Generation, p => p.Generation + 1)
                             .SetProperty(p => p.PendingEmail, (string?)null)
                             .SetProperty(p => p.PendingCodeHash, (string?)null)
                             .SetProperty(p => p.PendingCodeSalt, (string?)null)
@@ -274,8 +292,324 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                 var removed = await context.NotificationPreferences
                     .Where(p => p.UserId == userId)
                     .ExecuteDeleteAsync(cancellationToken);
+
+                // The mode goes with the row, so what the user was told goes with it
+                _ = await context.NotifiedItems
+                    .Where(i => i.UserId == userId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 return removed > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetModeAsync(
+        int userId,
+        NotificationMode mode,
+        DateTimeOffset nowUtc,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                var row = await context.NotificationPreferences.AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+                if (row is null || (mode != NotificationMode.None && row.Email is null) || row.Mode == mode)
+                {
+                    return (false, null);
+                }
+
+                // Switching on from none marks the baseline as pending; between the active modes the mark stays as it is,
+                // so a baseline that no pass recorded yet is not lost and the backlog is not mailed; switching to none
+                // clears it. Every change starts with no window and no failure
+                var baseline = mode != NotificationMode.None && (row.Mode == NotificationMode.None || row.BaselinePending);
+                _ = await context.NotificationPreferences
+                    .Where(p => p.UserId == userId)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(p => p.Mode, mode)
+                            .SetProperty(p => p.Generation, p => p.Generation + 1)
+                            .SetProperty(p => p.BaselinePending, baseline)
+                            .SetProperty(p => p.BatchStartedUtc, (DateTimeOffset?)null)
+                            .SetProperty(p => p.FailureCount, 0)
+                            .SetProperty(p => p.NextAttemptUtc, (DateTimeOffset?)null)
+                            .SetProperty(p => p.Updated, nowUtc),
+                        cancellationToken);
+                if (mode == NotificationMode.None)
+                {
+                    // Nothing is mailed any more, so nothing is remembered
+                    _ = await context.NotificationPreferences
+                        .Where(p => p.UserId == userId)
+                        .ExecuteUpdateAsync(
+                            setters => setters.SetProperty(p => p.DigestHandledUtc, (DateTimeOffset?)null),
+                            cancellationToken);
+                    _ = await context.NotifiedItems
+                        .Where(i => i.UserId == userId)
+                        .ExecuteDeleteAsync(cancellationToken);
+                }
+
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<NotificationRecipient>> ListRecipientsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        var rows = await (
+                from preference in context.NotificationPreferences.AsNoTracking()
+                join user in context.Users.AsNoTracking() on preference.UserId equals user.Id
+                where preference.Mode != NotificationMode.None && preference.Email != null
+                orderby preference.UserId
+                select new
+                {
+                    preference.UserId,
+                    user.Username,
+                    user.DisplayName,
+                    preference.Email,
+                    preference.Mode,
+                    preference.BaselinePending,
+                    preference.BatchStartedUtc,
+                    preference.DigestHandledUtc,
+                    preference.FailureCount,
+                    preference.NextAttemptUtc,
+                    IsDisabled = !user.Enabled,
+                    user.MustChangePassword,
+                    preference.Generation
+                })
+            .ToListAsync(cancellationToken);
+        return
+        [
+            .. rows.Select(r => new NotificationRecipient(
+                r.UserId,
+                r.Username,
+                r.DisplayName,
+                r.Email!,
+                r.Mode,
+                new NotificationDispatchState(
+                    r.BaselinePending,
+                    r.BatchStartedUtc,
+                    r.DigestHandledUtc,
+                    r.FailureCount,
+                    r.NextAttemptUtc),
+                r.IsDisabled,
+                r.MustChangePassword,
+                r.Generation))
+        ];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<NotifiedItem>> GetNotifiedAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.NotifiedItems.AsNoTracking()
+            .Where(i => i.UserId == userId)
+            .OrderBy(i => i.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ApplyAsync(int userId, NotificationCommit commit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // The conditional update that writes the state of the dispatcher is also the guard: the commit was
+                // prepared for one confirmed address and one generation of the preference, and a change of either one
+                // (a replaced address, a mode that was switched off and on again) makes it stale. A stale commit
+                // changes nothing, so no item, state or mail of it is recorded
+                var state = commit.State;
+                var address = commit.Address;
+                var generation = commit.Generation;
+                var changed = await context.NotificationPreferences
+                    .Where(p => p.UserId == userId
+                                && p.Mode != NotificationMode.None
+                                && p.Email == address
+                                && p.Generation == generation)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(p => p.BaselinePending, state.BaselinePending)
+                            .SetProperty(p => p.BatchStartedUtc, state.BatchStartedUtc)
+                            .SetProperty(p => p.DigestHandledUtc, state.DigestHandledUtc)
+                            .SetProperty(p => p.FailureCount, state.FailureCount)
+                            .SetProperty(p => p.NextAttemptUtc, state.NextAttemptUtc)
+                            .SetProperty(p => p.Updated, commit.NowUtc),
+                        cancellationToken);
+                if (changed != 1)
+                {
+                    return (false, null);
+                }
+
+                await ApplyItemsAsync(context, userId, commit, cancellationToken);
+
+                // Rows that can not count towards a limit any more go; the mail itself was counted when it was reserved
+                var dayStart = commit.NowUtc - _day;
+                _ = await context.NotificationSendLog
+                    .Where(e => e.SentUtc < dayStart)
+                    .ExecuteDeleteAsync(cancellationToken);
+                return (true, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<(SendReservation Outcome, int LogId)> ReserveSendAsync(
+        int userId,
+        string kind,
+        string address,
+        DateTimeOffset now,
+        int maxPerHour,
+        int maxPerUserPerDay,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        ArgumentNullException.ThrowIfNull(address);
+        return await appender.ExecuteAsync<(SendReservation, int)>(
+            factory,
+            async context =>
+            {
+                // Rows older than one day can not count towards any limit; the count and the insert run in the same
+                // serialized transaction, so two senders can not both pass the same count
+                var dayStart = now - _day;
+                var hourStart = now - _hour;
+                _ = await context.NotificationSendLog
+                    .Where(e => e.SentUtc < dayStart)
+                    .ExecuteDeleteAsync(cancellationToken);
+                var serverCount = await context.NotificationSendLog.CountAsync(e => e.SentUtc >= hourStart, cancellationToken);
+                var userCount = await context.NotificationSendLog.CountAsync(
+                    e => e.UserId == userId && e.SentUtc >= dayStart,
+                    cancellationToken);
+                var outcome = SendLimits.Decide(serverCount, userCount, maxPerHour, maxPerUserPerDay);
+                if (outcome != SendReservation.Reserved)
+                {
+                    return ((outcome, 0), null);
+                }
+
+                var log = new NotificationSendLogEntry
+                {
+                    UserId = userId,
+                    ToAddress = address,
+                    Kind = kind,
+                    SentUtc = now
+                };
+                context.NotificationSendLog.Add(log);
+                await context.SaveChangesAsync(cancellationToken);
+                return ((SendReservation.Reserved, log.Id), null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ReleaseSendAsync(int userId, int logId, CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        _ = await context.NotificationSendLog
+            .Where(e => e.Id == logId && e.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountSentAsync(int? userId, DateTimeOffset sinceUtc, CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        var query = context.NotificationSendLog.AsNoTracking().Where(e => e.SentUtc >= sinceUtc);
+        if (userId is { } id)
+        {
+            query = query.Where(e => e.UserId == id);
+        }
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Changes the notified items of a user as the commit says; the caller owns the transaction.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="userId">The user.</param>
+    /// <param name="commit">The commit.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the changes are made (new rows are saved with the transaction).</returns>
+    private static async Task ApplyItemsAsync(
+        ReviewCenterDbContext context,
+        int userId,
+        NotificationCommit commit,
+        CancellationToken cancellationToken)
+    {
+        if (commit.ReplaceAll is { } all)
+        {
+            // The baseline: exactly this set remains
+            _ = await context.NotifiedItems.Where(i => i.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+            foreach (var entry in all)
+            {
+                context.NotifiedItems.Add(NewItem(userId, entry, commit.NowUtc));
+            }
+
+            return;
+        }
+
+        var existing = await context.NotifiedItems.AsNoTracking()
+            .Where(i => i.UserId == userId)
+            .ToListAsync(cancellationToken);
+        var byKey = existing.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section, i.Kind), i => i.Id);
+
+        // Forget what left the inbox
+        var removeIds = commit.RemoveKeys.Where(byKey.ContainsKey).Select(key => byKey[key]).ToList();
+        if (removeIds.Count > 0)
+        {
+            _ = await context.NotifiedItems
+                .Where(i => removeIds.Contains(i.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // Update what changed state; insert what is new
+        foreach (var entry in commit.Upserts)
+        {
+            if (byKey.TryGetValue(entry.Key, out var id) && !removeIds.Contains(id))
+            {
+                var state = entry.State;
+                var gaveUp = entry.GaveUp;
+                var notified = commit.NowUtc;
+                _ = await context.NotifiedItems
+                    .Where(i => i.Id == id)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(i => i.State, state)
+                            .SetProperty(i => i.GaveUp, gaveUp)
+                            .SetProperty(i => i.NotifiedUtc, notified),
+                        cancellationToken);
+            }
+            else
+            {
+                context.NotifiedItems.Add(NewItem(userId, entry, commit.NowUtc));
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Builds the row of a notified item.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="entry">The item and its state.</param>
+    /// <param name="nowUtc">The time to store.</param>
+    /// <returns>The new row.</returns>
+    private static NotifiedItem NewItem(int userId, NotifiedEntry entry, DateTimeOffset nowUtc)
+    {
+        return new NotifiedItem
+        {
+            UserId = userId,
+            ProjectId = entry.Key.ProjectId,
+            ReviewId = entry.Key.ReviewId,
+            Section = entry.Key.Section,
+            Kind = entry.Key.Kind,
+            State = entry.State,
+            GaveUp = entry.GaveUp,
+            NotifiedUtc = nowUtc
+        };
     }
 }

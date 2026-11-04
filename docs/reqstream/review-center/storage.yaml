@@ -2084,3 +2084,235 @@ sections:
           - ReviewCenter-NotificationStore-PruneLog
         tests:
           - NotificationStore_ReserveConfirmationAsync_OldLogEntries_AreDeleted
+
+      - id: ReviewCenter-Storage-NotificationMode
+        title: >-
+          The Storage subsystem shall keep the notification mode of a user in the database file.
+        justification: |
+          The mode decides whether mail is sent, so it is kept in the database file and survives a restart.
+        children:
+          - ReviewCenter-NotificationStore-ModePersisted
+          - ReviewCenter-NotificationStore-ModeBaselineFlag
+          - ReviewCenter-NotificationStore-ModeBaselineFlag-BatchWindowCleared
+          - ReviewCenter-NotificationStore-ModeBaselineFlag-FailureStateCleared
+          - ReviewCenter-NotificationStore-ModeSwitchKeepsItems
+          - ReviewCenter-NotificationStore-ModeSwitchKeepsItems-NoBaseline
+          - ReviewCenter-NotificationStore-ModeSwitchKeepsItems-BaselinePending
+          - ReviewCenter-NotificationStore-ModeNoneClearsItems
+          - ReviewCenter-NotificationStore-ModeNoneClearsItems-DailySlot
+          - ReviewCenter-NotificationStore-ModeNoneClearsBaseline
+          - ReviewCenter-NotificationStore-ModeNoChange
+          - ReviewCenter-NotificationStore-ModeNoChange-NoAddress
+          - ReviewCenter-NotificationStore-ModeNoChange-SameMode
+          - ReviewCenter-NotificationStore-ModeNoChange-NoAudit
+          - ReviewCenter-DbContext-NotificationDispatchColumns
+          - ReviewCenter-DbContext-NotificationDispatchColumns-Mode
+        tests:
+          - StorageSubsystem_NotificationState_PersistsModeItemsAndState
+          - NotificationStore_SetMode_Persisted_ReadBack
+
+      - id: ReviewCenter-Storage-NotificationMode-DefaultNone
+        title: >-
+          The Storage subsystem shall use the notification mode None for a user who never chose a mode.
+        justification: |
+          A user who never chose a mode must get no mail.
+        children:
+          - ReviewCenter-NotificationStore-ModeDefault
+          - ReviewCenter-NotificationStore-ModeDefault-NoBaseline
+          - ReviewCenter-NotificationStore-ModeDefault-EmptyState
+          - ReviewCenter-DbContext-NotificationDispatchColumns-DefaultNone
+        tests:
+          - NotificationStore_Get_NewRow_ModeNone
+
+      - id: ReviewCenter-Storage-NotificationModeAudit
+        title: >-
+          The Storage subsystem shall save a change of the notification mode of a user together with its audit entry,
+          or neither.
+        justification: |
+          An audit entry must exist exactly when the change happened, which only the database can guarantee for any
+          number of requests.
+        children:
+          - ReviewCenter-NotificationStore-ModeAuditOneTransaction
+        tests:
+          - NotificationStore_SetMode_AuditFailure_ModeUnchanged
+
+      - id: ReviewCenter-Storage-NotificationRecipients
+        title: >-
+          The Storage subsystem shall list the users who have a notification mode other than None and a confirmed
+          address.
+        justification: |
+          The dispatcher must look at no other user.
+        children:
+          - ReviewCenter-NotificationStore-RecipientsListed
+          - ReviewCenter-NotificationStore-RecipientsUserFlags
+          - ReviewCenter-NotificationStore-RecipientsUserFlags-MustChangePassword
+        tests:
+          - NotificationStore_ListRecipients_Mixed_OnlyEligible
+
+      - id: ReviewCenter-Storage-NotificationRecipients-State
+        title: >-
+          The Storage subsystem shall return the state of the dispatcher with each listed recipient.
+        justification: |
+          The dispatcher must pick up after a restart where it stopped.
+        children:
+          - ReviewCenter-NotificationStore-RecipientsState
+          - ReviewCenter-NotificationStore-StateTimestamps
+          - ReviewCenter-NotificationStore-StateTimestamps-ReadBack
+        tests:
+          - NotificationStore_ListRecipients_State_RoundTrips
+
+      - id: ReviewCenter-Storage-NotificationNotifiedItems
+        title: >-
+          The Storage subsystem shall keep the items that a user was told about, one for each user, project, review,
+          section, and kind.
+        justification: |
+          The items decide on every pass which items are news, so they must survive a restart and must not outlive the
+          user, the review, the address, or the item. The table is created from the model without a migration, so a
+          database that was created before it has to be recreated.
+        children:
+          - ReviewCenter-NotificationStore-ItemsUniqueKey
+          - ReviewCenter-NotificationStore-ItemsPerKind
+          - ReviewCenter-NotificationStore-ItemsRemoveKind
+          - ReviewCenter-NotificationStore-ItemsRead
+          - ReviewCenter-NotificationStore-ItemsCascade
+          - ReviewCenter-NotificationStore-ItemsReviewCascade
+          - ReviewCenter-NotificationStore-ItemsRemoveAddress
+          - ReviewCenter-NotificationStore-UnavailableNoItemsTable
+          - ReviewCenter-NotificationStore-UnavailableNoGaveUpColumn
+          - ReviewCenter-NotificationStore-UnavailableNoModeColumn
+          - ReviewCenter-NotificationStore-UnavailableNoGenerationColumn
+          - ReviewCenter-DbContext-NotifiedItemsTable
+          - ReviewCenter-DbContext-NotifiedItemsGaveUp
+          - ReviewCenter-DbContext-NotifiedItemsUniqueIndex
+          - ReviewCenter-DbContext-NotifiedItemsCascade
+          - ReviewCenter-DbContext-NotifiedItemsReviewCascade
+        tests:
+          - StorageSubsystem_NotificationState_PersistsModeItemsAndState
+          - NotificationStore_Delete_User_CascadesNotifiedItems
+          - NotificationStore_Delete_Review_CascadesNotifiedItems
+
+      - id: ReviewCenter-Storage-NotificationCommit
+        title: >-
+          The Storage subsystem shall record the items and the dispatcher state of a sent mail in one transaction.
+        justification: |
+          A half-recorded mail would either be lost or sent again. The send log row of the mail is not part of the
+          commit, because it was reserved before the send.
+        children:
+          - ReviewCenter-NotificationStore-ApplyUpsert
+          - ReviewCenter-NotificationStore-ApplyUpsert-Update
+          - ReviewCenter-NotificationStore-ApplyUpsert-GaveUp
+          - ReviewCenter-NotificationStore-ApplyUpsert-GaveUpUpdate
+          - ReviewCenter-NotificationStore-ApplyRemove
+          - ReviewCenter-NotificationStore-ApplyReplaceAll
+          - ReviewCenter-NotificationStore-ApplyNoLogRow
+          - ReviewCenter-NotificationStore-ApplyAtomic
+          - ReviewCenter-NotificationStore-ApplyCurrent
+        tests:
+          - StorageSubsystem_NotificationState_PersistsModeItemsAndState
+          - NotificationStore_Apply_Failure_NothingPersisted
+
+      - id: ReviewCenter-Storage-NotificationCommit-Stale
+        title: >-
+          The Storage subsystem shall record nothing of a sent mail for a user whose notification preference changed
+          since the mail was prepared.
+        justification: |
+          A user who replaced the address, or switched the mail off and on again, during a send must not get the items
+          of the old preference recorded. The generation of the preference tells the change, and the check and the
+          write are one conditional update.
+        children:
+          - ReviewCenter-NotificationStore-ApplyStaleGeneration
+          - ReviewCenter-NotificationStore-ApplyChangedAddress
+          - ReviewCenter-NotificationStore-GenerationOnMode
+          - ReviewCenter-NotificationStore-GenerationOnConfirm
+          - ReviewCenter-NotificationStore-RecipientsGeneration
+          - ReviewCenter-DbContext-NotificationDispatchColumns-Generation
+        tests:
+          - NotificationStore_Apply_StaleGeneration_WritesNothing
+          - NotificationStore_Apply_ChangedAddress_WritesNothing
+
+      - id: ReviewCenter-Storage-NotificationCommit-ModeNone
+        title: >-
+          The Storage subsystem shall record nothing of a sent mail for a user whose notification mode is None.
+        justification: |
+          A user who switched the mail off during a pass must not get new items recorded.
+        children:
+          - ReviewCenter-NotificationStore-ApplyModeNone
+          - ReviewCenter-NotificationStore-ApplyModeNone-WritesNothing
+        tests:
+          - NotificationStore_Apply_ModeNone_WritesNothing
+
+      - id: ReviewCenter-Storage-NotificationCommit-RowGone
+        title: >-
+          The Storage subsystem shall record nothing of a sent mail for a user whose row is gone.
+        justification: |
+          A user who was deleted during a pass must not get new items recorded.
+        children:
+          - ReviewCenter-NotificationStore-ApplyRowGone
+        tests:
+          - NotificationStore_Apply_NoRow_ReturnsFalse
+
+      - id: ReviewCenter-Storage-NotificationSendCounts
+        title: >-
+          The Storage subsystem shall count the mails in the send log for one user since an instant.
+        justification: |
+          The limit for one user counts the log.
+        children:
+          - ReviewCenter-NotificationStore-CountUser
+        tests:
+          - NotificationStore_CountSent_User_CountsOwn
+
+      - id: ReviewCenter-Storage-NotificationSendCounts-All
+        title: >-
+          The Storage subsystem shall count the mails in the send log for all users since an instant.
+        justification: |
+          The limit for the server counts the log.
+        children:
+          - ReviewCenter-NotificationStore-CountAll
+        tests:
+          - NotificationStore_CountSent_All_CountsEverything
+
+      - id: ReviewCenter-Storage-NotificationSendCounts-Prune
+        title: >-
+          When the Storage subsystem handles a notification mail, it shall delete the send log entries that are older
+          than a day.
+        justification: |
+          No limit counts an entry that is older than a day.
+        children:
+          - ReviewCenter-NotificationStore-LogPrunedOnApply
+          - ReviewCenter-NotificationStore-ReserveSendPrune
+        tests:
+          - NotificationStore_Apply_OldLogRows_Pruned
+          - NotificationStore_ReserveSend_OldRows_AreDeleted
+
+      - id: ReviewCenter-Storage-NotificationSendReservation
+        title: >-
+          The Storage subsystem shall refuse to reserve a notification mail that exceeds a sending limit.
+        justification: |
+          The limits on mails are counted in the shared database by the reservation, so concurrent senders inside the
+          one host, such as the dispatcher and a confirmation request, can not pass the same count, and the limits cover
+          the confirmation mails. A mail counts from the moment it is reserved, so a mail that is lost between the
+          reservation and the send stays counted, and a release frees the place of a mail that was not sent.
+        children:
+          - ReviewCenter-NotificationStore-ReserveSendRow
+          - ReviewCenter-NotificationStore-ReserveSendServerLimit
+          - ReviewCenter-NotificationStore-ReserveSendUserLimit
+          - ReviewCenter-NotificationStore-ReserveSendSharesConfirmationCount
+          - ReviewCenter-NotificationStore-ReserveConfirmationSharesSendCount
+          - ReviewCenter-NotificationStore-ReleaseSendFreesSlot
+          - ReviewCenter-NotificationStore-ReleaseSendGoneNoOp
+        tests:
+          - NotificationStore_ReserveSend_HourlyLimit_CountsOtherKindsAndUsers
+          - NotificationStore_ReserveSend_UserDailyLimit_CountsOwnMailsOfEveryKind
+          - NotificationStore_ReleaseSend_Reserved_FreesSlot
+
+      - id: ReviewCenter-Storage-NotificationSendReservation-OneWinner
+        title: >-
+          When several reservations of notification mails arrive at the same time, the Storage subsystem shall reserve
+          no more mails than the limits have places for.
+        justification: |
+          Parallel senders must not pass the same count and cause more mails than the limits allow.
+        children:
+          - ReviewCenter-NotificationStore-ReserveSendOneWinner
+        tests:
+          - NotificationStore_ReserveSend_ParallelAtHourlyLimit_OneReserved
+          - NotificationStore_ReserveSend_ParallelAtUserLimit_OneReserved

@@ -67,6 +67,7 @@ public class AccountNotificationPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='notifications-card'] input"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-card'] button"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-explanation']"));
+        Assert.Empty(cut.FindAll("[data-testid='notifications-mode-select']"));
         Assert.Equal(0, NotificationStore.Calls);
     }
 

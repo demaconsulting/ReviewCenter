@@ -178,7 +178,8 @@ it with a message that names the setting (see Troubleshooting). Which settings a
   Connect sign-in settings: Identity:Oidc:Authority is required when sign-in with OpenID Connect is enabled.` The
   same holds for `Notifications:Enabled`: while it is `false`, nothing else of the `Notifications` section is read.
   Turned on, an invalid setting stops the start with `Invalid notification settings:` and the name of the setting,
-  and so does a database that has no notification tables (see Upgrade). The password of the mail server belongs into a
+  and so does a database that has no notification tables or columns (see Upgrade). The password of the mail server
+  belongs into a
   file, named by `Notifications:Smtp:PasswordFile` and readable only by the account of the service; a password written
   into the configuration is logged as a warning at every start, without the password.
 
@@ -778,13 +779,20 @@ lacked a table, and `/health` answered `200`. Only `--validate --check-config` r
 message `The database schema does not match this version of ReviewCenter: table 'UserTotps' is missing.` and exit
 code 1. Planned Work in the Introduction lists a migration command as future work.
 
-E-mail notifications are the latest example. They need two new tables, `NotificationPreferences` and
-`NotificationSendLog`, which a database of an earlier version does not have. With `Notifications:Enabled` off, such a
-database keeps working. Before you turn notifications on, the database must be **recreated** (the server creates the
-tables only for a new file, with no migration): for development data, start with a new database file as the Database
-section of the Administration chapter describes, and create the first administrator again. The server then refuses
-to start with notifications on and without the tables, with a message that says so, and
-`--validate --check-config` reports the missing tables.
+E-mail notifications are the latest example. They need three new tables, `NotificationPreferences`,
+`NotificationSendLog`, and `NotifiedItems` (with its column `GaveUp`), and the new columns `Mode`, `Generation`,
+`BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`, `FailureCount`, and `NextAttemptUtc` in
+`NotificationPreferences`, which a database of an earlier
+version does not have. This includes a database that was created while only the confirmation of an address existed:
+it has the first two tables without the new columns, and must be recreated as well. With `Notifications:Enabled` off,
+such a database keeps working. Before you turn notifications on, the database must be **recreated** (the server
+creates the tables only for a new file, with no migration): for development data, start with a new database file as
+the Database section of the Administration chapter describes, and create the first administrator again. The server
+then refuses to start with notifications on and without the tables or columns, with a message that says so, and
+`--validate --check-config` reports what is missing. The background work that sends the notification mails runs only
+in the web server, and only when `Notifications:Enabled` is true; the command-line verbs never start it. Run exactly
+one host with the notification worker for a database: the server is a single instance by design, and the worker is not
+coordinated between hosts, so two hosts on one database could send the same mail twice.
 
 The supported upgrade procedure is therefore:
 

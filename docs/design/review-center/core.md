@@ -43,8 +43,10 @@ of notifications) and the read state that marks what is new;
 the masking of what would reveal them; and `ReviewStatusService`, where a review stands for one viewer, the one next
 action, and what changed since a reviewer signed; `NotificationAddress`, the check that a text is exactly one plain
 e-mail address; `NotificationMessage`, an e-mail message that refuses a line break in a header part, with the
-sender contract; and `NotificationPreferenceService`, the confirmation of the optional e-mail address for
-notifications by a code that is mailed to it. The
+sender contract; `NotificationPreferenceService`, the confirmation of the optional e-mail address for
+notifications by a code that is mailed to it; `NotificationComposer`, the content of a notification mail and the rule
+for what is new; `DigestSchedule`, when the slot of the daily summary is due; and `NotificationDispatcher`, which
+decides which mails go to whom and sends them. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -284,18 +286,20 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   audited is stored in the same transaction as its entry. Every read returns a new object.
 
 **INotificationStore**: The store interface the subsystem requires for the e-mail address for notifications, the
-pending confirmation, and the log of the mails that were sent.
+pending confirmation, the notification mode, the items already mailed, and the log of the mails that were sent.
 
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `NotificationStore` in the `Storage` subsystem).
-- *Contract*: Tell whether the tables are available, read the preference of a user, reserve a confirmation (the pause and
-  the limits per user, per address, and per server are checked with the change, and the audit entry is stored when
-  it is reserved), abort a reservation after a failed send, count one attempt at the current code up to a limit, confirm
-  the pending address with the hash of the code and an audit entry, and remove the preference with an audit entry.
+- *Contract*: Tell whether the tables and columns are available, read the preference of a user, reserve a confirmation
+  (the pause and the limits per user, per address, and per server are checked with the change, and the audit entry is
+  stored when it is reserved), abort a reservation after a failed send, count one attempt at the current code up to a
+  limit, confirm the pending address with the hash of the code and an audit entry, remove the preference with an audit
+  entry, set the mode with an audit entry, list the recipients (users with a mode and a confirmed address), read the
+  items already mailed, apply the outcome of one mail in one transaction, and count the mails sent.
 - *Constraints*: Every decision with one winner (reserving, counting an attempt, confirming) is one transaction or one
   conditional change, so two requests can never both succeed. The store never sees a code, only its salted hash. A
   change that is audited is stored in the same transaction as its entry. The send log is kept when an address is
-  removed.
+  removed; the notified items are removed with it.
 
 **INotificationSender**: The contract of the unit that delivers an e-mail message. It is implemented by the host.
 
@@ -590,6 +594,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `NotificationLimitReached` | The limit of confirmation mails per user, per address, or per server is reached |
 | `NotificationSendFailed` | The confirmation mail could not be sent |
 | `NotificationNothingToConfirm` | No e-mail address is waiting for a code |
+| `NotificationAddressNotConfirmed` | A notification mode was chosen while the user has no confirmed address |
 | `NotificationCodeIncorrect` | The typed confirmation code is wrong |
 | `NotificationCodeExpired` | The confirmation code is more than 30 minutes old |
 | `NotificationTooManyAttempts` | Five codes were already typed against the current confirmation code |
@@ -697,9 +702,25 @@ hash of the code is stored, the code appears in the confirmation mail only, the 
 confirmed address stays in use while a new address waits. An actor that signed in with an API token, a disabled or
 unknown user, and a user with a temporary password are refused. The three audited changes (`notification.settings-changed`,
 `notification.email-confirmed`, and `notification.email-removed`) carry neither the address nor the code and are stored
-with their entry by the store. `NotificationAddress` accepts only one plain address, and `NotificationMessage` refuses a
-line break in the recipient or the subject. See the `NotificationAddress`, `NotificationMessage`, and
-`NotificationPreferenceService` units.
+with their entry by the store. A user with a confirmed address can choose a mode (`None` by default, `Daily`, or
+`Every`) with `SetModeAsync`; a mode needs a confirmed address, the audit entry (`notification.settings-changed`) names
+the mode and no address, a change into a mode from `None` marks the baseline so that no backlog is mailed, and removing
+the address resets the mode to `None`. `NotificationAddress` accepts only one plain address, and
+`NotificationMessage` refuses a line break in the recipient or the subject. See the `NotificationAddress`,
+`NotificationMessage`, and `NotificationPreferenceService` units.
+
+A ninth kind of fact is the news that the same notification feature mails to a user who chose a mode (`Every` or
+`Daily`). `NotificationDispatcher` runs in passes and, for each user who has a confirmed address, reads the inbox as
+that user, so a mail can not tell more than the user sees after the sign-in. `NotificationComposer` reduces the rows of
+the inbox to items with a state that has no text, decides which items are new, and writes a mail that says that there is
+news and links to it; the detail text, the answers, and the outcome of a review are never in a mail. The backlog that
+exists when a mode is switched on is recorded and not mailed. The mode `Every` collects the news of a batch window into
+one mail, and the mode `Daily` sends one summary for each local date from the digest hour on, as `DigestSchedule`
+decides. An item is not mailed twice in the same state, a failed send is tried again after growing waits and is given
+up after the sixth failure, and limits on the mails per user and for the whole server, counted in the shared database
+before each send, defer a mail without losing its
+news. The unit that runs the passes on a timer is the `NotificationWorker` of the `Messaging` subsystem. See the
+`NotificationComposer`, `DigestSchedule`, and `NotificationDispatcher` units.
 
 Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
 administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`

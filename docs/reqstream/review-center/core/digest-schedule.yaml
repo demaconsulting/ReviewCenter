@@ -1,0 +1,137 @@
+---
+# Software Unit Requirements for the DigestSchedule Class
+#
+# The DigestSchedule class decides when the slot of the daily summary of a local date is due: from the digest hour of a
+# configured time zone on, once for each local date. Each requirement states one rule, so that each rule can be traced
+# to its own test case.
+
+sections:
+  - title: DigestSchedule Unit Requirements
+    requirements:
+      - id: ReviewCenter-DigestSchedule-NotDueBeforeHour
+        title: >-
+          The DigestSchedule class shall report that the slot is not due while the local hour is before the digest hour.
+        justification: |
+          The summary is meant to arrive at the hour that the operator chose, not earlier.
+        tests:
+          - DigestSchedule_IsDue_BeforeHour_False
+
+      - id: ReviewCenter-DigestSchedule-DueAtHour
+        title: >-
+          The DigestSchedule class shall report that the slot is due when the local hour equals the digest hour and the
+          slot of the local date is not handled.
+        justification: |
+          The summary is meant to arrive at the hour that the operator chose.
+        tests:
+          - DigestSchedule_IsDue_AtHour_True
+
+      - id: ReviewCenter-DigestSchedule-DueAfterHour
+        title: >-
+          The DigestSchedule class shall report that the slot is due when the local hour is after the digest hour and
+          the slot of the local date is not handled.
+        justification: |
+          A pass that runs late, for example after a restart, must still send the summary of the day.
+        tests:
+          - DigestSchedule_IsDue_AfterHour_True
+
+      - id: ReviewCenter-DigestSchedule-NotDueWhenHandledToday
+        title: >-
+          The DigestSchedule class shall report that the slot is not due when the slot of the local date is handled.
+        justification: |
+          At most one summary is sent for each local date.
+        tests:
+          - DigestSchedule_IsDue_HandledToday_False
+
+      - id: ReviewCenter-DigestSchedule-DueWhenHandledYesterday
+        title: >-
+          The DigestSchedule class shall report that the slot is due after the digest hour when the last slot was
+          handled on an earlier local date.
+        justification: |
+          Each local date has its own slot.
+        tests:
+          - DigestSchedule_IsDue_HandledYesterday_True
+
+      - id: ReviewCenter-DigestSchedule-DueWhenNeverHandled
+        title: >-
+          The DigestSchedule class shall report that the slot is due after the digest hour when no slot was ever
+          handled.
+        justification: |
+          A user who never got a summary has an open slot.
+        tests:
+          - DigestSchedule_IsDue_NeverHandled_True
+
+      - id: ReviewCenter-DigestSchedule-CatchUp
+        title: >-
+          The DigestSchedule class shall report that the slot is due after the digest hour when the last slot was
+          handled several local dates ago.
+        justification: |
+          After a downtime of the server the summary must follow as soon as the server runs, not later.
+        tests:
+          - DigestSchedule_IsDue_HandledDaysAgo_True
+
+      - id: ReviewCenter-DigestSchedule-UseLocalDate
+        title: >-
+          The DigestSchedule class shall compare the local dates of the configured time zone, not the dates in UTC.
+        justification: |
+          A zone that is ahead of UTC reaches the digest hour on a different UTC date, and the summary must still
+          follow the clock of the people who read it.
+        tests:
+          - DigestSchedule_IsDue_ZoneAheadOfUtc_UsesLocalDate
+
+      - id: ReviewCenter-DigestSchedule-HourZero
+        title: >-
+          The DigestSchedule class shall accept the digest hour 0.
+        justification: |
+          Hour 0 is a valid hour, and an operator may choose it.
+        tests:
+          - DigestSchedule_Constructor_Hour0_Accepted
+
+      - id: ReviewCenter-DigestSchedule-HourZero-DueAfterMidnight
+        title: >-
+          The DigestSchedule class shall report the slot as due after local midnight when the digest hour is 0.
+        justification: |
+          A slot at hour 0 opens with the new local day.
+        tests:
+          - DigestSchedule_IsDue_HourZero_DueAfterMidnight
+
+      - id: ReviewCenter-DigestSchedule-SpringForwardGap
+        title: >-
+          The DigestSchedule class shall report the slot as due at the first local time after the gap when a clock
+          change skips the digest hour.
+        justification: |
+          On the day the clocks go forward the summary must not be lost because its hour does not exist.
+        tests:
+          - DigestSchedule_IsDue_SpringForwardGap_DueAfterGap
+
+      - id: ReviewCenter-DigestSchedule-FallBackRepeatedHour
+        title: >-
+          The DigestSchedule class shall report the slot as not due in the repeated digest hour after the slot was
+          handled when a clock change repeats the digest hour.
+        justification: |
+          On the day the clocks go back the summary must not be sent twice.
+        tests:
+          - DigestSchedule_IsDue_FallBackRepeat_OnceAfterHandled
+
+      - id: ReviewCenter-DigestSchedule-LocalDate
+        title: >-
+          The DigestSchedule class shall give the local date of an instant in the configured time zone.
+        justification: |
+          The callers and the rule of the slot must use the same notion of the local date.
+        tests:
+          - DigestSchedule_LocalDate_Instant_ConvertsToZone
+
+      - id: ReviewCenter-DigestSchedule-RefuseInvalidHour
+        title: >-
+          The DigestSchedule class shall refuse a digest hour outside the range 0 to 23 with an argument error.
+        justification: |
+          An hour that does not exist could never be reached, so no summary would ever be sent.
+        tests:
+          - DigestSchedule_Constructor_Hour24_Throws
+
+      - id: ReviewCenter-DigestSchedule-RefuseNullZone
+        title: >-
+          The DigestSchedule class shall refuse a missing time zone with an argument error.
+        justification: |
+          Without a time zone no local time can be computed.
+        tests:
+          - DigestSchedule_Constructor_NullZone_Throws
