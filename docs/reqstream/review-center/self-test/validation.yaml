@@ -29,6 +29,7 @@ sections:
           - ReviewCenter-Utilities-TempFiles-Removed-Repeated
           - ReviewCenter-Utilities-TempFiles-Removed-Retry
           - ReviewCenter-Utilities-TempFiles-LockedFile
+          - ReviewCenter-Utilities-TempFiles-LockedFile-Remains
           - ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
           - ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
           - ReviewCenter-Utilities-TempFiles-InvalidPolicy

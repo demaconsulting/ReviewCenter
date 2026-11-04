@@ -70,6 +70,25 @@ public class UtilitiesSubsystemTests
     }
 
     /// <summary>
+    ///     Test that utilities subsystem resolves a secret from a file of exactly the largest accepted size.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_FileOfExactlyTheLimit_ResolvesSecret()
+    {
+        // Arrange: a secret file inside a temporary directory that holds exactly the largest accepted number of bytes
+        using var directory = new TemporaryDirectory();
+        var text = new string('k', SecretSource.MaxFileBytes);
+        var path = directory.GetFilePath("secrets/limit.txt");
+        File.WriteAllText(path, text);
+
+        // Act: resolve from the file
+        var secret = SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile");
+
+        // Assert: the whole contents are returned and nothing is refused
+        Assert.Equal(text, secret);
+    }
+
+    /// <summary>
     ///     Test that utilities subsystem can handle path combination workflows.
     /// </summary>
     [Fact]

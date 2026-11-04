@@ -240,24 +240,85 @@ sections:
           functionality.
         children:
           - ReviewCenter-OTS-AspNetCore-Components
+
+      - id: Quality-WebPlatform-Components-Events
+        title: >-
+          The repository shall rely on ASP.NET Core to handle the user events of the components of the web
+          application.
+        tags: [quality]
+        justification: |
+          A button click or an input change in the browser must reach the Razor component that handles it, or the
+          interactive pages would show but not react. This grouping requirement links the ASP.NET Core event OTS
+          requirement to the quality root so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Components-Events
 
       - id: Quality-WebPlatform-Authentication
-        title: The repository shall rely on ASP.NET Core to authenticate users of the web application.
+        title: The repository shall rely on ASP.NET Core to issue a session cookie to a user who signs in.
         tags: [quality]
         justification: |
-          The sign-in with a local account is built on the cookie authentication,
-          the authorization, the antiforgery protection, and the password hasher of
-          the framework. This grouping requirement links the ASP.NET Core
-          authentication OTS requirements to the quality root so they participate in
-          orphan detection without being falsely reported as disconnected from tool
-          functionality.
+          The sign-in with a local account keeps the user signed in with the cookie authentication of the
+          framework. This grouping requirement links the ASP.NET Core cookie OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-AspNetCore-Authentication
+
+      - id: Quality-WebPlatform-Authentication-SignOut
+        title: The repository shall rely on ASP.NET Core to end the session of a user who signs out.
+        tags: [quality]
+        justification: |
+          A user who signs out must not keep access to the protected pages, which depends on the sign-out of the
+          cookie authentication. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Authentication-SignOut
+
+      - id: Quality-WebPlatform-Authentication-Redirect
+        title: >-
+          The repository shall rely on ASP.NET Core to redirect a request for a protected page without a signed-in user
+          to the login page.
+        tags: [quality]
+        justification: |
+          A visitor who is not signed in must be led to the login page instead of seeing a protected page, which
+          depends on the authorization of the framework. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Authentication-Redirect
+
+      - id: Quality-WebPlatform-Authentication-Antiforgery
+        title: The repository shall rely on ASP.NET Core to refuse a form post that carries no antiforgery token.
+        tags: [quality]
+        justification: |
+          A form post that another web site forges must not change data in the name of a signed-in user, which
+          depends on the antiforgery protection of the framework. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Authentication-Antiforgery
+
+      - id: Quality-WebPlatform-Authentication-PasswordAccept
+        title: >-
+          The repository shall rely on the password hasher of ASP.NET Core to accept the right password against its
+          hash.
+        tags: [quality]
+        justification: |
+          A user who types the right password must be able to sign in, which depends on the verification of the
+          password hasher. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Authentication-PasswordAccept
+
+      - id: Quality-WebPlatform-Authentication-PasswordReject
+        title: >-
+          The repository shall rely on the password hasher of ASP.NET Core to reject a wrong password against a hash.
+        tags: [quality]
+        justification: |
+          A wrong password must never sign a user in, which depends on the verification of the password hasher. This
+          grouping requirement links that OTS requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-Authentication-PasswordReject
 
       - id: Quality-WebPlatform-DataProtection
@@ -266,32 +327,145 @@ sections:
         justification: |
           The access tokens of git repositories are stored only encrypted, with the
           Data Protection of the framework. This grouping requirement links the
-          ASP.NET Core data protection OTS requirements to the quality root so they
-          participate in orphan detection without being falsely reported as
+          ASP.NET Core data protection OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as
           disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-AspNetCore-DataProtection
+
+      - id: Quality-WebPlatform-DataProtection-KeyRing
+        title: >-
+          The repository shall rely on ASP.NET Core to keep its keys in a key ring in a folder, so that protected text
+          can be read again after a restart.
+        tags: [quality]
+        justification: |
+          The stored secrets must still be readable after the service has been restarted, which depends on the keys
+          that survive in the key ring folder. This grouping requirement links that OTS requirement to the quality
+          root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-KeyRing
+
+      - id: Quality-WebPlatform-DataProtection-OtherKeyRing
+        title: >-
+          The repository shall rely on ASP.NET Core to refuse to decrypt text that was protected with another key ring.
+        tags: [quality]
+        justification: |
+          A copy of the database is useless without the key ring that protected it, which depends on the keys of the
+          key ring. This grouping requirement links that OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-OtherKeyRing
+
+      - id: Quality-WebPlatform-DataProtection-Purpose
+        title: >-
+          The repository shall rely on ASP.NET Core to refuse to decrypt text that was protected for another purpose.
+        tags: [quality]
+        justification: |
+          Text protected for one use must not be readable by another use of the same key ring, which depends on the
+          purpose that the data protection binds into the encrypted text. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-Purpose
+
+      - id: Quality-WebPlatform-DataProtection-Certificate
+        title: >-
+          The repository shall rely on ASP.NET Core to encrypt the key files of the key ring with a certificate.
+        tags: [quality]
+        justification: |
+          A key file that is copied from the key ring folder must not reveal the key, which depends on the
+          encryption of the key files with the certificate that the operator supplies. This grouping requirement
+          links that OTS requirement to the quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-Certificate
+
+      - id: Quality-WebPlatform-DataProtection-PreviousCertificate
+        title: >-
+          The repository shall rely on ASP.NET Core to decrypt the key files of the key ring with a previous
+          certificate when the current certificate did not encrypt them.
+        tags: [quality]
+        justification: |
+          An operator who replaces the certificate must still be able to read the key files that the earlier
+          certificate encrypted, which depends on the previous-certificate support of the framework. This grouping
+          requirement links that OTS requirement to the quality root so it participates in orphan detection without
+          being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous
+
+      - id: Quality-WebPlatform-DataProtection-Dpapi
+        title: >-
+          The repository shall rely on ASP.NET Core to encrypt the key files of the key ring with DPAPI on Windows.
+        tags: [quality]
+        justification: |
+          On Windows the key files can be protected at rest with DPAPI, which depends on the DPAPI protection of the
+          framework. This grouping requirement links that OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi
 
       - id: Quality-DataStorage
-        title: The repository shall rely on Entity Framework Core with SQLite to persist its data.
+        title: >-
+          The repository shall rely on Entity Framework Core with SQLite to return the entities that it saved
+          unchanged.
         tags: [quality]
         justification: |
           The Storage subsystem keeps its data in a SQLite database through
-          Entity Framework Core. This grouping requirement links the EF Core OTS
-          requirements to the quality root so they participate in orphan detection
+          Entity Framework Core, and every record must come back as it was saved. This grouping requirement links
+          the EF Core mapping OTS requirements to the quality root so they participate in orphan detection
           without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-EfCore-Mapping
           - ReviewCenter-OTS-EfCore-Mapping-BinaryColumns
+
+      - id: Quality-DataStorage-CompositeKeys
+        title: >-
+          The repository shall rely on Entity Framework Core to map a composite key that spans a project and a review
+          identifier.
+        tags: [quality]
+        justification: |
+          A review is identified by its project and its own identifier together, so the mapping of the table
+          depends on composite keys. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-EfCore-Mapping-CompositeKeys
+
+      - id: Quality-DataStorage-Database
+        title: >-
+          The repository shall rely on the Entity Framework Core SQLite provider to create a database file with the
+          tables of the model on first use.
+        tags: [quality]
+        justification: |
+          A new installation starts without a database file and must be able to create one without a separate setup
+          step. This grouping requirement links that OTS requirement to the quality root so it participates in orphan
+          detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-EfCore-Sqlite
+
+      - id: Quality-DataStorage-KeyUniqueness
+        title: >-
+          The repository shall rely on the Entity Framework Core SQLite provider to make the database refuse a
+          duplicate key.
+        tags: [quality]
+        justification: |
+          A second record with the key of an existing one must not overwrite or double it, so the Storage subsystem
+          depends on the uniqueness that the database enforces. This grouping requirement links that OTS requirement
+          to the quality root so it participates in orphan detection without being falsely reported as disconnected
+          from tool functionality.
+        children:
           - ReviewCenter-OTS-EfCore-Sqlite-KeyUniqueness
+
+      - id: Quality-DataStorage-Relationship
+        title: >-
+          The repository shall rely on the Entity Framework Core SQLite provider to make the database refuse a review
+          that belongs to no project.
+        tags: [quality]
+        justification: |
+          A review without a project would be unreachable, so the Storage subsystem depends on the relationship that
+          the database enforces. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-EfCore-Sqlite-Relationship
 
       - id: Quality-ComponentTesting
@@ -299,12 +473,32 @@ sections:
         tags: [quality]
         justification: |
           Verification of the Razor components without a browser depends on bUnit.
-          This grouping requirement links the bUnit OTS requirements to the quality
-          root so they participate in orphan detection without being falsely
+          This grouping requirement links the bUnit render OTS requirement to the quality
+          root so it participates in orphan detection without being falsely
           reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-bUnit-Component
+
+      - id: Quality-ComponentTesting-FormSubmission
+        title: The repository shall rely on bUnit to simulate the submission of a form of a rendered Razor component.
+        tags: [quality]
+        justification: |
+          The tests of the forms of the web interface submit the forms without a browser, which depends on the form
+          simulation of bUnit. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-bUnit-Component-FormSubmission
+
+      - id: Quality-ComponentTesting-FileSelection
+        title: >-
+          The repository shall rely on bUnit to simulate the selection of files in a file input of a rendered Razor
+          component.
+        tags: [quality]
+        justification: |
+          The tests of the upload pages choose files without a browser, which depends on the file selection of bUnit.
+          This grouping requirement links that OTS requirement to the quality root so it participates in orphan
+          detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-bUnit-Component-FileSelection
 
       - id: Quality-ComponentTesting-TestHost
@@ -319,58 +513,300 @@ sections:
           - ReviewCenter-OTS-bUnit-TestHost
 
       - id: Quality-ComponentTesting-TestProvider
-        title: The repository shall rely on OpenIddict as a test identity provider to verify the sign-in in memory.
+        title: The repository shall rely on OpenIddict as a test identity provider to serve its discovery document.
         tags: [quality]
         justification: |
           Verification of the sign-in with an identity provider depends on OpenIddict
-          as a provider that is used only by the tests. This grouping requirement
-          links the OpenIddict OTS requirements to the quality root so they
-          participate in orphan detection without being falsely reported as
-          disconnected from tool functionality.
+          as a provider that is used only by the tests, and the sign-in code starts by finding the provider through
+          its discovery document. This grouping requirement links the OpenIddict discovery OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
         children:
           - ReviewCenter-OTS-OpenIddict-TestProvider
+
+      - id: Quality-ComponentTesting-TestProvider-SigningKeys
+        title: The repository shall rely on OpenIddict as a test identity provider to serve its signing keys.
+        tags: [quality]
+        justification: |
+          The sign-in code checks the signature of an identity token with the keys that the provider serves. This
+          grouping requirement links that OTS requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys
+
+      - id: Quality-ComponentTesting-TestProvider-IdentityToken
+        title: >-
+          The repository shall rely on OpenIddict as a test identity provider to issue an identity token that is signed
+          with its keys in the authorization code flow with a proof key.
+        tags: [quality]
+        justification: |
+          The sign-in of the web application is an authorization code flow with a proof key, and a test of it needs a
+          signed identity token at the end of the flow. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
+        children:
           - ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken
+
+      - id: Quality-ComponentTesting-TestProvider-AuthTime
+        title: >-
+          The repository shall rely on OpenIddict as a test identity provider to put the authentication time of the
+          login into the identity tokens that it issues.
+        tags: [quality]
+        justification: |
+          The confirmation of identity for a signature checks the time of the login, so the tests of it need a
+          provider that puts the time into the token. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
+        children:
           - ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime
 
       - id: Quality-BrowserAutomation
-        title: The repository shall rely on Playwright to drive the web interface from the Puppet developer tool.
+        title: >-
+          The repository shall rely on Playwright to load the pages of the web interface in the Puppet developer tool.
         tags: [quality]
         justification: |
-          The Puppet developer tool depends on Playwright and Chromium to open and
-          drive the web interface. This grouping requirement links the Playwright
-          OTS requirements to the quality root so they participate in orphan
+          The Puppet developer tool depends on Playwright and Chromium to open the
+          web interface. This grouping requirement links the Playwright page-loading
+          OTS requirement to the quality root so it participates in orphan
           detection without being falsely reported as disconnected from tool
           functionality.
         children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
-      - id: Quality-SourceAccess
-        title: The repository shall rely on the installed git program to read source code from repositories.
+
+      - id: Quality-BrowserAutomation-Click
+        title: >-
+          The repository shall rely on Playwright to click an element of the web interface in the Puppet developer
+          tool.
         tags: [quality]
         justification: |
-          The ContentSources subsystem reads source code by running git. This grouping requirement links the git OTS
-          requirements to the quality root so they participate in orphan detection without being falsely reported as
-          disconnected from tool functionality.
+          Buttons and links are the main way that the Puppet developer tool moves through the interface, which
+          depends on the click of Playwright. This grouping requirement links that OTS requirement to the quality
+          root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
+
+      - id: Quality-BrowserAutomation-Hover
+        title: >-
+          The repository shall rely on Playwright to hover an element of the web interface in the Puppet developer
+          tool.
+        tags: [quality]
+        justification: |
+          Controls that only appear under the mouse can be reached by the Puppet developer tool only with the hover
+          of Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
+          in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+
+      - id: Quality-BrowserAutomation-Fill
+        title: >-
+          The repository shall rely on Playwright to fill a form field of the web interface in the Puppet developer
+          tool.
+        tags: [quality]
+        justification: |
+          The Puppet developer tool fills the forms of the interface field by field, which depends on the field fill
+          of Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
+          in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+
+      - id: Quality-BrowserAutomation-ReadText
+        title: >-
+          The repository shall rely on Playwright to read the text of an element of the web interface in the Puppet
+          developer tool.
+        tags: [quality]
+        justification: |
+          The text of an element is the cheapest way for the Puppet developer tool to report what a page says, which
+          depends on the text reading of Playwright. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
+
+      - id: Quality-BrowserAutomation-ColorScheme
+        title: >-
+          The repository shall rely on Playwright to emulate the color scheme of the web interface in the Puppet
+          developer tool.
+        tags: [quality]
+        justification: |
+          The Puppet developer tool checks both themes of the interface without changing the settings of the
+          operating system, which depends on the color scheme emulation of Playwright. This grouping requirement links
+          that OTS requirement to the quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+
+      - id: Quality-BrowserAutomation-Screenshot
+        title: >-
+          The repository shall rely on Playwright to capture a screenshot of the web interface in the Puppet developer
+          tool.
+        tags: [quality]
+        justification: |
+          A coding agent that polishes the interface judges it from screenshots, which depends on the capture of
+          Playwright. This grouping requirement links that OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
+
+      - id: Quality-SourceAccess
+        title: >-
+          The repository shall rely on the installed git program to mirror repositories into bare repository folders.
+        tags: [quality]
+        justification: |
+          The ContentSources subsystem reads source code by running git, and it starts by mirroring the repository.
+          This grouping requirement links the git mirror OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-Git-Access
+
+      - id: Quality-SourceAccess-ChildProcess
+        title: >-
+          The repository shall rely on the installed git program to be started directly by the service, with its
+          arguments as a list and no shell.
+        tags: [quality]
+        justification: |
+          A repository name or a revision from outside must never be read by a shell as a command, which depends on
+          starting git directly with a list of arguments. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ChildProcess
+
+      - id: Quality-SourceAccess-Output
+        title: >-
+          The repository shall rely on the installed git program to write its result to the standard output of the
+          child process.
+        tags: [quality]
+        justification: |
+          The service reads what git found from the standard output of the process that it started. This grouping
+          requirement links that OTS requirement to the quality root so it participates in orphan detection without
+          being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-Output
+
+      - id: Quality-SourceAccess-ExitCode
+        title: The repository shall rely on the installed git program to end a call that fails with a nonzero exit code.
+        tags: [quality]
+        justification: |
+          The service tells a failed git call from a successful one by the exit code. This grouping requirement links
+          that OTS requirement to the quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ExitCode
+
+      - id: Quality-SourceAccess-ErrorText
+        title: >-
+          The repository shall rely on the installed git program to write an error text to the error output of a call
+          that fails.
+        tags: [quality]
+        justification: |
+          The service shows the operator why a git call failed, from the error text that git writes. This grouping
+          requirement links that OTS requirement to the quality root so it participates in orphan detection without
+          being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ErrorText
+
+      - id: Quality-SourceAccess-Revision
+        title: >-
+          The repository shall rely on the installed git program to resolve a branch, a tag, or a commit name to the
+          identity of a commit.
+        tags: [quality]
+        justification: |
+          A review is pinned to one commit, but users name the content to review by branch, tag, or commit, so the
+          service needs git to turn the name into the identity of the commit. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ResolveRevision
+
+      - id: Quality-SourceAccess-RevisionRefusal
+        title: The repository shall rely on the installed git program to refuse a revision that is unknown or unsafe.
+        tags: [quality]
+        justification: |
+          A name that git does not know, or one that git would read as an option, must not select a commit, so the
+          service depends on the refusal by git. This grouping requirement links that OTS requirement to the quality
+          root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
+
+      - id: Quality-SourceAccess-ListFiles
+        title: The repository shall rely on the installed git program to list the files of a commit.
+        tags: [quality]
+        justification: |
+          A review without an earlier revision covers every file of the commit, which the service reads from the list
+          that git gives. This grouping requirement links that OTS requirement to the quality root so it participates
+          in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ListFiles
+
+      - id: Quality-SourceAccess-ListChanges
+        title: >-
+          The repository shall rely on the installed git program to list the files that changed between two commits.
+        tags: [quality]
+        justification: |
+          A review of a change covers the files that differ between a baseline and a head, which the service reads
+          from the list of changes that git gives. This grouping requirement links that OTS requirement to the quality
+          root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ListChanges
+
+      - id: Quality-SourceAccess-ListChanges-Renames
+        title: >-
+          The repository shall rely on the installed git program to list a rename as one deleted file and one added
+          file when rename detection is off.
+        tags: [quality]
+        justification: |
+          The service compares commits without rename detection, so that every change is one deletion or one
+          addition. This grouping requirement links that OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ListChanges-Renames
+
+      - id: Quality-SourceAccess-ListChanges-EntryModes
+        title: The repository shall rely on the installed git program to give the mode of every changed entry.
+        tags: [quality]
+        justification: |
+          The service reviews only the content of regular files, so it skips symbolic links and submodules by the
+          mode that git gives. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ListChanges-EntryModes
+
+      - id: Quality-SourceAccess-ReadFile
+        title: The repository shall rely on the installed git program to give the exact bytes of a file of a commit.
+        tags: [quality]
+        justification: |
+          The review shows and compares the exact content of a file, so binary content and carriage returns must come
+          back unchanged. This grouping requirement links that OTS requirement to the quality root so it participates
+          in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Access-ReadFile
+
+      - id: Quality-SourceAccess-Credentials
+        title: >-
+          The repository shall rely on the installed git program to send credentials that it is given in its process
+          environment as a Basic authorization header to the server.
+        tags: [quality]
+        justification: |
+          Tokens must reach the server without appearing in a command line or a URL, so the service hands them to git
+          through the environment of the process. This grouping requirement links that OTS requirement to the quality
+          root so it participates in orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-Git-Credentials
+
+      - id: Quality-SourceAccess-CredentialsNotStored
+        title: >-
+          The repository shall rely on the installed git program not to write the credentials that it is given into
+          the top-level files of the mirror, including its configuration.
+        tags: [quality]
+        justification: |
+          A token that stays in the mirror on disk would outlive the git process, so the service depends on git not
+          storing it. This grouping requirement links that OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-Git-Credentials-NotStored
 
       - id: Quality-PatternVerification
@@ -392,6 +828,40 @@ sections:
           participates in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-YamlDotNet-Parse
+
+      - id: Quality-ConfigurationReading-UnknownKeys
+        title: >-
+          The repository shall rely on YamlDotNet to ignore the keys of YAML text that the typed objects do not have.
+        tags: [quality]
+        justification: |
+          The configuration file of a repository has many more keys than the review-sets that ReviewCenter reads, and
+          it must still be read. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-YamlDotNet-Parse-UnknownKeys
+
+      - id: Quality-ConfigurationReading-Alias
+        title: >-
+          The repository shall rely on YamlDotNet to report an alias as an event that the tool can refuse before any
+          object is built.
+        tags: [quality]
+        justification: |
+          A file that expands an alias into a large structure must be refused before it uses the memory of the
+          service, which depends on the alias event that YamlDotNet reports. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-YamlDotNet-Parse-Alias
+
+      - id: Quality-ConfigurationReading-ErrorPosition
+        title: >-
+          The repository shall rely on YamlDotNet to report invalid YAML as an error that names the line and the
+          column.
+        tags: [quality]
+        justification: |
+          The operator who wrote an invalid configuration file needs to know where to look, which depends on the
+          position that YamlDotNet reports with the error. This grouping requirement links that OTS requirement to
+          the quality root so it participates in orphan detection without being falsely reported as disconnected from
+          tool functionality.
+        children:
           - ReviewCenter-OTS-YamlDotNet-Parse-ErrorPosition

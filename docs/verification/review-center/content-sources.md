@@ -57,6 +57,16 @@ head commit, reads the bytes of the configuration file, and the real parser retu
 and paths; the ancestor check says yes from the first commit to the second and no the other way. This scenario is tested
 by `ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration`.
 
+**ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound**: A local repository with one commit is opened
+through the real git source. A branch name that matches nothing is refused with `RevisionNotFound`, and a name that
+could be read as a git option is refused with `RevisionInvalid`. This scenario is tested by
+`ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound`.
+
+**ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository**: A repository is opened whose
+registered location does not exist. The open is refused with `GitAccessFailed`, the message names the repository and
+not its location, and no mirror folder is left in the cache folder. This scenario is tested by
+`ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository`.
+
 **Units**: The start of git without a shell and with a curated environment, the redaction of secrets, the limits and the
 failures are verified in the unit tests of `GitRunner`; the mirror, the revisions, the change lists, the blobs, the
 ancestor check, and the serialization per repository in the unit tests of `GitSource`; the reading and the limits of

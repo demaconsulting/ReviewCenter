@@ -22,6 +22,7 @@ using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Messaging;
+using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -120,14 +121,82 @@ public class HostingSubsystemTests
     }
 
     /// <summary>
-    ///     Test that a database setting the host cannot honor ends the run with exit code 1 and an error on the
-    ///     context, instead of an unhandled exception.
+    ///     Test that the host creates the configured database file when the server starts.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile()
+    {
+        // Arrange: a connection string for a database file that does not exist yet
+        var connectionString = TestDatabase.NewConnectionString();
+        var file = connectionString.Split(';')[0].Replace("Data Source=", string.Empty, StringComparison.Ordinal);
+        Assert.False(File.Exists(file), "The database file should not exist before the host starts");
+        var logs = new CapturingLoggerProvider();
+
+        // Act: start the host on that database
+        await using var app = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+
+        // Assert: the file now exists
+        Assert.True(File.Exists(file), $"Database file '{file}' was not created");
+    }
+
+    /// <summary>
+    ///     Test that the project, review, user, signing, and inbox services are available from a started host
+    ///     that is configured with a database.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_DatabaseConfigured_DomainServicesResolve()
+    {
+        // Arrange: a started host on a new database
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve each domain service from the host
+        var projects = app.Services.GetService<ProjectService>();
+        var reviews = app.Services.GetService<ReviewService>();
+        var users = app.Services.GetService<UserService>();
+        var signing = app.Services.GetService<SigningService>();
+        var inbox = app.Services.GetService<InboxService>();
+
+        // Assert: every service is available
+        Assert.NotNull(projects);
+        Assert.NotNull(reviews);
+        Assert.NotNull(users);
+        Assert.NotNull(signing);
+        Assert.NotNull(inbox);
+    }
+
+    /// <summary>
+    ///     Test that a visitor who is not signed in is sent to the login page when asking for a page that
+    ///     needs a signed-in user, while the login page itself is served.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin()
+    {
+        // Arrange: a started host and a client that has no sign-in and does not follow redirects
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request a protected page and the login page without signing in
+        var projects = await client.GetAsync("/projects", TestContext.Current.CancellationToken);
+        var login = await client.GetAsync("/login", TestContext.Current.CancellationToken);
+
+        // Assert: the protected page redirects to the login page, which answers 200
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, projects.StatusCode);
+        Assert.Contains("/login", projects.Headers.Location?.ToString(), StringComparison.Ordinal);
+        Assert.Equal(System.Net.HttpStatusCode.OK, login.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that a database setting the host cannot honor ends the run with exit code 1 and an error that
+    ///     names the problem on the context, instead of an unhandled exception.
     /// </summary>
     [Fact]
     public async Task HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne()
     {
-        // Arrange: configuration that selects a provider that is not implemented
-        using var context = Context.Create(["serve", "--silent"]);
+        // Arrange: a log file for the context and configuration that selects a provider that is not implemented
+        using var folder = new TemporaryDirectory();
+        var logFile = Path.Combine(folder.DirectoryPath, "run.log");
         var options = new ServerHostOptions
         {
             MapStaticAssets = false,
@@ -143,11 +212,19 @@ public class HostingSubsystemTests
         };
 
         // Act: run the server
-        var exitCode = await ServerHost.RunAsync(context, options, TestContext.Current.CancellationToken);
+        int exitCode;
+        int contextExitCode;
+        using (var context = Context.Create(["serve", "--silent", "--log", logFile]))
+        {
+            exitCode = await ServerHost.RunAsync(context, options, TestContext.Current.CancellationToken);
+            contextExitCode = context.ExitCode;
+        }
 
-        // Assert: the run failed with exit code 1 and the context holds the failure
+        // Assert: the run failed with exit code 1, the context holds the failure, and the error text names the provider
         Assert.Equal(1, exitCode);
-        Assert.Equal(1, context.ExitCode);
+        Assert.Equal(1, contextExitCode);
+        var text = await File.ReadAllTextAsync(logFile, TestContext.Current.CancellationToken);
+        Assert.Contains("Oracle", text, StringComparison.Ordinal);
     }
 
     /// <summary>

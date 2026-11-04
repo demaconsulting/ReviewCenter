@@ -177,4 +177,61 @@ public class ContentSourcesSubsystemTests
         Assert.Empty(summaries);
         Assert.Equal(DomainRule.RepositoryDisabled, exception.Rule);
     }
+
+    /// <summary>
+    ///     Test that a revision that does not exist in a real repository is refused with the revision-not-found rule
+    ///     and that a revision that could be read as a git option is refused with the revision-invalid rule.
+    /// </summary>
+    [Fact]
+    public async Task ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound()
+    {
+        // Arrange: an origin with one commit and a git source over a private cache folder
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = Path.Combine(root.Path, "origin");
+        Directory.CreateDirectory(origin);
+        GitTestSupport.Init(origin);
+        GitTestSupport.Write(origin, "readme.txt", "hello\n");
+        GitTestSupport.Commit(origin, "first");
+        var gitOptions = new GitOptions { CachePath = Path.Combine(root.Path, "cache"), TimeoutSeconds = 60 };
+        var source = new GitSource(new GitRunner(gitOptions), gitOptions);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var session = await source.OpenAsync(new RepositoryAccess(1, "local", origin, null, null), cancellationToken);
+
+        // Act: resolve a name that matches nothing and a name that looks like a git option
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
+            () => session.ResolveRevisionAsync("no-such-branch", cancellationToken));
+        var option = await Assert.ThrowsAsync<DomainRuleException>(
+            () => session.ResolveRevisionAsync("--upload-pack=x", cancellationToken));
+
+        // Assert: each refusal carries its own rule
+        Assert.Equal(DomainRule.RevisionNotFound, unknown.Rule);
+        Assert.Equal(DomainRule.RevisionInvalid, option.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a repository whose location cannot be cloned is reported as an access failure that names the
+    ///     repository and not its location, and that no mirror folder is left behind.
+    /// </summary>
+    [Fact]
+    public async Task ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository()
+    {
+        // Arrange: a registered location that does not exist and a git source over a private cache folder
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var missing = Path.Combine(root.Path, "nothing-here");
+        var cache = Path.Combine(root.Path, "cache");
+        var gitOptions = new GitOptions { CachePath = cache, TimeoutSeconds = 60 };
+        var source = new GitSource(new GitRunner(gitOptions), gitOptions);
+
+        // Act: open the repository for the first time
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => source.OpenAsync(new RepositoryAccess(1, "origin", missing, null, null), TestContext.Current.CancellationToken));
+
+        // Assert: the rule and the repository name are in the error, the location is not, and no mirror remains
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+        Assert.Contains("'origin'", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(missing, exception.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(cache, "repo-1")));
+    }
 }

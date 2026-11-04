@@ -126,6 +126,10 @@ sections:
         children:
           - ReviewCenter-Core-PlanReviews
           - ReviewCenter-ContentSources-ReviewSets
+          - ReviewCenter-ContentSources-ReviewSets-Limits
+          - ReviewCenter-ContentSources-ReviewSets-AtLimit
+          - ReviewCenter-ContentSources-ReviewSets-Unusable
+          - ReviewCenter-ContentSources-ReviewSets-UnknownCommit
           - ReviewCenter-ContentSources-ReviewSets-Read
           - ReviewCenter-ContentSources-ReviewSets-Ancestry
           - ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
@@ -905,6 +909,9 @@ sections:
           - ReviewCenter-Cli-AuditVerify
           - ReviewCenter-Cli-AuditVerify-Misuse
           - ReviewCenter-Hosting-AuditVerify
+          - ReviewCenter-Hosting-AuditVerify-Failed
+          - ReviewCenter-Hosting-AuditVerify-Services
+          - ReviewCenter-Hosting-Arguments
           - ReviewCenter-Web-AuditPage
           - ReviewCenter-Web-AuditPage-HeaderLink
           - ReviewCenter-Web-AuditPage-Verify
@@ -970,6 +977,9 @@ sections:
           - ReviewCenter-Web-EvidenceSettings-RightLost
           - ReviewCenter-Web-EvidenceSettings-Topic
           - ReviewCenter-Hosting-AttestationServices
+          - ReviewCenter-Hosting-AttestationServices-SelfSignedFolder
+          - ReviewCenter-Hosting-AttestationServices-UnprotectedKey
+          - ReviewCenter-Hosting-AttestationServices-ProtectedKeyUnreadable
           - ReviewCenter-Hosting-AttestationKeyFailure
           - ReviewCenter-Web-Attestation
           - ReviewCenter-Web-Attestation-KeyNote
@@ -1092,6 +1102,8 @@ sections:
           - ReviewCenter-Storage-ExternalIdentity-ExactPair
           - ReviewCenter-Storage-ExternalIdentity-UniquePair
           - ReviewCenter-Hosting-OidcSignIn
+          - ReviewCenter-Hosting-OidcSignIn-InvalidSettings
+          - ReviewCenter-Hosting-OidcSignIn-Off
           - ReviewCenter-Web-OidcSignIn
           - ReviewCenter-Web-OidcSignIn-UserList
           - ReviewCenter-Web-OidcSignIn-NoPassword
@@ -1129,6 +1141,8 @@ sections:
           - ReviewCenter-Storage-TotpSecondFactor-Audit
           - ReviewCenter-Storage-TotpSecondFactor-UserDeleted
           - ReviewCenter-Hosting-TotpSecondFactor
+          - ReviewCenter-Hosting-TotpSecondFactor-InvalidSettings
+          - ReviewCenter-Hosting-TotpSecondFactor-Endpoint
           - ReviewCenter-Web-TotpSecondFactor
           - ReviewCenter-Web-TotpSecondFactor-TurnOff
           - ReviewCenter-Web-TotpSecondFactor-CodePage
@@ -1156,6 +1170,7 @@ sections:
           - ReviewCenter-Messaging-OffRefusesSend
           - ReviewCenter-Messaging-OffSettings
           - ReviewCenter-Hosting-NotificationSettings
+          - ReviewCenter-Hosting-NotificationSettings-Valid
           - ReviewCenter-Hosting-NotificationTables
           - ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
           - ReviewCenter-Web-NotificationCard
@@ -1262,6 +1277,10 @@ sections:
         children:
           - ReviewCenter-Messaging-SmtpTransport
           - ReviewCenter-Messaging-SmtpDelivery
+          - ReviewCenter-Messaging-SmtpDelivery-Envelope
+          - ReviewCenter-Messaging-SmtpDelivery-Content
+          - ReviewCenter-Messaging-SmtpDelivery-SpecialCharacters
+          - ReviewCenter-Messaging-SmtpDelivery-Authentication
           - ReviewCenter-Messaging-SmtpTls
         tests:
           - SmtpNotificationSender_Send_DeliversMessageToServer
@@ -1276,6 +1295,11 @@ sections:
           Demonstrations, development, and automatic tests need mail without a mail server.
         children:
           - ReviewCenter-Messaging-FileTransport
+          - ReviewCenter-Messaging-FileTransport-Extension
+          - ReviewCenter-Messaging-FileTransport-CreateFolder
+          - ReviewCenter-Messaging-FileTransport-Content
+          - ReviewCenter-Messaging-FileTransport-UniqueNames
+          - ReviewCenter-Messaging-FileTransport-NoTemporaryFile
           - ReviewCenter-Messaging-FileEnabled
           - ReviewCenter-Messaging-FileConfigured
         tests:
@@ -1292,7 +1316,9 @@ sections:
           place where the operator configures the rest of the server.
         children:
           - ReviewCenter-Messaging-SettingsDefaults
+          - ReviewCenter-Messaging-Off-OtherSettings
           - ReviewCenter-Messaging-PasswordFile
+          - ReviewCenter-Messaging-PasswordFile-Trimmed
           - ReviewCenter-Messaging-Warnings
           - ReviewCenter-Messaging-WarningClearRemote
           - ReviewCenter-Messaging-WarningNoPassword
@@ -1316,7 +1342,9 @@ sections:
           A message that was not delivered must never be mistaken for a delivered one.
         children:
           - ReviewCenter-Messaging-SendFailure
+          - ReviewCenter-Messaging-SendFailure-NothingDelivered
           - ReviewCenter-Messaging-Cancellation
+          - ReviewCenter-Messaging-Cancellation-NothingSent
           - ReviewCenter-Messaging-NullMessage
         tests:
           - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
@@ -1376,6 +1404,7 @@ sections:
         children:
           - ReviewCenter-Messaging-InvalidSettings
           - ReviewCenter-Messaging-InvalidSettingsNamed
+          - ReviewCenter-Messaging-InvalidSettingsNamed-NoPassword
           - ReviewCenter-Hosting-NotificationSenderNoneRefused
         tests:
           - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
@@ -1912,7 +1941,10 @@ sections:
         children:
           - ReviewCenter-Hosting-NotificationWorker
           - ReviewCenter-Messaging-NotificationWorker
+          - ReviewCenter-Messaging-NotificationWorker-OnStart
           - ReviewCenter-Messaging-WorkerRegisteredWhenEnabled
+          - ReviewCenter-Messaging-WorkerRegisteredWhenEnabled-NoSender
+          - ReviewCenter-Messaging-WorkerRegisteredWhenEnabled-NullArgument
         tests:
           - HostingSubsystem_NotificationWorker_OnlyEnabledWebHost
           - MessagingSubsystem_Worker_EnabledRunsDispatcherAndSurvivesFailure
@@ -2001,6 +2033,7 @@ sections:
           The message of an error can hold an address.
         children:
           - ReviewCenter-Messaging-WorkerLogHasNoPersonalData-ErrorMessage
+          - ReviewCenter-Messaging-WorkerLogHasNoPersonalData-ErrorMessage-Type
         tests:
           - NotificationWorker_ExecuteAsync_PassThrows_LogHasNoMessage
 
@@ -2124,6 +2157,7 @@ sections:
         children:
           - ReviewCenter-Identity-Authorization
           - ReviewCenter-Hosting-Authentication
+          - ReviewCenter-Hosting-Authentication-Pages
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
@@ -2339,6 +2373,10 @@ sections:
           - ReviewCenter-Cli-UserAdd-NoPasswordOption
           - ReviewCenter-Hosting-UserAdd
           - ReviewCenter-Hosting-UserAdd-StandardInput
+          - ReviewCenter-Hosting-UserAdd-Prompt
+          - ReviewCenter-Hosting-UserAdd-NoPasswordPrinted
+          - ReviewCenter-Hosting-UserAdd-Rejected
+          - ReviewCenter-Hosting-Arguments
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
@@ -2375,6 +2413,8 @@ sections:
           - ReviewCenter-Web-Repositories-TokenHidden
           - ReviewCenter-Web-Repositories-NoRegistry
           - ReviewCenter-Hosting-RepositoryServices
+          - ReviewCenter-Hosting-RepositoryServices-Folders
+          - ReviewCenter-Hosting-RepositoryServices-TokenRestart
         tests:
           - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
           - StorageSubsystem_Repositories_PersistAcrossReopen
@@ -2393,14 +2433,27 @@ sections:
           hostile repository or a broken installation from harming the server or leaving the user guessing.
         children:
           - ReviewCenter-ContentSources-GitAccess
+          - ReviewCenter-ContentSources-GitAccess-Timeout
+          - ReviewCenter-ContentSources-GitAccess-OutputLimit
           - ReviewCenter-ContentSources-Mirror
+          - ReviewCenter-ContentSources-Mirror-CloneError
+          - ReviewCenter-ContentSources-Mirror-NoToken
+          - ReviewCenter-ContentSources-Mirror-Serialization
           - ReviewCenter-ContentSources-Revisions
+          - ReviewCenter-ContentSources-Revisions-Unknown
+          - ReviewCenter-ContentSources-Revisions-Unsafe
           - ReviewCenter-ContentSources-Revisions-Branch
           - ReviewCenter-ContentSources-Changes
+          - ReviewCenter-ContentSources-Changes-SpecialEntries
           - ReviewCenter-ContentSources-Changes-Between
           - ReviewCenter-ContentSources-Content
+          - ReviewCenter-ContentSources-Content-Limit
+          - ReviewCenter-ContentSources-Content-Size
+          - ReviewCenter-ContentSources-ArgumentErrors
           - ReviewCenter-ContentSources-Content-Bytes
           - ReviewCenter-ContentSources-Errors
+          - ReviewCenter-ContentSources-Errors-Failure
+          - ReviewCenter-ContentSources-Errors-Secrets
           - ReviewCenter-ContentSources-DisabledRepository
           - ReviewCenter-ContentSources-DisabledRepository-NotOffered
           - ReviewCenter-Core-FileSelection
@@ -2423,6 +2476,10 @@ sections:
           protection of the keys is part of the promise.
         children:
           - ReviewCenter-ContentSources-Credentials
+          - ReviewCenter-ContentSources-Credentials-Unreadable
+          - ReviewCenter-ContentSources-Credentials-GitEnvironment
+          - ReviewCenter-ContentSources-Credentials-Redaction
+          - ReviewCenter-ContentSources-Credentials-RedactionUnchanged
           - ReviewCenter-ContentSources-Credentials-Encrypted
           - ReviewCenter-ContentSources-Credentials-Access
           - ReviewCenter-ContentSources-Credentials-Display
@@ -2447,7 +2504,13 @@ sections:
           must stop rather than quietly create keys that make the stored tokens unreadable.
         children:
           - ReviewCenter-Hosting-KeyRingProtection
+          - ReviewCenter-Hosting-KeyRingProtection-PermissionsOnly
+          - ReviewCenter-Hosting-KeyRingProtection-Choice
+          - ReviewCenter-Hosting-KeyRingProtection-Refused
+          - ReviewCenter-Hosting-KeyRingProtection-Accepted
+          - ReviewCenter-Hosting-KeyRingProtection-Probe
           - ReviewCenter-Utilities-SecretSource
+          - ReviewCenter-Utilities-SecretSource-SizeLimit
           - ReviewCenter-Utilities-SecretSource-Inline
           - ReviewCenter-Utilities-SecretSource-Neither
           - ReviewCenter-Utilities-SecretSource-Refusal
@@ -2473,7 +2536,14 @@ sections:
           be able to test a restore without starting the server.
         children:
           - ReviewCenter-Hosting-SecretScan
+          - ReviewCenter-Hosting-SecretScan-ReadOnly
+          - ReviewCenter-Hosting-SecretScan-NoDisclosure
+          - ReviewCenter-Hosting-Arguments
           - ReviewCenter-Hosting-KeyRingLost
+          - ReviewCenter-Hosting-KeyRingLost-AllowNewKeyRing
+          - ReviewCenter-Hosting-KeyRingLost-UnreadableDatabase
+          - ReviewCenter-Hosting-KeyRingLost-StartsWithKeys
+          - ReviewCenter-Hosting-KeyRingLost-NothingLost
           - ReviewCenter-ValidationChecks-ConfiguredKeys
           - ReviewCenter-ValidationChecks-ConfiguredKeys-NothingConfiguredSkipped
           - ReviewCenter-ValidationChecks-ConfiguredKeys-MissingDatabaseSkipped
@@ -2525,6 +2595,11 @@ sections:
           - ReviewCenter-Program-KeysReprotect
           - ReviewCenter-Program-KeysReprotect-Help
           - ReviewCenter-Hosting-KeysReprotect
+          - ReviewCenter-Hosting-KeysReprotect-Secrets
+          - ReviewCenter-Hosting-KeysReprotect-Refused
+          - ReviewCenter-Hosting-KeysReprotect-Failure
+          - ReviewCenter-Hosting-KeysReprotect-Report
+          - ReviewCenter-Hosting-Arguments
         tests:
           - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
           - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
@@ -2592,6 +2667,8 @@ sections:
           - ReviewCenter-Api-ProjectAccess-ListProjects
           - ReviewCenter-Api-ProjectAccess-Removed
           - ReviewCenter-Hosting-ApiServices
+          - ReviewCenter-Hosting-ApiServices-OpenApi
+          - ReviewCenter-Hosting-ApiServices-UnknownAddress
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
           - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
@@ -2722,7 +2799,9 @@ sections:
           - ReviewCenter-Hosting-Health
           - ReviewCenter-Hosting-Health-Routes
           - ReviewCenter-Hosting-Logging
+          - ReviewCenter-Hosting-Logging-Silent
           - ReviewCenter-Hosting-Logging-FrameworkEntries
+          - ReviewCenter-Hosting-Arguments
         tests:
           - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
           - ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl
@@ -2773,6 +2852,7 @@ sections:
           request, so failing at start-up with a clear message lets the operator correct the setting.
         children:
           - ReviewCenter-Hosting-Database
+          - ReviewCenter-Hosting-Database-Services
           - ReviewCenter-Hosting-Database-Restart
           - ReviewCenter-Hosting-DatabaseFailure
           - ReviewCenter-Hosting-DatabaseFailure-ExitCode

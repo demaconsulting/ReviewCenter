@@ -70,18 +70,40 @@ sections:
 
       - id: ReviewCenterPuppet-System-Lifecycle-StartFailure
         title: >-
-          The tool shall exit with code 1 and print the reason when the browser cannot be started, and leave
-          no control file behind.
+          The tool shall exit with code 1 when the browser cannot be started.
         tags: [system]
         justification: |
-          A start that fails must tell the agent why, in the start command itself, and must not leave a control
-          file that makes the next command think a browser is there. The end-to-end test shows it with a start
-          whose Chromium is missing (an empty browser folder), where the message names the install command.
+          A start that fails must be told apart from one that worked by the exit code alone. The end-to-end test
+          shows it with a start whose Chromium is missing (an empty browser folder).
+        children:
+          - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-StartFailure-Reason
+        title: >-
+          The tool shall print the reason when the browser cannot be started.
+        tags: [system]
+        justification: |
+          A start that fails must tell the agent why, in the start command itself, so that the agent can fix it
+          without looking elsewhere. The end-to-end test shows it with a start whose Chromium is missing, where the
+          message names the install command.
         children:
           - ReviewCenterPuppet-BrowserDaemon-Lifecycle
-          - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
           - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
           - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure-OtherFailure
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-StartFailure-NoControlFile
+        title: >-
+          The tool shall leave no control file behind when the browser cannot be started.
+        tags: [system]
+        justification: |
+          A control file that outlives a failed start would make the next command think that a browser is there and
+          send it a request that nothing answers.
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -95,8 +117,21 @@ sections:
           code must say so.
         children:
           - ReviewCenterPuppet-PuppetProgram-Results-NotRunningExit
-          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningHint
           - ReviewCenterPuppet-ControlChannel-Protocol-StaleFile
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-NotRunning-Hint
+        title: >-
+          The tool shall point at the start command in the message that it prints for a command that is given when no
+          browser is running.
+        tags: [system]
+        justification: |
+          The fix for a missing browser is one command, so the message lets the agent run it without looking up how
+          to start the browser.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningHint
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -123,16 +158,24 @@ sections:
 
       - id: ReviewCenterPuppet-System-Interact
         title: >-
-          The tool shall navigate to a path or URL with the goto command and report the HTTP status of the
-          response.
+          The tool shall navigate to a path or URL with the goto command.
         tags: [system]
         justification: |
-          Every look at the interface starts with opening a page, and the status tells the agent at once whether
-          the page exists.
+          Every look at the interface starts with opening a page.
         children:
           - ReviewCenterPuppet-PlaywrightBrowser-Navigation
           - ReviewCenterPuppet-PlaywrightBrowser-Navigation-AbsoluteUrl
           - ReviewCenterPuppet-OTS-Playwright-Chromium
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Status
+        title: >-
+          The tool shall report the HTTP status of the response to the goto command.
+        tags: [system]
+        justification: |
+          The status tells the agent at once whether the page exists, without a look at the page itself.
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

@@ -20,8 +20,10 @@ N/A - standard test environment.
 - The health route and the home route are both registered and answer.
 - Start-up writes a structured log entry with a named property, and framework logging reaches
   the same logger providers.
-- The database is created for a configured location, the stored data is served again by a second host on the
-  same database (to a signed-in user), and an unsupported database provider ends the run with exit code 1.
+- The database is created at the configured location, the domain services resolve from it, the stored data is served
+  again by a second host on the same database (to a signed-in user), an unsupported database provider ends the run
+  with exit code 1 and an error that names it, and an anonymous visitor is sent from a protected page to the sign-in
+  page while the sign-in page itself is public.
 - The repository store, the project access rules, and the git source are registered, and a stored token stays readable
   after a restart because
   the key ring is persisted; the behavior is verified in the unit tests of `ServerHost`. The project access rules have
@@ -64,9 +66,22 @@ is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
 
 **HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne**: The server is run through
-`ServerHost.RunAsync` with an unsupported database provider; it returns 1 and the context records the failure,
-and no unhandled exception escapes. This scenario is tested by
+`ServerHost.RunAsync` with an unsupported database provider and a log file; it returns 1, the context records the
+failure, the log names the provider, and no unhandled exception escapes. This scenario is tested by
 `HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
+
+**HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile**: A host is started on a connection string that
+points to a database file that does not exist; the file is created at the configured location. This scenario is tested
+by `HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile`.
+
+**HostingSubsystem_Startup_DatabaseConfigured_DomainServicesResolve**: A host is started on a new database and the
+project, review, user, signing, and inbox services are resolved from its service provider; each resolves to an
+instance. This scenario is tested by `HostingSubsystem_Startup_DatabaseConfigured_DomainServicesResolve`.
+
+**HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin**: A host is started in memory and the client,
+which follows no redirect, requests `/projects` and `/login` without signing in; `/projects` answers a redirect to the
+sign-in page and `/login` answers HTTP status 200. This scenario is tested by
+`HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
 
 **Repository services and the key ring**: The registration of the repository store, the git source, and the token
 protector, the default folders beside the database, the persistence of the key ring so that a token stays readable after
