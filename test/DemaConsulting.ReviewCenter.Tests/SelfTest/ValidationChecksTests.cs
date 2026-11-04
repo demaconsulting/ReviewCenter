@@ -137,6 +137,42 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the attestation check reports that it verified the signature and that a changed byte is detected.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected()
+    {
+        // Arrange: the shared real run, in which the attestation check signed and verified a document
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the check passed and its detail names the verification and the detected change
+        Assert.Matches(
+            @"ReviewCenter_AttestationPdf - Passed \(\d+ ms\): CMS signature and DocMDP verified; changed byte detected",
+            log);
+    }
+
+    /// <summary>
+    ///     Test that the host check reports that the login page and the embedded asset were served and that the host
+    ///     stopped cleanly.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop()
+    {
+        // Arrange: the shared real run, in which the host check started the web host
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: both requests answered 200 and the host stopped cleanly
+        Assert.Matches(
+            @"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:\d+; "
+            + @"/login and /_framework/blazor\.web\.js returned 200; stopped cleanly",
+            log);
+    }
+
+    /// <summary>
     ///     Test that the review workflow check shows that the author's checklist answer is refused, answers and signs
     ///     with a separate reviewer, also shows that the author's signature is refused, that the approved review is
     ///     locked and that an administrator's reopen unlocks it.
@@ -334,6 +370,36 @@ public partial class ValidationChecksTests
         Assert.DoesNotContain("file-secret-value", detail);
         Assert.DoesNotContain(folder.DirectoryPath, detail);
         Assert.DoesNotContain("Warning", detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification check opens no connection to the mail server it examines.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection()
+    {
+        // Arrange: an SMTP configuration that points at a loopback listener, which would see any connection
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            using var configuration = new ConfiguredKeysEnvironment(SmtpVariables(
+                new("Notifications__Smtp__Host", "127.0.0.1"),
+                new("Notifications__Smtp__Port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new("Notifications__Smtp__Password", "unused-secret-value")));
+
+            // Act: run the check
+            var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+
+            // Assert: the check examined the settings and no connection reached the listener
+            Assert.Contains("server 127.0.0.1", detail);
+            Assert.False(listener.Pending(), "The check must not connect to the mail server");
+        }
+        finally
+        {
+            listener.Stop();
+        }
     }
 
     /// <summary>

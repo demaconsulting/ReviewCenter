@@ -74,6 +74,18 @@ break, an empty text, and null all become `/`. This scenario is tested by
 redirects to the home page and not to the other site. This scenario is tested by
 `SignIn_Login_HostileReturnUrl_RedirectsToHomePage`.
 
+**SignIn_Login_NoReturnUrl_RedirectsToHomePage**: A valid sign-in without a return URL redirects to the home page and
+sets the session cookie. This scenario is tested by `SignIn_Login_NoReturnUrl_RedirectsToHomePage`.
+
+**SignIn_Login_ReturnUrlWithEscapesAndQuery_ReturnsToTheSameAddress**: A valid sign-in with a local return URL that
+holds escaped characters and a query redirects to exactly that address. This scenario is tested by
+`SignIn_Login_ReturnUrlWithEscapesAndQuery_ReturnsToTheSameAddress`.
+
+**SignIn_ProtectedPage_AnonymousAddressWithEscapesAndQuery_KeepsTheAddressExactly**: An anonymous request for a page
+whose address holds escaped characters and a query is redirected to the login page, and the return address of that
+redirect is the address as requested, escaped once more as a whole. This scenario is tested by
+`SignIn_ProtectedPage_AnonymousAddressWithEscapesAndQuery_KeepsTheAddressExactly`.
+
 **SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn**: The login and logout endpoints are posted to
 without an antiforgery token; both answer status 400 and no cookie is set. This scenario is tested by
 `SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn`.
@@ -112,6 +124,19 @@ whose must-change-password flag is set signs in with the return URL `/projects`;
 session cookie is set, the users page is not served, and, after the flag is cleared in the store, the old cookie is
 no longer accepted and the protected page redirects. This scenario is tested by
 `SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges`.
+
+**SignIn_BuildPrincipal_AdministratorAndReviewer_OnlyAdministratorHasTheRole**: The principal is built for a system
+administrator and for an ordinary user; only the administrator is in the `SystemAdmin` role. This scenario is tested
+by `SignIn_BuildPrincipal_AdministratorAndReviewer_OnlyAdministratorHasTheRole`.
+
+**SignIn_BuildPrincipal_AnyUser_CarriesNoProjectRole**: The principal is built for a system administrator and for an
+ordinary user; neither carries a role claim other than the system administrator role. This scenario is tested by
+`SignIn_BuildPrincipal_AnyUser_CarriesNoProjectRole`.
+
+**SignIn_BuildPrincipal_TemporaryPasswordAdministrator_HasChangeClaimAndNoAdminRole**: The principal is built for a
+system administrator who has to change a temporary password; it carries the must-change-password claim and is not in
+the `SystemAdmin` role. This scenario is tested by
+`SignIn_BuildPrincipal_TemporaryPasswordAdministrator_HasChangeClaimAndNoAdminRole`.
 
 **SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim**: The shared rule is called for every combination of the
 stored flag and the claim, with and without a stored system administrator state; the principal is current only when
@@ -160,7 +185,10 @@ Repeated failures record the lockout once, which is tested by `SignIn_Login_Repe
 an attempt on a locked account records `auth.sign-in-locked` once per minute, which is tested by
 `SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry`; refused attempts record `auth.sign-in-throttled` once per
 minute, which is tested by `SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow`; and a complete flow forms an
-intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`. A failing audit trail does not
+stop a sign-in, which is tested by `SignIn_Login_FailingAuditTrail_StillSignsTheUserIn`, and the typed name of an
+unknown user that is longer than a user name is cut before it is recorded, which is tested by
+`SignIn_Login_OverlongUnknownName_RecordsCappedTypedName`.
 
 **SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames**: With the per-name limit
 lowered to 2, a known and an unknown user name are each tried three times with a wrong password; for both names the
@@ -177,6 +205,11 @@ right password are answered normally; then three wrong attempts get the generic 
 answer, so the count started again after the success. This scenario is tested by
 `SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter`.
 
+**SignIn_Login_Throttled_DoesNotCountTowardTheAccountLockout**: With the per-name limit lowered to 2, two wrong
+attempts are made and the failed-password count of the account is read; three more wrong attempts are refused with the
+throttled answer, and the count of the account is unchanged. This scenario is tested by
+`SignIn_Login_Throttled_DoesNotCountTowardTheAccountLockout`.
+
 **SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage**: The login page requested with `error=throttled`
 shows the "Too many sign-in attempts" message and not the generic error. This scenario is tested by
 `SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage`.
@@ -188,6 +221,14 @@ the redirect after the login all equal the link as requested; and the page then 
 highlighted. **SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin**: the same for a name with `+` and `&`.
 **SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage**: absolute, protocol-relative and backslash addresses that look
 like deep links are not followed after a login. These scenarios are tested by the tests of those names.
+
+**SignIn_Login_AccountWithSecondFactor_SendsToCodePageWithoutSession**: An account with a second factor posts the right
+password with a return URL; the answer is a redirect to the code page, no session cookie is set, and a challenge
+cookie is set. This scenario is tested by `SignIn_Login_AccountWithSecondFactor_SendsToCodePageWithoutSession`.
+
+**SignIn_Login_AccountWithoutSecondFactor_SignsInWithPasswordOnly**: An account without a second factor signs in with
+the password alone: a session cookie is set and no challenge cookie. This scenario is tested by
+`SignIn_Login_AccountWithoutSecondFactor_SignsInWithPasswordOnly`.
 
 **TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession**: An account with a second factor posts
 the right password; the answer is a redirect to the code page with a challenge cookie and no session cookie. This

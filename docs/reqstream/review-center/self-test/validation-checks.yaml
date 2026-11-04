@@ -12,46 +12,83 @@ sections:
     requirements:
       - id: ReviewCenter-ValidationChecks-GitAvailable
         title: >-
-          The GitAvailable check shall verify that git can be started and is at least the minimum version that
+          The GitAvailable check shall pass when git can be started and is at least the minimum version that
           ReviewCenter needs.
         justification: |
           Every content source of ReviewCenter is a git repository that is read through the git command line, so a
           machine without a usable git cannot run the tool at all; the qualification run has to say so first.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
-          - GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync
-          - GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable
 
       - id: ReviewCenter-ValidationChecks-GitRoundTrip
         title: >-
-          The GitRoundTrip check shall create a repository, read back its history, the changes between two commits
-          and a file at a revision through the production git source, and compare them with what was committed.
+          The GitRoundTrip check shall pass when the history, the changes between two commits and a file at a revision
+          that it reads back from a repository it created are what was committed.
         justification: |
           Review planning depends on the exact commits, changed files and file contents that git reports; reading
           back what was just committed proves the git integration end to end on this machine.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
 
       - id: ReviewCenter-ValidationChecks-ReviewWorkflow
         title: >-
-          The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review as one
-          user, show that the author is refused when answering the checklist while the rule is on, answer the checklist
-          as a separate reviewer, sign the review as a separate reviewer with a local-password re-authentication,
-          show that the author is refused as a signer while independent reviewers are required, show that the approved
-          review is locked and that a change is refused with the ReviewLocked rule, show that an administrator can
-          reopen it, which returns it to not approved, and read the evidence index back with the content fingerprint and
-          the record digest.
+          The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review as
+          one user, answer the checklist as a separate reviewer and sign the review as a separate reviewer with a
+          local-password re-authentication.
         justification: |
           The signed review and its evidence index are the product of ReviewCenter. Running the production services
-          through the whole path, from the project to the evidence, shows that the pieces work together on this
-          machine, on a database that is private to the run. The separate reviewer, the refusal of the author, the
-          lock, and the reopening are the rules that make an approval trustworthy, so the qualification run shows them
-          working and not only the happy path.
+          through the whole path, from the project to the signature, shows that the pieces work together on this
+          machine, on a database that is private to the run.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow-AuthorAnswerRefused
+        title: >-
+          The ReviewWorkflow check shall show that the author of the review is refused when answering the checklist
+          while the rule that the author may not answer is on.
+        justification: |
+          The refusal of the author is one of the rules that make an approval trustworthy, so the qualification run
+          shows it working and not only the happy path.
+        tests:
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow-AuthorSignatureRefused
+        title: >-
+          The ReviewWorkflow check shall show that the author of the review is refused as a signer while independent
+          reviewers are required.
+        justification: |
+          A review that the author signs would not be independent, so the qualification run shows that the rule works.
+        tests:
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow-ReviewLocked
+        title: >-
+          The ReviewWorkflow check shall show that the approved review is locked and that a change to it is refused
+          with the ReviewLocked rule.
+        justification: |
+          The lock keeps the approved content as it was signed, so the qualification run shows that it holds.
+        tests:
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow-AdministratorReopen
+        title: >-
+          The ReviewWorkflow check shall show that an administrator can reopen the locked review, which returns it
+          to not approved.
+        justification: |
+          The reopening is the only way back from the lock, so the qualification run shows that it works and that it
+          removes the approval.
+        tests:
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow-EvidenceIndex
+        title: >-
+          The ReviewWorkflow check shall read the evidence index back with the content fingerprint and the record
+          digest.
+        justification: |
+          The evidence index is what an auditor receives, so the qualification run shows that it carries the
+          fingerprint and the digest of the signed record.
+        tests:
           - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
 
       - id: ReviewCenter-ValidationChecks-Fingerprint
@@ -67,28 +104,53 @@ sections:
 
       - id: ReviewCenter-ValidationChecks-PasswordHash
         title: >-
-          The PasswordHash check shall hash a throw-away password with the production hasher, accept the right
-          password, and reject a wrong one.
+          The PasswordHash check shall hash a throw-away password with the production hasher and accept the right
+          password.
         justification: |
           The local sign-in and the re-authentication of a signature depend on the password hash; the check shows
           that it works on this platform.
         tests:
           - ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword
 
+      - id: ReviewCenter-ValidationChecks-PasswordHash-WrongRejected
+        title: >-
+          The PasswordHash check shall show that the production hasher rejects a wrong password.
+        justification: |
+          A hasher that accepted a wrong password would let anyone sign in.
+        tests:
+          - ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword
+
       - id: ReviewCenter-ValidationChecks-Totp
         title: >-
           The Totp check shall compute the codes of the published test vectors of RFC 6238 with the production
-          algorithm, accept the right code and refuse a wrong one, and fail when a vector does not match.
+          algorithm and fail when a code does not match its vector.
         justification: |
           The second factor of a person depends on the computation of the code to be the same as that of every
           authenticator app. The published vectors are the proof that the library and its use work on this platform.
         tests:
           - ValidationChecks_Totp_Run_PassesWithRfcVectors
 
+      - id: ReviewCenter-ValidationChecks-Totp-CodeAcceptance
+        title: >-
+          The Totp check shall show that the production algorithm accepts the right code and refuses a wrong code.
+        justification: |
+          An algorithm that accepted a wrong code, or refused the right one, would lock people out or let others in.
+        tests:
+          - ValidationChecks_Totp_Run_PassesWithRfcVectors
+
       - id: ReviewCenter-ValidationChecks-AuditChain
         title: >-
-          The AuditChain check shall append entries to the audit chain of a temporary database, verify that the
-          chain is intact, change an entry, and verify that the production verifier reports the change.
+          The AuditChain check shall append entries to the audit chain of a temporary database and verify that the
+          chain is intact.
+        justification: |
+          The audit trail is evidence only if an untouched chain verifies as intact.
+        tests:
+          - ValidationChecks_AuditChain_Run_DetectsTamperedEntry
+
+      - id: ReviewCenter-ValidationChecks-AuditChain-TamperDetected
+        title: >-
+          The AuditChain check shall change an entry of the chain and verify that the production verifier reports the
+          change.
         justification: |
           The audit trail is evidence only if a change to it is found; the check proves that the verifier finds
           one, rather than only that an untouched chain passes.
@@ -98,78 +160,436 @@ sections:
       - id: ReviewCenter-ValidationChecks-AttestationPdf
         title: >-
           The AttestationPdf check shall render and sign an attestation PDF with a temporary self-signed key through
-          the production renderer and signer, verify the CMS signature and the DocMDP certification independently of
-          the production code, and show that a changed byte makes the verification fail.
+          the production renderer and signer, and verify the CMS signature and the DocMDP certification independently
+          of the production code.
         justification: |
           The signed attestation is what an auditor opens. Verifying it with the platform cryptography, and not with
-          the code that made it, proves that the document is really signed and that a change to it is detectable.
+          the code that made it, proves that the document is really signed.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected
+
+      - id: ReviewCenter-ValidationChecks-AttestationPdf-TamperDetected
+        title: >-
+          The AttestationPdf check shall show that a changed byte of the signed attestation PDF makes the
+          verification fail.
+        justification: |
+          A signature is only worth something if a change to the document is detectable.
+        tests:
+          - ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected
 
       - id: ReviewCenter-ValidationChecks-HostStart
         title: >-
-          The HostStart check shall start the real web host from the temporary settings alone, with no configuration
-          file, environment variable or host default read, on an ephemeral loopback port, request the login page and
-          an embedded static asset, expect success for both, and stop the host cleanly.
+          The HostStart check shall start the real web host from the temporary settings alone, reading no
+          configuration file, environment variable or host default.
         justification: |
           Starting the host proves that the dependency injection, the middleware, the embedded assets and the
-          database start-up work in the deployed executable, including a single-file publish; an ephemeral port on
-          the loopback interface never collides with the configured port. The host is built from an empty builder, so
-          a broken appsettings.json, an ambient listen address or an environment name on the machine cannot change
-          what the qualification run proves, and a host that bound anything but one loopback port fails the check.
+          database start-up work in the deployed executable, including a single-file publish. The host is built from
+          an empty builder, so a broken appsettings.json or an environment name on the machine cannot change what the
+          qualification run proves.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
-          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
           - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
-          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+
+      - id: ReviewCenter-ValidationChecks-HostStart-EphemeralLoopbackPort
+        title: >-
+          The HostStart check shall have the web host listen on one ephemeral loopback port and not on an address
+          that the environment of the machine names.
+        justification: |
+          An ephemeral port on the loopback interface never collides with the configured port, and an ambient listen
+          address cannot expose the host of a qualification run.
+        tests:
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+
+      - id: ReviewCenter-ValidationChecks-HostStart-NothingAmbientTouched
+        title: >-
+          The HostStart check shall create nothing in the places that the ambient database, key ring, cache and
+          attestation settings of the machine name.
+        justification: |
+          A qualification run that used the configured database or key ring would depend on, and could change, the
+          deployment that it qualifies.
+        tests:
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+
+      - id: ReviewCenter-ValidationChecks-HostStart-MoreThanOneAddress
+        title: >-
+          The HostStart check shall fail when the web host listens on more than one address.
+        justification: |
+          A configuration that adds a second endpoint, for example one for all interfaces, must fail the check
+          instead of being tested through the first address and ignored.
+        tests:
           - HostStartCheck_ExpectOneLoopbackAddress_MoreThanOneAddress_ThrowsValidationFailed
-          - HostStartCheck_ExpectOneLoopbackAddress_NotLoopbackOrNoPort_ThrowsValidationFailed
+
+      - id: ReviewCenter-ValidationChecks-HostStart-NoAddress
+        title: >-
+          The HostStart check shall fail when the web host listens on no address.
+        justification: |
+          A host without an address cannot be asked anything, so the check cannot pass.
+        tests:
           - HostStartCheck_ExpectOneLoopbackAddress_NoAddressOrOneLoopback_RefusesOrAccepts
+
+      - id: ReviewCenter-ValidationChecks-HostStart-NotLoopback
+        title: >-
+          The HostStart check shall fail when the address of the web host is not a loopback address.
+        justification: |
+          A host that listens beyond the loopback interface can be reached from the network during a qualification
+          run.
+        tests:
+          - HostStartCheck_ExpectOneLoopbackAddress_NotLoopbackOrNoPort_ThrowsValidationFailed
+
+      - id: ReviewCenter-ValidationChecks-HostStart-NoRealPort
+        title: >-
+          The HostStart check shall fail when the address of the web host has no real port.
+        justification: |
+          Port 0 is only the request for a free port, so a host that still reports it did not bind anything the check
+          could ask.
+        tests:
+          - HostStartCheck_ExpectOneLoopbackAddress_NotLoopbackOrNoPort_ThrowsValidationFailed
+
+      - id: ReviewCenter-ValidationChecks-HostStart-OneLoopbackAccepted
+        title: >-
+          The HostStart check shall accept a web host that listens on exactly one loopback address with a real port.
+        justification: |
+          The refusals above must not stop the one address that the check is meant to use, in the IPv4 form or the
+          IPv6 form.
+        tests:
+          - HostStartCheck_ExpectOneLoopbackAddress_NoAddressOrOneLoopback_RefusesOrAccepts
+
+      - id: ReviewCenter-ValidationChecks-HostStart-LoginPage
+        title: >-
+          The HostStart check shall request the login page of the web host and expect the answer 200.
+        justification: |
+          The login page needs the middleware, the database and the rendering of the host, so its answer shows that
+          the host works.
+        tests:
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop
+
+      - id: ReviewCenter-ValidationChecks-HostStart-StaticAsset
+        title: >-
+          The HostStart check shall request an embedded static asset of the web host and expect the answer 200.
+        justification: |
+          The embedded assets must be served by the deployed executable, including a single-file publish.
+        tests:
+          - ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop
+
+      - id: ReviewCenter-ValidationChecks-HostStart-CleanStop
+        title: >-
+          The HostStart check shall stop the web host cleanly after the requests.
+        justification: |
+          A host that does not stop would leave the process of a qualification run hanging.
+        tests:
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop
 
       - id: ReviewCenter-ValidationChecks-ConfiguredDatabase
         title: >-
-          The ConfiguredDatabase check shall, only when asked for with `--check-config`, load the configuration the way
-          the server does, open the configured database read-only, compare its tables and columns with the model of
-          this build, report differences by name only, never write, be skipped when nothing is configured, and be
-          skipped, with the reason, when the configured database file does not exist yet.
+          The ConfiguredDatabase check shall pass when the tables and columns of the configured database match the
+          model of this build.
         justification: |
           An operator upgrading a deployment wants to know, before starting the server, that the database can be
-          opened and has the schema of the new build. The check must not change the database and must not reveal
-          the connection string or the path, which can hold secrets, in a report that is archived. On a fresh
-          installation the file is created at the first start, so a missing file is not a failure.
+          opened and has the schema of the new build.
         tests:
-          - ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped
+          - ValidationChecks_ConfiguredDatabase_CurrentSchema_PassesWithoutWriting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-ReadOnly
+        title: >-
+          The ConfiguredDatabase check shall open the configured database read-only and never write to it.
+        justification: |
+          The check must not change the database that it examines, so that running it is safe on a deployment.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_CurrentSchema_PassesWithoutWriting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-NoPathInReport
+        title: >-
+          The ConfiguredDatabase check shall not reveal the connection string or the path of the database in its
+          report.
+        justification: |
+          The connection string and the path can hold secrets, and the report is archived.
+        tests:
           - ValidationChecks_ConfiguredDatabase_CurrentSchema_PassesWithoutWriting
           - ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly
           - ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingTableNamed
+        title: >-
+          The ConfiguredDatabase check shall fail and name the table when a table of the model of this build is
+          missing from the configured database.
+        justification: |
+          A report by name tells the operator what is different without anything that could be a secret.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-NothingConfiguredSkipped
+        title: >-
+          The ConfiguredDatabase check shall be skipped, with the reason, when no database is configured.
+        justification: |
+          A machine without a configured database has nothing to check, which is not a failure.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingFileSkipped
+        title: >-
+          The ConfiguredDatabase check shall be skipped, with the reason, when the configured database file does not
+          exist yet.
+        justification: |
+          On a fresh installation the file is created at the first start, so a missing file is not a failure.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingFileNotCreated
+        title: >-
+          The ConfiguredDatabase check shall not create the configured database file when it does not exist.
+        justification: |
+          A database created by a check would hide the fact that the deployment had none.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase-UnsupportedProvider
+        title: >-
+          The ConfiguredDatabase check shall fail and name the provider when the configured database provider is not
+          supported.
+        justification: |
+          The server refuses such a provider, so the operator should hear about it before the start.
+        tests:
           - ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails
 
       - id: ReviewCenter-ValidationChecks-ConfiguredKeys
         title: >-
-          The ConfiguredKeys check shall, only when asked for with `--check-config`, load the configuration the way the
-          server does, read the configured key ring and the database read-only without creating a key, a folder, or a
-          file, report the protection mode, the number of key files and how many are not encrypted, and the number of
-          protected secrets and how many cannot be decrypted, fail when secrets cannot be decrypted, when the ring is
-          empty but the database holds secrets, when the ring is not encrypted although
-          DataProtection:RequireEncryptedKeys is true, or when the newest key cannot be decrypted, also report the
-          attestation key without creating it (its subject, thumbprint, and validity, or that it will be created at
-          the first start, with a warning note for a plaintext key file of an earlier version that is ignored, and the
-          expiry warning of a certificate that ends soon or has ended) for the SelfSigned, CertificateStore and File
-          providers, and fail when the protected attestation key file cannot be decrypted or the File provider
-          has no path, no file, no password or a wrong password, never show a key, a secret, a password, or a
-          path other than the key folder (a problem with the attestation key names only a file name or a setting), and
-          be skipped, with the reason, when nothing is configured, the database file does not exist yet, or the key
-          folder does not exist yet and there is nothing to protect.
+          The ConfiguredKeys check shall pass when the configured key ring reads every protected secret of the
+          configured database, and report the protection mode, the number of key files and how many are not
+          encrypted, and the number of protected secrets and how many cannot be decrypted.
         justification: |
           After a restore the operator wants to know, before starting the server, whether the key ring and the database
-          belong together. The check must not create what it looks for: a key created while the ring is examined would
-          hide the loss. On a fresh installation both are created at the first start, so their absence is not a failure,
-          but a database with secrets and no ring is. The report is archived, so it must not hold anything secret.
+          belong together. The counts tell the operator what the ring protects without showing any of it.
+        tests:
+          - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-NothingConfiguredSkipped
+        title: >-
+          The ConfiguredKeys check shall be skipped, with the reason, when no database is configured.
+        justification: |
+          A machine without a configured database has no secrets to check, which is not a failure.
         tests:
           - ValidationChecks_ConfiguredKeys_NothingConfigured_IsSkipped
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-MissingDatabaseSkipped
+        title: >-
+          The ConfiguredKeys check shall be skipped, with the reason, when the configured database file does not exist
+          yet.
+        justification: |
+          On a fresh installation the database is created at the first start, so its absence is not a failure.
+        tests:
+          - ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-NoFolderNoSecretsSkipped
+        title: >-
+          The ConfiguredKeys check shall be skipped, with the reason, when the key folder does not exist yet and the
+          database holds no protected secret.
+        justification: |
+          On a fresh installation the key ring is created at the first start and there is nothing to protect, so the
+          absence of the folder is not a failure.
+        tests:
+          - ValidationChecks_ConfiguredKeys_NoKeyFolderAndNoSecrets_IsSkippedWithoutCreatingTheFolder
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-CertificateRing
+        title: >-
+          The ConfiguredKeys check shall pass and report the protection mode Certificate with no key file that is not
+          encrypted for a key ring that is protected with a certificate.
+        justification: |
+          A deployment that protects its key ring with a certificate wants the check to read that ring with the same
+          certificate as the server.
+        tests:
+          - ValidationChecks_ConfiguredKeys_CertificateRing_PassesAndNeverPrintsThePassword
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-EmptyRingFails
+        title: >-
+          The ConfiguredKeys check shall fail, naming the key folder and the number of secrets, when the key ring is
+          empty but the database holds protected secrets.
+        justification: |
+          A database with secrets and no key ring is the loss of the keys, which the operator must hear of before the
+          server start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-OtherRingFails
+        title: >-
+          The ConfiguredKeys check shall fail, with the number of secrets that cannot be decrypted and the ids of
+          their rows, when the key ring cannot decrypt protected secrets of the database.
+        justification: |
+          Secrets of another installation next to this ring cannot be read, and the ids tell the operator which rows
+          are affected.
+        tests:
+          - ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-WrongCertificate
+        title: >-
+          The ConfiguredKeys check shall fail when the newest key of the ring cannot be decrypted with the configured
+          certificate.
+        justification: |
+          A server that started with the wrong certificate could not read the ring and would create a new key, which
+          would hide the loss of the old one.
+        tests:
+          - ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-PlaintextWhenEncryptionRequired
+        title: >-
+          The ConfiguredKeys check shall fail when the key ring is not encrypted although
+          DataProtection:RequireEncryptedKeys is true.
+        justification: |
+          The policy exists to keep keys from being stored in plain text, so a ring that breaks it is a finding.
+        tests:
+          - ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-UnusableSettings
+        title: >-
+          The ConfiguredKeys check shall fail, naming the setting group, when the key ring settings are not usable.
+        justification: |
+          The server refuses such settings, so the operator should hear of it before the start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedProvider
+        title: >-
+          The ConfiguredKeys check shall fail and name the provider when the configured database provider is not
+          supported.
+        justification: |
+          The server refuses such a provider, so the operator should hear about it before the start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationKeyReport
+        title: >-
+          The ConfiguredKeys check shall report the subject, thumbprint and validity of the attestation key of the
+          SelfSigned provider, or that it will be created at the first start.
+        justification: |
+          The attestation key signs what an auditor reads, so the operator wants to see which key the server will use.
+        tests:
+          - ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity
+          - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-LegacyAttestationWarning
+        title: >-
+          The ConfiguredKeys check shall add a warning to its report, and still pass, when a plaintext attestation
+          key file of an earlier version is present, which the server ignores.
+        justification: |
+          A key file of an earlier version is not encrypted and is no longer used, so the operator should delete it.
+        tests:
+          - ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-UnreadableAttestationKey
+        title: >-
+          The ConfiguredKeys check shall fail, naming the file and not the folder, when the protected attestation key
+          file cannot be decrypted.
+        justification: |
+          A key that cannot be decrypted cannot sign, so the operator must hear of it before the server start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationIoError
+        title: >-
+          The ConfiguredKeys check shall fail, naming the setting to correct and not the folder, when the attestation
+          key file cannot be read because of an I/O error.
+        justification: |
+          The operator can correct a setting that the message points to, and a path in an archived report would tell
+          a reader where the keys are kept.
+        tests:
+          - ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedAttestationProvider
+        title: >-
+          The ConfiguredKeys check shall fail, naming the setting and the supported providers, when the configured
+          attestation provider is not supported.
+        justification: |
+          The server refuses such a provider, so the operator should hear about it before the start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderReport
+        title: >-
+          The ConfiguredKeys check shall report the subject, thumbprint and validity of the attestation key of the
+          File provider.
+        justification: |
+          The operator wants to see which certificate the server will sign with, without a path or a password.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning
+        title: >-
+          The ConfiguredKeys check shall add a warning to its report when the attestation certificate ends soon or
+          has ended.
+        justification: |
+          A certificate that has ended cannot sign a valid attestation, so the operator should hear about it in time.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPassword
+        title: >-
+          The ConfiguredKeys check shall fail, naming the file and the two password settings and not the folder, when
+          the certificate file of the File provider needs a password that is not set.
+        justification: |
+          The operator can correct a setting that the message points to.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderWithoutPassword_FailsNamingTheFileAndSettings
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderMissingFile
+        title: >-
+          The ConfiguredKeys check shall fail, naming the file and not the folder, when the certificate file of the
+          File provider does not exist.
+        justification: |
+          The server cannot sign without the certificate, so the operator must hear of it before the start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderMissingFile_FailsNamingTheFileWithoutFolder
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPath
+        title: >-
+          The ConfiguredKeys check shall fail, naming the setting, when the File provider has no certificate path.
+        justification: |
+          The File provider cannot work without a path, and the operator can correct the setting that is named.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderWithoutPath_FailsNamingTheSetting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderWrongPassword
+        title: >-
+          The ConfiguredKeys check shall fail with a message about a wrong password when the certificate file of the
+          File provider is protected with another password.
+        justification: |
+          The operator must be told that the password is wrong, without the check repeating any password.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderUntrustedKey
+        title: >-
+          The ConfiguredKeys check shall fail, naming the Attestation:RequireTrustedKey setting, when a trusted key is
+          required and the certificate of the File provider is self-signed.
+        justification: |
+          The policy applies to every provider, and the operator must hear of a certificate that breaks it before the
+          server start.
+        tests:
+          - ValidationChecks_ConfiguredKeys_FileProviderUntrustedKeyWithRequireTrustedKey_Fails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-CreatesNothing
+        title: >-
+          The ConfiguredKeys check shall not create or change a key, a folder or a file.
+        justification: |
+          The check must not create what it looks for: a key created while the ring is examined would hide the loss.
+        tests:
           - ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything
           - ValidationChecks_ConfiguredKeys_NoKeyFolderAndNoSecrets_IsSkippedWithoutCreatingTheFolder
+          - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
+          - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
+          - ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds
+          - ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey
+          - ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity
+          - ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses
+          - ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile
+          - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-NoSecretInReport
+        title: >-
+          The ConfiguredKeys check shall not show a key, a secret, a ciphertext or a password in its report.
+        justification: |
+          The report is archived, so it must not hold anything secret.
+        tests:
           - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
           - ValidationChecks_ConfiguredKeys_CertificateRing_PassesAndNeverPrintsThePassword
           - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
@@ -177,18 +597,28 @@ sections:
           - ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey
           - ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails
           - ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking
-          - ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails
+          - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
+          - ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys-NoPathInReport
+        title: >-
+          The ConfiguredKeys check shall not show a path other than the key folder in its report; a problem with the
+          attestation key names only a file name or a setting.
+        justification: |
+          A path in an archived report tells a reader where the secrets are kept.
+        tests:
+          - ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything
+          - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
+          - ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds
+          - ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking
           - ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity
           - ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses
           - ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile
           - ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder
-          - ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting
           - ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword
           - ValidationChecks_ConfiguredKeys_FileProviderWithoutPassword_FailsNamingTheFileAndSettings
           - ValidationChecks_ConfiguredKeys_FileProviderMissingFile_FailsNamingTheFileWithoutFolder
-          - ValidationChecks_ConfiguredKeys_FileProviderWithoutPath_FailsNamingTheSetting
           - ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder
-          - ValidationChecks_ConfiguredKeys_FileProviderUntrustedKeyWithRequireTrustedKey_Fails
 
       - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSkipped
         title: >-
@@ -319,33 +749,81 @@ sections:
           The check examines settings only. A connection to a mail server would make the result depend on the
           network, and would send the password to a machine on the strength of a mere check.
         tests:
-          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection
 
       - id: ReviewCenter-ValidationChecks-Hermetic
         title: >-
           The default checks shall create every file they need in a uniquely named temporary folder that is removed
-          at the end, use an in-memory configuration, and listen only on an ephemeral loopback port.
+          at the end of the run.
         justification: |
-          The qualification run must give the same answer on every machine, must not depend on or change the
-          configuration of the deployment, and must leave nothing behind.
+          The qualification run must give the same answer on every machine and must leave nothing behind.
         tests:
-          - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+
+      - id: ReviewCenter-ValidationChecks-Hermetic-InMemoryConfiguration
+        title: >-
+          The default checks shall use an in-memory configuration and not read the configuration of the deployment.
+        justification: |
+          The qualification run must not depend on the configuration of the machine it runs on.
+        tests:
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+
+      - id: ReviewCenter-ValidationChecks-Hermetic-EphemeralLoopbackPort
+        title: >-
+          The default checks shall listen only on an ephemeral loopback port.
+        justification: |
+          A fixed port could collide with a service of the machine, and a listener on another address would be
+          reachable from the network.
+        tests:
           - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
 
       - id: ReviewCenter-ValidationChecks-FastCommit
         title: >-
-          The checks shall speed up the commits of their throw-away SQLite database through one internal interceptor
-          that is created with the temporary folder of the check and relaxes only a writable database file inside
-          that folder, and no database of the server or of the configured deployment shall ever be relaxed.
+          The checks shall speed up the commits of their throw-away SQLite database, which is inside the temporary
+          folder of the check.
         justification: |
           A review workflow makes about a hundred commits, and waiting for the disk after each one dominates the run
-          time of the qualification. Turning that wait off is only acceptable for a database that is thrown away. The
-          interceptor cannot be created without the folder it is allowed to act in, ignores read-only, in-memory
-          and outside-the-folder databases, and is not part of the production registration, so the relaxation cannot
-          reach stored review evidence.
+          time of the qualification. Turning that wait off is acceptable for a database that is thrown away.
         tests:
           - ValidationChecks_FastCommit_SelfTestServices_RelaxesTheEmbeddedDatabase
+
+      - id: ReviewCenter-ValidationChecks-FastCommit-ProductionDefault
+        title: >-
+          The production registration of the server shall keep the default commit settings of the database.
+        justification: |
+          The relaxation must not reach stored review evidence, so it is not part of the production registration.
+        tests:
           - ValidationChecks_FastCommit_ProductionServices_KeepDefaultCommitSettings
+
+      - id: ReviewCenter-ValidationChecks-FastCommit-OnlyInsideFolder
+        title: >-
+          The speed-up shall relax only a database file inside the temporary folder of the check, and no database
+          outside that folder.
+        justification: |
+          A database of the server or of the configured deployment must never be relaxed.
+        tests:
           - ValidationChecks_FastCommit_Interceptor_RelaxesOnlyDatabasesInsideItsFolder
+
+      - id: ReviewCenter-ValidationChecks-FastCommit-ReadOnlyUntouched
+        title: >-
+          The speed-up shall leave a database that is opened read-only alone.
+        justification: |
+          A read-only database is one that is examined, such as a stored deployment, and it must not be changed.
+        tests:
+          - ValidationChecks_FastCommit_Interceptor_RelaxesOnlyDatabasesInsideItsFolder
+
+      - id: ReviewCenter-ValidationChecks-FastCommit-InMemoryUntouched
+        title: >-
+          The speed-up shall leave an in-memory database alone.
+        justification: |
+          An in-memory database has no disk to wait for, so there is nothing to relax.
+        tests:
           - ValidationChecks_FastCommit_Interceptor_LeavesInMemoryDatabaseAlone
+
+      - id: ReviewCenter-ValidationChecks-FastCommit-RequiresAllowedFolder
+        title: >-
+          The speed-up shall refuse to be created without the folder in which it is allowed to act.
+        justification: |
+          Without a folder it could not tell a throw-away database from a stored one.
+        tests:
           - ValidationChecks_FastCommit_Interceptor_RequiresAllowedFolder

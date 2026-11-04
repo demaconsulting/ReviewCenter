@@ -82,6 +82,10 @@ nonce is refused with the reason class `token-invalid` or `state-or-nonce`, sets
 token value reaches the log or the trail. This scenario is tested by
 `OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed`.
 
+**OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed**: An identity token whose lifetime ended an hour ago, or that is
+signed with a key that is not the key of the provider, is refused with the reason class `token-invalid`, sets no cookie
+and creates no account. This scenario is tested by `OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed`.
+
 **OidcSignIn_AccountDisabledWhileSessionIsOpen_EndsTheSession**: An account that is disabled after the sign-in loses
 its open session at the next request. This scenario is tested by
 `OidcSignIn_AccountDisabledWhileSessionIsOpen_EndsTheSession`.
@@ -93,6 +97,10 @@ asks for a verified one and accepted otherwise. This scenario is tested by
 **OidcSignIn_TooManyCallbacks_AreThrottled**: After the callbacks allowed for one client address by the throttle, a
 correct sign-in is refused too, creates no account and is recorded as `throttled`. This scenario is tested by
 `OidcSignIn_TooManyCallbacks_AreThrottled`.
+
+**OidcSignIn_ThrottledCallback_DoesNotExchangeTheCode**: After the callbacks allowed for one client address by the
+throttle, a correct sign-in is refused and the token endpoint of the provider receives no request for it, so the code
+is not exchanged. This scenario is tested by `OidcSignIn_ThrottledCallback_DoesNotExchangeTheCode`.
 
 **OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson**: With a low limit per name and a higher limit per
 address, more bad callbacks than the limit per name come from one address and are refused as before; another browser

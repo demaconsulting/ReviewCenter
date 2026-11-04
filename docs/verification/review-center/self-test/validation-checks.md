@@ -101,6 +101,16 @@ PDF and host start (`/login`,
 `stopped cleanly`) checks each show a passed line with their detail. This scenario is tested by
 `ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails`.
 
+**ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected**: The log of the real run is
+read; the attestation PDF check shows a passed line whose detail says that the CMS signature and the DocMDP
+certification were verified and that a changed byte was detected. This scenario is tested by
+`ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected`.
+
+**ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop**: The log of the real run is read;
+the host start check shows a passed line whose detail says that the loopback host answered 200 for `/login` and the
+embedded Blazor script and stopped cleanly. This scenario is tested by
+`ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop`.
+
 **ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails**: The review workflow check is run over its
 embedded database. It creates the review as the user `selftest` (the author) and seats a second user,
 `selftest-reviewer`, as reviewer. It shows that the author's answer to the checklist is refused with
@@ -236,6 +246,11 @@ host `mail.example.com`, port 587, `StartTls`, a user name, and a password file 
 holds "SMTP", "mail.example.com:587" and "password from a file", and neither the secret, nor the folder of the file,
 nor a warning. The host does not exist, so the check passes only because it opens no connection. This scenario is
 tested by the test of the same name.
+
+**ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection**: A complete SMTP configuration names a
+loopback listener as the mail server. The check passes and its report names that server, and the listener has no
+pending connection, so the check opened none. This scenario is tested by
+`ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection`.
 
 **ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt**: The same configuration with an
 inline password. The report holds a warning, the name `PasswordFile`, and "inline in the configuration", and not the

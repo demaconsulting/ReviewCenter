@@ -318,6 +318,25 @@ public partial class ValidationTests
     }
 
     /// <summary>
+    ///     Test that the duration of a check is recorded in the results file.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_SlowCheck_RecordsDurationInResults()
+    {
+        // Arrange: a check that takes at least 150 ms
+        var checks = new[] { FastValidationChecks.Slow("ReviewCenter_Slow", TimeSpan.FromMilliseconds(150)) };
+
+        // Act: run validation with a JUnit XML results file
+        var output = Run(checks, ".xml");
+
+        // Assert: the test case of the check carries a duration of at least 150 ms, in seconds
+        var match = Regex.Match(output.Results, @"<testcase[^>]*\stime=""([0-9.,]+)""");
+        Assert.True(match.Success, "The results should record the duration of the check:" + output.Results);
+        var seconds = double.Parse(match.Groups[1].Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(seconds >= 0.14, $"Recorded duration {seconds} s is too short");
+    }
+
+    /// <summary>
     ///     Test that a check that blocks synchronously and ignores its token is failed at the deadline, without
     ///     the runner waiting for it. Before the deadline was enforced by the runner this call never returned.
     /// </summary>

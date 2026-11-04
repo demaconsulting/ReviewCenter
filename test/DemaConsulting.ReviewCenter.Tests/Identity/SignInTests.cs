@@ -22,6 +22,7 @@ using System.Net;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -630,6 +631,214 @@ public class SignInTests
         // Act and assert: null arguments are refused
         Assert.Throws<ArgumentNullException>(() => SignIn.AddSignIn(null!, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
         Assert.Throws<ArgumentNullException>(() => SignIn.AddSignIn(new ServiceCollection(), null!));
+    }
+
+    /// <summary>
+    ///     Test that a login without a return URL leads to the home page.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_NoReturnUrl_RedirectsToHomePage()
+    {
+        // Arrange: an application with a user
+        await using var app = await StartAsync();
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+
+        // Act: log in without a return URL
+        var response = await browser.LoginAsync("ann", TestBrowser.Password);
+
+        // Assert: redirected to the home page
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.OriginalString);
+    }
+
+    /// <summary>
+    ///     Test that attempts refused by the throttle are not counted as failed passwords of the account, so a
+    ///     throttled client cannot push the account toward its lockout.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_Throttled_DoesNotCountTowardTheAccountLockout()
+    {
+        // Arrange: a limit of two attempts per name, both used up with wrong passwords
+        await using var app = await StartAsync(perName: 2);
+        await CreateUserAsync(app, "ann");
+        var users = app.Services.GetRequiredService<UserService>();
+        using var browser = new TestBrowser(app);
+        await browser.LoginAsync("ann", "wrong password here");
+        await browser.LoginAsync("ann", "wrong password here");
+        var before = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!.FailedLoginCount;
+
+        // Act: three more wrong attempts, which the throttle refuses
+        HttpResponseMessage? last = null;
+        for (var i = 0; i < 3; i++)
+        {
+            last = await browser.LoginAsync("ann", "wrong password here");
+        }
+
+        // Assert: the attempts were refused as throttled and the failed-password count of the account is unchanged
+        Assert.Equal("/login?error=throttled", last!.Headers.Location?.OriginalString);
+        Assert.Equal(2, before);
+        Assert.Equal(before, (await users.GetAsync("ann", TestContext.Current.CancellationToken))!.FailedLoginCount);
+    }
+
+    /// <summary>
+    ///     Test that a return URL with escaped characters and a query string is used exactly as it was written.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_ReturnUrlWithEscapesAndQuery_ReturnsToTheSameAddress()
+    {
+        // Arrange: an application with a user, and a return address with escaped slash, percent sign and a query
+        await using var app = await StartAsync();
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+        const string Address = "/projects/1/reviews/REV-1/files/a%2Fb%25c.txt?line=2&x=%26";
+
+        // Act: log in with that return address
+        var response = await browser.LoginAsync("ann", TestBrowser.Password, Address);
+
+        // Assert: the redirect leads to the very same address
+        Assert.Equal(Address, response.Headers.Location?.OriginalString);
+    }
+
+    /// <summary>
+    ///     Test that an anonymous request for a protected address with escaped characters and a query string is sent
+    ///     to the login page with that address, as it was written, as the return address.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_ProtectedPage_AnonymousAddressWithEscapesAndQuery_KeepsTheAddressExactly()
+    {
+        // Arrange: an application and a visitor who is not signed in
+        await using var app = await StartAsync();
+        using var browser = new TestBrowser(app);
+        const string Address = "/projects/1/reviews/REV-1/files/100%25%20done.txt?line=2&x=%26";
+
+        // Act: request the address
+        var response = await browser.Client.GetAsync(Address, TestContext.Current.CancellationToken);
+
+        // Assert: redirected to the login page, with the whole address escaped once more as the return address
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            "/login?ReturnUrl=" + Uri.EscapeDataString(Address),
+            response.Headers.Location?.OriginalString);
+    }
+
+    /// <summary>
+    ///     Test that an account without a second factor signs in with the password alone: a session cookie and no
+    ///     challenge cookie.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_AccountWithoutSecondFactor_SignsInWithPasswordOnly()
+    {
+        // Arrange: an application with an account that has no second factor
+        await using var app = await StartAsync();
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+
+        // Act: log in with the password
+        var response = await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+
+        // Assert: signed in and sent to the requested place, without any challenge
+        Assert.Equal("/projects", response.Headers.Location?.OriginalString);
+        Assert.Single(AuthCookies(browser));
+        Assert.DoesNotContain(
+            browser.SetCookieHeaders,
+            h => h.StartsWith(TotpSignIn.CookieName + "=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that the right password of an account with a second factor sends the browser to the code page and
+    ///     sets no session cookie.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_AccountWithSecondFactor_SendsToCodePageWithoutSession()
+    {
+        // Arrange: an application with an account that has a second factor
+        await using var app = await StartAsync();
+        await CreateUserAsync(app, "ann");
+        var totp = app.Services.GetRequiredService<TotpService>();
+        var actor = new Actor("ann", "ann");
+        var enrollment = await totp.BeginEnrollmentAsync(actor, TestBrowser.Password, TestContext.Current.CancellationToken);
+        var secret = TotpOracle.FromBase32(enrollment.SecretBase32);
+        await totp.ConfirmEnrollmentAsync(
+            actor, TotpOracle.CodeAt(secret, DateTimeOffset.UtcNow), TestContext.Current.CancellationToken);
+        using var browser = new TestBrowser(app);
+
+        // Act: log in with the right password
+        var response = await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+
+        // Assert: sent to the code page, with a challenge cookie and without a session cookie
+        Assert.Equal(TotpSignIn.LoginPath, response.Headers.Location?.OriginalString);
+        Assert.Empty(AuthCookies(browser));
+        Assert.Contains(
+            browser.SetCookieHeaders,
+            h => h.StartsWith(TotpSignIn.CookieName + "=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that only a system administrator who has no temporary password gets the administrator role in the
+    ///     principal.
+    /// </summary>
+    [Fact]
+    public void SignIn_BuildPrincipal_AdministratorAndReviewer_OnlyAdministratorHasTheRole()
+    {
+        // Arrange: a system administrator and a reviewer
+        var admin = new User { Id = 1, Username = "adm", DisplayName = "Adm", IsSystemAdmin = true, Enabled = true };
+        var reviewer = new User { Id = 2, Username = "rev", DisplayName = "Rev", Enabled = true };
+
+        // Act: build the principals
+        var forAdmin = SignIn.BuildPrincipal(admin);
+        var forReviewer = SignIn.BuildPrincipal(reviewer);
+
+        // Assert: only the administrator has the role
+        Assert.True(forAdmin.IsInRole(SignIn.AdminRole));
+        Assert.False(forReviewer.IsInRole(SignIn.AdminRole));
+    }
+
+    /// <summary>
+    ///     Test that the principal holds no project role: apart from the user name and display name, the only claim
+    ///     it can carry is the system administrator role.
+    /// </summary>
+    [Fact]
+    public void SignIn_BuildPrincipal_AnyUser_CarriesNoProjectRole()
+    {
+        // Arrange: a system administrator and a reviewer
+        var admin = new User { Id = 1, Username = "adm", DisplayName = "Adm", IsSystemAdmin = true, Enabled = true };
+        var reviewer = new User { Id = 2, Username = "rev", DisplayName = "Rev", Enabled = true };
+
+        // Act: build the principals
+        var claims = new[] { SignIn.BuildPrincipal(admin), SignIn.BuildPrincipal(reviewer) }.SelectMany(p => p.Claims).ToList();
+
+        // Assert: the claims are only user name, display name and the administrator role
+        Assert.All(claims, claim => Assert.Contains(
+            claim.Type,
+            new[] { System.Security.Claims.ClaimTypes.Name, SignIn.DisplayNameClaimType, System.Security.Claims.ClaimTypes.Role }));
+        Assert.All(claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role), claim => Assert.Equal(SignIn.AdminRole, claim.Value));
+    }
+
+    /// <summary>
+    ///     Test that the principal of a system administrator with a temporary password has the must-change-password
+    ///     claim and no administrator role.
+    /// </summary>
+    [Fact]
+    public void SignIn_BuildPrincipal_TemporaryPasswordAdministrator_HasChangeClaimAndNoAdminRole()
+    {
+        // Arrange: a system administrator who has to change the password
+        var user = new User
+        {
+            Id = 1,
+            Username = "adm",
+            DisplayName = "Adm",
+            IsSystemAdmin = true,
+            MustChangePassword = true,
+            Enabled = true
+        };
+
+        // Act: build the principal
+        var principal = SignIn.BuildPrincipal(user);
+
+        // Assert: the claim is there and the role is withheld
+        Assert.True(SignIn.IsPasswordChangeRequired(principal));
+        Assert.False(principal.IsInRole(SignIn.AdminRole));
     }
 
     /// <summary>

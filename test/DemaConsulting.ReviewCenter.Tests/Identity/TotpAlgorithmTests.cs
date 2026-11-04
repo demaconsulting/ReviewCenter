@@ -101,6 +101,23 @@ public class TotpAlgorithmTests
     }
 
     /// <summary>
+    ///     Test that the code for the person has six digits, with the leading zero kept.
+    /// </summary>
+    [Fact]
+    public void TotpAlgorithm_ComputeCode_DefaultDigits_GivesSixDigitsWithLeadingZero()
+    {
+        // Arrange: the published instant whose eight digit code 07081804 ends in the six digits 081804
+        var time = DateTimeOffset.FromUnixTimeSeconds(1111111109);
+
+        // Act: compute the code with the default number of digits
+        var code = _algorithm.ComputeCode(TotpOracle.VectorSecret, time);
+
+        // Assert: exactly six digits, the leading zero is kept
+        Assert.Equal("081804", code);
+        Assert.Equal(6, code.Length);
+    }
+
+    /// <summary>
     ///     Test that the step the library matches is exactly floor(unix time / 30), for every offset of the window.
     /// </summary>
     /// <param name="offset">The step offset of the code relative to the current step.</param>

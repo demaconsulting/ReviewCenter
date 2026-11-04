@@ -91,6 +91,10 @@ by `Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail`.
 line shows an elapsed time of at least that long and the duration is recorded in the results.
 This scenario is tested by `Validation_Run_SlowCheck_ReportsElapsedTime`.
 
+**Validation_Run_SlowCheck_RecordsDurationInResults**: A check that takes at least 150 ms is run with a JUnit XML
+results file; its test case records a duration of at least that long. This scenario is tested by
+`Validation_Run_SlowCheck_RecordsDurationInResults`.
+
 **Validation_Run_SlowFirstCheck_ReportsInListedOrder**: The first check finishes after the
 others; the report still lists the checks in the listed order. This scenario is tested by
 `Validation_Run_SlowFirstCheck_ReportsInListedOrder`.

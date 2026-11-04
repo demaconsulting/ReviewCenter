@@ -1715,6 +1715,7 @@ sections:
           The link must still work after a sign-in, so the address survives the login page.
         children:
           - ReviewCenter-SignIn-ReturnDeepLink
+          - ReviewCenter-SignIn-ReturnDeepLink-ExactEncoding
         tests:
           - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
 

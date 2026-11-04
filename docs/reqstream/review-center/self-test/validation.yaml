@@ -9,7 +9,9 @@ sections:
   - title: Validation Unit Requirements
     requirements:
       - id: ReviewCenter-Validation-Run
-        title: The Validation class shall run self-validation tests and print a summary.
+        title: >-
+          The Validation class shall print a summary with the number of checks that ran, passed, were skipped and
+          failed, and the total time.
         justification: |
           Provides a built-in mechanism to verify the tool is functioning correctly
           in the deployment environment. A summary is printed for human review.
@@ -18,56 +20,203 @@ sections:
           - ReviewCenter-Utilities-TempFiles
         tests:
           - Validation_Run_WithSilentContext_PrintsSummary
+
+      - id: ReviewCenter-Validation-Run-ExitCode
+        title: >-
+          The Validation class shall leave the exit code at zero when every check passes.
+        justification: |
+          A pipeline that runs the self-validation decides on the exit code, so a run in which everything passed must
+          not look like a failure.
+        tests:
           - Validation_Run_WithSilentContext_ExitCodeIsZero
+
+      - id: ReviewCenter-Validation-Run-InputValidation
+        title: >-
+          The Validation class shall refuse a run without a context or without a list of checks with an
+          ArgumentNullException.
+        justification: |
+          A run without a context has nowhere to report to, and a run without checks would pass without proving
+          anything.
+        tests:
           - Validation_Run_NullContext_ThrowsArgumentNullException
           - Validation_Run_NullChecks_ThrowsArgumentNullException
 
       - id: ReviewCenter-Validation-Timing
         title: >-
-          The Validation class shall time every check, print one line with its outcome and elapsed time, record the
-          duration in the results, and report the checks in the order they are listed.
+          The Validation class shall print one line for every check with its outcome and the time it took.
         justification: |
-          A reviewer reading the report or the results file must see at a glance which check passed or failed and
-          how long it took, and a check that hangs or turns slow must be noticed. The checks run at the same time to
-          keep the whole run short, so the report must still be stable and in a fixed order. A check that fails or
-          throws is a failed test with a message, never a crash, so that the remaining checks still run and the
-          report is complete.
+          A reviewer reading the report must see at a glance which check passed or failed and how long it took, and a
+          check that hangs or turns slow must be noticed.
         tests:
           - Validation_Run_SlowCheck_ReportsElapsedTime
+
+      - id: ReviewCenter-Validation-Timing-ResultDuration
+        title: >-
+          The Validation class shall record the duration of every check in the results file.
+        justification: |
+          A reader of the results file, which a pipeline archives, must see how long each check took without the
+          console report.
+        tests:
+          - Validation_Run_SlowCheck_RecordsDurationInResults
+
+      - id: ReviewCenter-Validation-Timing-ListedOrder
+        title: >-
+          The Validation class shall report the checks in the order in which they are listed, also when they finish
+          in another order.
+        justification: |
+          The checks run at the same time to keep the whole run short, so the report must still be stable and in a
+          fixed order.
+        tests:
           - Validation_Run_SlowFirstCheck_ReportsInListedOrder
+
+      - id: ReviewCenter-Validation-Timing-FailureReported
+        title: >-
+          The Validation class shall report a check that fails as failed, with the message of the failure.
+        justification: |
+          A failed check is a test result with a message, so that the reader knows what was wrong.
+        tests:
           - Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode
+
+      - id: ReviewCenter-Validation-Timing-FailureSetsExitCode
+        title: >-
+          The Validation class shall set a non-zero exit code when a check fails.
+        justification: |
+          A pipeline that runs the self-validation decides on the exit code, so a failed check must not be missed.
+        tests:
+          - Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode
+
+      - id: ReviewCenter-Validation-Timing-ContinuesAfterFailure
+        title: >-
+          The Validation class shall run and record the remaining checks after a check has failed.
+        justification: |
+          A check that fails must not hide the result of the other checks, so that the report is complete.
+        tests:
+          - Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode
+
+      - id: ReviewCenter-Validation-Timing-ExceptionRecorded
+        title: >-
+          The Validation class shall record a check that throws an unexpected exception as failed, with the type and
+          the message of the exception.
+        justification: |
+          A check that throws is a failed test with a message, never a crash, so that the remaining checks still run
+          and the report is complete.
+        tests:
           - Validation_Run_ThrowingCheck_RecordsFailureWithExceptionType
 
       - id: ReviewCenter-Validation-Timeout
         title: >-
-          The Validation class shall give every check a deadline that it enforces itself: a check that does not
-          finish in time is recorded as failed with a "Timed out" message, its cancellation token is cancelled, the
-          run does not wait for it, and a cancellation that is not the deadline is reported as "Cancelled".
+          The Validation class shall record a check that does not finish within its deadline as failed with a
+          "Timed out" message.
         justification: |
           A cooperative time limit only works for a check that looks at its token. A check that blocks a thread,
           waits on a lock or runs a child process that ignores the token would hang the qualification run, and with
-          it the pipeline that waits for the run. The runner therefore waits for the check and for the deadline at
-          the same time and gives up on the check when the deadline passes. The report must say whether time ran out
-          or the check was cancelled, and a late failure of an abandoned check must not surface as an unobserved
-          exception.
+          it the pipeline that waits for the run. The runner therefore enforces the deadline itself and says in the
+          report that time ran out.
         tests:
           - ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting
+
+      - id: ReviewCenter-Validation-Timeout-NoWaiting
+        title: >-
+          The Validation class shall not wait for a check that has passed its deadline to return.
+        justification: |
+          The runner waits for the check and for the deadline at the same time and gives up on the check when the
+          deadline passes, because a check that ignores its token would otherwise never return.
+        tests:
+          - ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting
+
+      - id: ReviewCenter-Validation-Timeout-CancelsToken
+        title: >-
+          The Validation class shall cancel the cancellation token of a check when the deadline of the check passes.
+        justification: |
+          A cooperative check stops when its token is cancelled, so that it does not go on using the machine after
+          it has been reported as timed out.
+        tests:
           - ValidationRunner_ExecuteAsync_DeadlinePasses_CancelsTheTokenOfTheCheck
+
+      - id: ReviewCenter-Validation-Timeout-CheckCancellation
+        title: >-
+          The Validation class shall report a check that cancels itself as failed with a "Cancelled" message and not
+          as timed out.
+        justification: |
+          The report must say whether time ran out or the check was cancelled.
+        tests:
           - ValidationRunner_ExecuteAsync_CheckThrowsCancellation_ReportsCancelledNotTimedOut
+
+      - id: ReviewCenter-Validation-Timeout-CallerCancellation
+        title: >-
+          The Validation class shall report a check as failed with a "Cancelled" message when the caller of the run
+          cancels it, without waiting for the check to return.
+        justification: |
+          A run that the operator stops must end at once, also when a check ignores its token.
+        tests:
           - ValidationRunner_ExecuteAsync_CallerCancels_ReportsCancelledWithoutWaitingForTheCheck
+
+      - id: ReviewCenter-Validation-Timeout-OwnTimeoutException
+        title: >-
+          The Validation class shall report a TimeoutException that a check throws itself as the failure of that
+          check and not as the deadline of the runner.
+        justification: |
+          A check that waits for git or for a host has its own time limit, and its message tells the reader more
+          than the general deadline does.
+        tests:
           - ValidationRunner_ExecuteAsync_CheckThrowsTimeoutException_ReportsTheCheckOwnFailure
+
+      - id: ReviewCenter-Validation-Timeout-AbandonedExceptionObserved
+        title: >-
+          The Validation class shall observe an exception that an abandoned check throws later, so that it does not
+          surface as an unobserved task exception.
+        justification: |
+          A late failure of a check that was already reported as timed out must not raise a second, unrelated
+          failure of the process.
+        tests:
           - ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved
+
+      - id: ReviewCenter-Validation-Timeout-InputValidation
+        title: >-
+          The Validation class shall refuse a deadline that is not positive with an ArgumentOutOfRangeException.
+        justification: |
+          A deadline of zero or less would fail every check at once and prove nothing.
+        tests:
           - ValidationRunner_ExecuteAsync_NonPositiveTimeout_ThrowsArgumentOutOfRangeException
+
+      - id: ReviewCenter-Validation-Timeout-OthersStillPass
+        title: >-
+          The Validation class shall run the other checks to their own outcome when one check has timed out.
+        justification: |
+          One hung check must not turn the other checks into failures or hang the whole run.
+        tests:
           - Validation_Run_HungCheck_ReportsTimeoutAndOtherChecksStillPass
 
       - id: ReviewCenter-Validation-Skipped
         title: >-
-          The Validation class shall report a check that finds nothing to check as skipped, record it as not
-          executed in the results, count it separately in the summary, and not fail the run for it.
+          The Validation class shall report a check that finds nothing to check as skipped, with the reason.
         justification: |
           The opt-in configured-database check has nothing to check on a machine without configuration. That is not
-          a failure of the tool, so it must not turn the exit code non-zero, but it must not be mistaken for a pass
-          either, so it is shown as skipped and recorded as not executed.
+          a failure of the tool, but it must not be mistaken for a pass either, so it is shown as skipped.
+        tests:
+          - Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail
+
+      - id: ReviewCenter-Validation-Skipped-NotExecuted
+        title: >-
+          The Validation class shall record a skipped check as not executed in the results file.
+        justification: |
+          A results file that recorded a skipped check as passed would claim a result that was never obtained.
+        tests:
+          - Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail
+
+      - id: ReviewCenter-Validation-Skipped-Counted
+        title: >-
+          The Validation class shall count a skipped check separately in the summary.
+        justification: |
+          The reader of the summary must see how many checks were not run, apart from those that passed.
+        tests:
+          - Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail
+
+      - id: ReviewCenter-Validation-Skipped-NoFailure
+        title: >-
+          The Validation class shall keep the exit code at zero when a check is skipped.
+        justification: |
+          A skipped check is not a failure of the tool, so it must not turn the exit code non-zero.
         tests:
           - Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail
 
@@ -121,11 +270,18 @@ sections:
 
       - id: ReviewCenter-Validation-InvalidExtension
         title: >-
-          The Validation class shall report an error and set exit code 1 when the
-          results file path has an unsupported extension.
+          The Validation class shall report an error when the results file path has an unsupported extension.
         justification: |
           Provides a clear failure signal when an unrecognized results file extension is
           supplied, preventing silent evidence loss and enabling CI/CD pipelines to
           surface output configuration errors automatically.
+        tests:
+          - Validation_Run_WithUnsupportedResultsFormat_DoesNotWriteFile
+
+      - id: ReviewCenter-Validation-InvalidExtension-ExitCode
+        title: >-
+          The Validation class shall set exit code 1 when the results file path has an unsupported extension.
+        justification: |
+          A pipeline decides on the exit code, so a results file that cannot be written must not look like a success.
         tests:
           - Validation_Run_WithUnsupportedResultsFormat_DoesNotWriteFile

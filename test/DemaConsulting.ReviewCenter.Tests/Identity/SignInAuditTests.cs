@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Identity;
@@ -217,6 +219,91 @@ public class SignInAuditTests
         var result = await Verify(app);
         Assert.True(result.IsIntact);
         Assert.True(result.Count >= 4);
+    }
+
+    /// <summary>
+    ///     Test that a failure of the audit trail does not stop a sign-in.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_FailingAuditTrail_StillSignsTheUserIn()
+    {
+        // Arrange: an application whose audit trail refuses every appended entry, and a user
+        await using var app = await TestWebApp.StartAsync(
+            new CapturingLoggerProvider(),
+            null,
+            ["serve", "--silent"],
+            null,
+            services =>
+            {
+                services.AddSingleton<DemaConsulting.ReviewCenter.Storage.AuditStore>();
+                services.AddSingleton<IAuditStore>(provider =>
+                {
+                    var proxy = DispatchProxy.Create<IAuditStore, FailingAppendProxy>();
+                    ((FailingAppendProxy)(object)proxy).Inner = provider.GetRequiredService<DemaConsulting.ReviewCenter.Storage.AuditStore>();
+                    return proxy;
+                });
+            });
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+
+        // Act: log in
+        var response = await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+
+        // Assert: signed in despite the failed record, and nothing was recorded
+        Assert.Equal("/projects", response.Headers.Location?.OriginalString);
+        Assert.Single(browser.SetCookieHeaders, h => h.StartsWith(SignIn.CookieName + "=", StringComparison.Ordinal));
+        Assert.Empty(await EntriesAsync(app, "auth.sign-in"));
+    }
+
+    /// <summary>
+    ///     Test that the typed name of an unknown user is cut to the allowed length in the audit trail.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_OverlongUnknownName_RecordsCappedTypedName()
+    {
+        // Arrange: an application and a name far longer than a user name can be
+        await using var app = await StartAsync();
+        using var browser = new TestBrowser(app);
+        var typed = new string('x', ReviewLimits.MaxUsernameLength + 150);
+
+        // Act: fail to log in with it
+        await browser.LoginAsync(typed, "typed-secret-password-4");
+
+        // Assert: the recorded name is cut and marked as cut
+        var entry = Assert.Single(await EntriesAsync(app, "auth.sign-in-failed"));
+        Assert.Equal(
+            $"unknown user, name '{new string('x', ReviewLimits.MaxUsernameLength - 3)}...'",
+            entry.Detail);
+    }
+
+    /// <summary>
+    ///     A proxy of the audit store that refuses every appended entry and passes everything else on.
+    /// </summary>
+    private class FailingAppendProxy : DispatchProxy
+    {
+        /// <summary>
+        ///     Gets or sets the store that receives all other calls.
+        /// </summary>
+        public IAuditStore Inner { get; set; } = null!;
+
+        /// <inheritdoc />
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod!.Name == nameof(IAuditStore.AppendAsync))
+            {
+                return Task.FromException<AuditEntry>(new InvalidOperationException("The audit trail is unavailable."));
+            }
+
+            try
+            {
+                return targetMethod.Invoke(Inner, args);
+            }
+            catch (TargetInvocationException exception)
+            {
+                ExceptionDispatchInfo.Capture(exception.InnerException!).Throw();
+                throw;
+            }
+        }
     }
 
     /// <summary>

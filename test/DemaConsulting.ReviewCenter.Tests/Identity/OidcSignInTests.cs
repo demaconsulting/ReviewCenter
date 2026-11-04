@@ -469,6 +469,63 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
     }
 
     /// <summary>
+    ///     Test that a callback the throttle refuses is refused before the code is exchanged: the provider receives no
+    ///     token request for it.
+    /// </summary>
+    [Fact]
+    public async Task OidcSignIn_ThrottledCallback_DoesNotExchangeTheCode()
+    {
+        // Arrange: a limit of two failures, used up by two refusals of the provider
+        _idp.Scenario = new IdpScenario { AuthorizeError = "access_denied" };
+        await using var app = await OidcTestApp.StartAsync(
+            _idp,
+            settings: new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = "2",
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "2"
+            });
+        using var browser = new TestBrowser(app);
+        await OidcTestApp.SignInAsync(browser, _idp);
+        await OidcTestApp.SignInAsync(browser, _idp);
+        _idp.Scenario = new IdpScenario();
+        var exchanges = _idp.TokenRequestCount;
+
+        // Act: a correct sign-in
+        var landing = await OidcTestApp.SignInAsync(browser, _idp);
+
+        // Assert: refused, and the code was not exchanged
+        Assert.Equal("/login?error=oidc", landing.Headers.Location?.OriginalString);
+        Assert.Equal(exchanges, _idp.TokenRequestCount);
+    }
+
+    /// <summary>
+    ///     Test that an identity token that has expired, or that is not signed with the key of the provider, is
+    ///     refused: no session, no account, and the reason class only recorded.
+    /// </summary>
+    /// <param name="fault">What is wrong with the identity token.</param>
+    [Theory]
+    [InlineData(IdTokenFault.Expired)]
+    [InlineData(IdTokenFault.WrongSignature)]
+    public async Task OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed(IdTokenFault fault)
+    {
+        // Arrange
+        _idp.Scenario = new IdpScenario { IdTokenFault = fault };
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+
+        // Act
+        var landing = await OidcTestApp.SignInAsync(browser, _idp);
+
+        // Assert
+        Assert.Equal("/login?error=oidc", landing.Headers.Location?.OriginalString);
+        Assert.Empty(OidcTestApp.SessionCookies(browser));
+        Assert.Empty(await app.Services.GetRequiredService<UserService>()
+            .ListAsync(TestContext.Current.CancellationToken));
+        var entry = Assert.Single(await OidcTestApp.AuditAsync(app, "auth.oidc-sign-in-failed"));
+        Assert.Equal("token-invalid", entry.Detail);
+    }
+
+    /// <summary>
     ///     Test that the callback is counted per client address only: more bad callbacks than the per-name limit from
     ///     one address do not block a legitimate sign-in from that address while it is below the address limit.
     /// </summary>

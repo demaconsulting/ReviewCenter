@@ -10,92 +10,194 @@ sections:
       - id: ReviewCenter-SignIn-Login
         title: >-
           The SignIn unit shall, on a sign-in request with the user name and password of an enabled account, sign
-          the user in with a session cookie and redirect to the requested local address or to the home page, or to
-          the account page when the account has a temporary password.
+          the user in with a session cookie and redirect to the requested local address.
         justification: |
           Signing in must lead the user back to where they were going, and nowhere else.
         tests:
           - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
-          - SignIn_Login_OverHttps_CookieIsSecure
+
+      - id: ReviewCenter-SignIn-Login-DefaultHome
+        title: >-
+          The SignIn unit shall redirect to the home page after a successful sign-in that names no return address.
+        justification: |
+          A user who came to the login page directly has no place to go back to, so the home page is the start.
+        tests:
+          - SignIn_Login_NoReturnUrl_RedirectsToHomePage
 
       - id: ReviewCenter-SignIn-LoginFailure
         title: >-
           The SignIn unit shall answer a failed sign-in, whether the user name is unknown, the password is wrong,
-          the account is disabled, or it is locked out, with the same redirect to the login page and set no
-          cookie.
+          the account is disabled, or it is locked out, with the same redirect to the login page.
         justification: |
           A different answer per reason would tell an attacker which user names exist and which accounts are
           disabled. The one allowed difference is the refusal by the sign-in throttle, which does not depend on
           the account (see ReviewCenter-SignIn-Throttle).
         tests:
           - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
+
+      - id: ReviewCenter-SignIn-LoginFailure-NoCookie
+        title: >-
+          The SignIn unit shall set no session cookie on a failed sign-in.
+        justification: |
+          A failed sign-in must never leave the browser with a session.
+        tests:
+          - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
+
+      - id: ReviewCenter-SignIn-LoginFailure-ReturnUrl
+        title: >-
+          The SignIn unit shall keep a safe return address on the login page after a failed sign-in.
+        justification: |
+          A user who mistyped the password must still end up where they were going once the next attempt works.
+        tests:
           - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
 
       - id: ReviewCenter-SignIn-Throttle
         title: >-
-          The SignIn unit shall, before it checks a password, ask the sign-in throttle for permission and, when the
-          throttle refuses, check no password, set no cookie, give the same throttled answer whether or not the
-          user name exists, keep the safe return address, and record the refusal in the audit trail, at most once
-          per minute and typed name, with the typed name cleaned and without the password; and shall give the
-          attempts of a name back when its sign-in succeeds.
+          The SignIn unit shall ask the sign-in throttle for permission before it checks a password and, when the
+          throttle refuses, answer with a redirect to the login page that reports too many attempts.
         justification: |
           Guessing passwords must be slow even where the account lockout does not apply, for example for names that
-          do not exist. Refusing without checking the password, and with an answer that does not depend on the
-          account, keeps the throttle from revealing which accounts exist or whether a guess was right. Recording
-          the refusals once per minute shows an attack without letting it flood the trail.
+          do not exist.
         tests:
           - SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames
+
+      - id: ReviewCenter-SignIn-Throttle-RefusesRightPassword
+        title: >-
+          The SignIn unit shall refuse a sign-in that the throttle refuses even when the password is right.
+        justification: |
+          Checking the password of a throttled attempt would reveal whether a guess was right.
+        tests:
           - SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie
-          - SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter
+
+      - id: ReviewCenter-SignIn-Throttle-NoCookie
+        title: >-
+          The SignIn unit shall set no session cookie when the throttle refuses a sign-in.
+        justification: |
+          A refused attempt must never leave the browser with a session.
+        tests:
+          - SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie
+
+      - id: ReviewCenter-SignIn-Throttle-SameAnswer
+        title: >-
+          The SignIn unit shall give the same throttled answer whether or not the user name exists.
+        justification: |
+          An answer that depends on the account would let the throttle reveal which accounts exist.
+        tests:
+          - SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames
+
+      - id: ReviewCenter-SignIn-Throttle-ReturnUrl
+        title: >-
+          The SignIn unit shall keep the safe return address in the throttled answer.
+        justification: |
+          A user who has to wait must still end up where they were going afterwards.
+        tests:
+          - SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames
+
+      - id: ReviewCenter-SignIn-Throttle-NoLockoutCount
+        title: >-
+          The SignIn unit shall not count an attempt that the throttle refuses as a failed password of the account.
+        justification: |
+          Counting refused attempts would let a throttled attacker push a real user into the account lockout without
+          a single password having been checked.
+        tests:
+          - SignIn_Login_Throttled_DoesNotCountTowardTheAccountLockout
+
+      - id: ReviewCenter-SignIn-Throttle-Audit
+        title: >-
+          The SignIn unit shall record a refusal by the throttle in the audit trail, at most once per minute and typed
+          name, with the typed name cleaned and without the password.
+        justification: |
+          Recording the refusals once per minute shows an attack without letting it flood the trail.
+        tests:
           - SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow
 
-      - id: ReviewCenter-SignIn-ThrottleSettings
+      - id: ReviewCenter-SignIn-Throttle-SuccessReset
         title: >-
-          The SignIn unit shall read the limits of the sign-in throttle from the Identity:Throttle settings
-          (failures per name, failures per client address, and the window in seconds), and shall stop the server
-          from starting, naming the setting, when a value is not above 0, when the window is longer than one day,
-          or when the limit per address is lower than the limit per name.
+          The SignIn unit shall give the attempts of a name back to the throttle when its sign-in succeeds.
         justification: |
-          An operator must be able to tune the throttle, and a wrong value, such as a limit of 0 that would lock
-          everybody out, must be found when the server starts and not when the first user cannot sign in.
+          A user who mistyped the password a few times must not be throttled after having signed in successfully.
         tests:
-          - ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError
-          - ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication
+          - SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter
 
       - id: ReviewCenter-SignIn-ReturnUrl
         title: >-
-          The SignIn unit shall use a return address only when it is a local path, and shall use the home page for
-          any other value, including addresses of other sites and addresses that only look local.
+          The SignIn unit shall use a return address only when it is a local path.
         justification: |
           A return address that could lead to another site would let an attacker use the login page to send
           users to a look-alike site after they sign in.
         tests:
           - SignIn_SafeReturnUrl_AnyInput_KeepsOnlyLocalPaths
+
+      - id: ReviewCenter-SignIn-ReturnUrl-HostileHome
+        title: >-
+          The SignIn unit shall redirect to the home page after a sign-in whose return address is the address of
+          another site or only looks local.
+        justification: |
+          The hostile address must not survive the login, even when it looks like a link into a review.
+        tests:
           - SignIn_Login_HostileReturnUrl_RedirectsToHomePage
+          - SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage
 
       - id: ReviewCenter-SignIn-ReturnDeepLink
         title: >-
-          The SignIn unit shall send an anonymous request for a protected page to the login page with the address
-          that was requested as the return address, exactly as it was written, including escaped characters and the
-          query, so that signing in leads back to the same page.
+          The SignIn unit shall send a visitor who signs in after an anonymous request for a protected page back to
+          that same page.
         justification: |
-          A link to one file, line or thread is only useful if it survives the sign-in. The decoded request path
-          cannot be used, because it turns an escaped slash or percent sign in a file name into something else.
+          A link to one file, line or thread is only useful if it survives the sign-in.
         tests:
           - SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin
           - SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin
-          - SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage
+
+      - id: ReviewCenter-SignIn-ReturnDeepLink-ExactEncoding
+        title: >-
+          The SignIn unit shall use the address of an anonymous request for a protected page as the return address
+          exactly as it was written, including escaped characters and the query.
+        justification: |
+          The decoded request path cannot be used, because it turns an escaped slash or percent sign in a file name
+          into something else.
+        tests:
+          - SignIn_ProtectedPage_AnonymousAddressWithEscapesAndQuery_KeepsTheAddressExactly
+          - SignIn_Login_ReturnUrlWithEscapesAndQuery_ReturnsToTheSameAddress
+          - SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin
+
       - id: ReviewCenter-SignIn-Cookie
         title: >-
-          The SignIn unit shall keep the session in a cookie that scripts cannot read, that is not sent with
-          requests from other sites, that is a session cookie, and that is marked Secure when the request is over
-          HTTPS, and shall reject missing arguments when it is set up.
+          The SignIn unit shall keep the session in a cookie that scripts cannot read.
         justification: |
-          The session cookie is the key to the account, so it must be protected against theft by scripts and
-          against use from other sites.
+          The session cookie is the key to the account, so it must be protected against theft by scripts.
         tests:
           - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+
+      - id: ReviewCenter-SignIn-Cookie-SameSite
+        title: >-
+          The SignIn unit shall keep the session in a cookie that is not sent with requests from other sites.
+        justification: |
+          The session cookie must not be usable from other sites, which would let them act as the user.
+        tests:
+          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+
+      - id: ReviewCenter-SignIn-Cookie-Session
+        title: >-
+          The SignIn unit shall keep the session in a session cookie that has no expiry time.
+        justification: |
+          A session that outlives the browser would stay open on a shared computer.
+        tests:
+          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+
+      - id: ReviewCenter-SignIn-Cookie-Secure
+        title: >-
+          The SignIn unit shall mark the session cookie Secure when the request is over HTTPS.
+        justification: |
+          A Secure cookie is never sent over an unencrypted connection, where it could be read by others.
+        tests:
           - SignIn_Login_OverHttps_CookieIsSecure
+
+      - id: ReviewCenter-SignIn-Cookie-InputValidation
+        title: >-
+          The SignIn unit shall reject missing arguments when it is set up.
+        justification: |
+          A missing argument is a programming error that must be found at start-up and not when a user signs in.
+        tests:
           - SignIn_AddSignIn_NullArguments_Throw
 
       - id: ReviewCenter-SignIn-Antiforgery
@@ -110,79 +212,186 @@ sections:
 
       - id: ReviewCenter-SignIn-Logout
         title: >-
-          The SignIn unit shall end the session of the signed-in user on a sign-out request and redirect to the
-          home page.
+          The SignIn unit shall end the session of the signed-in user on a sign-out request.
         justification: |
           Users on a shared computer must be able to end their session.
+        tests:
+          - SignIn_Logout_SignedInUser_EndsTheSession
+
+      - id: ReviewCenter-SignIn-Logout-RedirectHome
+        title: >-
+          The SignIn unit shall redirect to the home page after a sign-out request.
+        justification: |
+          After signing out there is nothing left to show to the user but the page that is open to everybody.
         tests:
           - SignIn_Logout_SignedInUser_EndsTheSession
 
       - id: ReviewCenter-SignIn-Protected
         title: >-
           The SignIn unit shall redirect a request without a signed-in user to the login page, with the requested
-          address as the return address, for every page except the home page and the login page, which stay open.
+          address as the return address, for every page except the home page and the login page.
         justification: |
-          Review data must only be reached by identified users, while the home page and the login page must work
-          without signing in.
+          Review data must only be reached by identified users.
         tests:
           - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
+
+      - id: ReviewCenter-SignIn-Protected-PublicPages
+        title: >-
+          The SignIn unit shall serve the home page and the login page to a visitor who is not signed in.
+        justification: |
+          The home page and the login page must work without signing in, or nobody could ever sign in.
+        tests:
           - SignIn_PublicPage_Anonymous_IsServed
 
       - id: ReviewCenter-SignIn-AdminOnly
         title: >-
-          The SignIn unit shall allow the user administration page only to a user with the system administrator role.
+          The SignIn unit shall serve the user administration page to a user with the system administrator role.
         justification: |
           Managing users is limited to system administrators, because it controls who may sign in.
+        tests:
+          - SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+
+      - id: ReviewCenter-SignIn-AdminOnly-ReviewerForbidden
+        title: >-
+          The SignIn unit shall refuse the user administration page to a user who is not a system administrator.
+        justification: |
+          A reviewer who could manage users could give themselves any right.
         tests:
           - SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed
 
       - id: ReviewCenter-SignIn-AdminClaim
         title: >-
           The SignIn unit shall put the system administrator role into the principal of a session only for a user
-          who is a system administrator and has no temporary password to change, and no role for a project, and shall
-          consider the principal current only
-          when it has that role exactly when the stored user is such a system administrator.
+          who is a system administrator and has no temporary password to change.
+        justification: |
+          The system administrator role is the one claim that pages use for authorization, so it must be given to
+          system administrators only.
+        tests:
+          - SignIn_BuildPrincipal_AdministratorAndReviewer_OnlyAdministratorHasTheRole
+
+      - id: ReviewCenter-SignIn-AdminClaim-NoProjectRole
+        title: >-
+          The SignIn unit shall put no role for a project into the principal of a session.
         justification: |
           A project role copied into the cookie would stay true after a member was removed from the project, so
-          memberships are always read from the database when they are needed. The system administrator role is
-          the one claim that pages use for authorization, and comparing its presence with the stored flag ends the
-          session of a user who was promoted or demoted.
+          memberships are always read from the database when they are needed.
+        tests:
+          - SignIn_BuildPrincipal_AnyUser_CarriesNoProjectRole
+
+      - id: ReviewCenter-SignIn-AdminClaim-Current
+        title: >-
+          The SignIn unit shall consider the principal current only when it has the system administrator role
+          exactly when the stored user is such a system administrator.
+        justification: |
+          Comparing the presence of the claim with the stored flag ends the session of a user who was promoted or
+          demoted.
         tests:
           - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+
+      - id: ReviewCenter-SignIn-AdminClaim-RoleChangeEndsSession
+        title: >-
+          The SignIn unit shall reject the session cookie of a user whose system administrator state changed after
+          the sign-in.
+        justification: |
+          The user signs in again and gets the current role instead of keeping the old one.
+        tests:
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
 
       - id: ReviewCenter-SignIn-TemporaryPassword
         title: >-
           The SignIn unit shall, for an account that has to change its temporary password, sign the user in and
-          redirect to the account page instead of the requested address, put a must-change-password claim and no
-          system administrator role into the principal, even for a system administrator, and consider the principal
-          current only when the claim is present exactly when the stored user has to change the password, so that
-          the session of that user ends when the password is changed and the user signs in again.
+          redirect to the account page instead of the requested address.
         justification: |
-          A temporary password was handed over by somebody else, so it may only be used to choose a new one. The
-          claim lets the layout confine the user to the account page without a call per navigation, withholding the
-          administrator role keeps the rights of a system administrator out of reach until the password is replaced,
-          and comparing the claim with the stored flag makes the confinement end, and the old session stop, at the
-          moment the password is changed.
+          A temporary password was handed over by somebody else, so it may only be used to choose a new one.
         tests:
           - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+
+      - id: ReviewCenter-SignIn-TemporaryPassword-NoAdminRole
+        title: >-
+          The SignIn unit shall give no system administrator role to a user who has to change a temporary password,
+          even to a system administrator.
+        justification: |
+          Withholding the administrator role keeps the rights of a system administrator out of reach until the
+          password is replaced.
+        tests:
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+          - SignIn_BuildPrincipal_TemporaryPasswordAdministrator_HasChangeClaimAndNoAdminRole
+
+      - id: ReviewCenter-SignIn-TemporaryPassword-Claim
+        title: >-
+          The SignIn unit shall put a must-change-password claim into the principal of a user who has to change a
+          temporary password.
+        justification: |
+          The claim lets the layout confine the user to the account page without a call per navigation.
+        tests:
+          - SignIn_BuildPrincipal_TemporaryPasswordAdministrator_HasChangeClaimAndNoAdminRole
+
+      - id: ReviewCenter-SignIn-TemporaryPassword-StaleWhenFlagChanges
+        title: >-
+          The SignIn unit shall end the session of a user when the temporary-password state of the account changes
+          after the sign-in.
+        justification: |
+          The confinement ends, and the old session stops, at the moment the password is changed; the user signs in
+          again.
+        tests:
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+
+      - id: ReviewCenter-SignIn-TemporaryPassword-ClaimMatchesFlag
+        title: >-
+          The SignIn unit shall consider the principal current only when the must-change-password claim is present
+          exactly when the stored user has to change the password.
+        justification: |
+          Comparing the claim with the stored flag is what makes the confinement and the old session end when the
+          password is changed.
+        tests:
           - SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim
 
       - id: ReviewCenter-SignIn-SessionValidation
         title: >-
-          The SignIn unit shall consider a signed-in user valid only while that user exists, is enabled, and has
-          the same system administrator state and display name as at sign-in, using this one rule for every check,
-          and shall reject the session cookie of a user who is not valid.
+          The SignIn unit shall reject the session cookie of a user who is disabled.
         justification: |
-          Disabling a user or changing the system administrator right must take effect at once, not when the cookie
-          runs out. One rule for
-          the cookie and for open pages means a page that is already open cannot be treated more leniently than a
-          new request.
+          Disabling a user must take effect at once, not when the cookie runs out.
         tests:
           - SignIn_Session_UserDisabledAfterLogin_IsRejected
+
+      - id: ReviewCenter-SignIn-SessionValidation-RoleChange
+        title: >-
+          The SignIn unit shall consider a signed-in user not valid when the system administrator state differs from
+          the state at sign-in.
+        justification: |
+          Changing the system administrator right must take effect at once, not when the cookie runs out.
+        tests:
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
           - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+
+      - id: ReviewCenter-SignIn-SessionValidation-DisplayName
+        title: >-
+          The SignIn unit shall consider a signed-in user not valid when the display name differs from the name at
+          sign-in.
+        justification: |
+          The user signs in again and gets the current name in everything that is recorded.
+        tests:
+          - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+
+      - id: ReviewCenter-SignIn-SessionValidation-MissingInputs
+        title: >-
+          The SignIn unit shall consider a signed-in user not valid when the principal, the stored user, or the
+          display name claim is missing.
+        justification: |
+          A user that does not exist any more, or a cookie without the claims that the rule compares, must not be
+          accepted.
+        tests:
           - SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse
+
+      - id: ReviewCenter-SignIn-SessionValidation-Rule
+        title: >-
+          The SignIn unit shall decide whether a signed-in user is valid with one rule for the session cookie and
+          for open pages.
+        justification: |
+          One rule for the cookie and for open pages means a page that is already open cannot be treated more
+          leniently than a new request.
+        tests:
+          - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
 
       - id: ReviewCenter-SignIn-RevalidationSetting
         title: >-
@@ -195,47 +404,149 @@ sections:
         tests:
           - AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive
 
+      - id: ReviewCenter-SignIn-RevalidationSetting-Minimum
+        title: >-
+          The SignIn unit shall not allow fewer than 5 seconds between two checks of the signed-in user by an open
+          page.
+        justification: |
+          A check every moment would read the user store without a reason and load it more than the window needs.
+        tests:
+          - AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive
+
       - id: ReviewCenter-SignIn-Actor
         title: >-
-          The SignIn unit shall provide the signed-in user as an actor, with user name and display name, and shall
-          refuse with a message that the user is no longer signed in, saving nothing, when nobody is signed in.
+          The SignIn unit shall provide the signed-in user as an actor, with user name and display name.
         justification: |
           The services that record who acted take the person from the sign-in, so nobody can act in the name of
-          somebody else. An open page can lose its user between two clicks, so the refusal must be a message the
-          page can show instead of a failure of the whole page.
+          somebody else.
+        tests:
+          - SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows
+
+      - id: ReviewCenter-SignIn-Actor-NotSignedIn
+        title: >-
+          The SignIn unit shall refuse with a message that the user is no longer signed in, saving nothing, when
+          nobody is signed in.
+        justification: |
+          An open page can lose its user between two clicks, so the refusal must be a message the page can show
+          instead of a failure of the whole page.
         tests:
           - SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows
 
       - id: ReviewCenter-SignIn-Audit
         title: >-
-          The SignIn unit shall record a successful sign-in and a sign-out in the audit trail on a best-effort basis,
-          after the cookie was set or before it is cleared, taking the actor from the server-side sign-in state, and
-          shall record a failed sign-in, an attempt on a locked account and a lockout, with the typed user name of an
-          unknown user cleaned and capped, and never with the typed password.
+          The SignIn unit shall record a successful sign-in in the audit trail, with the actor taken from the
+          server-side sign-in state.
         justification: |
           Who was signed in when something happened is part of the history. The actor must come from the server
-          and not from form input, and a failing trail must not stop anybody from signing in or out. The typed name
-          of an unknown user shows what an attacker tried, and is cleaned and capped so that it cannot forge or
-          flood the trail.
+          and not from form input.
         tests:
           - SignIn_Login_ValidCredentials_RecordsSignInEntry
+
+      - id: ReviewCenter-SignIn-Audit-SignOut
+        title: >-
+          The SignIn unit shall record a sign-out in the audit trail, with the actor taken from the server-side
+          sign-in state.
+        justification: |
+          The end of a session is part of the history of who was signed in when something happened.
+        tests:
           - SignIn_Logout_SignedInUser_RecordsSignOutEntry
-          - SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword
+
+      - id: ReviewCenter-SignIn-Audit-BestEffort
+        title: >-
+          The SignIn unit shall sign a user in even when the audit trail cannot record the sign-in.
+        justification: |
+          A failing trail must not stop anybody from signing in or out.
+        tests:
+          - SignIn_Login_FailingAuditTrail_StillSignsTheUserIn
+
+      - id: ReviewCenter-SignIn-Audit-FailedSignIn
+        title: >-
+          The SignIn unit shall record a failed sign-in of an existing user in the audit trail with the user and the
+          reason.
+        justification: |
+          Attempts to break into an account belong to the history of that account.
+        tests:
           - SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword
+
+      - id: ReviewCenter-SignIn-Audit-UnknownUser
+        title: >-
+          The SignIn unit shall record a failed sign-in of an unknown user in the audit trail with the typed user
+          name cleaned to one line.
+        justification: |
+          The typed name of an unknown user shows what an attacker tried, and is cleaned so that it cannot forge
+          lines of the trail.
+        tests:
+          - SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword
+
+      - id: ReviewCenter-SignIn-Audit-CappedName
+        title: >-
+          The SignIn unit shall cut the typed user name of an unknown user to the longest user name before it records
+          it in the audit trail.
+        justification: |
+          An unauthenticated caller must not be able to flood the trail with text of their choice.
+        tests:
+          - SignIn_Login_OverlongUnknownName_RecordsCappedTypedName
+
+      - id: ReviewCenter-SignIn-Audit-NoPassword
+        title: >-
+          The SignIn unit shall never record the typed password in the audit trail.
+        justification: |
+          A password in the trail would be readable by everybody who may read the trail.
+        tests:
+          - SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword
+          - SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword
           - SignIn_Login_RepeatedFailures_RecordsLockoutOnce
           - SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry
+
+      - id: ReviewCenter-SignIn-Audit-Lockout
+        title: >-
+          The SignIn unit shall record the lockout of an account in the audit trail once, when the account is locked.
+        justification: |
+          A lockout is a sign of an attack, and one entry per lockout shows it without repeating it for every
+          later attempt.
+        tests:
+          - SignIn_Login_RepeatedFailures_RecordsLockoutOnce
+
+      - id: ReviewCenter-SignIn-Audit-LockedAccount
+        title: >-
+          The SignIn unit shall record repeated sign-in attempts on a locked account in the audit trail as a single
+          entry, not one entry per attempt.
+        justification: |
+          Attempts on a locked account show an attack without letting it flood the trail.
+        tests:
+          - SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry
+
+      - id: ReviewCenter-SignIn-Audit-ChainIntact
+        title: >-
+          The SignIn unit shall leave the audit trail a chain that verifies after sign-ins, failed sign-ins and
+          sign-outs.
+        justification: |
+          Entries that break the chain would make the whole trail untrustworthy.
+        tests:
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
 
       - id: ReviewCenter-SignIn-TotpBranch
         title: >-
-          The SignIn unit shall, when the password is right and the account has a second factor, give the browser a
-          challenge cookie, send it to the page that asks for the code without setting the session cookie or the
-          failure counter, give the address slot of the attempt back, and shall sign in an account without a second
-          factor exactly as before.
+          The SignIn unit shall, when the password is right and the account has a second factor, send the browser to
+          the page that asks for the code and set no session cookie.
         justification: |
-          The password step must not open a session for an account that owes a second factor, and a person who types
-          the right password must not use up the attempts of their address before the code is typed.
+          The password step must not open a session for an account that owes a second factor.
         tests:
-          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
-          - TotpSignIn_PasswordStep_AccountWithoutSecondFactor_SignsInAsBefore
-          - TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota
+          - SignIn_Login_AccountWithSecondFactor_SendsToCodePageWithoutSession
+
+      - id: ReviewCenter-SignIn-TotpBranch-NoSecondFactor
+        title: >-
+          The SignIn unit shall sign in an account without a second factor with the password alone.
+        justification: |
+          Accounts that did not enroll keep signing in as before.
+        tests:
+          - SignIn_Login_AccountWithoutSecondFactor_SignsInWithPasswordOnly
+
+      - id: ReviewCenter-SignIn-TotpBranch-Challenge
+        title: >-
+          The SignIn unit shall give the browser a challenge cookie when the password is right and the account has a
+          second factor.
+        justification: |
+          The challenge cookie carries the pending sign-in to the page that asks for the code.
+        tests:
+          - SignIn_Login_AccountWithSecondFactor_SendsToCodePageWithoutSession

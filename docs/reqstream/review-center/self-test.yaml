@@ -21,23 +21,95 @@ sections:
           without requiring a separate test harness.
         children:
           - ReviewCenter-Validation-Run
+          - ReviewCenter-Validation-Run-ExitCode
+          - ReviewCenter-Validation-Run-InputValidation
           - ReviewCenter-Validation-Timing
+          - ReviewCenter-Validation-Timing-ResultDuration
+          - ReviewCenter-Validation-Timing-ListedOrder
+          - ReviewCenter-Validation-Timing-FailureReported
+          - ReviewCenter-Validation-Timing-FailureSetsExitCode
+          - ReviewCenter-Validation-Timing-ContinuesAfterFailure
+          - ReviewCenter-Validation-Timing-ExceptionRecorded
           - ReviewCenter-Validation-Timeout
+          - ReviewCenter-Validation-Timeout-NoWaiting
+          - ReviewCenter-Validation-Timeout-CancelsToken
+          - ReviewCenter-Validation-Timeout-CheckCancellation
+          - ReviewCenter-Validation-Timeout-CallerCancellation
+          - ReviewCenter-Validation-Timeout-OwnTimeoutException
+          - ReviewCenter-Validation-Timeout-AbandonedExceptionObserved
+          - ReviewCenter-Validation-Timeout-InputValidation
+          - ReviewCenter-Validation-Timeout-OthersStillPass
           - ReviewCenter-Validation-Skipped
+          - ReviewCenter-Validation-Skipped-NotExecuted
+          - ReviewCenter-Validation-Skipped-Counted
+          - ReviewCenter-Validation-Skipped-NoFailure
           - ReviewCenter-ValidationChecks-GitAvailable
           - ReviewCenter-ValidationChecks-GitRoundTrip
           - ReviewCenter-ValidationChecks-ReviewWorkflow
+          - ReviewCenter-ValidationChecks-ReviewWorkflow-AuthorAnswerRefused
+          - ReviewCenter-ValidationChecks-ReviewWorkflow-AuthorSignatureRefused
+          - ReviewCenter-ValidationChecks-ReviewWorkflow-ReviewLocked
+          - ReviewCenter-ValidationChecks-ReviewWorkflow-AdministratorReopen
+          - ReviewCenter-ValidationChecks-ReviewWorkflow-EvidenceIndex
           - ReviewCenter-ValidationChecks-Fingerprint
           - ReviewCenter-ValidationChecks-PasswordHash
+          - ReviewCenter-ValidationChecks-PasswordHash-WrongRejected
           - ReviewCenter-ValidationChecks-Totp
+          - ReviewCenter-ValidationChecks-Totp-CodeAcceptance
           - ReviewCenter-ValidationChecks-AuditChain
+          - ReviewCenter-ValidationChecks-AuditChain-TamperDetected
           - ReviewCenter-ValidationChecks-AttestationPdf
+          - ReviewCenter-ValidationChecks-AttestationPdf-TamperDetected
           - ReviewCenter-ValidationChecks-HostStart
+          - ReviewCenter-ValidationChecks-HostStart-EphemeralLoopbackPort
+          - ReviewCenter-ValidationChecks-HostStart-NothingAmbientTouched
+          - ReviewCenter-ValidationChecks-HostStart-MoreThanOneAddress
+          - ReviewCenter-ValidationChecks-HostStart-NoAddress
+          - ReviewCenter-ValidationChecks-HostStart-NotLoopback
+          - ReviewCenter-ValidationChecks-HostStart-NoRealPort
+          - ReviewCenter-ValidationChecks-HostStart-OneLoopbackAccepted
+          - ReviewCenter-ValidationChecks-HostStart-LoginPage
+          - ReviewCenter-ValidationChecks-HostStart-StaticAsset
+          - ReviewCenter-ValidationChecks-HostStart-CleanStop
           - ReviewCenter-ValidationChecks-ConfiguredDatabase
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-ReadOnly
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-NoPathInReport
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingTableNamed
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-NothingConfiguredSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingFileSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-MissingFileNotCreated
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase-UnsupportedProvider
           - ReviewCenter-ValidationChecks-ConfiguredKeys
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NothingConfiguredSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-MissingDatabaseSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoFolderNoSecretsSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-CertificateRing
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-EmptyRingFails
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-OtherRingFails
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-WrongCertificate
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-PlaintextWhenEncryptionRequired
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnusableSettings
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedProvider
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationKeyReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-LegacyAttestationWarning
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnreadableAttestationKey
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationIoError
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedAttestationProvider
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPassword
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderMissingFile
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPath
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderWrongPassword
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderUntrustedKey
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-CreatesNothing
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoSecretInReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoPathInReport
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound
+          - GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync
+          - GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable
 
       - id: ReviewCenter-SelfTest-Hermetic
         title: >-
@@ -54,7 +126,14 @@ sections:
           - ReviewCenter-Validation-CheckConfig
           - ReviewCenter-Validation-DefaultChecks
           - ReviewCenter-ValidationChecks-Hermetic
+          - ReviewCenter-ValidationChecks-Hermetic-InMemoryConfiguration
+          - ReviewCenter-ValidationChecks-Hermetic-EphemeralLoopbackPort
           - ReviewCenter-ValidationChecks-FastCommit
+          - ReviewCenter-ValidationChecks-FastCommit-ProductionDefault
+          - ReviewCenter-ValidationChecks-FastCommit-OnlyInsideFolder
+          - ReviewCenter-ValidationChecks-FastCommit-ReadOnlyUntouched
+          - ReviewCenter-ValidationChecks-FastCommit-InMemoryUntouched
+          - ReviewCenter-ValidationChecks-FastCommit-RequiresAllowedFolder
           - ReviewCenter-ServerHost-IsolatedSettings
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
@@ -98,7 +177,7 @@ sections:
         children:
           - ReviewCenter-ValidationChecks-ConfiguredNotificationsNoNetwork
         tests:
-          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection
 
       - id: ReviewCenter-SelfTest-ResultsOutput
         title: The tool shall write self-validation results to a standard test result file when --results is provided.
@@ -126,5 +205,6 @@ sections:
           pipelines to detect misconfigured output paths automatically.
         children:
           - ReviewCenter-Validation-InvalidExtension
+          - ReviewCenter-Validation-InvalidExtension-ExitCode
         tests:
           - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile
