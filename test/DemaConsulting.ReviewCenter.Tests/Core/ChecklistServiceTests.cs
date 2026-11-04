@@ -330,8 +330,7 @@ public class ChecklistServiceTests
         // Arrange, Act: the default checklist
         var definition = DefaultChecklist.Current;
 
-        // Assert: version, section order and counts, and the first and last checks verbatim
-        Assert.Equal(DefaultChecklist.Version, definition.Version);
+        // Assert: section order and counts, and the first and last checks verbatim
         Assert.Equal(
             ["REQ", "DES", "DOC", "CODE", "LOGIC", "ERR", "USE", "TEST", "SEC", "READ", "REQDOC", "REQIMP", "REQTEST", "CODEDOC"],
             definition.Sections.Select(section => section.Id));
@@ -340,6 +339,21 @@ public class ChecklistServiceTests
         Assert.Equal("Requirements Checks", definition.Sections[0].Title);
         Assert.Equal("REQ-01", definition.Sections[0].Items[0].Id);
         Assert.Equal("CODEDOC-04", definition.Sections[^1].Items[^1].Id);
+    }
+
+    /// <summary>
+    ///     Test that the default checklist carries a version label that fits the validation limit of 64 characters.
+    /// </summary>
+    [Fact]
+    public void ChecklistService_DefaultChecklist_HasAVersionLabel()
+    {
+        // Arrange, Act: the default checklist
+        var definition = DefaultChecklist.Current;
+
+        // Assert: the label is present, short enough, and the one that the class publishes
+        Assert.False(string.IsNullOrWhiteSpace(definition.Version));
+        Assert.True(definition.Version.Length <= 64);
+        Assert.Equal(DefaultChecklist.Version, definition.Version);
     }
 
     /// <summary>
@@ -542,17 +556,21 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that a pass can be recorded without a justification, and an empty one is stored as none.
+    ///     Test that a pass can be recorded without a justification, and that an absent or blank one is stored as
+    ///     none.
     /// </summary>
-    [Fact]
-    public async Task ChecklistService_SetAnswer_PassWithoutJustification_Stores()
+    /// <param name="justification">The justification that is given: absent or blank.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    public async Task ChecklistService_SetAnswer_PassWithoutJustification_Stores(string? justification)
     {
         // Arrange: a review
         var (_, service, projectId) = await CreateAsync();
 
-        // Act: pass a check with white space as justification
+        // Act: pass a check with no justification or with white space as justification
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, "  ", TestActors.Ann, TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, justification, TestActors.Ann, TestContext.Current.CancellationToken);
         var answer = (await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01");
 
         // Assert: stored as a pass with no justification
@@ -1082,15 +1100,18 @@ public class ChecklistServiceTests
     [Fact]
     public async Task ChecklistService_Get_CarriedAnswers_CountAsAnswered()
     {
-        // Arrange: a follow-up review with two carried answers and a carried not-applicable section (5 checks)
+        // Arrange: a follow-up review in which REQ-01 (Pass) and REQ-02 (Fail) are carried as answered and the
+        // section DES, which has 5 checks, is carried as not applicable
         var cancellationToken = TestContext.Current.CancellationToken;
         var (_, service, projectId) = await CreateFollowUpAsync();
+        var sections = DefaultChecklist.Current.Sections;
+        var total = sections.Sum(s => s.Items.Count) - sections.Single(s => s.Id == "DES").Items.Count;
 
         // Act
         var state = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
 
-        // Assert: two answered of the 53 checks of the sections that apply
-        Assert.Equal(new ChecklistProgress(2, 53), state.Overall);
+        // Assert: two answered of the checks of the sections that apply, without the checks of DES
+        Assert.Equal(new ChecklistProgress(2, total), state.Overall);
     }
 
     /// <summary>
@@ -1119,6 +1140,12 @@ public class ChecklistStateTests
     ///     The instant used for all answers.
     /// </summary>
     private static readonly DateTimeOffset _now = new(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
+
+    /// <summary>
+    ///     The number of checks of the default checklist without those of the section DES.
+    /// </summary>
+    private static readonly int _checksWithoutDesign =
+        DefaultChecklist.Current.Sections.Sum(s => s.Items.Count) - DefaultChecklist.Current.Sections.Single(s => s.Id == "DES").Items.Count;
 
     /// <summary>
     ///     Builds a state over the default checklist.
@@ -1202,7 +1229,7 @@ public class ChecklistStateTests
 
         // Act, Assert: the section is done with nothing to answer, and the total is smaller
         Assert.True(state.SectionProgress("DES").IsDone);
-        Assert.Equal(new ChecklistProgress(0, 53), state.Overall);
+        Assert.Equal(new ChecklistProgress(0, _checksWithoutDesign), state.Overall);
     }
 
     /// <summary>
@@ -1215,7 +1242,7 @@ public class ChecklistStateTests
         var state = Build(["DES-01", "REQ-01"], "DES");
 
         // Act, Assert: only the requirements answer counts
-        Assert.Equal(new ChecklistProgress(1, 53), state.Overall);
+        Assert.Equal(new ChecklistProgress(1, _checksWithoutDesign), state.Overall);
     }
 
     /// <summary>

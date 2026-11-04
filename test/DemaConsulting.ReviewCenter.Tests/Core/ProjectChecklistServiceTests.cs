@@ -117,9 +117,9 @@ public class ProjectChecklistServiceTests
     /// <summary>
     ///     Test that the checklist is read by anyone who may see the project and changed by a system administrator
     ///     and a project administrator of the project only: a plain member is told it may not change, and everybody
-    ///     else (and nobody) is given the answer for a project that does not exist.
+    ///     else is given the answer for a project that does not exist.
     /// </summary>
-    /// <param name="who">The user name of the actor, or <c>null</c> for nobody.</param>
+    /// <param name="who">The user name of the actor.</param>
     /// <param name="mayRead">Whether the actor may read the checklist.</param>
     /// <param name="refusal">The rule that refuses a change, or <c>null</c> when the actor may change it.</param>
     [Theory]
@@ -130,22 +130,19 @@ public class ProjectChecklistServiceTests
     [InlineData("padm", false, DomainRule.ProjectNotFound)]
     [InlineData("off", false, DomainRule.ProjectNotFound)]
     [InlineData("offadm", false, DomainRule.ProjectNotFound)]
-    [InlineData(null, false, DomainRule.ProjectNotFound)]
     public async Task ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused(
-        string? who,
+        string who,
         bool mayRead,
         DomainRule? refusal)
     {
         // Arrange
         var world = await WorldAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
-        var actor = who is null ? null : new Actor(who, who);
+        var actor = new Actor(who, who);
 
         // Act
         var read = world.Service.GetAsync(actor, world.Project, cancellationToken);
-        var write = actor is null
-            ? Task.FromException<bool>(new DomainRuleException(DomainRule.ProjectNotFound, "no actor"))
-            : world.Service.SetAsync(actor, world.Project, ProjectChecklistService.HashOf(null), Custom("v2"), cancellationToken);
+        var write = world.Service.SetAsync(actor, world.Project, ProjectChecklistService.HashOf(null), Custom("v2"), cancellationToken);
 
         // Assert
         if (mayRead)
@@ -169,6 +166,64 @@ public class ProjectChecklistServiceTests
         // A refusal changes nothing and records nothing
         Assert.Null((await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
         Assert.DoesNotContain(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
+    }
+
+    /// <summary>
+    ///     Test that reading the checklist without an actor is answered as for a project that does not exist.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_GetAsync_NullActor_IsNotFound()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.GetAsync(null, world.Project, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ProjectNotFound, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a reset is done by a system administrator and a project administrator of the project, that a
+    ///     plain member is told it may not reset, that everybody else is given the answer for a project that does
+    ///     not exist, and that a refusal leaves the stored definition and the audit trail as they were.
+    /// </summary>
+    /// <param name="who">The user name of the actor.</param>
+    /// <param name="refusal">The rule that refuses the reset, or <c>null</c> when the actor may reset.</param>
+    [Theory]
+    [InlineData("root", null)]
+    [InlineData("pa", null)]
+    [InlineData("mem", DomainRule.ActorNotAllowed)]
+    [InlineData("out", DomainRule.ProjectNotFound)]
+    [InlineData("padm", DomainRule.ProjectNotFound)]
+    [InlineData("off", DomainRule.ProjectNotFound)]
+    [InlineData("offadm", DomainRule.ProjectNotFound)]
+    public async Task ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused(string who, DomainRule? refusal)
+    {
+        // Arrange: the project has a custom definition
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.Service.SetAsync(
+            new Actor("pa", "pa"), world.Project, ProjectChecklistService.HashOf(null), Custom("moon-1"), cancellationToken);
+        var hash = ProjectChecklistService.HashOf(Custom("moon-1"));
+
+        // Act
+        var reset = world.Service.ResetAsync(new Actor(who, who), world.Project, hash, cancellationToken);
+
+        // Assert
+        if (refusal is null)
+        {
+            Assert.True(await reset);
+            Assert.Null((await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
+            return;
+        }
+
+        Assert.Equal(refusal, (await Assert.ThrowsAsync<DomainRuleException>(() => reset)).Rule);
+        Assert.Equal(Custom("moon-1"), (await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
+        Assert.Single(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
     }
 
     /// <summary>

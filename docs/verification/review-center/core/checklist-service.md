@@ -88,8 +88,13 @@ N/A - standard test environment.
 14 sections and 58 items, with section and item ids in the order of the template. This scenario is tested by
 `ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder`.
 
+**ChecklistService_DefaultChecklist_HasAVersionLabel**: The default checklist is read; its version label is not blank,
+is at most 64 characters long, and is the label that `DefaultChecklist` publishes. This scenario is tested by
+`ChecklistService_DefaultChecklist_HasAVersionLabel`.
+
 **ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection**: Every item id is unique and starts with its
-section id. This scenario is tested by `ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection`.
+section id, a hyphen, and two digits, and every item has wording. This scenario is tested by
+`ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection`.
 
 **ChecklistService_DefaultChecklist_RoundTripsThroughJson**: The default checklist is written to JSON and read back
 unchanged. This scenario is tested by `ChecklistService_DefaultChecklist_RoundTripsThroughJson`.
@@ -134,8 +139,9 @@ exactly 2000 characters is accepted. This scenario is tested by
 the stored state holds the user name, the display name, and the UTC time. This scenario is tested by
 `ChecklistService_SetSectionApplicability_StoresActorAndUtcTime`.
 
-**ChecklistService_SetAnswer_PassWithoutJustification_Stores**: A Pass is stored without a justification. This
-scenario is tested by `ChecklistService_SetAnswer_PassWithoutJustification_Stores`.
+**ChecklistService_SetAnswer_PassWithoutJustification_Stores**: A theory over an absent and a blank justification: a
+Pass is stored with no justification in both cases. This scenario is tested by
+`ChecklistService_SetAnswer_PassWithoutJustification_Stores`.
 
 **ChecklistService_SetAnswer_NotApplicableWithJustification_Stores**: An answer of Not applicable with a justification
 is stored as given. This scenario is tested by `ChecklistService_SetAnswer_NotApplicableWithJustification_Stores`.
@@ -325,6 +331,12 @@ the rule is off. This scenario is tested by
 affected slots it is given, so a later change to the caller's list does not change it, and an exception without slots
 has an empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
 
+**ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards**: With the signature of slot 1 current,
+a reviewer whose draft differs hands the ballot in without the acknowledgement; the refusal lists the affected slot and
+its list is recorded. The ballot is then handed in with the acknowledgement, which puts the signature out of date; the
+list of the refusal that was caught is still the recorded one. This scenario is tested by
+`ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards`.
+
 **ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing store, project access, or
 clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This
 scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.
@@ -348,7 +360,8 @@ not-applicable section is set again with a new reason; the stored state has no c
 
 **ChecklistService_Get_CarriedAnswers_CountAsAnswered**: In a follow-up review with two carried answers and a carried
 not-applicable section, the progress counts the two answers as answered and the checks of the section leave the total
-(2 of 53). This scenario is tested by `ChecklistService_Get_CarriedAnswers_CountAsAnswered`.
+(2 of the checks of the default checklist without those of the section `DES`). This scenario is tested by
+`ChecklistService_Get_CarriedAnswers_CountAsAnswered`.
 
 **ChecklistState_Progress_FailedAnswer_CountsAsAnswered**: A check is answered Fail; it counts as answered. This
 scenario is tested by `ChecklistState_Progress_FailedAnswer_CountsAsAnswered`.

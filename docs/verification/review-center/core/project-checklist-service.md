@@ -70,12 +70,21 @@ SHA-256 of its UTF-8 bytes, and the hash for no text is the hash of the default'
 `ProjectChecklistService_HashOf_IsSha256OfTheTextAndOfTheDefaultForNull`.
 
 **ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused**: A theory over the system administrator, the project
-administrator, the member, a user outside the project, the administrator of the other project, the disabled member, the
-disabled administrator, and no actor; each reads and replaces the checklist of `Own`. The system administrator and the
+administrator, the member, a user outside the project, the administrator of the other project, the disabled member, and
+the disabled administrator (seven kinds); each reads and replaces the checklist of `Own`. The system administrator and the
 project administrator read the default and replace it, and the new version is then read back; the member can read it but
 gets `ActorNotAllowed` for the change, and the others get `ProjectNotFound` for both. After a refusal the project still
 has no definition and no entry `project.checklist-changed` exists. This scenario is tested by
 `ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused`.
+
+**ProjectChecklistService_GetAsync_NullActor_IsNotFound**: The checklist of `Own` is read without an actor; the call
+raises `ProjectNotFound`. This scenario is tested by `ProjectChecklistService_GetAsync_NullActor_IsNotFound`.
+
+**ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused**: A theory over the same seven kinds of actor; the
+project has a custom definition that a project administrator stored. The system administrator and the project
+administrator reset it and the project has no definition afterwards; the member gets `ActorNotAllowed`, the others get
+`ProjectNotFound`, and after a refusal the custom definition is still stored and the only entry `project.checklist-changed`
+is the one of the setup. This scenario is tested by `ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused`.
 
 **ProjectChecklistService_SetAndReset_ApiToken_AreRefused**: A project administrator who came through an API token
 replaces and resets the checklist; both raise `ActorNotAllowed`, the project still has no definition, and no entry exists;
