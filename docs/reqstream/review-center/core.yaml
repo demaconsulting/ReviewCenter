@@ -1620,9 +1620,11 @@ sections:
           - ReviewCenter-NotificationDispatcher-BaselineStartsDigestDay
           - ReviewCenter-NotificationDispatcher-BaselineThenNewMails
           - ReviewCenter-NotificationDispatcher-BaselineBypassesIdleSkip
+          - ReviewCenter-NotificationDispatcher-BaselineKeptBetweenModes
         tests:
           - NotificationDispatcher_RunPass_BaselinePending_RecordsBacklogNoMail
           - NotificationDispatcher_RunPass_AfterBaseline_NewItemMailed
+          - NotificationDispatcher_RunPass_ModeSwitchedBeforeBaseline_BacklogNotMailed
 
       - id: ReviewCenter-Core-NotificationBatching
         title: >-
@@ -1719,7 +1721,7 @@ sections:
         justification: |
           A user who switched the mail off, or off and on again, chose a new start, and the result of a send that began
           before it must not decide what is news. Discarding means that nothing is sent when the mail is off before
-          the send, and that nothing is recorded when the mode flipped during the send.
+          the send, and that no item is recorded when the mode flipped during the send.
         children:
           - ReviewCenter-NotificationDispatcher-StaleModeOffNoSend
           - ReviewCenter-NotificationDispatcher-StaleModeFlipNothingRecorded
@@ -1780,6 +1782,24 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_GlobalCapReached_Deferred
           - NotificationDispatcher_RunPass_UserCapReached_Deferred
+
+      - id: ReviewCenter-Core-NotificationMailLimits-Reservation
+        title: >-
+          The Core subsystem shall reserve a notification mail under the limits on the number of mails before it sends
+          the mail.
+        justification: |
+          The limits are counted in the shared database, so a reservation that exists during the send keeps parallel
+          senders, such as several server instances, from passing the same count. A mail that was sent stays counted,
+          and a mail that was not sent is released.
+        children:
+          - ReviewCenter-NotificationDispatcher-CapReserveBeforeSend
+          - ReviewCenter-NotificationDispatcher-CapReservationRefusedNoSend
+          - ReviewCenter-NotificationDispatcher-CapReleaseOnFailure
+          - ReviewCenter-NotificationDispatcher-CapReleaseOnCancellation
+          - ReviewCenter-NotificationDispatcher-CapKeepsRowWhenStale
+        tests:
+          - NotificationDispatcher_RunPass_SendInProgress_ReservationExists
+          - NotificationDispatcher_RunPass_ReservationRefused_NothingChanges
 
       - id: ReviewCenter-Core-NotificationSendLog
         title: >-

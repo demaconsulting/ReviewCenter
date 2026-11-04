@@ -107,6 +107,56 @@ public sealed record ConfirmationRequest(
 }
 
 /// <summary>
+///     The outcome of asking the store to reserve the send of a notification mail.
+/// </summary>
+public enum SendReservation
+{
+    /// <summary>The mail may be sent: it is counted from now on.</summary>
+    Reserved,
+
+    /// <summary>The server already sent the most mails allowed per hour; nothing is stored.</summary>
+    ServerHourLimitReached,
+
+    /// <summary>The user already received the most mails allowed per day; nothing is stored.</summary>
+    UserDayLimitReached
+}
+
+/// <summary>
+///     The decision of the sending limits for a notification mail, shared by every store so that they can not
+///     disagree.
+/// </summary>
+/// <remarks>
+///     The server limit counts every mail of any kind (confirmation mails included) of the last hour, and the user
+///     limit counts every mail of any kind of the user in the last 24 hours. The class is static and thread-safe.
+/// </remarks>
+public static class SendLimits
+{
+    /// <summary>
+    ///     Decides whether a notification mail may be sent.
+    /// </summary>
+    /// <param name="serverCountLastHour">How many mails of any kind the server sent in the last hour.</param>
+    /// <param name="userCountLastDay">How many mails of any kind the user received in the last 24 hours.</param>
+    /// <param name="maxPerHour">The most mails of any kind the server sends in one hour.</param>
+    /// <param name="maxPerUserPerDay">The most mails of any kind one user receives in 24 hours.</param>
+    /// <returns>The outcome; the server limit is looked at first.</returns>
+    public static SendReservation Decide(
+        int serverCountLastHour,
+        int userCountLastDay,
+        int maxPerHour,
+        int maxPerUserPerDay)
+    {
+        if (serverCountLastHour >= maxPerHour)
+        {
+            return SendReservation.ServerHourLimitReached;
+        }
+
+        return userCountLastDay >= maxPerUserPerDay
+            ? SendReservation.UserDayLimitReached
+            : SendReservation.Reserved;
+    }
+}
+
+/// <summary>
 ///     The persistence port of e-mail notifications: the address of a user with its confirmation, and the log of
 ///     mails that the sending limits count.
 /// </summary>
@@ -217,9 +267,10 @@ public interface INotificationStore
     /// <returns><c>true</c> when the mode changed; <c>false</c> when nothing changed and no audit entry was written.</returns>
     /// <remarks>
     ///     A change clears the batch window and the failure state and raises the generation of the row by one.
-    ///     Switching on from <see cref="NotificationMode.None"/>
-    ///     marks the baseline as pending; switching to <see cref="NotificationMode.None"/> deletes the notified items
-    ///     and the time of the last digest.
+    ///     Switching on from <see cref="NotificationMode.None"/> marks the baseline as pending; switching between
+    ///     the active modes keeps the baseline as it is, so a baseline that is still pending stays pending and the
+    ///     backlog is never mailed; switching to <see cref="NotificationMode.None"/> clears the baseline mark, and
+    ///     deletes the notified items and the time of the last digest.
     /// </remarks>
     Task<bool> SetModeAsync(
         int userId,
@@ -245,8 +296,8 @@ public interface INotificationStore
     Task<IReadOnlyList<NotifiedItem>> GetNotifiedAsync(int userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Applies the result of a dispatcher pass for one user in one transaction: notified items, dispatch state
-    ///     and the send-log row. Send-log rows older than one day are deleted in the same transaction.
+    ///     Applies the result of a dispatcher pass for one user in one transaction: notified items and dispatch
+    ///     state. Send-log rows older than one day are deleted in the same transaction.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="commit">What to change. Must not be null.</param>
@@ -261,6 +312,44 @@ public interface INotificationStore
     ///     was prepared before a change of the address or the mode can never be applied.
     /// </remarks>
     Task<bool> ApplyAsync(int userId, NotificationCommit commit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Applies the sending limits and, when the mail may be sent, counts the mail by writing its send-log row, all
+    ///     in one serialized transaction, so that senders that race (another server instance, a confirmation mail)
+    ///     can not both slip under a limit. Send-log rows older than one day are deleted in the same transaction.
+    /// </summary>
+    /// <param name="userId">The user the mail is for.</param>
+    /// <param name="kind">The kind of the mail, for example <see cref="NotificationSendLogEntry.KindUpdate"/>.</param>
+    /// <param name="address">The address the mail goes to.</param>
+    /// <param name="now">The current time (UTC); the time stored as the time of the mail.</param>
+    /// <param name="maxPerHour">The most mails of any kind the server sends in one hour.</param>
+    /// <param name="maxPerUserPerDay">The most mails of any kind one user receives in 24 hours.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The outcome (decided by <see cref="SendLimits.Decide"/>) and, for <see cref="SendReservation.Reserved"/>,
+    ///     the identity of the counted mail (for <see cref="ReleaseSendAsync"/>); zero otherwise.
+    /// </returns>
+    /// <remarks>
+    ///     The mail is counted from the moment it is reserved, so a mail whose sender crashes between the
+    ///     reservation and the send stays counted.
+    /// </remarks>
+    Task<(SendReservation Outcome, int LogId)> ReserveSendAsync(
+        int userId,
+        string kind,
+        string address,
+        DateTimeOffset now,
+        int maxPerHour,
+        int maxPerUserPerDay,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Takes back a reservation whose mail was not sent: the mail is no longer counted.
+    /// </summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="logId">The identity returned by <see cref="ReserveSendAsync"/>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the reservation is taken back; nothing happens when it is gone.</returns>
+    Task ReleaseSendAsync(int userId, int logId, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Counts the mails of the send log since a moment.

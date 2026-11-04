@@ -340,9 +340,11 @@ sections:
         title: >-
           When a mode is switched on from None, the NotificationStore class shall set the baseline flag.
         justification: |
-          The dispatcher records the backlog as known before it mails anything.
+          The dispatcher records the backlog as known before it mails anything. A switch from None to a mode starts a
+          new baseline, also after a switch to None before the baseline of an earlier use was recorded.
         tests:
           - NotificationStore_SetMode_NoneToDaily_FlagSet
+          - NotificationStore_SetMode_ActiveToNoneToActive_SetsBaselinePendingAgain
 
       - id: ReviewCenter-NotificationStore-ModeBaselineFlag-BatchWindowCleared
         title: >-
@@ -370,11 +372,30 @@ sections:
 
       - id: ReviewCenter-NotificationStore-ModeSwitchKeepsItems-NoBaseline
         title: >-
-          When the mode switches between Daily and Every, the NotificationStore class shall set no baseline flag.
+          When the mode switches between Daily and Every after the baseline was recorded, the NotificationStore class
+          shall set no baseline flag.
         justification: |
           A new baseline would swallow news that arrived before the switch.
         tests:
           - NotificationStore_SetMode_DailyToEvery_NoBaselineFlag
+          - NotificationStore_SetMode_EveryToDailyAfterBaseline_KeepsBaselineCleared
+
+      - id: ReviewCenter-NotificationStore-ModeSwitchKeepsItems-BaselinePending
+        title: >-
+          When the mode switches between Daily and Every before the baseline was recorded, the NotificationStore class
+          shall keep the baseline flag set.
+        justification: |
+          The switch is no new start. A cleared flag would let the first pass mail the whole backlog as news.
+        tests:
+          - NotificationStore_SetMode_DailyToEveryBeforeBaseline_KeepsBaselinePending
+
+      - id: ReviewCenter-NotificationStore-ModeNoneClearsBaseline
+        title: >-
+          When the mode becomes None, the NotificationStore class shall clear the baseline flag.
+        justification: |
+          A user without a mode has no backlog to record, and a later switch on sets the flag again.
+        tests:
+          - NotificationStore_SetMode_ToNoneBeforeBaseline_ClearsBaselinePending
 
       - id: ReviewCenter-NotificationStore-ModeNoneClearsItems
         title: >-
@@ -508,14 +529,14 @@ sections:
         tests:
           - NotificationStore_Apply_ReplaceAll_ReplacesSet
 
-      - id: ReviewCenter-NotificationStore-ApplyLogRow
+      - id: ReviewCenter-NotificationStore-ApplyNoLogRow
         title: >-
-          The NotificationStore class shall write the send log row of a commit in the same transaction as the notified
-          items.
+          The NotificationStore class shall write no send log row when it applies a commit.
         justification: |
-          The limits count the log, and a mail that is in the log must also be recorded as notified.
+          The row of a mail is reserved before the send, so a commit that wrote a second row would count the mail
+          twice under the limits.
         tests:
-          - NotificationStore_Apply_WithLog_RowWritten
+          - NotificationStore_Apply_Commit_WritesNoLogRow
 
       - id: ReviewCenter-NotificationStore-ApplyAtomic
         title: >-
@@ -537,7 +558,7 @@ sections:
         title: >-
           The NotificationStore class shall write nothing of a commit for a user whose mode is None.
         justification: |
-          A user who switched the mail off while a pass ran must not get items or a log row recorded from that pass.
+          A user who switched the mail off while a pass ran must not get items recorded from that pass.
         tests:
           - NotificationStore_Apply_ModeNone_WritesNothing
 
@@ -688,6 +709,90 @@ sections:
           No limit counts an entry that is older than a day.
         tests:
           - NotificationStore_Apply_OldLogRows_Pruned
+
+      # Reservation of the send log row of a mail
+      - id: ReviewCenter-NotificationStore-ReserveSendRow
+        title: >-
+          The NotificationStore class shall write the send log row of a mail when it reserves the send of the mail.
+        justification: |
+          The limits count the rows of the send log, so the row must exist while the mail is on its way.
+        tests:
+          - NotificationStore_ReserveSend_UnderLimits_ReservedAndCounted
+
+      - id: ReviewCenter-NotificationStore-ReserveSendServerLimit
+        title: >-
+          The NotificationStore class shall refuse to reserve the send of a mail when the send log holds the limit of
+          the server in rows for the last hour.
+        justification: |
+          The limit of the server bounds the load on the mail server. The rows of every kind and of every user count,
+          so the confirmation mails use the limit as well.
+        tests:
+          - NotificationStore_ReserveSend_HourlyLimit_CountsOtherKindsAndUsers
+          - NotificationStore_ReserveSend_HourlyLimit_IgnoresOlderMails
+
+      - id: ReviewCenter-NotificationStore-ReserveSendUserLimit
+        title: >-
+          The NotificationStore class shall refuse to reserve the send of a mail when the send log holds the limit of
+          the user in rows of the user for the last day.
+        justification: |
+          A single mailbox must not be flooded. The rows of every kind count, so the confirmation mails use the limit
+          as well.
+        tests:
+          - NotificationStore_ReserveSend_UserDailyLimit_CountsOwnMailsOfEveryKind
+
+      - id: ReviewCenter-NotificationStore-ReserveSendOneWinner
+        title: >-
+          When several reservations arrive at the same time, the NotificationStore class shall reserve no more mails
+          than the limit has places for.
+        justification: |
+          The count and the insert of the row are one serialized transaction, so parallel senders cannot pass the same
+          count.
+        tests:
+          - NotificationStore_ReserveSend_ParallelAtHourlyLimit_OneReserved
+          - NotificationStore_ReserveSend_ParallelAtUserLimit_OneReserved
+
+      - id: ReviewCenter-NotificationStore-ReserveSendSharesConfirmationCount
+        title: >-
+          The NotificationStore class shall count a reserved confirmation mail against the limit of the server when it
+          reserves the send of a mail.
+        justification: |
+          The limit of the server holds for all mail that the server sends, so the two reservations share one count.
+        tests:
+          - NotificationStore_ReserveSend_AfterConfirmationReserved_SharesHourlyCount
+
+      - id: ReviewCenter-NotificationStore-ReserveConfirmationSharesSendCount
+        title: >-
+          The NotificationStore class shall count a reserved notification mail against the limit of the server when it
+          reserves a confirmation.
+        justification: |
+          The limit of the server holds for all mail that the server sends, so the two reservations share one count.
+        tests:
+          - NotificationStore_ReserveSend_BeforeConfirmation_SharesHourlyCount
+
+      - id: ReviewCenter-NotificationStore-ReserveSendPrune
+        title: >-
+          The NotificationStore class shall delete the send log entries that are older than one day when it reserves
+          the send of a mail.
+        justification: |
+          No limit counts an entry that is older than a day.
+        tests:
+          - NotificationStore_ReserveSend_OldRows_AreDeleted
+
+      - id: ReviewCenter-NotificationStore-ReleaseSendFreesSlot
+        title: >-
+          The NotificationStore class shall delete the send log row of a reservation when the reservation is released.
+        justification: |
+          A mail that was not sent must not use up a place under the limits.
+        tests:
+          - NotificationStore_ReleaseSend_Reserved_FreesSlot
+
+      - id: ReviewCenter-NotificationStore-ReleaseSendGoneNoOp
+        title: >-
+          The NotificationStore class shall change nothing when it releases a reservation whose row is gone.
+        justification: |
+          A row that a prune deleted is gone, and a release must never delete the row of another user.
+        tests:
+          - NotificationStore_ReleaseSend_GoneOrForeign_NoOp
 
       - id: ReviewCenter-NotificationStore-UnavailableNoItemsTable
         title: >-

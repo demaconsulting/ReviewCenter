@@ -1738,9 +1738,12 @@ sections:
           A single mailbox must not be flooded. A deferral delays the news and does not lose it.
         children:
           - ReviewCenter-Core-NotificationMailLimits
+          - ReviewCenter-Core-NotificationMailLimits-Reservation
           - ReviewCenter-Core-NotificationSendLog
           - ReviewCenter-Storage-NotificationSendCounts
           - ReviewCenter-Storage-NotificationSendCounts-Prune
+          - ReviewCenter-Storage-NotificationSendReservation
+          - ReviewCenter-Storage-NotificationSendReservation-OneWinner
         tests:
           - NotificationDispatcher_RunPass_UserCapReached_Deferred
           - NotificationStore_CountSent_User_CountsOwn

@@ -1816,6 +1816,7 @@ reviews:
       - "src/**/Storage/NotificationStore.cs"
       - "test/**/Storage/NotificationStoreTests.cs"
       - "test/**/Storage/NotificationStoreModeTests.cs"
+      - "test/**/Storage/NotificationStoreSendTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources

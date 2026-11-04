@@ -100,6 +100,29 @@ public class NotificationDispatcherCapTests
     }
 
     /// <summary>
+    ///     Test that a mail whose reservation is refused changes nothing: no log row is added, no item is recorded and
+    ///     the window of the mail stays.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_ReservationRefused_NothingChanges()
+    {
+        // Arrange: one mail of another user in the last hour, a limit of one
+        var world = await ArrangeAsync(1);
+        world.Store.AddLog(world.IdOf("dee"), "dee@example.com", world.Clock.GetUtcNow().AddMinutes(-5), NotificationSendLogEntry.KindUpdate);
+        var before = world.Store.StateOf(world.IdOf("ann"));
+
+        // Act
+        var result = await world.PassAsync();
+
+        // Assert
+        Assert.Equal(new NotificationPassResult(0, 0, 1), result);
+        Assert.Empty(world.Sender.Sent);
+        Assert.Single(world.Store.Log);
+        Assert.Empty(world.NotifiedOf("ann"));
+        Assert.Equal(before, world.Store.StateOf(world.IdOf("ann")));
+    }
+
+    /// <summary>
     ///     Test that a deferred item stays new, and is mailed when the limit allows it again.
     /// </summary>
     [Fact]

@@ -132,7 +132,8 @@ N/A - standard test environment.
 - The dispatcher mails each new inbox item once, as the recipient and only to the confirmed address, records the backlog
   of a newly chosen mode without a mail, holds back the items of the mode Every for a batch window, sends the summary of
   the mode Daily once for each date, retries a failed send five times with growing waits, defers a mail beyond the
-  limits, writes a log row for each sent mail, reads the inbox only when something may have changed, and does not let
+  limits (reserved in the shared database before the send), writes a log row for each sent mail, reads the inbox only
+  when something may have changed, and does not let
   one user's failure stop the others (see the unit tests of `NotificationDispatcher`).
 - The progress of the reviews of a project gives, for each review, the stage derived from its approval status (Setup,
   In review, Approved, Rejected), the signatures given, needed, and out of date, the people it waits on, the blocker

@@ -21,7 +21,8 @@ kept by `INotificationStore` (table `NotificationPreferences` and its related ta
 - the mode (`None`, `Every`, or `Daily`) and the confirmed address;
 - `Generation` — a counter that the store raises by one with every change of the mode and every confirmed address; the
   dispatcher carries it into its commit, and a commit whose generation is not the current one is discarded;
-- `BaselinePending` — the mode was switched on and the backlog is not recorded yet;
+- `BaselinePending` — the mode was switched on from None and the backlog is not recorded yet; a switch between Daily
+  and Every keeps it as it is;
 - `DigestHandledUtc` — the instant at which the last daily slot was handled;
 - `BatchStartedUtc` — the start of the running batch window of the mode Every, or null;
 - `FailureCount` and `NextAttemptUtc` — the state of the retry of a failed send;
@@ -31,7 +32,8 @@ kept by `INotificationStore` (table `NotificationPreferences` and its related ta
   question that is asked after the item to answer was mailed is mailed too.
 
 Each mail that is sent is a `NotificationSendLogEntry` of the kind `update` (the mode Every) or `digest` (the mode
-Daily). The same log holds the confirmation mails of `NotificationPreferenceService`, with the kind `confirmation`.
+Daily), written when the mail is reserved. The same log holds the confirmation mails of `NotificationPreferenceService`,
+with the kind `confirmation`.
 
 `NotificationSettings` supplies the limit of mails for the whole server per hour (`MaxMailsPerHour`). The length of the
 batch window is a constructor argument. The result of a pass is a `NotificationPassResult`: the numbers of mails sent,
@@ -79,24 +81,30 @@ Constants:
   6. In the mode Daily the slot is due according to `DigestSchedule.IsDue`. At the due slot a mail of the kind `digest`
      is sent when something is new, and the slot is used up whether or not a mail was sent. The outstanding
      candidates that the user was told about before are counted and not listed.
-  7. A mail is sent by one common step. The limits are checked first: the number of log rows of any kind in the last
-     hour against the setting for the server, and the number of rows of the user in the last day against 24. A mail
-     that exceeds a limit is deferred: no state changes, the items stay new, and they go out when the limit allows it.
-     Otherwise the mail is composed. Right before the send the dispatcher reads the preference of the user again and
-     goes on only when the mode is still not None and the generation and the confirmed address are those that the batch
-     was prepared for; otherwise the batch is discarded, nothing is sent, nothing is recorded, and the next pass starts
-     again from the current preference. The mail is then sent. When the sender fails, `FailureCount` is raised and
-     `NextAttemptUtc` is set according to the waits above; the sixth failure gives up, which records the items as
-     notified, clears the
-     failure state, and passes the error on to the callback once. When the sender succeeds, one call of
-     `INotificationStore.ApplyAsync` records the new items, removes the keys of items that left the inbox, writes the
-     log row, clears the batch window and the failure state, and, in the mode Daily, sets `DigestHandledUtc`. The
-     commit carries the address and the generation of the recipient, and the store applies it only when both are still
-     current, in the same conditional update; a commit that is stale because the user changed the address, or switched
-     the mode off and on again, during the send is discarded and records nothing. One transaction means that a crash
-     can repeat a mail but never lose the record of one. A change of the preference between the re-read and the
-     send itself can not be excluded, because the send is outside of the database; in that case the mail has gone out
-     and the commit is discarded, so that the new preference starts from its own state.
+  7. A mail is sent by one common step. First the mail is composed. Right before the send the dispatcher reads the
+     preference of the user again and goes on only when the mode is still not None and the generation and the
+     confirmed address are those that the batch was prepared for; otherwise the batch is discarded, nothing is sent,
+     nothing is recorded, and the next pass starts again from the current preference. Then the dispatcher reserves the
+     mail with `INotificationStore.ReserveSendAsync`, which checks the limits and writes the send log row in one
+     serialized transaction: the number of log rows of any kind in the last hour against the setting for the server,
+     and the number of rows of the user in the last day against 24. A mail whose reservation is refused is deferred:
+     no state changes, the items stay new, and they go out when the limit allows it. The limits are therefore counted
+     in the shared database and hold across several server instances and across the confirmation mails, and a mail
+     counts from the moment it is reserved, so a mail that is lost between the reservation and the send stays counted.
+     The mail is then sent. When the sender throws, whatever the reason, including a cancellation, the dispatcher
+     first releases the reservation with `ReleaseSendAsync` (with a token that is not cancelled, so a shutdown does not
+     leak the row). Then, for a failure of the sender, `FailureCount` is raised and `NextAttemptUtc` is set according
+     to the waits above; the sixth failure gives up, which records the items as notified, clears the failure state,
+     and passes the error on to the callback once. A cancellation is passed on after the release. When the sender
+     succeeds, the reserved row stays as the log row of the mail, and one call of `INotificationStore.ApplyAsync`
+     records the new items, removes the keys of items that left the inbox, clears the batch window and the failure
+     state, and, in the mode Daily, sets `DigestHandledUtc`. The commit carries the address and the generation of the
+     recipient, and the store applies it only when both are still current, in the same conditional update; a commit
+     that is stale because the user changed the address, or switched the mode off and on again, during the send is
+     discarded and records no item, but the mail has gone out, so its reserved row stays and is counted. One
+     transaction means that a crash can repeat a mail but never lose the record of one. A change of the preference
+     between the re-read and the send itself can not be excluded, because the send is outside of the database; in that
+     case the mail has gone out and the commit is discarded, so that the new preference starts from its own state.
 
 An item is new when `NotificationComposer.IsNew` says so for the stored state. A key that is not in the inbox any more
 is forgotten, so an item that returns is mailed again.
@@ -115,8 +123,8 @@ no address reaches a log.
 
 #### Dependencies
 
-- **INotificationStore** — recipients, notified items, counts of the send log, and the one transaction that applies the
-  result of a send (implemented by `NotificationStore`).
+- **INotificationStore** — recipients, notified items, the reservation and release of the send log row of a mail, and
+  the one transaction that applies the result of a send (implemented by `NotificationStore`).
 - **InboxService** — the inbox of the recipient, with its masking.
 - **IAuditStore** — the latest audit sequence, which tells that something changed.
 - **INotificationSender** — delivers the mail.

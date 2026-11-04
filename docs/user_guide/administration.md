@@ -640,7 +640,9 @@ cannot set it for somebody else.
   change, so that changes that follow each other arrive in one mail.
 
 When a user switches a mode on, the server first notes what is already in the inbox and mails none of it (the
-baseline), so nobody gets a flood of old items. Switching between Daily and Every keeps that memory. Each item is mailed
+baseline), so nobody gets a flood of old items. Switching between Daily and Every keeps that memory, and also keeps a
+baseline that is still waiting for the first pass, so a switch before that pass does not mail the backlog. Each item
+is mailed
 once; when it is gone and comes back, it counts as new again.
 
 ### What Is Mailed
@@ -676,7 +678,11 @@ mode. A disabled user, and a user with a temporary password, get none.
   hours. After the sixth failure it gives up on that batch; the news stays in the inbox of the user, but no mail
   about those items is sent again.
 - **Limits**: a user gets at most 24 mails a day, and the server sends at most `Notifications:MaxMailsPerHour` mails in
-  an hour, counting every kind of mail. A mail beyond a limit is held back and sent when there is room.
+  an hour, counting every kind of mail. A mail beyond a limit is held back and sent when there is room. The limits are
+  counted in the shared database, so they hold across several server instances that use the same database and across
+  the confirmation mails. A mail is counted from the moment the server reserves its place, before it hands the mail
+  to the mail server, so a mail that is lost between the reservation and the send, for example in a crash, is still
+  counted. A mail that fails or is cancelled during the send gives its place back.
 - **Idle cost**: an idle server does not read the inboxes. A look at the audit trail tells that something changed; at
   most every 15 minutes the server checks anyway.
 - **Log**: the server logs a pass that sent or failed a mail as numbers (mails sent, failed, and deferred) and, for a
@@ -692,7 +698,8 @@ mode. A disabled user, and a user with a temporary password, get none.
 - A user who signs in with a temporary password has to choose a new password first and sees no notification card until
   then.
 - The server sends at most `Notifications:MaxMailsPerHour` mails in an hour, over all users, and a user gets at most 24
-  mails a day. Both limits count the confirmation mails, the update mails, and the daily summaries.
+  mails a day. Both limits count the confirmation mails, the update mails, and the daily summaries, in the shared
+  database, so they hold across several server instances, and a mail counts from the moment it is reserved.
 - The send log keeps the target address of each mail in clear text, because the limits need it. Each send deletes the
   entries that are older than one day, so an address stays in the log for about a day after the next mail; removing
   the address on the Account page does not delete its log rows at once.

@@ -20,7 +20,8 @@ gate and transaction but writes no audit entry.
 
 The tables are `NotificationPreferences` (one row per user, keyed by the user, with the mode and the dispatcher state),
 `NotifiedItems` (one row per user, project, review, inbox section, and kind that the user was told about, with the
-state token and the time as a fixed width UTC text), and `NotificationSendLog` (one row per mail that was sent, with the
+state token and the time as a fixed width UTC text), and `NotificationSendLog` (one row per mail that was sent or is
+on its way, with the
 user, the recipient address, the kind, and the time as a fixed width UTC text, and with indexes on the user and time,
 on the address and time, and on the time alone). All are deleted with the user, and `NotifiedItems` also with the
 review (see `ReviewCenterDbContext`). Only the
@@ -106,8 +107,10 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 - *Postconditions*: In one transaction the mode is set, `Generation` is raised by one, the batch window and the failure
   state are cleared, and the
   audit entry is stored. Switching on from `None` sets the baseline flag (`BaselinePending`). Switching to `None`
-  deletes the notified items of the user and the time of the last digest. Switching between `Daily` and `Every` keeps
-  the notified items and sets no flag. If the audit entry cannot be stored, the mode stays as it was.
+  deletes the notified items of the user and the time of the last digest, and clears the baseline flag. Switching
+  between `Daily` and `Every` keeps the notified items and keeps the baseline flag as it is: a baseline that is still
+  pending stays pending, so the first pass still records the backlog and does not mail it, and a baseline that was
+  recorded is not taken again. If the audit entry cannot be stored, the mode stays as it was.
 
 **ListRecipientsAsync**: Lists the users whom the dispatcher may mail.
 
@@ -121,8 +124,8 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 **ApplyAsync**: Records the result of a dispatcher pass for one user.
 
 - *Parameters*: The identity of the user, a `NotificationCommit` (the time, the address and the generation that the mail
-  was prepared for, the items to insert or update, the keys to forget, an optional replace-all set, the new dispatcher
-  state, and an optional send log record), and a cancellation token.
+  was prepared for, the items to insert or update, the keys to forget, an optional replace-all set, and the new
+  dispatcher state), and a cancellation token.
 - *Returns*: True when applied; false, with nothing recorded, when the row is gone, its mode is `None` again, its
   confirmed address is not the address of the commit, or its generation is not the generation of the commit, which can
   happen when the user changed the mode or the address while the pass ran.
@@ -130,12 +133,32 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
   the mode not to be `None` and the address and the generation to be those of the commit; when it changes no row,
   nothing is written. Then it deletes the forgotten items, updates the state of known items and
   inserts new ones (one row per user, project, review, section, and kind), or replaces the whole set for a baseline;
-  stores the dispatcher state; inserts the send log row, if any; and deletes the log rows that are older than one day.
+  stores the dispatcher state; and deletes the log rows that are older than one day. The commit writes no send log
+  row, because the row of a mail is reserved by `ReserveSendAsync` before the send.
   No audit
   entry is written. If any part fails, nothing of the commit remains.
 
+**ReserveSendAsync**: Reserves the place of one notification mail under the limits, and writes its send log row.
+
+- *Parameters*: The identity of the user, the kind of the mail (`update` or `digest`), the target address, the current
+  time, the limit of the server for one hour, the limit of the user for one day, and a cancellation token.
+- *Returns*: The outcome (reserved, server limit reached, or user limit reached) and the identity of the new send log
+  row (zero when nothing was reserved).
+- *Postconditions*: In one serialized transaction, like `ReserveConfirmationAsync`, the unit first deletes the log rows
+  that are older than one day. Then it counts the rows of all kinds and all users in the last hour (the confirmation
+  mails included), counts the rows of all kinds of the user in the last day, and lets `SendLimits.Decide` choose, the
+  server limit first. Only when it is reserved does the unit insert the row. Because the count and the insert are one
+  transaction, of several parallel senders, in this process or another one that shares the database, no more are
+  reserved than the limits leave places for. A refused reservation keeps only the deletion of old rows.
+
+**ReleaseSendAsync**: Takes the reservation of a mail back after the mail was not sent.
+
+- *Parameters*: The identity of the user, the identity of the log row, and a cancellation token.
+- *Postconditions*: The row is deleted, but only when it belongs to the user. A row that is gone, or that belongs to
+  another user, is left alone and no error is raised.
+
 **CountSentAsync**: Counts the rows of the send log since an instant, of all kinds, for one user or, with no user, for
-all users. The daily limit of a user and the hourly limit of the server are counted from it.
+all users. The reservation counts the same rows; this method reads them for callers and tests.
 
 #### Error Handling
 
@@ -148,13 +171,13 @@ The unit never sees a code: it stores the hash and the salt it is given, and nei
 - **ReviewCenterDbContext** — the schema and the context factory.
 - **AuditAppender** — runs every audited change together with its audit entry.
 - **Core domain types and INotificationStore** — the `NotificationPreference`, `NotifiedItem`,
-  `NotificationRecipient`, `NotificationCommit`, and `NotificationSendLogEntry` types stored and the interface
-  implemented.
+  `NotificationRecipient`, `NotificationCommit`, `NotificationSendLogEntry`, and `SendLimits` types stored or used and
+  the interface implemented.
 - **Entity Framework Core** — queries and the single-statement updates and deletes.
 
 #### Callers
 
 - **NotificationPreferenceService** — through the Core interface, for the address, the confirmation, and the mode.
-- **NotificationDispatcher** — through the Core interface, to list the recipients, read the notified items, commit the
-  result of a pass, and count the sent mails.
+- **NotificationDispatcher** — through the Core interface, to list the recipients, read the notified items, reserve
+  and release the send of a mail, and commit the result of a pass.
 - **ServerHost** — registers the store as the implementation of the Core interface.

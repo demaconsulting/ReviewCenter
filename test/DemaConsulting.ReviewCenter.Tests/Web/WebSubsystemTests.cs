@@ -736,7 +736,7 @@ public partial class WebSubsystemTests
     [Fact]
     public async Task WebSubsystem_AccountPage_ChoosesNotificationMode()
     {
-        // Arrange: the application with notifications on (a recording sender takes the mails), and ann signed in
+        // Arrange: the application with notifications on (a recording sender takes the mails), and Ann signed in
         var cancellationToken = TestContext.Current.CancellationToken;
         var sender = new FakeNotificationSender();
         var folder = Path.Combine(Path.GetTempPath(), $"rc-web-{Guid.NewGuid():N}");

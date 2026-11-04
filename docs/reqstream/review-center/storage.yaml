@@ -2097,8 +2097,10 @@ sections:
           - ReviewCenter-NotificationStore-ModeBaselineFlag-FailureStateCleared
           - ReviewCenter-NotificationStore-ModeSwitchKeepsItems
           - ReviewCenter-NotificationStore-ModeSwitchKeepsItems-NoBaseline
+          - ReviewCenter-NotificationStore-ModeSwitchKeepsItems-BaselinePending
           - ReviewCenter-NotificationStore-ModeNoneClearsItems
           - ReviewCenter-NotificationStore-ModeNoneClearsItems-DailySlot
+          - ReviewCenter-NotificationStore-ModeNoneClearsBaseline
           - ReviewCenter-NotificationStore-ModeNoChange
           - ReviewCenter-NotificationStore-ModeNoChange-NoAddress
           - ReviewCenter-NotificationStore-ModeNoChange-SameMode
@@ -2189,16 +2191,16 @@ sections:
 
       - id: ReviewCenter-Storage-NotificationCommit
         title: >-
-          The Storage subsystem shall record the items, the dispatcher state, and the send log row of a sent mail in
-          one transaction.
+          The Storage subsystem shall record the items and the dispatcher state of a sent mail in one transaction.
         justification: |
-          A half-recorded mail would either be lost or sent again.
+          A half-recorded mail would either be lost or sent again. The send log row of the mail is not part of the
+          commit, because it was reserved before the send.
         children:
           - ReviewCenter-NotificationStore-ApplyUpsert
           - ReviewCenter-NotificationStore-ApplyUpsert-Update
           - ReviewCenter-NotificationStore-ApplyRemove
           - ReviewCenter-NotificationStore-ApplyReplaceAll
-          - ReviewCenter-NotificationStore-ApplyLogRow
+          - ReviewCenter-NotificationStore-ApplyNoLogRow
           - ReviewCenter-NotificationStore-ApplyAtomic
           - ReviewCenter-NotificationStore-ApplyCurrent
         tests:
@@ -2267,10 +2269,45 @@ sections:
 
       - id: ReviewCenter-Storage-NotificationSendCounts-Prune
         title: >-
-          When the Storage subsystem records a mail, it shall delete the send log entries that are older than a day.
+          When the Storage subsystem handles a notification mail, it shall delete the send log entries that are older
+          than a day.
         justification: |
           No limit counts an entry that is older than a day.
         children:
           - ReviewCenter-NotificationStore-LogPrunedOnApply
+          - ReviewCenter-NotificationStore-ReserveSendPrune
         tests:
           - NotificationStore_Apply_OldLogRows_Pruned
+          - NotificationStore_ReserveSend_OldRows_AreDeleted
+
+      - id: ReviewCenter-Storage-NotificationSendReservation
+        title: >-
+          The Storage subsystem shall refuse to reserve a notification mail that exceeds a sending limit.
+        justification: |
+          The limits on mails are counted in the shared database, so they hold across several server instances and
+          across confirmation mails. A mail counts from the moment it is reserved, so a mail that is lost between the
+          reservation and the send stays counted, and a release frees the place of a mail that was not sent.
+        children:
+          - ReviewCenter-NotificationStore-ReserveSendRow
+          - ReviewCenter-NotificationStore-ReserveSendServerLimit
+          - ReviewCenter-NotificationStore-ReserveSendUserLimit
+          - ReviewCenter-NotificationStore-ReserveSendSharesConfirmationCount
+          - ReviewCenter-NotificationStore-ReserveConfirmationSharesSendCount
+          - ReviewCenter-NotificationStore-ReleaseSendFreesSlot
+          - ReviewCenter-NotificationStore-ReleaseSendGoneNoOp
+        tests:
+          - NotificationStore_ReserveSend_HourlyLimit_CountsOtherKindsAndUsers
+          - NotificationStore_ReserveSend_UserDailyLimit_CountsOwnMailsOfEveryKind
+          - NotificationStore_ReleaseSend_Reserved_FreesSlot
+
+      - id: ReviewCenter-Storage-NotificationSendReservation-OneWinner
+        title: >-
+          When several reservations of notification mails arrive at the same time, the Storage subsystem shall reserve
+          no more mails than the limits have places for.
+        justification: |
+          Parallel senders must not pass the same count and cause more mails than the limits allow.
+        children:
+          - ReviewCenter-NotificationStore-ReserveSendOneWinner
+        tests:
+          - NotificationStore_ReserveSend_ParallelAtHourlyLimit_OneReserved
+          - NotificationStore_ReserveSend_ParallelAtUserLimit_OneReserved

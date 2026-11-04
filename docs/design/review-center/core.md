@@ -717,7 +717,8 @@ news and links to it; the detail text, the answers, and the outcome of a review 
 exists when a mode is switched on is recorded and not mailed. The mode `Every` collects the news of a batch window into
 one mail, and the mode `Daily` sends one summary for each local date from the digest hour on, as `DigestSchedule`
 decides. An item is not mailed twice in the same state, a failed send is tried again after growing waits and is given
-up after the sixth failure, and limits on the mails per user and for the whole server defer a mail without losing its
+up after the sixth failure, and limits on the mails per user and for the whole server, counted in the shared database
+before each send, defer a mail without losing its
 news. The unit that runs the passes on a timer is the `NotificationWorker` of the `Messaging` subsystem. See the
 `NotificationComposer`, `DigestSchedule`, and `NotificationDispatcher` units.
 

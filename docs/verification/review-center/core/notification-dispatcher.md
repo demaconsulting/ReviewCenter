@@ -27,6 +27,8 @@ N/A - standard test environment (the in-memory stand-ins and the fake clock are 
 - The inbox is read as the recipient, no audit entry is written, answers of others stay hidden, and no detail text and
   no outcome reach a mail, also when a title holds a line break and a header.
 - The backlog at the switch-on of a mode is recorded without a mail and without a log row, and news after it is mailed.
+- A switch between Daily and Every before the baseline was recorded does not make the backlog news, and the first pass
+  records it without a mail.
 - In the mode Every the first new item starts a stored batch window, nothing is sent inside it, and one mail with the
   items that are still new goes out when it ends.
 - In the mode Daily one summary goes out for each local date from the digest hour on, also after a downtime and on the
@@ -36,8 +38,9 @@ N/A - standard test environment (the in-memory stand-ins and the fake clock are 
   give-up.
 - A failed send waits 5 minutes, 15 minutes, 1 hour, 4 hours, and 12 hours, the sixth failure gives up, and a success
   resets the state.
-- A mail beyond the limit of the server or of the user is deferred without a change of state, and a sent mail writes a
-  log row of the kind `update` or `digest`.
+- A mail beyond the limit of the server or of the user is deferred without a change of state, the row of a mail is
+  reserved in the store before the send and released when the send fails or is cancelled, a mail that was sent keeps
+  its row even when the commit turns out stale, and a sent mail has a log row of the kind `update` or `digest`.
 - An idle pass reads one audit sequence, reads the inbox only when the sequence changed, a sweep is due, or a
   time-driven duty waits, a pass that failed for a user is followed by a full read, and a failure of one user does not
   stop the others.
@@ -76,10 +79,13 @@ a line break, and the failed-checks row and the waiting-for-others row are not m
 
 **Baseline**: The backlog of a user who switched a mode on is recorded as notified without a mail, the pending flag is
 cleared, no log row is written, the digest day starts, an item that arrives later is mailed, and a pending baseline is
-read although the audit sequence did not move. These scenarios are tested by
+read although the audit sequence did not move. A user who switched from Daily to Every before the first pass recorded
+the baseline still gets the backlog recorded without a mail, because the store keeps the pending baseline. These
+scenarios are tested by
 `NotificationDispatcher_RunPass_BaselinePending_RecordsBacklogNoMail`, `NotificationDispatcher_RunPass_BaselinePending_FlagCleared`,
 `NotificationDispatcher_RunPass_Baseline_NoLogRow`, `NotificationDispatcher_RunPass_Baseline_DigestHandledNow`,
-`NotificationDispatcher_RunPass_AfterBaseline_NewItemMailed`, and
+`NotificationDispatcher_RunPass_AfterBaseline_NewItemMailed`,
+`NotificationDispatcher_RunPass_ModeSwitchedBeforeBaseline_BacklogNotMailed`, and
 `NotificationDispatcher_RunPass_BaselinePendingSequenceUnchanged_ReadsInbox`.
 
 **Batch window of the mode Every**: The first new item starts the window, nothing is sent inside it, a mail goes out
@@ -119,7 +125,7 @@ user saw before the send is dropped. These scenarios are tested by
 `NotificationDispatcher_RunPass_ItemLeaves_KeyRemoved`, `NotificationDispatcher_RunPass_ConcludedThenReopened_BothMailed`,
 `NotificationDispatcher_RunPass_SendSucceeds_ItemsRecorded`, `NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded`,
 `NotificationDispatcher_RunPass_SendInProgress_ItemsNotYetRecorded` (the items are not recorded while the send is still
-running), and `NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped`.
+running; the log row is already reserved then), and `NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped`.
 
 **Question and standing item**: The inbox returns a standing item to answer and a question for the user in the same
 section of one review. A question that is asked after the item to answer was mailed is mailed, and when both were mailed
@@ -129,8 +135,9 @@ in the same state neither is mailed again. These scenarios are tested by
 
 **Concurrent change of the preference** (`NotificationDispatcherStaleTests.cs`): The fake store can change the
 preference of a user at a chosen point of a pass. When the address is replaced before the send, nothing is sent to the
-old address, and the next pass mails the new address. When the address is replaced during the send, nothing is
-recorded. When the mode is switched off and on again during the send, nothing is recorded. When the mode is switched
+old address, and the next pass mails the new address. When the address is replaced during the send, no item is
+recorded, and the reserved log row of the mail that went out stays. When the mode is switched off and on again during
+the send, no item is recorded, and the log row stays. When the mode is switched
 off before the send, nothing is sent. These scenarios are tested by
 `NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NothingSent`,
 `NotificationDispatcher_RunPass_AddressReplacedBeforeSend_NextPassMailsNewAddress`,
@@ -153,11 +160,19 @@ to one user does not keep another user from being mailed. These scenarios are te
 **Limits and log**: A mail is deferred when the hourly limit of the server is reached, mails of every kind count against
 it, a mail is deferred when the user had 24 mails in the last day, a deferred item stays new and is mailed when the limit
 allows it, a deferral leaves the failure count and the next attempt as they were, and a sent mail writes a log row of
-the kind `update` in the mode Every and `digest` in the mode Daily. These scenarios are tested by
+the kind `update` in the mode Every and `digest` in the mode Daily. The row is reserved in the store before the send:
+while the sender runs, the row is visible from inside the sender; a refused reservation sends nothing and changes
+nothing; a failed send and a cancelled send leave no row (the cancelled pass still raises the cancellation); and a
+mail that was sent keeps its row. The fake store models the same rules as the real one with the shared `SendLimits`
+decision. These scenarios are tested by
 `NotificationDispatcher_RunPass_GlobalCapReached_Deferred`, `NotificationDispatcher_RunPass_ConfirmationMailsCounted`,
 `NotificationDispatcher_RunPass_UserCapReached_Deferred`, `NotificationDispatcher_RunPass_Deferred_SentAfterWindowOfCap`,
 `NotificationDispatcher_RunPass_Deferred_FailureCountUnchanged`, `NotificationDispatcher_RunPass_EverySent_LogKindUpdate`,
-and `NotificationDispatcher_RunPass_DailySent_LogKindDigest`.
+`NotificationDispatcher_RunPass_DailySent_LogKindDigest`,
+`NotificationDispatcher_RunPass_SendInProgress_ReservationExists`,
+`NotificationDispatcher_RunPass_ReservationRefused_NothingChanges`,
+`NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded`, and
+`NotificationDispatcher_RunPass_SendCancelled_ReservationReleased`.
 
 **Idle cost**: Without a recipient the audit sequence is not read, the first pass reads the inbox, an unchanged sequence
 causes no inbox read, a changed sequence does, 15 minutes without a change cause one, an elapsed window is served

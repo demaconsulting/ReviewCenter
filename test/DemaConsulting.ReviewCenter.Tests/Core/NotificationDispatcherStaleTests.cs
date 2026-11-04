@@ -98,7 +98,7 @@ public class NotificationDispatcherStaleTests
     }
 
     /// <summary>
-    ///     Test that a mail that was sent to an address replaced during the send is not recorded.
+    ///     Test that a mail that was sent to an address replaced during the send records no items, and stays counted.
     /// </summary>
     [Fact]
     public async Task NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded()
@@ -111,13 +111,14 @@ public class NotificationDispatcherStaleTests
         // Act
         await world.PassAsync();
 
-        // Assert: neither the items nor the send log hold the stale result
-        Assert.Empty(world.Store.Log);
+        // Assert: the items hold no stale result, and the mail that was sent stays counted in the send log
+        Assert.Single(world.Store.Log);
         Assert.Empty(world.Store.NotifiedOf(annId));
     }
 
     /// <summary>
-    ///     Test that a mode that was switched off and on during the send does not keep the stale result.
+    ///     Test that a mode that was switched off and on during the send does not keep the stale items, and the mail
+    ///     stays counted.
     /// </summary>
     [Fact]
     public async Task NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded()
@@ -135,8 +136,8 @@ public class NotificationDispatcherStaleTests
         // Act
         await world.PassAsync();
 
-        // Assert: the result of the earlier mode is not recorded
-        Assert.Empty(world.Store.Log);
+        // Assert: the items of the earlier mode are not recorded, and the mail that was sent stays counted
+        Assert.Single(world.Store.Log);
         Assert.Empty(world.Store.NotifiedOf(annId));
     }
 

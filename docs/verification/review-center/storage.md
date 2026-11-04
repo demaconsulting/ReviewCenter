@@ -111,7 +111,8 @@ persistence across a restart, and the unit tests verify the detailed rules on th
   the unit tests of `InboxStore`.
 - The notification mode, the items already mailed, and the dispatch state of a user are stored with the audit entry of
   a mode change or not at all, are still there, identical, after the database is closed and opened again, and the mode
-  `None` forgets the items; the commit of a mail (items, log row, and state) is one transaction; this is verified in
+  `None` forgets the items; the commit of a mail (items and state) is one transaction; the send log row of a mail is
+  reserved under the limits in one transaction before the send; this is verified in
   the unit tests of `NotificationStore` and by `StorageSubsystem_NotificationState_PersistsModeItemsAndState`.
 
 ### Test Scenarios

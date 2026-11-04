@@ -38,9 +38,13 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 - The mode is stored with its audit entry in one transaction; `None` deletes the notified items; an unchanged mode
   writes nothing; a new row reads as `None`.
 - Only users with a mode and a confirmed address are listed as recipients, with their flags and dispatch state.
-- A commit of a mail is atomic, is refused for a user without a mode or a row, or whose address or generation is not the
-  current one, keeps one row per key and kind, and prunes old log rows; the mails sent are counted per user and for all
-  users.
+- A commit of a mail is atomic, writes no log row, is refused for a user without a mode or a row, or whose address or
+  generation is not the current one, keeps one row per key and kind, and prunes old log rows; the mails sent are
+  counted per user and for all users.
+- A reservation of a mail is refused at the limit of the server (rows of every kind and user in the last hour) and at
+  the limit of the user (rows of every kind in the last day), is shared with the confirmation mails, lets only one of
+  two parallel reservations pass at the limit minus one, and is freed by a release.
+- A switch between `Daily` and `Every` keeps a pending baseline pending, and `None` clears it.
 - The generation rises with a change of the mode and with a confirmed address, and the items go away with their review.
 - A database without the table of notified items, the mode column, or the generation column is reported as not
   available.
@@ -137,14 +141,20 @@ are in `NotificationStoreModeTests.cs`, over the same real database.
 
 **Mode**: A new row reads as `None`, with no pending baseline and an empty dispatch state; the mode is read back by a
 new store instance; a failing audit write leaves the mode unchanged; switching on from `None` sets the baseline flag
-and clears the batch window and the failure state; switching between `Daily` and `Every` keeps the items and sets no
-baseline; `None` deletes the notified items and the daily slot memory; and a missing row, a missing address, or an
+and clears the batch window and the failure state; switching between `Daily` and `Every` keeps the items, leaves a
+recorded baseline recorded (flag clear), and keeps a pending baseline pending (flag set); `None` deletes the notified
+items and the daily slot memory and clears a pending baseline; a switch on again after `None` sets the flag again; and
+a missing row, a missing address, or an
 unchanged mode changes nothing, and none of them writes an audit entry. These scenarios are tested by
 `NotificationStore_Get_NewRow_ModeNone`, `NotificationStore_Get_NewRow_NoPendingBaseline`,
 `NotificationStore_Get_NewRow_EmptyDispatchState`, `NotificationStore_SetMode_Persisted_ReadBack`,
 `NotificationStore_SetMode_AuditFailure_ModeUnchanged`, `NotificationStore_SetMode_NoneToDaily_FlagSet`,
 `NotificationStore_SetMode_NoneToDaily_BatchWindowCleared`, `NotificationStore_SetMode_NoneToDaily_FailureStateCleared`,
 `NotificationStore_SetMode_DailyToEvery_KeepsItems`, `NotificationStore_SetMode_DailyToEvery_NoBaselineFlag`,
+`NotificationStore_SetMode_DailyToEveryBeforeBaseline_KeepsBaselinePending`,
+`NotificationStore_SetMode_EveryToDailyAfterBaseline_KeepsBaselineCleared`,
+`NotificationStore_SetMode_ToNoneBeforeBaseline_ClearsBaselinePending`,
+`NotificationStore_SetMode_ActiveToNoneToActive_SetsBaselinePendingAgain`,
 `NotificationStore_SetMode_None_DeletesNotified`, `NotificationStore_SetMode_None_ClearsDailySlotMemory`,
 `NotificationStore_SetMode_NoRow_ReturnsFalse`, `NotificationStore_SetMode_NoConfirmedAddress_ReturnsFalse`,
 `NotificationStore_SetMode_SameMode_ReturnsFalse`, and `NotificationStore_SetMode_NoChangePossible_NoAuditEntry`.
@@ -157,15 +167,36 @@ sortable UTC text form and read back unchanged. These scenarios are tested by
 `NotificationStore_Apply_State_TimestampsStoredAsUtcText`, and `NotificationStore_Apply_State_TimestampsRoundTrip`.
 
 **Commit of a mail**: A commit inserts new items, updates existing ones, removes named keys, can replace all items,
-writes the log row, and is atomic (a failing log row rolls back the items and the state); a commit for a user whose
+writes no log row, and is atomic (a failing item write rolls back the state); a commit for a user whose
 mode is `None` returns false and writes nothing; a commit for a user without a row returns false; the same key keeps
 one row, also by the unique key of the database itself; old log rows are pruned. These scenarios are tested by
 `NotificationStore_Apply_Upserts_InsertsNewItem`, `NotificationStore_Apply_Upserts_UpdatesExistingItem`,
 `NotificationStore_Apply_RemoveKeys_Deleted`, `NotificationStore_Apply_ReplaceAll_ReplacesSet`,
-`NotificationStore_Apply_WithLog_RowWritten`, `NotificationStore_Apply_Failure_NothingPersisted`,
+`NotificationStore_Apply_Commit_WritesNoLogRow`, `NotificationStore_Apply_Failure_NothingPersisted`,
 `NotificationStore_Apply_ModeNone_ReturnsFalse`, `NotificationStore_Apply_ModeNone_WritesNothing`,
 `NotificationStore_Apply_NoRow_ReturnsFalse`, `NotificationStore_Apply_SameKeyTwice_OneRow`,
 `NotificationStore_Create_Database_NotifiedItemsKeyUnique`, and `NotificationStore_Apply_OldLogRows_Pruned`.
+
+**Reservation of the send of a mail**: The tests are in `NotificationStoreSendTests.cs`, over the same real database.
+A reservation under the limits is reserved, returns the identity of a new log row of the given kind, address, and
+time, and is counted. A reservation is refused as the server limit when the log holds the limit in rows of the last
+hour, whatever their kind (a confirmation row counts) and whatever their user, and rows older than an hour do not
+count. A reservation is refused as the user limit when the log holds the limit in rows of that user in the last day,
+of every kind. Two parallel reservations at the limit minus one give exactly one reserved, for the server limit and
+for the user limit. A release deletes the row and frees the place; a release of a row that is gone, or that belongs to
+another user, changes nothing. A reservation deletes the rows that are older than a day. A confirmation that was
+reserved earlier counts against a notification mail, and a notification mail that was reserved earlier counts
+against a confirmation. The decision itself is a pure function, `SendLimits.Decide`, which checks the server limit
+first; a theory covers its combinations. These scenarios are tested by
+`NotificationStore_ReserveSend_UnderLimits_ReservedAndCounted`,
+`NotificationStore_ReserveSend_HourlyLimit_CountsOtherKindsAndUsers`,
+`NotificationStore_ReserveSend_HourlyLimit_IgnoresOlderMails`,
+`NotificationStore_ReserveSend_UserDailyLimit_CountsOwnMailsOfEveryKind`,
+`NotificationStore_ReserveSend_ParallelAtHourlyLimit_OneReserved`,
+`NotificationStore_ReserveSend_ParallelAtUserLimit_OneReserved`, `NotificationStore_ReleaseSend_Reserved_FreesSlot`,
+`NotificationStore_ReleaseSend_GoneOrForeign_NoOp`, `NotificationStore_ReserveSend_OldRows_AreDeleted`,
+`NotificationStore_ReserveSend_AfterConfirmationReserved_SharesHourlyCount`,
+`NotificationStore_ReserveSend_BeforeConfirmation_SharesHourlyCount`, and `SendLimits_Decide_Counts_ReturnsOutcome`.
 
 **Notified items and counts**: A new database has the table; only the items of the asked user are returned; the items
 go away with the user and with the removal of the address; and the mails of one user or of all users since an instant
@@ -176,7 +207,7 @@ are counted. These scenarios are tested by `NotificationStore_Create_Database_Ha
 
 **Generation and stale commits**: The generation of a preference rises by one when the mode changes and when an address
 is confirmed, and it is reported with each recipient. A commit whose generation differs from the current one, or whose
-address differs from the confirmed address, returns false and writes nothing (no item, no state, no log row), and a
+address differs from the confirmed address, returns false and writes nothing (no item, no state), and a
 commit with the current address and generation is applied. These scenarios are tested by
 `NotificationStore_SetMode_Changed_RaisesGeneration`, `NotificationStore_Confirm_Address_RaisesGeneration`,
 `NotificationStore_ListRecipients_Generation_Joined`, `NotificationStore_Apply_StaleGeneration_WritesNothing`,

@@ -42,20 +42,13 @@ public sealed record NotifiedKey(int ProjectId, string ReviewId, InboxSection Se
 public sealed record NotifiedEntry(NotifiedKey Key, string State);
 
 /// <summary>
-///     The send-log row that is written together with the notified items of a mail.
-/// </summary>
-/// <param name="Kind">The kind of the mail, for example <see cref="NotificationSendLogEntry.KindUpdate"/>.</param>
-/// <param name="Address">The address the mail was sent to.</param>
-/// <param name="SentUtc">When the mail was sent (UTC).</param>
-public sealed record NotificationLogRecord(string Kind, string Address, DateTimeOffset SentUtc);
-
-/// <summary>
 ///     Everything the dispatcher changes for one user after a pass, applied in one transaction.
 /// </summary>
 /// <remarks>
-///     Notified items, the dispatch state and the send-log row are saved together or not at all, so a crash can
-///     not leave a mail recorded without its items or the items without the mail. The record is immutable; the
-///     lists must not be changed after construction. The commit is conditional: it names the confirmed address and
+///     Notified items and the dispatch state are saved together or not at all. The mail itself was counted before
+///     it was sent (see <see cref="INotificationStore.ReserveSendAsync"/>), so the commit carries no send-log row.
+///     The record is immutable; the lists must not be changed after construction. The commit is conditional: it
+///     names the confirmed address and
 ///     the generation of the preference the pass was prepared for, and the store applies it only while both still
 ///     hold, so a result that was prepared before the user changed the address or the mode is discarded and nothing
 ///     of it is recorded.
@@ -68,7 +61,6 @@ public sealed record NotificationLogRecord(string Kind, string Address, DateTime
 ///     baseline). <paramref name="Upserts"/> and <paramref name="RemoveKeys"/> are ignored in that case.
 /// </param>
 /// <param name="State">The new dispatch state of the user.</param>
-/// <param name="Log">The send-log row to write; <c>null</c> when no mail was sent.</param>
 /// <param name="Address">The confirmed address the pass was prepared for.</param>
 /// <param name="Generation">
 ///     The generation of the preference the pass was prepared for (see
@@ -80,6 +72,5 @@ public sealed record NotificationCommit(
     IReadOnlyList<NotifiedKey> RemoveKeys,
     IReadOnlyList<NotifiedEntry>? ReplaceAll,
     NotificationDispatchState State,
-    NotificationLogRecord? Log,
     string Address,
     int Generation);

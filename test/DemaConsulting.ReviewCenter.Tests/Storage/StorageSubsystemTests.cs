@@ -900,7 +900,6 @@ public class StorageSubsystemTests
                     [],
                     null,
                     state,
-                    null,
                     current.Email!,
                     current.Generation),
                 cancellationToken);

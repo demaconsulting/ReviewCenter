@@ -24,11 +24,13 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 
 /// <summary>
 ///     In-memory <see cref="INotificationStore"/> that keeps the contract of the real one: the limits and the
-///     pending state are decided together, and every decision with one winner is made atomically.
+///     pending state are decided together, a send is reserved (counted) before it happens and released when it
+///     fails, and every decision with one winner is made atomically.
 /// </summary>
 /// <remarks>
 ///     One lock serializes every access, which is what the serialized transaction and the conditional updates of the
-///     database give. The limits are decided by <see cref="ConfirmationRequest.Decide"/>, the same code the real
+///     database give. The limits are decided by <see cref="ConfirmationRequest.Decide"/> and
+///     <see cref="SendLimits.Decide"/>, the same code the real
 ///     store uses. Like the real store it returns copies. A test can read the stored rows, the counted mails and
 ///     the audit drafts the changes carried. Thread-safe.
 /// </remarks>
@@ -420,7 +422,8 @@ internal sealed class FakeNotificationStore : INotificationStore
                 return Task.FromResult(false);
             }
 
-            var switchedOn = row.Mode == NotificationMode.None;
+            // Switching on from none marks the baseline as pending; between the active modes the mark stays
+            var switchedOn = row.Mode == NotificationMode.None || row.BaselinePending;
             _rows[userId] = new NotificationPreference
             {
                 UserId = userId,
@@ -432,7 +435,7 @@ internal sealed class FakeNotificationStore : INotificationStore
                 PendingAttempts = row.PendingAttempts,
                 PendingSentUtc = row.PendingSentUtc,
                 Mode = mode,
-                BaselinePending = switchedOn,
+                BaselinePending = mode != NotificationMode.None && switchedOn,
                 DigestHandledUtc = mode == NotificationMode.None ? null : row.DigestHandledUtc,
                 Generation = row.Generation + 1,
                 Updated = nowUtc
@@ -547,22 +550,57 @@ internal sealed class FakeNotificationStore : INotificationStore
                 Generation = row.Generation,
                 Updated = commit.NowUtc
             };
-            if (commit.Log is { } log)
-            {
-                _log.Add(new NotificationSendLogEntry
-                {
-                    Id = _nextLogId++,
-                    UserId = userId,
-                    ToAddress = log.Address,
-                    Kind = log.Kind,
-                    SentUtc = log.SentUtc
-                });
-            }
-
             _log.RemoveAll(e => e.SentUtc < commit.NowUtc.AddDays(-1));
             Commits.Add(commit);
             return Task.FromResult(true);
         }
+    }
+
+    /// <inheritdoc />
+    public Task<(SendReservation Outcome, int LogId)> ReserveSendAsync(
+        int userId,
+        string kind,
+        string address,
+        DateTimeOffset now,
+        int maxPerHour,
+        int maxPerUserPerDay,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_lock)
+        {
+            Calls++;
+            _log.RemoveAll(e => e.SentUtc < now.AddDays(-1));
+            var serverCount = _log.Count(e => e.SentUtc >= now.AddHours(-1));
+            var userCount = _log.Count(e => e.UserId == userId && e.SentUtc >= now.AddDays(-1));
+            var outcome = SendLimits.Decide(serverCount, userCount, maxPerHour, maxPerUserPerDay);
+            if (outcome != SendReservation.Reserved)
+            {
+                return Task.FromResult((outcome, 0));
+            }
+
+            var logId = _nextLogId++;
+            _log.Add(new NotificationSendLogEntry
+            {
+                Id = logId,
+                UserId = userId,
+                ToAddress = address,
+                Kind = kind,
+                SentUtc = now
+            });
+            return Task.FromResult((outcome, logId));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task ReleaseSendAsync(int userId, int logId, CancellationToken cancellationToken = default)
+    {
+        lock (_lock)
+        {
+            Calls++;
+            _log.RemoveAll(e => e.Id == logId && e.UserId == userId);
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />

@@ -245,6 +245,91 @@ public class NotificationStoreModeTests
     }
 
     /// <summary>
+    ///     Test that switching between two active modes before the baseline was recorded keeps the baseline pending.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_SetMode_DailyToEveryBeforeBaseline_KeepsBaselinePending()
+    {
+        // Arrange: switched on, and no pass has recorded the baseline yet
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
+
+        // Act
+        var changed = await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+
+        // Assert
+        Assert.True(changed);
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.Equal(NotificationMode.Every, row.Mode);
+        Assert.True(row.BaselinePending);
+    }
+
+    /// <summary>
+    ///     Test that switching between two active modes after the baseline was recorded keeps the baseline cleared.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_SetMode_EveryToDailyAfterBaseline_KeepsBaselineCleared()
+    {
+        // Arrange: switched on, and a pass recorded the baseline
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        await ApplyCurrentAsync(db, userId, Commit());
+
+        // Act
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
+
+        // Assert
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.False(row.BaselinePending);
+    }
+
+    /// <summary>
+    ///     Test that switching to the mode None clears a baseline that is still pending.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_SetMode_ToNoneBeforeBaseline_ClearsBaselinePending()
+    {
+        // Arrange: switched on, and no pass has recorded the baseline yet
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
+
+        // Act
+        await db.Notifications.SetModeAsync(userId, NotificationMode.None, _now, Draft(), Token);
+
+        // Assert
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.False(row.BaselinePending);
+    }
+
+    /// <summary>
+    ///     Test that switching an active mode off and on again marks the baseline as pending again.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_SetMode_ActiveToNoneToActive_SetsBaselinePendingAgain()
+    {
+        // Arrange: a baseline that was recorded, then the mode is switched off
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Daily, _now, Draft(), Token);
+        await ApplyCurrentAsync(db, userId, Commit());
+        await db.Notifications.SetModeAsync(userId, NotificationMode.None, _now, Draft(), Token);
+
+        // Act
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+
+        // Assert
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.True(row.BaselinePending);
+    }
+
+    /// <summary>
     ///     Test that the mode None deletes the notified items.
     /// </summary>
     [Fact]
@@ -610,10 +695,10 @@ public class NotificationStoreModeTests
     }
 
     /// <summary>
-    ///     Test that the send-log row is written with the commit.
+    ///     Test that a commit writes no send-log row: the mail was counted when it was reserved.
     /// </summary>
     [Fact]
-    public async Task NotificationStore_Apply_WithLog_RowWritten()
+    public async Task NotificationStore_Apply_Commit_WritesNoLogRow()
     {
         // Arrange
         using var db = new TestStore();
@@ -622,42 +707,34 @@ public class NotificationStoreModeTests
         var before = await CountLogAsync(db);
 
         // Act
-        await ApplyCurrentAsync(
-            db,
-            userId,
-            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
+        var applied = await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
 
         // Assert
-        Assert.Equal(before + 1, await CountLogAsync(db));
-        await using var context = await db.Factory.CreateDbContextAsync(Token);
-        var row = await context.NotificationSendLog.OrderByDescending(e => e.Id).FirstAsync(Token);
-        Assert.Equal(userId, row.UserId);
-        Assert.Equal("ann@example.com", row.ToAddress);
-        Assert.Equal(NotificationSendLogEntry.KindUpdate, row.Kind);
-        Assert.Equal(_now, row.SentUtc);
+        Assert.True(applied);
+        Assert.Equal(before, await CountLogAsync(db));
     }
 
     /// <summary>
-    ///     Test that a failure while writing the log row rolls back the items and the state as well.
+    ///     Test that a failure while writing the items rolls back the state as well.
     /// </summary>
     [Fact]
     public async Task NotificationStore_Apply_Failure_NothingPersisted()
     {
-        // Arrange: a trigger refuses every send-log insert
+        // Arrange: a trigger refuses every insert of a notified item
         using var db = new TestStore();
         var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
         await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
-        Execute(db, "CREATE TRIGGER refuse_log BEFORE INSERT ON NotificationSendLog BEGIN SELECT RAISE(ABORT, 'log refused'); END;");
+        Execute(db, "CREATE TRIGGER refuse_item BEFORE INSERT ON NotifiedItems BEGIN SELECT RAISE(ABORT, 'item refused'); END;");
         var commit = Commit(
             upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
-            state: new NotificationDispatchState(false, null, _now, 4, _now.AddHours(1)),
-            log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now));
+            state: new NotificationDispatchState(false, null, _now, 4, _now.AddHours(1)));
 
         // Act
         await Assert.ThrowsAnyAsync<Exception>(() => ApplyCurrentAsync(db, userId, commit));
 
         // Assert: neither the item, nor the state
-        Execute(db, "DROP TRIGGER refuse_log");
+        Execute(db, "DROP TRIGGER refuse_item");
         Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
         var row = await db.Notifications.GetAsync(userId, Token);
         Assert.NotNull(row);
@@ -684,7 +761,7 @@ public class NotificationStoreModeTests
     }
 
     /// <summary>
-    ///     Test that a commit for a user whose mode is None writes no item and no log row.
+    ///     Test that a commit for a user whose mode is None writes no item.
     /// </summary>
     [Fact]
     public async Task NotificationStore_Apply_ModeNone_WritesNothing()
@@ -698,9 +775,7 @@ public class NotificationStoreModeTests
         await ApplyCurrentAsync(
             db,
             userId,
-            Commit(
-                upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
-                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")]));
 
         // Assert
         Assert.Empty(await db.Notifications.GetNotifiedAsync(userId, Token));
@@ -748,8 +823,7 @@ public class NotificationStoreModeTests
             userId,
             Commit(
                 upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
-                state: new NotificationDispatchState(false, null, _now, 4, _now.AddHours(1)),
-                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now))
+                state: new NotificationDispatchState(false, null, _now, 4, _now.AddHours(1)))
             with
             {
                 Address = prepared.Email!,
@@ -784,9 +858,7 @@ public class NotificationStoreModeTests
         // Act
         var applied = await db.Notifications.ApplyAsync(
             userId,
-            Commit(
-                upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")],
-                log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "old@example.com", _now))
+            Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "a")])
             with
             {
                 Address = "old@example.com",
@@ -1227,13 +1299,10 @@ public class NotificationStoreModeTests
         var before = await CountLogAsync(db);
 
         // Act
-        await ApplyCurrentAsync(
-            db,
-            userId,
-            Commit(log: new NotificationLogRecord(NotificationSendLogEntry.KindUpdate, "ann@example.com", _now)));
+        await ApplyCurrentAsync(db, userId, Commit());
 
-        // Assert: one row went, one row came
-        Assert.Equal(before, await CountLogAsync(db));
+        // Assert: one row went, none came
+        Assert.Equal(before - 1, await CountLogAsync(db));
         await using var context = await db.Factory.CreateDbContextAsync(Token);
         Assert.DoesNotContain(await context.NotificationSendLog.ToListAsync(Token), e => e.SentUtc == _now.AddHours(-25));
     }
@@ -1280,15 +1349,13 @@ public class NotificationStoreModeTests
     /// <param name="removeKeys">The items to forget.</param>
     /// <param name="replaceAll">The baseline set.</param>
     /// <param name="state">The new dispatch state; the empty state when omitted.</param>
-    /// <param name="log">The send-log row.</param>
     /// <returns>The commit.</returns>
     private static NotificationCommit Commit(
         DateTimeOffset? nowUtc = null,
         NotifiedEntry[]? upserts = null,
         NotifiedKey[]? removeKeys = null,
         NotifiedEntry[]? replaceAll = null,
-        NotificationDispatchState? state = null,
-        NotificationLogRecord? log = null)
+        NotificationDispatchState? state = null)
     {
         return new NotificationCommit(
             nowUtc ?? _now,
@@ -1296,7 +1363,6 @@ public class NotificationStoreModeTests
             removeKeys ?? [],
             replaceAll,
             state ?? NotificationDispatchState.Empty,
-            log,
             string.Empty,
             0);
     }

@@ -43,9 +43,12 @@ public sealed record NotificationPassResult(int Sent, int Failed, int Deferred);
 ///     used up even when nothing was new. A user who has just switched a mode on gets no mail for the backlog: the
 ///     first pass records what exists. A failed send is retried after 5 minutes, 15 minutes, 1 hour, 4 hours and
 ///     12 hours; after the sixth failure the items are recorded as notified and the mail is dropped. The server-wide
-///     hourly limit and a limit per user and day defer a mail without counting it as a failure. A mail is recorded
-///     (items, state and send log together) only after it was sent, so a crash between the send and the record can
-///     repeat a mail but never lose one; the record is conditional on the confirmed address and the generation of the
+///     hourly limit and a limit per user and day defer a mail without counting it as a failure; both are applied by
+///     the store, which counts the mail (a reservation) right before the send, so the limits hold across several
+///     server instances and across confirmation mails, and a send that fails or is cancelled gives its reservation
+///     back. The items and the state of a mail are recorded (together) only after it was sent, so a crash between
+///     the send and the record can repeat a mail but never lose one; the record is conditional on the confirmed
+///     address and the generation of the
 ///     preference that the mail was prepared for, so a mail whose recipient changed the address or the mode meanwhile
 ///     is neither sent when the change is seen before the send nor recorded when it is seen after it. To keep an idle
 ///     server cheap, the inbox of a recipient is read only when the
@@ -376,7 +379,7 @@ public sealed class NotificationDispatcher
         var all = candidates.Select(c => new NotifiedEntry(c.Key, c.State)).ToList();
         await _store.ApplyAsync(
             recipient.UserId,
-            new NotificationCommit(now, [], [], all, state, null, recipient.Address, recipient.Generation),
+            new NotificationCommit(now, [], [], all, state, recipient.Address, recipient.Generation),
             cancellationToken);
     }
 
@@ -406,11 +409,11 @@ public sealed class NotificationDispatcher
             var diff = await ComputeAsync(recipient, cancellationToken);
             if (diff.Fresh.Count > 0)
             {
-                await ApplyAsync(recipient, now, [], diff.Stale, state with { BatchStartedUtc = now }, null, cancellationToken);
+                await ApplyAsync(recipient, now, [], diff.Stale, state with { BatchStartedUtc = now }, cancellationToken);
             }
             else if (diff.Stale.Count > 0)
             {
-                await ApplyAsync(recipient, now, [], diff.Stale, state, null, cancellationToken);
+                await ApplyAsync(recipient, now, [], diff.Stale, state, cancellationToken);
             }
 
             return Outcome.None;
@@ -425,7 +428,7 @@ public sealed class NotificationDispatcher
         var current = await ComputeAsync(recipient, cancellationToken);
         if (current.Fresh.Count == 0)
         {
-            await ApplyAsync(recipient, now, [], current.Stale, ClearedState(state, null), null, cancellationToken);
+            await ApplyAsync(recipient, now, [], current.Stale, ClearedState(state, null), cancellationToken);
             return Outcome.None;
         }
 
@@ -454,7 +457,7 @@ public sealed class NotificationDispatcher
         var diff = await ComputeAsync(recipient, cancellationToken);
         if (diff.Fresh.Count == 0)
         {
-            await ApplyAsync(recipient, now, [], diff.Stale, ClearedState(state, now), null, cancellationToken);
+            await ApplyAsync(recipient, now, [], diff.Stale, ClearedState(state, now), cancellationToken);
             return Outcome.None;
         }
 
@@ -474,7 +477,7 @@ public sealed class NotificationDispatcher
     ///     Sends the mail for the new items, or holds it back by a limit, or schedules a retry, or gives up.
     /// </summary>
     /// <param name="recipient">The recipient.</param>
-    /// <param name="kind">The kind of the send-log row.</param>
+    /// <param name="kind">The kind of the send-log row that reserves the mail.</param>
     /// <param name="diff">The new and stale items.</param>
     /// <param name="outstanding">The number of items that were mailed before and still wait.</param>
     /// <param name="now">The time of the pass.</param>
@@ -488,13 +491,6 @@ public sealed class NotificationDispatcher
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // A limit holds the mail back without changing anything; the next pass asks again
-        if (await _store.CountSentAsync(null, now.AddHours(-1), cancellationToken) >= _settings.MaxMailsPerHour
-            || await _store.CountSentAsync(recipient.UserId, now.AddDays(-1), cancellationToken) >= MaxMailsPerUserPerDay)
-        {
-            return Outcome.Deferred;
-        }
-
         var composition = _composer.Compose(diff.Fresh, outstanding, recipient.Mode);
         var message = new NotificationMessage(recipient.Address, composition.Subject, composition.Text, composition.Html);
         var state = recipient.State;
@@ -508,29 +504,53 @@ public sealed class NotificationDispatcher
             return Outcome.None;
         }
 
+        // The limits are applied by the store, which counts the mail in the same transaction (the reservation), so
+        // senders that race can not both slip under a limit. A refused reservation holds the mail back without
+        // changing anything; the next pass asks again
+        var (reservation, logId) = await _store.ReserveSendAsync(
+            recipient.UserId,
+            kind,
+            recipient.Address,
+            now,
+            _settings.MaxMailsPerHour,
+            MaxMailsPerUserPerDay,
+            cancellationToken);
+        if (reservation != SendReservation.Reserved)
+        {
+            return Outcome.Deferred;
+        }
+
         try
         {
             await _sender.SendAsync(message, cancellationToken);
         }
-        catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
+        catch (Exception exception)
         {
+            // The mail did not go out, so it is no longer counted; the release does not honor the cancellation of
+            // the pass, so a shutdown does not leak the reservation
+            await _store.ReleaseSendAsync(recipient.UserId, logId, CancellationToken.None);
+            if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
             var failures = state.FailureCount + 1;
             if (failures <= RetryDelays.Count)
             {
                 var waiting = state with { FailureCount = failures, NextAttemptUtc = now + RetryDelays[failures - 1] };
-                await ApplyAsync(recipient, now, [], [], waiting, null, cancellationToken);
+                await ApplyAsync(recipient, now, [], [], waiting, cancellationToken);
                 return Outcome.Failed;
             }
 
             // Give up: the items count as told, so the dead mail is not tried again and again
-            await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), null, cancellationToken);
+            await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
             _onError?.Invoke(exception);
             return Outcome.Failed;
         }
 
-        // The mail is out: record items, state and the send-log row together
-        var log = new NotificationLogRecord(kind, recipient.Address, now);
-        await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), log, cancellationToken);
+        // The mail is out and its reservation is the log row: record items and state together. When the commit is
+        // stale the row stays, because the mail was sent and is counted
+        await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
         return Outcome.Sent;
     }
 
@@ -589,7 +609,6 @@ public sealed class NotificationDispatcher
     /// <param name="upserts">The items to record.</param>
     /// <param name="stale">The items to forget.</param>
     /// <param name="state">The new state.</param>
-    /// <param name="log">The send-log row; <c>null</c> for none.</param>
     /// <param name="cancellationToken">Cancels the pass.</param>
     /// <returns>A task that completes when the change is stored.</returns>
     private async Task ApplyAsync(
@@ -598,12 +617,11 @@ public sealed class NotificationDispatcher
         IReadOnlyList<NotifiedEntry> upserts,
         IReadOnlyList<NotifiedKey> stale,
         NotificationDispatchState state,
-        NotificationLogRecord? log,
         CancellationToken cancellationToken)
     {
         await _store.ApplyAsync(
             recipient.UserId,
-            new NotificationCommit(now, upserts, stale, null, state, log, recipient.Address, recipient.Generation),
+            new NotificationCommit(now, upserts, stale, null, state, recipient.Address, recipient.Generation),
             cancellationToken);
     }
 

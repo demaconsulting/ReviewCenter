@@ -322,8 +322,10 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                     return (false, null);
                 }
 
-                // Switching on marks the baseline as pending; every change starts with no window and no failure
-                var baseline = mode != NotificationMode.None && row.Mode == NotificationMode.None;
+                // Switching on from none marks the baseline as pending; between the active modes the mark stays as it is,
+                // so a baseline that no pass recorded yet is not lost and the backlog is not mailed; switching to none
+                // clears it. Every change starts with no window and no failure
+                var baseline = mode != NotificationMode.None && (row.Mode == NotificationMode.None || row.BaselinePending);
                 _ = await context.NotificationPreferences
                     .Where(p => p.UserId == userId)
                     .ExecuteUpdateAsync(
@@ -446,18 +448,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
 
                 await ApplyItemsAsync(context, userId, commit, cancellationToken);
 
-                // The mail is counted in the same transaction; rows that can not count towards a limit any more go
-                if (commit.Log is { } log)
-                {
-                    context.NotificationSendLog.Add(new NotificationSendLogEntry
-                    {
-                        UserId = userId,
-                        ToAddress = log.Address,
-                        Kind = log.Kind,
-                        SentUtc = log.SentUtc
-                    });
-                }
-
+                // Rows that can not count towards a limit any more go; the mail itself was counted when it was reserved
                 var dayStart = commit.NowUtc - _day;
                 _ = await context.NotificationSendLog
                     .Where(e => e.SentUtc < dayStart)
@@ -465,6 +456,62 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                 return (true, null);
             },
             cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<(SendReservation Outcome, int LogId)> ReserveSendAsync(
+        int userId,
+        string kind,
+        string address,
+        DateTimeOffset now,
+        int maxPerHour,
+        int maxPerUserPerDay,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        ArgumentNullException.ThrowIfNull(address);
+        return await appender.ExecuteAsync<(SendReservation, int)>(
+            factory,
+            async context =>
+            {
+                // Rows older than one day can not count towards any limit; the count and the insert run in the same
+                // serialized transaction, so two senders can not both pass the same count
+                var dayStart = now - _day;
+                var hourStart = now - _hour;
+                _ = await context.NotificationSendLog
+                    .Where(e => e.SentUtc < dayStart)
+                    .ExecuteDeleteAsync(cancellationToken);
+                var serverCount = await context.NotificationSendLog.CountAsync(e => e.SentUtc >= hourStart, cancellationToken);
+                var userCount = await context.NotificationSendLog.CountAsync(
+                    e => e.UserId == userId && e.SentUtc >= dayStart,
+                    cancellationToken);
+                var outcome = SendLimits.Decide(serverCount, userCount, maxPerHour, maxPerUserPerDay);
+                if (outcome != SendReservation.Reserved)
+                {
+                    return ((outcome, 0), null);
+                }
+
+                var log = new NotificationSendLogEntry
+                {
+                    UserId = userId,
+                    ToAddress = address,
+                    Kind = kind,
+                    SentUtc = now
+                };
+                context.NotificationSendLog.Add(log);
+                await context.SaveChangesAsync(cancellationToken);
+                return ((SendReservation.Reserved, log.Id), null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ReleaseSendAsync(int userId, int logId, CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        _ = await context.NotificationSendLog
+            .Where(e => e.Id == logId && e.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <inheritdoc />

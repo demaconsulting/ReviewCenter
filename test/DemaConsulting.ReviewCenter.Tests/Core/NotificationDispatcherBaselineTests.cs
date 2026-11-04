@@ -83,7 +83,6 @@ public class NotificationDispatcherBaselineTests
 
         // Assert
         Assert.Empty(world.Store.Log);
-        Assert.All(world.Store.Commits, commit => Assert.Null(commit.Log));
     }
 
     /// <summary>
@@ -146,6 +145,31 @@ public class NotificationDispatcherBaselineTests
 
         // Assert
         Assert.Equal(reads + 1, world.InboxStore.InboxReads);
+        Assert.False(world.Store.StateOf(world.IdOf("ann")).BaselinePending);
+    }
+
+    /// <summary>
+    ///     Test that switching between the active modes before the first pass keeps the baseline pending, so the
+    ///     backlog is recorded and not mailed.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_ModeSwitchedBeforeBaseline_BacklogNotMailed()
+    {
+        // Arrange: ann has a review to answer, switches the daily summary on and then the mode every change on, before
+        // any pass recorded the baseline
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Daily, baselinePending: true);
+        world.Store.SwitchMode(world.IdOf("ann"), NotificationMode.Every);
+
+        // Act
+        await world.PassAsync();
+        world.Advance(NotificationDispatcherWorld.DefaultWindow);
+        await world.PassAsync();
+
+        // Assert
+        Assert.Empty(world.Sender.Sent);
+        Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
         Assert.False(world.Store.StateOf(world.IdOf("ann")).BaselinePending);
     }
 }

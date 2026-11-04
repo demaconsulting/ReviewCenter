@@ -444,7 +444,6 @@ public class NotificationPreferenceServiceModeTests
                 [],
                 null,
                 recipient.State with { BaselinePending = false },
-                null,
                 recipient.Address,
                 recipient.Generation),
             world.Token);

@@ -229,6 +229,16 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_BaselinePendingSequenceUnchanged_ReadsInbox
 
+      - id: ReviewCenter-NotificationDispatcher-BaselineKeptBetweenModes
+        title: >-
+          The NotificationDispatcher class shall send no mail for the backlog of a user who switched between Daily and
+          Every before the baseline was recorded.
+        justification: |
+          A switch between two modes is no new start, so the baseline that waits for the first pass must still be
+          taken, and the backlog must not become news.
+        tests:
+          - NotificationDispatcher_RunPass_ModeSwitchedBeforeBaseline_BacklogNotMailed
+
       # Every
       - id: ReviewCenter-NotificationDispatcher-EveryStartsWindow
         title: >-
@@ -558,7 +568,7 @@ sections:
 
       - id: ReviewCenter-NotificationDispatcher-StaleAddressNothingRecorded
         title: >-
-          The NotificationDispatcher class shall record nothing of a mail when the address was replaced during the
+          The NotificationDispatcher class shall record no item of a mail when the address was replaced during the
           send.
         justification: |
           The items were not told to the new address, so recording them would hide their news from the user.
@@ -567,7 +577,7 @@ sections:
 
       - id: ReviewCenter-NotificationDispatcher-StaleModeFlipNothingRecorded
         title: >-
-          The NotificationDispatcher class shall record nothing of a mail when the user switched the mode off and on
+          The NotificationDispatcher class shall record no item of a mail when the user switched the mode off and on
           again during the send.
         justification: |
           A switch on starts a new baseline, so the result of a send that began before it must not be recorded.
@@ -729,6 +739,51 @@ sections:
           A deferral is no failure of the mail server, so it must not move the retry schedule or lead to a give-up.
         tests:
           - NotificationDispatcher_RunPass_Deferred_FailureCountUnchanged
+
+      - id: ReviewCenter-NotificationDispatcher-CapReserveBeforeSend
+        title: >-
+          The NotificationDispatcher class shall reserve the send log row of a mail in the store before it sends the
+          mail.
+        justification: |
+          The limits count the rows of the send log in the shared database. A row that exists during the send makes
+          a parallel sender, such as another server instance, count the mail that is on its way.
+        tests:
+          - NotificationDispatcher_RunPass_SendInProgress_ReservationExists
+
+      - id: ReviewCenter-NotificationDispatcher-CapReservationRefusedNoSend
+        title: >-
+          The NotificationDispatcher class shall send no mail when the store refuses the reservation of the send log
+          row.
+        justification: |
+          A refused reservation means that a limit is reached, so the mail waits, and nothing of the user changes.
+        tests:
+          - NotificationDispatcher_RunPass_ReservationRefused_NothingChanges
+
+      - id: ReviewCenter-NotificationDispatcher-CapReleaseOnFailure
+        title: >-
+          The NotificationDispatcher class shall release the reserved send log row when the send fails.
+        justification: |
+          A mail that was not sent must not use up a place under the limits.
+        tests:
+          - NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded
+
+      - id: ReviewCenter-NotificationDispatcher-CapReleaseOnCancellation
+        title: >-
+          The NotificationDispatcher class shall release the reserved send log row when the send is cancelled.
+        justification: |
+          A shutdown of the server during a send must not leave a row that counts a mail that was not sent.
+        tests:
+          - NotificationDispatcher_RunPass_SendCancelled_ReservationReleased
+
+      - id: ReviewCenter-NotificationDispatcher-CapKeepsRowWhenStale
+        title: >-
+          The NotificationDispatcher class shall keep the reserved send log row of a mail that was sent when the
+          commit of its items turned stale.
+        justification: |
+          The mail went out, so it counts under the limits, even when the items are not recorded.
+        tests:
+          - NotificationDispatcher_RunPass_AddressReplacedDuringSend_NothingRecorded
+          - NotificationDispatcher_RunPass_ModeFlippedDuringSend_NothingRecorded
 
       - id: ReviewCenter-NotificationDispatcher-LogUpdateKind
         title: >-

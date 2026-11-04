@@ -262,7 +262,8 @@ public class NotificationDispatcherDedupeTests
     }
 
     /// <summary>
-    ///     Test that the notified items are recorded together with the send-log row after the mail was sent.
+    ///     Test that the notified items are recorded after the mail was sent and that its send-log row stays as the
+    ///     count of the mail.
     /// </summary>
     [Fact]
     public async Task NotificationDispatcher_RunPass_SendSucceeds_ItemsRecorded()
@@ -277,13 +278,14 @@ public class NotificationDispatcherDedupeTests
 
         // Assert
         Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
-        var commit = world.Store.Commits[^1];
-        Assert.NotNull(commit.Log);
-        Assert.Equal("ann@example.com", commit.Log.Address);
+        var row = Assert.Single(world.Store.Log);
+        Assert.Equal("ann@example.com", row.ToAddress);
+        Assert.Equal(NotificationSendLogEntry.KindUpdate, row.Kind);
     }
 
     /// <summary>
-    ///     Test that nothing is recorded as notified while the mail is being sent: the record follows the send.
+    ///     Test that nothing is recorded as notified while the mail is being sent: the record follows the send. The
+    ///     mail is already counted at that moment, because it is reserved before the send.
     /// </summary>
     [Fact]
     public async Task NotificationDispatcher_RunPass_SendInProgress_ItemsNotYetRecorded()
@@ -306,12 +308,35 @@ public class NotificationDispatcherDedupeTests
         // Assert: empty during the send, recorded after it
         Assert.NotNull(notifiedDuringSend);
         Assert.Empty(notifiedDuringSend);
-        Assert.Equal(0, logRowsDuringSend);
+        Assert.Equal(1, logRowsDuringSend);
         Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
     }
 
     /// <summary>
-    ///     Test that nothing is recorded as notified when the send fails.
+    ///     Test that the mail is counted by a reservation that exists while the mail is being sent.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_SendInProgress_ReservationExists()
+    {
+        // Arrange: the sender looks at the send log at the moment of the send
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Every);
+        NotificationSendLogEntry? rowDuringSend = null;
+        world.Sender.OnSend = _ => rowDuringSend = world.Store.Log.SingleOrDefault();
+
+        // Act
+        await world.DeliverEveryAsync();
+
+        // Assert
+        Assert.NotNull(rowDuringSend);
+        Assert.Equal(world.IdOf("ann"), rowDuringSend.UserId);
+        Assert.Equal("ann@example.com", rowDuringSend.ToAddress);
+        Assert.Equal(NotificationSendLogEntry.KindUpdate, rowDuringSend.Kind);
+    }
+
+    /// <summary>
+    ///     Test that nothing is recorded as notified when the send fails, and that the mail is not counted.
     /// </summary>
     [Fact]
     public async Task NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded()
@@ -320,15 +345,42 @@ public class NotificationDispatcherDedupeTests
         var world = await NotificationDispatcherWorld.CreateAsync();
         await world.SeatAsync("r1", "ann");
         world.Enroll("ann", NotificationMode.Every);
+        var rowsDuringSend = -1;
+        world.Sender.BeforeSend = _ => rowsDuringSend = world.Store.Log.Count;
         world.Sender.Fail = true;
 
         // Act
         await world.DeliverEveryAsync();
 
-        // Assert
+        // Assert: the reservation existed during the failed send and was given back
         Assert.Empty(world.NotifiedOf("ann"));
+        Assert.Equal(1, rowsDuringSend);
         Assert.Empty(world.Store.Log);
     }
+
+    /// <summary>
+    ///     Test that a send that is cancelled gives its reservation back.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_SendCancelled_ReservationReleased()
+    {
+        // Arrange: the pass is cancelled while the mail is being sent
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        world.Enroll("ann", NotificationMode.Every);
+        using var source = new CancellationTokenSource();
+        world.Sender.BeforeSend = _ => source.Cancel();
+        await world.PassAsync();
+        world.Advance(NotificationDispatcherWorld.DefaultWindow);
+
+        // Act
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => world.Dispatcher.RunPassAsync(source.Token));
+
+        // Assert
+        Assert.Empty(world.Store.Log);
+        Assert.Empty(world.NotifiedOf("ann"));
+    }
+
 
     /// <summary>
     ///     Test that an update the user looked at before the mail was due is dropped.
