@@ -15,7 +15,7 @@ functions work correctly.
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all twelve
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all thirteen
 requirements are satisfied.
 
 ### Test Scenarios
