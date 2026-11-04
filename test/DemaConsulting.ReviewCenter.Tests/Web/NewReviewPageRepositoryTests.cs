@@ -373,7 +373,7 @@ public class NewReviewPageRepositoryTests : PageTestBase
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
         // Assert: an error is shown and nothing was created
-        Assert.NotEmpty(cut.Find("[data-testid='review-error']").TextContent);
+        Assert.Equal("The repository 'main-repo' is disabled.", cut.Find("[data-testid='review-error']").TextContent);
         Assert.Empty(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken));
     }
 

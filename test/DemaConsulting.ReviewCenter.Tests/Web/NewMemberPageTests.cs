@@ -195,7 +195,8 @@ public class NewMemberPageTests : PageTestBase
         }
 
         // Assert: one message, which says to check the spelling, and no membership was added
-        Assert.Single(messages.Distinct());
+        Assert.Equal(2, messages.Count);
+        Assert.Equal(messages[0], messages[1]);
         Assert.Contains("cannot be added", messages[0], StringComparison.Ordinal);
         Assert.Equal(before, (await Store.ListMembershipsAsync(apollo, TestContext.Current.CancellationToken)).Count);
     }
@@ -215,10 +216,32 @@ public class NewMemberPageTests : PageTestBase
         await SubmitAsync(cut, "mem");
 
         // Assert
-        Assert.NotEmpty(cut.FindAll("[data-testid='new-member-error']"));
+        Assert.Contains("already a member", cut.Find("[data-testid='new-member-error']").TextContent, StringComparison.Ordinal);
         var mem = (await UserStore.GetByUsernameAsync("mem", TestContext.Current.CancellationToken))!;
         var memMembership = await Store.GetMembershipAsync(mem.Id, apollo, TestContext.Current.CancellationToken);
         Assert.Equal(ProjectRole.User, memMembership!.Role);
+    }
+
+    /// <summary>
+    ///     Test that choosing both the project admin and the auditor role shows a message and adds nothing.
+    /// </summary>
+    [Fact]
+    public async Task NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing()
+    {
+        // Arrange: both role boxes are ticked
+        var apollo = await ArrangeAsync();
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+        var cut = RenderPage(apollo);
+        await cut.Find("[data-testid='new-member-auditor-checkbox']").ChangeAsync(true);
+        await cut.Find("[data-testid='new-member-admin-checkbox']").ChangeAsync(true);
+
+        // Act
+        await SubmitAsync(cut, "out");
+
+        // Assert: the message asks for one role, and the user is no member
+        Assert.Equal("Choose either project admin or auditor, not both.", cut.Find("[data-testid='new-member-error']").TextContent);
+        var user = (await UserStore.GetByUsernameAsync("out", TestContext.Current.CancellationToken))!;
+        Assert.Null(await Store.GetMembershipAsync(user.Id, apollo, TestContext.Current.CancellationToken));
     }
 
     /// <summary>

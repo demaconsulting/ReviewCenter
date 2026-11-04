@@ -114,6 +114,55 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that, without a repository, the note names whom to ask: a contributor who administers nothing is told
+    ///     to ask a project administrator, and a project administrator is pointed to the Repositories button.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_PlanLinkUnavailable_PlainMember_NamesWhomToAsk()
+    {
+        // Arrange: a project without a repository, a plain member and a project administrator
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        SignInAs("mbr", "Zed Member", isSystemAdmin: false);
+
+        // Act: render the page as the plain member, then as the project administrator
+        var member = RenderProjectPage(projectId);
+        var memberNote = member.Find("[data-testid='plan-reviews-unavailable']").TextContent.Trim();
+        SignInAs("pam", "Pam Admin", isSystemAdmin: false);
+        var admin = RenderProjectPage(projectId);
+        var adminNote = admin.Find("[data-testid='plan-reviews-unavailable']").TextContent.Trim();
+
+        // Assert: each note names whom to ask, and there is no link
+        Assert.Equal("Planning reviews needs a repository; ask a project administrator to add one.", memberNote);
+        Assert.Equal("Planning reviews needs a repository; add one with the Repositories button.", adminNote);
+        Assert.Empty(member.FindAll("[data-testid='plan-reviews-link']"));
+        Assert.Empty(admin.FindAll("[data-testid='plan-reviews-link']"));
+    }
+
+    /// <summary>
+    ///     Test that a project whose only repository is disabled shows no plan link and the note, as a project
+    ///     without a repository does.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_PlanLink_OnlyDisabledRepository_ShowsNoLinkAndNote()
+    {
+        // Arrange: a project whose only repository is registered and then disabled
+        var token = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        var admin = new Actor("adm", "Adm");
+        await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", token);
+        var repository = await Repositories.CreateAsync(
+            "main-repo", "https://example.com/org/repo.git", null, null, admin, token);
+        await Repositories.SetEnabledAsync(repository.Id, false, admin, token);
+
+        // Act: render the page
+        var cut = RenderProjectPage(project.Id);
+
+        // Assert: no link, and the note explains why
+        Assert.Empty(cut.FindAll("[data-testid='plan-reviews-link']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='plan-reviews-unavailable']"));
+    }
+
+    /// <summary>
     ///     Test that a project without reviews shows its name and an empty message.
     /// </summary>
     [Fact]
@@ -185,6 +234,41 @@ public class ProjectPageTests : PageTestBase
         // Assert: the badges follow the approval
         Assert.Equal("Approved", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
         Assert.Equal("Setup", cut.Find("[data-testid='review-approval-REV-2']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that an approved review whose record changed after the signature is listed as In review again, and
+    ///     that the row says the signature is out of date.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_SignedThenChangedReview_ShowsInReviewAgain()
+    {
+        // Arrange: a review fully signed by its only slot, so that it is Approved
+        var token = TestContext.Current.CancellationToken;
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", token);
+        await Users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", token);
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddMembershipAsync(ann.Id, project.Id, token);
+        await Reviews.CreateDraftAsync(project.Id, "REV-1", "Signed", [new("a.txt", TestContent.A)], token);
+        var slot = await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-1", ann.Id, null, token);
+        var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items);
+        foreach (var item in items)
+        {
+            await Checklists.SetAnswerAsync(project.Id, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, token);
+        }
+
+        var approval = await Signing.GetApprovalAsync(project.Id, "REV-1", token);
+        await Signing.SignAsync(TestActors.Ann, project.Id, "REV-1", slot.Id, approval!.Digest, "correct horse battery", token);
+        var before = RenderProjectPage(project.Id).Find("[data-testid='review-approval-REV-1']").TextContent;
+
+        // Act: the record changes after the signature (a reopen changes the record), then the page is rendered again
+        await Signing.ReopenReviewAsync(new Actor("bob", "Bob"), project.Id, "REV-1", "Found a mistake", token);
+        var cut = RenderProjectPage(project.Id);
+
+        // Assert: Approved before the change, In review after it, with the signature reported as out of date
+        Assert.Equal("Approved", before);
+        Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
+        Assert.Equal("1 signed, then the review changed", cut.Find("[data-testid='review-outofdate-REV-1']").TextContent);
     }
 
     /// <summary>
@@ -782,6 +866,25 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a project administrator sees the Repositories button, which leads to the repositories of the
+    ///     project.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_ProjectAdmin_ShowsRepositoriesLink()
+    {
+        // Arrange: a project administrator who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: the button leads to the repositories page of the project
+        var link = cut.Find("[data-testid='repositories-link']");
+        Assert.Equal($"/projects/{projectId}/repositories", link.GetAttribute("href"));
+        Assert.Equal("Repositories", link.TextContent);
+    }
+
+    /// <summary>
     ///     Test that a plain member sees the reviews but no members section, no add button and no audit button.
     /// </summary>
     [Fact]
@@ -873,6 +976,28 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal("Project admin", promoted);
         Assert.Empty(cut.FindAll("[data-testid='member-row-mbr']"));
         Assert.NotEmpty(cut.FindAll("[data-testid='member-row-pam']"));
+    }
+
+    /// <summary>
+    ///     Test that a project administrator is told the outcome of each change: the new role after a role change
+    ///     and the removal after a removal.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_ProjectAdmin_ShowsOutcomeOfEachChange()
+    {
+        // Arrange: a project administrator with a plain member
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+
+        // Act: promote the member, then remove the member, reading the status after each change
+        await cut.Find("[data-testid='member-toggle-role-mbr']").ClickAsync();
+        var afterRole = cut.Find("[data-testid='member-status']").TextContent;
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+        var afterRemove = cut.Find("[data-testid='member-status']").TextContent;
+
+        // Assert: each status names the member and the outcome
+        Assert.Equal("'mbr' is now project admin.", afterRole);
+        Assert.Equal("Removed 'mbr' from the project.", afterRemove);
     }
 
     /// <summary>
