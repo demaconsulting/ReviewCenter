@@ -29,7 +29,7 @@ sections:
           - ReviewCenter-PathHelpers-SafeCombine
           - ReviewCenter-PathHelpers-SafeCombine-CurrentDirectory
           - ReviewCenter-PathHelpers-SafeCombine-EmptyPath
-          - ReviewCenter-PathHelpers-SafeCombine-NullArgument
+          - ReviewCenter-PathHelpers-SafeCombine-DotDotName
         tests:
           - UtilitiesSubsystem_PathResolutionWorkflow_ValidPaths_ResolvesCorrectly
           - UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories
@@ -44,7 +44,6 @@ sections:
           checking on its own.
         children:
           - ReviewCenter-PathHelpers-SafeCombine-Traversal
-          - ReviewCenter-PathHelpers-SafeCombine-DotDotName
         tests:
           - UtilitiesSubsystem_PathTraversalValidation_DangerousPaths_ThrowsException
 
@@ -58,6 +57,17 @@ sections:
           - ReviewCenter-PathHelpers-SafeCombine-AbsolutePath
         tests:
           - UtilitiesSubsystem_AbsolutePathRejection_ThrowsException
+
+      - id: ReviewCenter-Utilities-SafePaths-NullArgument
+        title: >-
+          The Utilities subsystem shall reject a null base directory and a null relative path.
+        justification: |
+          A missing value would otherwise surface as an unrelated failure deep inside a consumer; the subsystem
+          refuses it at the boundary for every consumer, naming the argument that was missing.
+        children:
+          - ReviewCenter-PathHelpers-SafeCombine-NullArgument
+        tests:
+          - UtilitiesSubsystem_PathResolutionWorkflow_NullArguments_ThrowsArgumentNullException
 
       # ---------------------------------------------------------------------------------------------------------------
       # Temporary files
@@ -152,7 +162,7 @@ sections:
           - ReviewCenter-SecretSource-FileProblems-TooLarge
           - ReviewCenter-SecretSource-FileProblems-NotUtf8
         tests:
-          - UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret
+          - UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting
 
       - id: ReviewCenter-Utilities-SecretSource-NoDisclosure
         title: >-

@@ -64,20 +64,36 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
-    ///     Test that the default retry policy is five delete attempts with a pause of 75 ms between them.
+    ///     Test that a directory created with the parameterless constructor keeps retrying a delete that fails, with
+    ///     pauses of 75 ms, for about a third of a second before it gives up.
     /// </summary>
     [Fact]
-    public void TemporaryDirectory_Constructor_Default_UsesFiveAttemptsAboutSeventyFiveMsApart()
+    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond()
     {
-        // Arrange: nothing to set up; the default policy is what the parameterless constructor passes on
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Act: read the default policy
-        var attempts = TemporaryDirectory.DefaultDeleteAttempts;
-        var delay = TemporaryDirectory.DefaultRetryDelay;
+        // Arrange: a file that stays open for the whole test in a directory with the default policy, which is five
+        // attempts with four pauses of 75 ms
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("locked.txt");
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
-        // Assert: five attempts, 75 ms apart
-        Assert.Equal(5, attempts);
-        Assert.Equal(TimeSpan.FromMilliseconds(75), delay);
+        // Act: dispose and measure how long it takes
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var exception = Record.Exception(directory.Dispose);
+        watch.Stop();
+
+        // Assert: nothing is thrown, the four pauses were taken (300 ms, with a little slack for the timer) and the
+        // wait is bounded well below what a larger default would take
+        Assert.Null(exception);
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(250), $"Gave up too early: {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+        Assert.False(Directory.Exists(directory.DirectoryPath));
     }
 
     /// <summary>
@@ -240,8 +256,8 @@ public class TemporaryDirectoryTests
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for the whole test and the default policy of 5 attempts, 75 ms apart
-        using var directory = new TemporaryDirectory();
+        // Arrange: a file that stays open for the whole test and an explicit policy of 3 attempts, 50 ms apart
+        using var directory = new TemporaryDirectory(3, TimeSpan.FromMilliseconds(50));
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
@@ -250,10 +266,10 @@ public class TemporaryDirectoryTests
         var exception = Record.Exception(directory.Dispose);
         watch.Stop();
 
-        // Assert: nothing is thrown, the pauses were really taken (4 x 75 ms) and the wait stays bounded
+        // Assert: nothing is thrown, the pauses were really taken (2 x 50 ms) and the wait stays bounded
         Assert.Null(exception);
         Assert.True(Directory.Exists(directory.DirectoryPath));
-        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(200), $"Gave up too early: {watch.Elapsed}");
+        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(80), $"Gave up too early: {watch.Elapsed}");
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
 
         // Cleanup: release the file and remove what is left

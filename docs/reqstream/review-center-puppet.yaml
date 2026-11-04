@@ -12,8 +12,10 @@
 #   installs Chromium and makes a missing browser fail those tests.
 # - Every requirement states one criterion. The first criterion of a topic keeps the original id; the further
 #   criteria of the same topic are named <original id>-<Aspect>.
-# - The unit requirements stay children of the requirement that held them before the split; where a unit
-#   requirement fits one of the more specific requirements better, a later pass can re-home it.
+# - The unit requirements are children of the system requirement that shows the same behavior: starts and start
+#   failures under the start requirements, rejections and failure results under the failure requirements, and result
+#   lines under the result requirements. Units with no system counterpart stay with the main requirement of their
+#   topic.
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -27,18 +29,9 @@ sections:
           keep the page, the scroll position, and the hover state while it decides what to do next.
         children:
           - ReviewCenterPuppet-PuppetProgram-Arguments
-          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownCommand
-          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownOption
-          - ReviewCenterPuppet-PuppetProgram-Arguments-ArgumentCount
-          - ReviewCenterPuppet-PuppetProgram-Arguments-MalformedValue
           - ReviewCenterPuppet-ControlChannel-Protocol
-          - ReviewCenterPuppet-ControlChannel-Protocol-StaleFile
           - ReviewCenterPuppet-ControlChannel-Protocol-EnvironmentVariable
           - ReviewCenterPuppet-ControlChannel-Protocol-DefaultFile
-          - ReviewCenterPuppet-BrowserDaemon-Lifecycle
-          - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
-          - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
-          - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure-OtherFailure
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -60,6 +53,11 @@ sections:
         tags: [system]
         justification: |
           Two browsers behind one control file would leave the commands talking to an unpredictable one.
+        children:
+          - ReviewCenterPuppet-BrowserDaemon-Lifecycle
+          - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
+          - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
+          - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure-OtherFailure
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -71,6 +69,10 @@ sections:
         justification: |
           A command without a browser is a usage problem of the agent, not a failed browser action, and its exit
           code must say so.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningExit
+          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningHint
+          - ReviewCenterPuppet-ControlChannel-Protocol-StaleFile
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -105,19 +107,9 @@ sections:
           the page exists.
         children:
           - ReviewCenterPuppet-PuppetProgram-Results
-          - ReviewCenterPuppet-PuppetProgram-Results-PageLine
-          - ReviewCenterPuppet-PuppetProgram-Results-Events
           - ReviewCenterPuppet-PuppetProgram-Results-ExitCodeSuccess
-          - ReviewCenterPuppet-PuppetProgram-Results-ExitCodeFailure
-          - ReviewCenterPuppet-PuppetProgram-Results-FailureMessage
-          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningExit
-          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningHint
-          - ReviewCenterPuppet-SelectorResolver-Resolve
-          - ReviewCenterPuppet-SelectorResolver-Resolve-PassThrough
-          - ReviewCenterPuppet-SelectorResolver-Resolve-Blank
           - ReviewCenterPuppet-PlaywrightBrowser-Navigation
           - ReviewCenterPuppet-PlaywrightBrowser-Navigation-AbsoluteUrl
-          - ReviewCenterPuppet-PlaywrightBrowser-Navigation-MissingBase
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -128,6 +120,9 @@ sections:
         tags: [system]
         justification: |
           Buttons and links are the main way an agent moves through the interface.
+        children:
+          - ReviewCenterPuppet-SelectorResolver-Resolve
+          - ReviewCenterPuppet-SelectorResolver-Resolve-PassThrough
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -218,16 +213,21 @@ sections:
         justification: |
           The agent decides its next action from what the last command reported, so each result shows where the
           browser is.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-PageLine
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
       - id: ReviewCenterPuppet-System-Interact-ConsoleErrors
         title: >-
-          The tool shall report a new console error once, in the result of the command that follows it.
+          The tool shall report a new console error once, in the result of the command during which it was raised.
         tags: [system]
         justification: |
-          A script error that an action caused shows up at once, and is not repeated in every later result.
+          A script error that an action caused shows up at once, next to the action, and is not repeated in every
+          later result.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-Events
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -238,6 +238,14 @@ sections:
         tags: [system]
         justification: |
           A wrong selector must be noticed from the exit code alone, without reading the text.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownCommand
+          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownOption
+          - ReviewCenterPuppet-PuppetProgram-Arguments-ArgumentCount
+          - ReviewCenterPuppet-PuppetProgram-Arguments-MalformedValue
+          - ReviewCenterPuppet-PuppetProgram-Results-ExitCodeFailure
+          - ReviewCenterPuppet-SelectorResolver-Resolve-Blank
+          - ReviewCenterPuppet-PlaywrightBrowser-Navigation-MissingBase
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
@@ -249,6 +257,8 @@ sections:
         tags: [system]
         justification: |
           A bad selector must fail fast with a clear message, so that a wrong guess costs little.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-FailureMessage
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

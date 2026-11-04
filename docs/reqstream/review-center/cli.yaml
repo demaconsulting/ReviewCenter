@@ -27,6 +27,8 @@ sections:
           - ReviewCenter-Context-ArgumentParsing-Depth
           - ReviewCenter-Context-ArgumentParsing-DepthDefault
           - ReviewCenter-Context-ArgumentParsing-Log
+          - ReviewCenter-Context-Serve-Absent
+          - ReviewCenter-Context-CheckConfig-Default
         tests:
           - CliSubsystem_VersionFlow_ContextAndProgram_DisplaysVersionAndExits
           - CliSubsystem_HelpFlow_ContextAndProgram_DisplaysHelpAndExits
@@ -110,7 +112,6 @@ sections:
         children:
           - ReviewCenter-Context-LogOutput
           - ReviewCenter-Context-LogOutput-LogErrors
-          - ReviewCenter-Context-LogFailure
         tests:
           - CliSubsystem_LogFlow_ContextAndProgram_WritesLogFile
 
@@ -121,6 +122,7 @@ sections:
           without polluting stdout, which consumers may pipe or redirect for data capture.
         children:
           - ReviewCenter-Context-ErrorOutput
+          - ReviewCenter-Context-LogFailure
         tests:
           - CliSubsystem_ErrorOutput_ContextAndProgram_WritesErrorToStderr
 
@@ -133,9 +135,7 @@ sections:
           the argument in the message lets the operator find the typo at once.
         children:
           - ReviewCenter-Context-InvalidArgs
-          - ReviewCenter-Context-InvalidArgs-MissingValue
-          - ReviewCenter-Context-InvalidArgs-DepthNotInteger
-          - ReviewCenter-Context-InvalidArgs-DepthOutOfRange
+          - ReviewCenter-Context-UserAddMisuse-WrongAction
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsUnknownArgumentsAndExitsNonZero
 
@@ -146,6 +146,12 @@ sections:
         justification: |
           A value that cannot be used would otherwise be replaced by a default without telling the operator, which
           hides a misconfiguration of the run.
+        children:
+          - ReviewCenter-Context-InvalidArgs-MissingValue
+          - ReviewCenter-Context-InvalidArgs-DepthNotInteger
+          - ReviewCenter-Context-InvalidArgs-DepthOutOfRange
+          - ReviewCenter-Context-Urls-Missing
+          - ReviewCenter-Context-Urls-Invalid
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero
 
@@ -178,8 +184,6 @@ sections:
           its key ring must ask for that explicitly.
         children:
           - ReviewCenter-Context-CheckConfig
-          - ReviewCenter-Context-CheckConfig-Default
-          - ReviewCenter-Context-CheckConfig-RequiresValidate
         tests:
           - CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate
 
@@ -188,6 +192,8 @@ sections:
         justification: |
           The option only adds checks to a validation run, so on its own it would silently do nothing. Rejecting it
           shows the operator that the validation run they believe they requested did not happen.
+        children:
+          - ReviewCenter-Context-CheckConfig-RequiresValidate
         tests:
           - CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate
 
@@ -198,7 +204,6 @@ sections:
           the rest of the tool needs a single place to read that request from.
         children:
           - ReviewCenter-Context-Serve
-          - ReviewCenter-Context-Serve-Absent
         tests:
           - CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
 
@@ -211,9 +216,6 @@ sections:
         children:
           - ReviewCenter-Context-Urls
           - ReviewCenter-Context-Urls-Default
-          - ReviewCenter-Context-Urls-Missing
-          - ReviewCenter-Context-Urls-Invalid
-          - ReviewCenter-Context-Urls-RequiresServe
         tests:
           - CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
 
@@ -222,6 +224,8 @@ sections:
         justification: |
           The option only has meaning for the serve verb, so accepting it elsewhere would hide a forgotten verb from
           the operator.
+        children:
+          - ReviewCenter-Context-Urls-RequiresServe
         tests:
           - CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination
 
@@ -234,11 +238,6 @@ sections:
         children:
           - ReviewCenter-Context-UserAdd
           - ReviewCenter-Context-UserAdd-SystemAdmin
-          - ReviewCenter-Context-UserAdd-OrdinaryDefault
-          - ReviewCenter-Context-UserAddMisuse
-          - ReviewCenter-Context-UserAddMisuse-WrongAction
-          - ReviewCenter-Context-UserAddMisuse-OptionsWithoutVerb
-          - ReviewCenter-Context-UserAddMisuse-PasswordOption
         tests:
           - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
 
@@ -248,6 +247,8 @@ sections:
           `--system-admin` switch.
         justification: |
           An ordinary user is the safe default, because the right to see every project must be asked for.
+        children:
+          - ReviewCenter-Context-UserAdd-OrdinaryDefault
         tests:
           - CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser
 
@@ -257,6 +258,8 @@ sections:
         justification: |
           A user cannot be created without the two names that identify the account, so a missing name must be found
           when the arguments are parsed.
+        children:
+          - ReviewCenter-Context-UserAddMisuse
         tests:
           - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
 
@@ -266,6 +269,8 @@ sections:
           user add verb is not given.
         justification: |
           Options without their verb would hide a forgotten verb from the operator.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-OptionsWithoutVerb
         tests:
           - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
 
@@ -275,6 +280,8 @@ sections:
           the command line.
         justification: |
           A password on the command line is visible to other processes and kept in shell history.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-PasswordOption
         tests:
           - CliSubsystem_UserAddFlow_ContextAndProgram_PasswordOption_IsRejected
 
@@ -285,7 +292,6 @@ sections:
           Verifying the trail from the command line lets scripts and scheduled jobs check it.
         children:
           - ReviewCenter-Context-AuditVerify
-          - ReviewCenter-Context-AuditVerify-Misuse
         tests:
           - CliSubsystem_AuditVerifyFlow_ContextAndProgram_ParsesVerbAndDocumentsIt
 
@@ -295,6 +301,8 @@ sections:
         justification: |
           A mistyped action must be found when the arguments are parsed, rather than starting no verification and
           reporting nothing.
+        children:
+          - ReviewCenter-Context-AuditVerify-Misuse
         tests:
           - CliSubsystem_AuditVerifyFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero
 
@@ -306,7 +314,6 @@ sections:
           Rotating the key writes to the key ring and the database, so it must be an explicit action.
         children:
           - ReviewCenter-Context-KeysReprotect
-          - ReviewCenter-Context-KeysReprotect-Misuse
         tests:
           - CliSubsystem_KeysReprotectFlow_ContextAndProgram_ParsesVerbAndDocumentsIt
 
@@ -316,5 +323,7 @@ sections:
         justification: |
           A mistyped action must be found when the arguments are parsed, because the intended key rotation would
           otherwise not happen.
+        children:
+          - ReviewCenter-Context-KeysReprotect-Misuse
         tests:
           - CliSubsystem_KeysReprotectFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero

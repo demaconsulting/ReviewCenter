@@ -42,9 +42,11 @@ GUID. This scenario is tested by
 created at the same time; their paths differ. This scenario is tested by
 `TemporaryDirectory_Constructor_TwoInstances_UseDifferentDirectories`.
 
-**TemporaryDirectory_Constructor_Default_UsesFiveAttemptsAboutSeventyFiveMsApart**: The default retry policy that the
-constructor without arguments passes on is read; it is five attempts with a pause of 75 ms between them. This scenario is
-tested by `TemporaryDirectory_Constructor_Default_UsesFiveAttemptsAboutSeventyFiveMsApart`.
+**TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond**: On Windows a file
+stays held open for the whole disposal of a directory created with the constructor without arguments; no exception is
+thrown, the directory stays, and the call takes at least 250 ms (the four pauses of 75 ms were taken, with a little slack
+for the timer) and less than 3 seconds. This scenario is tested by
+`TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForAboutAThirdOfASecond`.
 
 **TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents**: A file
 two folders down is requested; the returned path is the full path of that file inside the directory, its
@@ -79,9 +81,9 @@ policy; the single `Dispose` call removes the whole directory, which a single at
 This scenario is tested by `TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory`.
 
 **TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime**: On
-Windows a file stays held open for the whole disposal with the default policy; no exception is
-thrown, the call takes at least about 200 ms (the retries happened) and returns well within the
-bound of five attempts. This scenario is tested by
+Windows a file stays held open for the whole disposal of a directory with an explicit policy of three attempts 50 ms
+apart; no exception is thrown, the directory stays, the call takes at least 80 ms (the retries happened) and returns
+well within the bound. This scenario is tested by
 `TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime`.
 
 **TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException**: Zero

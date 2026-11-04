@@ -43,7 +43,7 @@ it creates its repository and the server's clone cache in a temporary folder tha
 - A hover stays in effect for later commands: after `hover`, a separate `screenshot` and `eval` still see the
   element hovered, until `mouse-move` moves the mouse away.
 - `goto` reports the HTTP status and every result ends with the `@ <url>  "<title>"` line of the current page.
-- A console error that `eval` raises is reported once, in the result of the command that follows it, and is not
+- A console error that `eval` raises is reported once, in the result of the command that raised it, and is not
   repeated by the commands after that. Page errors and failed requests are reported the same way by the code but are
   not claimed by a requirement, because their timing is not deterministic.
 - A command that fails (for example an unknown element) exits with code 1 and a one-line message naming the selector.
@@ -68,8 +68,8 @@ interactive, a `click` on the new project button, a `fill` of the project name, 
 create a project over the live connection, and `wait` (for an element and for text) and `text` (of an element and of
 the whole page) show the project page. On the account page a
 `click` on the dark theme button makes `eval` report the `dark` theme attribute on the page and in the stored
-setting. An `eval` of `console.error('probe')` is reported once, by the `! console.error: probe` line of the command
-that follows it, and not by the one after that. A click on a missing element exits with 1 and names the selector;
+setting. An `eval` of `console.error('probe')` is reported once, by the `! console.error: probe` line of the
+same command, and not by the two commands after it. A click on a missing element exits with 1 and names the selector;
 `screenshot` writes a PNG of the page and of one element (`--selector`); `viewport` sets the inner width and
 `theme light` and `theme dark` set the emulated color scheme (checked with `eval`); `console` succeeds; `start` while
 running exits with 1; `stop` exits with 0

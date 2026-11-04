@@ -137,12 +137,14 @@ public class PuppetEndToEndTests
             Assert.Equal(0, (await Run("wait", "css=html[data-theme=dark]")).Code);
             Assert.StartsWith("dark", (await Run("eval", "localStorage.getItem('reviewcenter-theme')")).Output.Trim('"'), StringComparison.Ordinal);
 
-            // Act and assert: a console error is reported once, by the footer of the command that follows it
+            // Act and assert: a console error is reported once, by the footer of the command that raised it, and
+            // not repeated by the commands after that
             var probe = await Run("eval", "console.error('probe')");
             var afterProbe = await Run("eval", "1");
             var laterCommand = await Run("eval", "2");
             const string probeEvent = "! console.error: probe";
-            Assert.Single((probe.Output + afterProbe.Output).ReplaceLineEndings("\n").Split('\n'), line => line == probeEvent);
+            Assert.Single(probe.Output.ReplaceLineEndings("\n").Split('\n'), line => line == probeEvent);
+            Assert.DoesNotContain(probeEvent, afterProbe.Output, StringComparison.Ordinal);
             Assert.DoesNotContain(probeEvent, laterCommand.Output, StringComparison.Ordinal);
 
             // Act and assert: a missing element fails fast with a one-line message and exit code 1

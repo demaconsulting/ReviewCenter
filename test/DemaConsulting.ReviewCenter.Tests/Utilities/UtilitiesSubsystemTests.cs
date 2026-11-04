@@ -30,29 +30,42 @@ namespace DemaConsulting.ReviewCenter.Tests;
 public class UtilitiesSubsystemTests
 {
     /// <summary>
-    ///     Test that utilities subsystem resolves a secret from a file kept in a temporary directory, trimmed, and
-    ///     refuses the file once it is gone.
+    ///     Test that utilities subsystem resolves a secret from a file kept in a temporary directory, trimmed.
     /// </summary>
     [Fact]
     public void UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret()
     {
         // Arrange: a secret file with a trailing newline inside a temporary directory
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("secrets/client.txt");
+        File.WriteAllText(path, "workflow-secret\n");
+
+        // Act: resolve from the file
+        var secret = SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile");
+
+        // Assert: the secret is the trimmed contents
+        Assert.Equal("workflow-secret", secret);
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem refuses a secret file once the temporary directory that held it is gone.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting()
+    {
+        // Arrange: a secret file inside a temporary directory that is disposed afterwards
         string path;
         using (var directory = new TemporaryDirectory())
         {
             path = directory.GetFilePath("secrets/client.txt");
             File.WriteAllText(path, "workflow-secret\n");
-
-            // Act: resolve from the file
-            var secret = SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile");
-
-            // Assert: the secret is the trimmed contents
-            Assert.Equal("workflow-secret", secret);
         }
 
-        // Assert: after the directory is gone the file is refused, naming the setting
+        // Act: resolve from the file that no longer exists
         var exception = Assert.Throws<InvalidOperationException>(
             () => SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile"));
+
+        // Assert: the refusal names the file setting
         Assert.Contains("Test:SecretFile", exception.Message, StringComparison.Ordinal);
     }
 
@@ -145,6 +158,26 @@ public class UtilitiesSubsystemTests
         // Assert: verify exceptions are thrown
         Assert.Equal(absolutePaths.Count, exceptions.Count);
         Assert.All(exceptions, exception => Assert.IsType<ArgumentException>(exception));
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem rejects a null base directory and a null relative path.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_PathResolutionWorkflow_NullArguments_ThrowsArgumentNullException()
+    {
+        // Arrange: a valid base path and a valid relative path
+        var basePath = Path.GetTempPath();
+
+        // Act: combine with a null relative path and with a null base path
+        var nullRelative = Record.Exception(() => PathHelpers.SafePathCombine(basePath, null!));
+        var nullBase = Record.Exception(() => PathHelpers.SafePathCombine(null!, "file.txt"));
+
+        // Assert: each null is refused with the exception that names the missing argument
+        var relativeException = Assert.IsType<ArgumentNullException>(nullRelative);
+        Assert.Equal("relativePath", relativeException.ParamName);
+        var baseException = Assert.IsType<ArgumentNullException>(nullBase);
+        Assert.Equal("basePath", baseException.ParamName);
     }
 
     /// <summary>

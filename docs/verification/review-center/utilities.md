@@ -65,6 +65,11 @@ argument to `SafePathCombine`; an `ArgumentException` is thrown for each and no 
 succeeds. This scenario is tested by
 `UtilitiesSubsystem_AbsolutePathRejection_ThrowsException`.
 
+**UtilitiesSubsystem_PathResolutionWorkflow_NullArguments_ThrowsArgumentNullException**: `SafePathCombine` is called
+once with a null relative path and once with a null base path; each call throws `ArgumentNullException` and the
+exception names the missing argument. This scenario is tested by
+`UtilitiesSubsystem_PathResolutionWorkflow_NullArguments_ThrowsArgumentNullException`.
+
 **UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories**:
 `PathHelpers.SafePathCombine` is used to compute a nested path, and the resulting path is
 passed to `Directory.CreateDirectory`; the directory is created at the expected location within
@@ -72,9 +77,12 @@ the base directory. This scenario is tested by
 `UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories`.
 
 **UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret**: A secret file with a
-trailing line break is written inside a `TemporaryDirectory`; `SecretSource.Resolve` returns the trimmed secret, and
-once the directory is gone the same call is refused with a message that names the file setting. This scenario is
-tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret`.
+trailing line break is written inside a `TemporaryDirectory`; `SecretSource.Resolve` returns the trimmed secret. This
+scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting**: The `TemporaryDirectory` that held a
+secret file is disposed; the same `SecretSource.Resolve` call is refused with a message that names the file setting.
+This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting`.
 
 **UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned**: Only an inline secret is given; `SecretSource.Resolve`
 returns it unchanged. This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned`.

@@ -19,6 +19,7 @@ sections:
           - ReviewCenter-Utilities-SafePaths
           - ReviewCenter-Utilities-SafePaths-PathTraversal
           - ReviewCenter-Utilities-SafePaths-AbsolutePath
+          - ReviewCenter-Utilities-SafePaths-NullArgument
           - ReviewCenter-Utilities-TempFiles
           - ReviewCenter-Utilities-TempFiles-InsideOnly
           - ReviewCenter-Utilities-TempFiles-Removed
