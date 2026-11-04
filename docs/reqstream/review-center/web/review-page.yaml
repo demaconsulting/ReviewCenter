@@ -970,110 +970,471 @@ sections:
           - ReviewPage_FileList_ThreadCounts_IncludeBothSides
       - id: ReviewCenter-ReviewPage-ThreadSummary
         title: >-
-          The ReviewPage unit shall show the number of open and of resolved threads of the review (on the filter
-          buttons of the thread index), and the number of open threads next to every file.
+          The ReviewPage unit shall show the number of open threads of the review on the Open filter button of the
+          thread index.
         justification: |
-          Reviewers need to see at a glance how much discussion is still open and which files it concerns.
+          Reviewers need to see at a glance how much discussion is still open.
+        tests:
+          - ReviewPage_Render_NoThreads_ShowsZeroSummaryAndZeroFileCounts
+          - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+
+      - id: ReviewCenter-ReviewPage-ThreadSummary-Resolved
+        title: >-
+          The ReviewPage unit shall show the number of resolved threads of the review on the Resolved filter button
+          of the thread index.
+        justification: |
+          Reviewers need to see at a glance how much of the discussion is settled.
+        tests:
+          - ReviewPage_Render_NoThreads_ShowsZeroSummaryAndZeroFileCounts
+          - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+
+      - id: ReviewCenter-ReviewPage-ThreadSummary-FileCount
+        title: >-
+          The ReviewPage unit shall show the number of open threads next to every file in the list of files.
+        justification: |
+          Reviewers need to see which files the open discussion concerns.
         tests:
           - ReviewPage_Render_NoThreads_ShowsZeroSummaryAndZeroFileCounts
           - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
 
       - id: ReviewCenter-ReviewPage-ThreadIndex
         title: >-
-          The ReviewPage unit shall list the threads of all files in one index showing file, anchor (for a file
-          that has a baseline in plain words as "Before: line N" or "After: lines N-M"), state, number of
-          comments, author of the first comment and time of last activity, filterable to All, Open (default) and
-          Resolved, where Open is the default unless the review is concluded or has only resolved threads, in which
-          case All is chosen first, and where choosing a thread selects its file and highlights and scrolls to its
-          anchored lines, in the Diff view when the file has one.
+          The ReviewPage unit shall list the threads of all files in one index, each row showing the file, the
+          anchor, the state, the number of comments, the author of the first comment and the time of last
+          activity.
         justification: |
-          Reviewers need to find the discussion that needs them without opening every file, and to go from a
-          thread to the code it is about in one step. A line number alone is ambiguous when a file has two
-          versions, so the index says which one it means.
+          Reviewers need to find the discussion that needs them without opening every file.
         tests:
           - ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-AnchorWording
+        title: >-
+          The ReviewPage unit shall state the anchor of a thread of a file that has a baseline in plain words as
+          "Before: line N" or "After: lines N-M".
+        justification: |
+          A line number alone is ambiguous when a file has two versions, so the index says which one it means.
+        tests:
+          - ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-Filters
+        title: >-
+          The ReviewPage unit shall let the reader filter the index of threads to All, Open or Resolved threads.
+        justification: |
+          Reviewers narrow the list to the discussion they came for.
+        tests:
+          - ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-DefaultOpen
+        title: >-
+          The ReviewPage unit shall choose the Open filter of the index of threads first when the review is not
+          concluded and has an open thread.
+        justification: |
+          The discussion that needs the reader comes first.
+        tests:
+          - ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity
+          - ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-DefaultAllResolved
+        title: >-
+          The ReviewPage unit shall choose the All filter of the index of threads first when the review has only
+          resolved threads.
+        justification: |
+          An empty Open list would look as if there were no discussion.
+        tests:
+          - ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-DefaultAllConcluded
+        title: >-
+          The ReviewPage unit shall choose the All filter of the index of threads first when the review is
+          concluded.
+        justification: |
+          Nothing is open to act on in a concluded review, so the reader reads the record.
+        tests:
+          - ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-SelectFile
+        title: >-
+          The ReviewPage unit shall select the file of a thread when the reader chooses the thread in the index.
+        justification: |
+          A thread is read next to the code it is about.
+        tests:
+          - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-Highlight
+        title: >-
+          The ReviewPage unit shall highlight the anchored lines of the chosen thread on the side, baseline or
+          head, that the thread belongs to.
+        justification: |
+          The reader sees which code the thread is about.
+        tests:
+          - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
+          - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
+          - ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-Scroll
+        title: >-
+          The ReviewPage unit shall scroll to the first anchored line of the thread that the reader chose in the
+          index.
+        justification: |
+          The reader does not search a long file for the lines of the thread.
+        tests:
           - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
           - ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff
           - ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread
-          - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
-          - ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-DiffView
+        title: >-
+          The ReviewPage unit shall show the thread that the reader chose in the index in the Diff view, at its
+          row, when the file has a diff.
+        justification: |
+          The thread is read against the change it is about.
+        tests:
+          - ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff
           - ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow
-          - ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex-Version
+        title: >-
+          The ReviewPage unit shall open the version of the file that the chosen thread belongs to when the file
+          has no diff because it is too large to compare.
+        justification: |
+          A thread on a file without a diff must still lead the reader to its lines.
+        tests:
+          - ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread
+          - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
 
       - id: ReviewCenter-ReviewPage-ThreadCollapse
         title: >-
-          The ReviewPage unit shall show a resolved thread as a one-line header (anchor, state, number of
-          comments) that expands and collapses on request, keep open threads expanded, and collapse a thread
-          when it is resolved.
+          The ReviewPage unit shall show a resolved thread as a one-line header with its anchor, state and number of
+          comments.
         justification: |
-          Settled discussion should not push the open discussion out of sight, yet it must stay readable and
-          open to being reopened.
+          Settled discussion should not push the open discussion out of sight.
         tests:
           - ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest
+
+      - id: ReviewCenter-ReviewPage-ThreadCollapse-Toggle
+        title: >-
+          The ReviewPage unit shall expand a collapsed thread and collapse it again on request.
+        justification: |
+          Settled discussion must stay readable and open to being reopened.
+        tests:
+          - ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest
+
+      - id: ReviewCenter-ReviewPage-ThreadCollapse-OpenExpanded
+        title: >-
+          The ReviewPage unit shall keep an open thread expanded.
+        justification: |
+          Open discussion is what the reader needs to see.
+        tests:
+          - ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest
+
+      - id: ReviewCenter-ReviewPage-ThreadCollapse-OnResolve
+        title: >-
+          The ReviewPage unit shall collapse a thread when the reader resolves it.
+        justification: |
+          The thread leaves the open discussion at once.
+        tests:
+          - ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest
+          - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
 
       - id: ReviewCenter-ReviewPage-ThreadStart
         title: >-
           The ReviewPage unit shall let a reader start a thread on the selected file with an optional start and
-          end line and a text, with the signed-in user as the author and no field to enter an author, offer a
-          Comment button on every line that fills in the line range, show a violated rule or an unreadable line
-          number as a message next to the form while keeping the entered values, on success clear the text and
-          show the new thread, and submit a comment or a reply when the reader presses Ctrl+Enter in its text
-          field, telling the reader so next to the button.
+          end line and a text, anchor it to the lines entered or to the whole file when none are entered, and
+          show the new thread under its anchor.
         justification: |
-          Comments are only useful when they are easy to start and a mistake is easy to correct. Keeping what
-          was typed saves the reader from typing it again. The author is the signed-in user, so it cannot be
-          chosen or faked. The keyboard shortcut spares the reader from leaving the keyboard to send a comment.
+          Comments are only useful when they are easy to start.
         tests:
-          - ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton
-          - ReviewPage_LineCommentButton_Click_FillsStartAndEndLine
           - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
           - ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-Author
+        title: >-
+          The ReviewPage unit shall record the signed-in user as the author of a new thread.
+        justification: |
+          The author is the signed-in user, so it cannot be chosen or faked.
+        tests:
+          - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-NoAuthorField
+        title: >-
+          The ReviewPage unit shall offer no field to enter an author when a thread is started.
+        justification: |
+          Nothing in the form can name another author.
+        tests:
+          - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-LineButton
+        title: >-
+          The ReviewPage unit shall offer a Comment button on a line of the selected file that fills the start and
+          end line fields with the number of that line.
+        justification: |
+          The reader does not need to type line numbers.
+        tests:
+          - ReviewPage_LineCommentButton_Click_FillsStartAndEndLine
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-Error
+        title: >-
+          The ReviewPage unit shall show a violated rule or an unreadable line number as a message next to the
+          form that starts a thread.
+        justification: |
+          A mistake is easy to correct when the message is next to the form.
+        tests:
           - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
-          - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-KeepValues
+        title: >-
+          The ReviewPage unit shall keep the entered line numbers and text in the form that starts a thread after
+          a message was shown.
+        justification: |
+          Keeping what was typed saves the reader from typing it again.
+        tests:
+          - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-Clear
+        title: >-
+          The ReviewPage unit shall clear the text field of the form after a thread was started.
+        justification: |
+          The next comment starts with an empty field.
+        tests:
+          - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-CtrlEnter
+        title: >-
+          The ReviewPage unit shall make Ctrl+Enter in the comment field press the button that starts the thread.
+        justification: |
+          The keyboard shortcut spares the reader from leaving the keyboard to send a comment.
+        tests:
+          - ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-ReplyShortcut
+        title: >-
+          The ReviewPage unit shall make Ctrl+Enter in the reply field of a thread press the Reply button of that
+          thread.
+        justification: |
+          The keyboard shortcut spares the reader from leaving the keyboard to send a reply.
+        tests:
+          - ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-ShortcutHint
+        title: >-
+          The ReviewPage unit shall tell the reader next to the submit button of a comment and of a reply that
+          Ctrl+Enter submits.
+        justification: |
+          A shortcut that nobody knows is not used.
+        tests:
+          - ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-BinaryWholeFile
+        title: >-
+          The ReviewPage unit shall accept a thread on the whole of a binary file.
+        justification: |
+          A binary file can still be discussed.
+        tests:
           - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-BinaryRange
+        title: >-
+          The ReviewPage unit shall refuse a line range on a binary file with a message that says the file is binary.
+        justification: |
+          A binary file has no lines to anchor a thread to.
+        tests:
+          - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
+
+      - id: ReviewCenter-ReviewPage-ThreadStart-SessionEnded
+        title: >-
+          The ReviewPage unit shall show the not-found page and store no thread when the session of the user ended
+          before the page knew it.
+        justification: |
+          An action after the session ended must neither fail the page nor leave a trace.
+        tests:
+          - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing
 
       - id: ReviewCenter-ReviewPage-ThreadShow
         title: >-
-          The ReviewPage unit shall list the threads of the selected file in creation order, each with its
-          anchor, state, and comments (author, UTC time, and text as plain text), and shall mark the lines that
-          a thread is anchored to.
+          The ReviewPage unit shall list the threads of the selected file, and only those, each with its anchor
+          and state and its comments with author, UTC time and text.
         justification: |
-          Reviewers read the discussion next to the code. Showing comment text as plain text means that nothing
-          typed by an author can change the page.
+          Reviewers read the discussion next to the code.
         tests:
           - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
-          - ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage
+
+      - id: ReviewCenter-ReviewPage-ThreadShow-Order
+        title: >-
+          The ReviewPage unit shall list the threads of the selected file in the order in which they were created.
+        justification: |
+          A discussion reads in the order in which it happened.
+        tests:
+          - ReviewPage_FileSelect_ThreadsExist_ListsThreadsInCreationOrder
+
+      - id: ReviewCenter-ReviewPage-ThreadShow-Markers
+        title: >-
+          The ReviewPage unit shall mark the lines that a thread of the selected file is anchored to.
+        justification: |
+          The reader sees at once where the discussion is.
+        tests:
+          - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+
+      - id: ReviewCenter-ReviewPage-ThreadShow-PlainText
+        title: >-
+          The ReviewPage unit shall show the text of a comment as plain text.
+        justification: |
+          Nothing typed by an author can change the page.
+        tests:
           - ReviewPage_Render_ThreadText_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-ThreadShow-Empty
+        title: >-
+          The ReviewPage unit shall show an empty message and no list for a file without threads.
+        justification: |
+          The reader knows that there is nothing to read.
+        tests:
+          - ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage
 
       - id: ReviewCenter-ReviewPage-ThreadUpdate
         title: >-
-          The ReviewPage unit shall let a reader reply to a thread as the signed-in user, without a field to
-          enter an author, showing a violated rule inside that thread, and resolve and reopen a thread, updating
-          the thread and the counts.
+          The ReviewPage unit shall let a reader add a reply to a thread and show it in that thread.
         justification: |
-          Replying, resolving, and reopening are how a discussion moves forward and how reviewers track what
-          is settled.
+          Replying is how a discussion moves forward.
+        tests:
+          - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-Author
+        title: >-
+          The ReviewPage unit shall record the signed-in user as the author of a reply.
+        justification: |
+          The author is the signed-in user, so it cannot be chosen or faked.
         tests:
           - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
           - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-NoAuthorField
+        title: >-
+          The ReviewPage unit shall offer no field to enter an author when a reply is added.
+        justification: |
+          Nothing in the form can name another author.
+        tests:
+          - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-Error
+        title: >-
+          The ReviewPage unit shall show a violated rule of a reply, such as a blank text, as a message inside that
+          thread.
+        justification: |
+          A mistake is corrected where it was made.
+        tests:
+          - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-Resolve
+        title: >-
+          The ReviewPage unit shall let a reader resolve an open thread, which then shows the state Resolved.
+        justification: |
+          Reviewers track what is settled.
+        tests:
+          - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-Reopen
+        title: >-
+          The ReviewPage unit shall let a reader reopen a resolved thread, which then shows the state Open.
+        justification: |
+          A settled discussion may have to continue.
+        tests:
+          - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
+          - ThreadCard_ResolveFinding_AsksForNoteThenReopens
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate-Counts
+        title: >-
+          The ReviewPage unit shall update the counts of open and of resolved threads when a thread is resolved or
+          reopened.
+        justification: |
+          The summary must follow the threads.
+        tests:
           - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
 
       - id: ReviewCenter-ReviewPage-CheckThreads
         title: >-
-          The ReviewPage unit shall list the threads about a check of the checklist in the index of threads with the
-          label Check and the identifier of the check in place of a file path, show them in a card of check
-          discussions, apart from the threads of the selected file, with their anchor, state, and comments as plain
-          text, let a reader reply to and resolve such a thread like any other, open one from a deep link without
-          selecting a file, and offer no way to start one yet.
+          The ReviewPage unit shall list a thread about a check of the checklist in the index of threads with the
+          label Check discussion and the anchor Check followed by the identifier of the check, in place of a file
+          path.
         justification: |
-          A discussion about a check has no file, so it must not be hidden among the threads of a file or make the
-          page select one. Replying and resolving must work, because an open check thread blocks the signature and
-          the conclusion. The way to start one comes with the ballot screen, so this page only shows what exists.
+          A discussion about a check has no file, so the index names the check instead.
+        tests:
+          - ReviewPage_CheckThread_ListedInIndexWithCheckLabel
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-Card
+        title: >-
+          The ReviewPage unit shall show a thread about a check in a card of check discussions with its anchor,
+          state and comments.
+        justification: |
+          The discussion about a check must be readable on the page.
         tests:
           - ReviewPage_CheckThread_ListedInIndexWithCheckLabel
           - ReviewPage_CheckThread_ReplyAndResolve_Work
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-Apart
+        title: >-
+          The ReviewPage unit shall keep a thread about a check out of the list of threads of the selected file.
+        justification: |
+          A discussion about a check must not be hidden among the threads of a file.
+        tests:
+          - ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-PlainText
+        title: >-
+          The ReviewPage unit shall show the text of a comment of a thread about a check as plain text.
+        justification: |
+          Nothing typed by an author can change the page.
+        tests:
+          - ReviewPage_CheckThread_CommentText_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-Reply
+        title: >-
+          The ReviewPage unit shall let a reader reply to a thread about a check like to any other thread.
+        justification: |
+          An open check thread blocks the signature and the conclusion, so it must be answerable.
+        tests:
+          - ReviewPage_CheckThread_ReplyAndResolve_Work
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-Resolve
+        title: >-
+          The ReviewPage unit shall let a reader resolve a thread about a check like any other thread.
+        justification: |
+          An open check thread blocks the signature and the conclusion, so it must be resolvable.
+        tests:
+          - ReviewPage_CheckThread_ReplyAndResolve_Work
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-DeepLink
+        title: >-
+          The ReviewPage unit shall show a thread about a check from a deep link in the card of check discussions
+          without a not-found message.
+        justification: |
+          A link in a mail must lead to the thread.
+        tests:
           - ReviewPage_CheckThreadDeepLink_ShowsCheckCard
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-DeepLinkNoFile
+        title: >-
+          The ReviewPage unit shall select no file when a thread about a check is opened from a deep link.
+        justification: |
+          The page must not select a file for a discussion that has none.
+        tests:
+          - ReviewPage_CheckThreadDeepLink_SelectsNoFile
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-NoFile
+        title: >-
+          The ReviewPage unit shall select no file when the reader chooses a thread about a check in the index.
+        justification: |
+          The page must not select a file for a discussion that has none.
+        tests:
           - ReviewPage_CheckThread_DoesNotSelectFile
+
+      - id: ReviewCenter-ReviewPage-CheckThreads-NoForm
+        title: >-
+          The ReviewPage unit shall offer no form to start a thread in the card of check discussions.
+        justification: |
+          A thread about a check is started with the Discuss button of the status panel, so the card only shows
+          what exists.
+        tests:
+          - ReviewPage_CheckThread_Card_OffersNoFormToStartThread
 
       - id: ReviewCenter-ReviewPage-SignatureWarning
         title: >-
@@ -1645,206 +2006,805 @@ sections:
 
       - id: ReviewCenter-ReviewPage-UnreadMarkers
         title: >-
-          The ReviewPage unit shall mark a thread with a New badge when it holds a comment of
-          somebody else that is newer than the last one the user has seen, give the number of such comments in the
-          summary, and show no badge for the user's own comments or on a later visit.
+          The ReviewPage unit shall mark a thread with a New badge when it holds a comment of somebody else that is
+          newer than the last comment the user has seen.
         justification: |
           A reader who returns to a review wants to see what was said since the last visit without reading all of it
           again.
         tests:
           - ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers
+
+      - id: ReviewCenter-ReviewPage-UnreadMarkers-Index
+        title: >-
+          The ReviewPage unit shall show the New badge also on the row of such a thread in the thread index.
+        justification: |
+          The reader finds the new discussion without opening every file.
+        tests:
+          - ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers
+
+      - id: ReviewCenter-ReviewPage-UnreadMarkers-Summary
+        title: >-
+          The ReviewPage unit shall give the number of comments that are new to the user in the summary of the
+          review.
+        justification: |
+          The reader sees the size of what is new at a glance.
+        tests:
+          - ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers
+          - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
+
+      - id: ReviewCenter-ReviewPage-UnreadMarkers-OwnComments
+        title: >-
+          The ReviewPage unit shall show no New badge for the comments of the user.
+        justification: |
+          Nobody needs news of what they wrote themselves.
+        tests:
           - ReviewPage_Render_OwnComments_ShowNoDot
+
+      - id: ReviewCenter-ReviewPage-UnreadMarkers-LaterVisit
+        title: >-
+          The ReviewPage unit shall show no New badge on a later visit when nothing was added since the last visit.
+        justification: |
+          The markers show what is new, not what is old.
+        tests:
+          - ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots
 
       - id: ReviewCenter-ReviewPage-MarkSeen
         title: >-
-          The ReviewPage unit shall read what the user has seen before it shows the review, store the newest comment
-          written up to the time the loading began, with that time, after the page was shown in the live session, store
-          it again when the page is changed to another review, and store nothing for a user who may not see the review.
+          The ReviewPage unit shall store the newest comment shown, with its time, as seen after the page was shown
+          in the live session.
         justification: |
-          The badges must show the state of the previous visit, so it is read first, and only a rendered page counts as
-          seen. A comment posted while the page loads was not shown and must stay new. A user without access must
-          leave no trace.
+          Only a page that was rendered counts as seen.
         tests:
           - ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots
-          - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
+
+      - id: ReviewCenter-ReviewPage-MarkSeen-Baseline
+        title: >-
+          The ReviewPage unit shall read what the user has seen before it shows the review and mark the threads
+          against it.
+        justification: |
+          The badges must show the state of the previous visit, so what was seen is read first.
+        tests:
           - ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen
+          - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
+
+      - id: ReviewCenter-ReviewPage-MarkSeen-LoadStart
+        title: >-
+          The ReviewPage unit shall store as seen only comments written up to the time the loading began.
+        justification: |
+          A comment posted while the page loads was not shown and must stay new.
+        tests:
+          - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
+
+      - id: ReviewCenter-ReviewPage-MarkSeen-ParameterChange
+        title: >-
+          The ReviewPage unit shall store what was seen again when the page is changed to another review.
+        justification: |
+          The other review was shown too, so it must count as seen.
+        tests:
+          - ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen
+
+      - id: ReviewCenter-ReviewPage-MarkSeen-NoAccess
+        title: >-
+          The ReviewPage unit shall store nothing as seen for a user who may not see the review.
+        justification: |
+          A user without access must leave no trace.
+        tests:
           - ReviewPage_Render_NoViewAccess_WritesNoState
 
       - id: ReviewCenter-ReviewPage-BallotMasking
         title: >-
-          The ReviewPage unit shall show a viewer who may not see the others, in a review with several slots, no
-          checklist standing (a note that it stays hidden until the own ballot is handed in for a member without a
-          slot, and only the own progress for a slot owner), no discussions about checks and no count of them, and no
-          conclusion text, and shall show all of it to the lead and the administrators.
+          The ReviewPage unit shall show a member without a slot of a review with several slots a note that the
+          checklist standing stays hidden until the own ballot is handed in.
         justification: |
           The review page summarizes the same ballots as the checklist, so it must follow the same rule or it would
-          give the hidden answers away through a count or a line of text.
+          give the hidden answers away.
+        tests:
+          - ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden
+
+      - id: ReviewCenter-ReviewPage-BallotMasking-OwnProgress
+        title: >-
+          The ReviewPage unit shall show a slot owner who has not handed in a ballot only the progress of the own
+          checklist and no count of failed checks.
+        justification: |
+          The own work is visible, while the work of the other reviewers stays hidden.
+        tests:
+          - ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly
+
+      - id: ReviewCenter-ReviewPage-BallotMasking-CheckThreads
+        title: >-
+          The ReviewPage unit shall show no discussion about a check to a viewer who may not see the answers of the
+          others.
+        justification: |
+          The title or the text of such a discussion would give the hidden answers away.
+        tests:
+          - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+
+      - id: ReviewCenter-ReviewPage-BallotMasking-ThreadCount
+        title: >-
+          The ReviewPage unit shall count no discussion about a check in the number of open threads that a viewer
+          who may not see the answers of the others is shown.
+        justification: |
+          A count would give the hidden answers away.
+        tests:
+          - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+
+      - id: ReviewCenter-ReviewPage-BallotMasking-Conclusion
+        title: >-
+          The ReviewPage unit shall show a viewer who may not see the answers of the others the notice that the
+          conclusion is hidden instead of the conclusion text.
+        justification: |
+          The conclusion text may name the hidden answers.
         tests:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
           - ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden
+
+      - id: ReviewCenter-ReviewPage-BallotMasking-Administrator
+        title: >-
+          The ReviewPage unit shall show a system administrator the discussions about checks with their count and
+          the conclusion, without the notice that they are hidden.
+        justification: |
+          An administrator steers the review and must see all of it.
+        tests:
           - ReviewPage_Administrator_SeesCheckThreadsAndConclusion
 
       - id: ReviewCenter-ReviewPage-ThreadKinds
         title: >-
-          The ReviewPage unit shall show every thread as either a Question (a neutral speech-bubble icon and the
-          visible word Question) or a Finding (an amber flag icon, the visible word Finding and an In report badge),
-          in the thread card, the thread index and the check discussions, and shall mark the lines of the diff that
-          have threads with one marker per kind (a gray bubble for questions, an amber flag for findings), each with
-          a count, a title and an accessible name such as 2 questions or 1 finding, both on a row that has both
-          kinds, and never with the icon or the color alone.
+          The ReviewPage unit shall show a Question with a neutral speech-bubble icon and the visible word Question.
         justification: |
-          A Question is conversation and a Finding goes into the report, so the reader must tell them apart at a
-          glance and without relying on color. Icons are hidden from assistive technology, so every marker carries
-          its meaning as text, and the markers must work in the light and the dark theme.
+          A Question is conversation, so the reader must recognize it at a glance.
         tests:
           - ThreadKindBadge_Question_ShowsIconAndLabel
-          - ThreadKindBadge_Finding_ShowsFlagLabelAndInReportBadge
-          - ThreadKindBadge_Kinds_UseDifferentIcons
-          - ThreadKindBadge_Compact_NamesKindAndCount
-          - DiffView_Markers_UseDifferentIconPerKind
-          - DiffView_Markers_MixedRow_ShowsBothKindsWithCounts
-          - DiffView_Markers_EveryMarkerHasTextNameAndHiddenIcon
-          - DiffView_Markers_NoThreads_NoMarkers
-          - ReviewPage_KindMarkers_EveryMarkerHasTextLabel
-          - ReviewPage_CheckThread_ShowsKindBadgeAndPromote
 
-      - id: ReviewCenter-ReviewPage-ThreadComposer
+      - id: ReviewCenter-ReviewPage-ThreadKinds-Finding
         title: >-
-          The ReviewPage unit shall offer, wherever a new thread is started (a line, a diff row, a whole file, or a
-          check of the checklist), a choice between Question (the default) and Finding (goes in the report) with the
-          text box and Ctrl+Enter to send, shall start the thread with the kind chosen, shall offer the same choice
-          in a review with a single slot, and shall offer in the reply box an Add to report check box so that a reply
-          is chat unless it is ticked.
+          The ReviewPage unit shall show a Finding with an amber flag icon and the visible word Finding.
         justification: |
-          The kind is decided when the thread is written, so the form must make the choice plain and make Question
-          the harmless default. A reply that matters for the report must be addable without leaving the box.
+          A Finding goes into the report, so the reader must recognize it at a glance.
         tests:
-          - ThreadComposer_DefaultsToQuestion
-          - ThreadComposer_FindingChoice_StartsFindingThread
-          - ThreadComposer_ReplyAddToReport_SetsIncludeInReport
-          - ThreadComposer_Error_IsShownAsAlert
-          - ReviewPage_SingleSlot_KindChoiceStillAvailable
-          - ChecklistPage_DiscussFinding_KindChosenInComposer
+          - ThreadKindBadge_Finding_ShowsFlagLabelAndInReportBadge
 
-      - id: ReviewCenter-ReviewPage-ThreadActions
+      - id: ReviewCenter-ReviewPage-ThreadKinds-InReport
         title: >-
-          The ReviewPage unit shall show in each thread card, driven by the capabilities that the Core computes, the
-          buttons to make a Question a Finding, to make a Finding a Question, to add a reply to the report or take it
-          out, and to resolve or reopen the thread, only to the people who may use them and never for an auditor or
-          after the conclusion, shall show each comment as a chat bubble or with an In report mark, shall ask for a
-          short resolution note when a Finding is resolved (optional for a Question) and let the person cancel,
-          and shall, when a change alters the digest, ask for the confirmation that names the signatures it makes
-          out of date, store nothing on cancel and audit the change once it is confirmed.
+          The ReviewPage unit shall show an In report badge on a Finding.
         justification: |
-          The page must not offer what the rules would refuse, and a decision that changes the report must be a
-          deliberate one: the note says why a Finding is closed, and the signers must know that moving content into
-          or out of the report asks them to sign again.
+          The reader sees which content the report will hold.
+        tests:
+          - ThreadKindBadge_Finding_ShowsFlagLabelAndInReportBadge
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-DistinctIcons
+        title: >-
+          The ReviewPage unit shall use a different icon for a Question and for a Finding.
+        justification: |
+          The reader tells the two kinds apart at a glance.
+        tests:
+          - ThreadKindBadge_Kinds_UseDifferentIcons
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-Card
+        title: >-
+          The ReviewPage unit shall show the kind badge of a thread in its thread card.
+        justification: |
+          The kind is read where the thread is read.
         tests:
           - ThreadCard_Question_ShowsQuestionBadgeAndChatBubbles
           - ThreadCard_Finding_ShowsFindingBadgeAndInReportMarkOnStartingComment
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-CheckCard
+        title: >-
+          The ReviewPage unit shall show the kind badge of a thread about a check in the card of check discussions.
+        justification: |
+          The kind is read where the discussion about a check is read.
+        tests:
+          - ReviewPage_CheckThread_ShowsKindBadgeAndPromote
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-DiffMarkers
+        title: >-
+          The ReviewPage unit shall mark a diff row that has threads with one marker per kind, a gray bubble for
+          questions and an amber flag for findings.
+        justification: |
+          The reader sees where the discussion is and of which kind it is.
+        tests:
+          - DiffView_Markers_UseDifferentIconPerKind
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-MarkerCount
+        title: >-
+          The ReviewPage unit shall show the number of threads of its kind on every diff marker.
+        justification: |
+          A count says more than a dot.
+        tests:
+          - DiffView_Markers_MixedRow_ShowsBothKindsWithCounts
+          - ThreadKindBadge_Compact_NamesKindAndCount
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-MarkerName
+        title: >-
+          The ReviewPage unit shall give every diff marker a title and an accessible name such as 2 questions or
+          1 finding.
+        justification: |
+          Icons are hidden from assistive technology, so every marker carries its meaning as text.
+        tests:
+          - ThreadKindBadge_Compact_NamesKindAndCount
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-MixedRow
+        title: >-
+          The ReviewPage unit shall show both markers, each with its count, on a diff row that has threads of both
+          kinds.
+        justification: |
+          A row must not hide one of its kinds.
+        tests:
+          - DiffView_Markers_MixedRow_ShowsBothKindsWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-NoMarker
+        title: >-
+          The ReviewPage unit shall show no marker on a diff row without threads.
+        justification: |
+          A marker must always mean that there is a discussion.
+        tests:
+          - DiffView_Markers_NoThreads_NoMarkers
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds-NotColorAlone
+        title: >-
+          The ReviewPage unit shall give every kind marker a visible word or accessible name and hide its icon from
+          assistive technology, so that no kind rests on the icon or the color alone.
+        justification: |
+          Color and icons must not carry a meaning alone.
+        tests:
+          - ReviewPage_KindMarkers_EveryMarkerHasTextLabel
+          - DiffView_Markers_EveryMarkerHasTextNameAndHiddenIcon
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer
+        title: >-
+          The ReviewPage unit shall offer, wherever a new thread is started, a choice between Question and Finding
+          with Question chosen by default.
+        justification: |
+          The kind is decided when the thread is written, so the form makes the choice plain and makes Question the
+          harmless default.
+        tests:
+          - ThreadComposer_DefaultsToQuestion
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-Finding
+        title: >-
+          The ReviewPage unit shall start the new thread as a Finding when the reader chooses Finding.
+        justification: |
+          The kind chosen when the thread is written decides what goes into the report.
+        tests:
+          - ThreadComposer_FindingChoice_StartsFindingThread
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-SingleSlot
+        title: >-
+          The ReviewPage unit shall offer the choice between Question and Finding also in a review with a single
+          slot.
+        justification: |
+          A review with a single slot needs Findings too.
+        tests:
+          - ReviewPage_SingleSlot_KindChoiceStillAvailable
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-Check
+        title: >-
+          The ReviewPage unit shall start a discussion about a check from the status panel as a Finding when the
+          reader chooses Finding.
+        justification: |
+          The choice must exist where a check is discussed as well.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-ReplyReport
+        title: >-
+          The ReviewPage unit shall offer in the reply box an Add to report check box that includes the reply in
+          the report when it is ticked.
+        justification: |
+          A reply that matters for the report must be addable without leaving the box.
+        tests:
+          - ThreadComposer_ReplyAddToReport_SetsIncludeInReport
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-ReplyChat
+        title: >-
+          The ReviewPage unit shall treat a reply as chat that is not part of the report unless the Add to report
+          check box is ticked.
+        justification: |
+          Chat must not change the report.
+        tests:
+          - ThreadComposer_ReplyAddToReport_SetsIncludeInReport
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer-Error
+        title: >-
+          The ReviewPage unit shall show a rule violation of a new thread or of a reply as an alert in the composer.
+        justification: |
+          The reader must notice that the thread or the reply was refused.
+        tests:
+          - ThreadComposer_Error_IsShownAsAlert
+
+      - id: ReviewCenter-ReviewPage-ThreadActions
+        title: >-
+          The ReviewPage unit shall show the button that makes a Question a Finding in a thread card only to a
+          person who may use it.
+        justification: |
+          The page must not offer what the rules would refuse.
+        tests:
           - ThreadCard_PromoteVisibleForSlotOwner_HiddenForAuditor
+          - ReviewPage_CheckThread_ShowsKindBadgeAndPromote
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-Demote
+        title: >-
+          The ReviewPage unit shall show the button that makes a Finding a Question in a thread card only to a
+          person who may use it.
+        justification: |
+          The page must not offer what the rules would refuse.
+        tests:
           - ThreadCard_DemoteHiddenForNonStarterNonLead
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-ReportToggle
+        title: >-
+          The ReviewPage unit shall show the button that adds a reply to the report or takes it out only to a
+          person who may use it.
+        justification: |
+          The page must not offer what the rules would refuse.
+        tests:
           - ThreadCard_ReplyReportToggle_OnlyAuthorOrLead
-          - ThreadCard_ResolveFinding_AsksForNoteThenReopens
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-ReplyReport
+        title: >-
+          The ReviewPage unit shall add a reply to the report or take it out again when the person uses that
+          button.
+        justification: |
+          The content of the report is chosen on the page.
+        tests:
+          - ReviewPage_ReplyReportToggle_AddsAndRemovesReplyFromReport
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-Auditor
+        title: >-
+          The ReviewPage unit shall show an auditor the kind of every thread but no action on a thread.
+        justification: |
+          An auditor only reads.
+        tests:
+          - ReviewPage_Auditor_SeesKindsButNoThreadActions
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-Concluded
+        title: >-
+          The ReviewPage unit shall show no action on a thread after the review is concluded.
+        justification: |
+          A concluded review is locked.
+        tests:
+          - ReviewPage_Concluded_ThreadActionsAbsent
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-ChatBubble
+        title: >-
+          The ReviewPage unit shall show the comments of a Question as chat bubbles.
+        justification: |
+          A Question is conversation.
+        tests:
+          - ThreadCard_Question_ShowsQuestionBadgeAndChatBubbles
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-InReportMark
+        title: >-
+          The ReviewPage unit shall show the starting comment of a Finding with an In report mark.
+        justification: |
+          The reader sees which content goes into the report.
+        tests:
+          - ThreadCard_Finding_ShowsFindingBadgeAndInReportMarkOnStartingComment
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-NoteFinding
+        title: >-
+          The ReviewPage unit shall ask for a resolution note when a Finding is resolved and refuse a blank note
+          with a message.
+        justification: |
+          The note says why a Finding is closed.
+        tests:
           - ResolveNoteDialog_Finding_RequiresNote
+          - ThreadCard_ResolveFinding_AsksForNoteThenReopens
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-NoteQuestion
+        title: >-
+          The ReviewPage unit shall let a Question be resolved with or without a note.
+        justification: |
+          A Question needs no justification.
+        tests:
           - ResolveNoteDialog_Question_NoteOptional
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-NoteCancel
+        title: >-
+          The ReviewPage unit shall hand over no note and tell the card when the person cancels the resolution
+          note.
+        justification: |
+          The person may change their mind.
+        tests:
           - ResolveNoteDialog_Cancel_HandsOverNothing
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-SignatureWarning
+        title: >-
+          The ReviewPage unit shall ask for a confirmation that names the signers whose signatures a change makes
+          stale before that change is made.
+        justification: |
+          Moving content into or out of the report asks the signers to sign again, so the person must know it.
+        tests:
           - ReviewPage_Promote_AfterSignature_ShowsSignatureImpactAndAudits
           - ReviewPage_Demote_AfterSignature_NamesAffectedSigners
           - ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote
-          - ReviewPage_ReplyReportToggle_AddsAndRemovesReplyFromReport
-          - ReviewPage_Concluded_ThreadActionsAbsent
-          - ReviewPage_Auditor_SeesKindsButNoThreadActions
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-CancelStoresNothing
+        title: >-
+          The ReviewPage unit shall store nothing when the person cancels that confirmation.
+        justification: |
+          A decision that changes the report must be a deliberate one.
+        tests:
+          - ReviewPage_Promote_AfterSignature_ShowsSignatureImpactAndAudits
+          - ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote
+
+      - id: ReviewCenter-ReviewPage-ThreadActions-KeepNote
+        title: >-
+          The ReviewPage unit shall keep the typed resolution note while the confirmation is cancelled and store
+          it when the change is confirmed.
+        justification: |
+          The reader does not have to type the note again.
+        tests:
+          - ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote
 
       - id: ReviewCenter-ReviewPage-ThreadKindIndex
         title: >-
-          The ReviewPage unit shall let the reader filter the thread index by kind (All, Questions, Findings) and by
-          state (All, Open, Resolved), with the count of each choice, shall show the kind badge in every row, and
-          shall show in the summary strip the number of open questions and the number of open findings.
+          The ReviewPage unit shall let the reader filter the index of threads by kind: Both kinds, Questions or
+          Findings.
         justification: |
-          A reader who prepares the report wants the findings first, and a reader who answers wants the open
-          questions, so both views must be one click away with their counts.
+          A reader who prepares the report wants the findings first, and a reader who answers wants the questions.
         tests:
           - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-KindCounts
+        title: >-
+          The ReviewPage unit shall show the number of threads next to each kind choice.
+        justification: |
+          The reader sees the size of each view before choosing it.
+        tests:
+          - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-Combined
+        title: >-
+          The ReviewPage unit shall apply the kind filter and the state filter of the index together.
+        justification: |
+          The open findings are the view that a reader who prepares the report needs.
+        tests:
+          - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-StateCounts
+        title: >-
+          The ReviewPage unit shall show on the state filter buttons the number of threads of the chosen kind.
+        justification: |
+          The counts must match the list that they filter.
+        tests:
+          - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-Badge
+        title: >-
+          The ReviewPage unit shall show the kind badge in every row of the index of threads.
+        justification: |
+          The kind is read without opening the thread.
+        tests:
+          - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-SummaryQuestions
+        title: >-
+          The ReviewPage unit shall show the number of open questions in the summary strip.
+        justification: |
+          A reader who answers wants to see the open questions.
+        tests:
+          - ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex-SummaryFindings
+        title: >-
+          The ReviewPage unit shall show the number of open findings in the summary strip.
+        justification: |
+          A reader who prepares the report wants to see the open findings.
+        tests:
           - ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts
 
       - id: ReviewCenter-ReviewPage-ConclusionFindings
         title: >-
-          The ReviewPage unit shall show the conclusion of a concluded review as a card with the outcome as an icon
-          and text, the conclusion text, the findings that are in the report with their resolution notes, and the
-          signers with the time, shall show the empty state while no conclusion is written, and shall show a viewer
-          who may not see the others only the notice.
+          The ReviewPage unit shall list the findings that are in the report on the conclusion card with their text
+          and state and the resolution note of a resolved one, and no chat thread.
         justification: |
-          The conclusion is the record that the review leaves behind, so it must say what was decided, why, and which
-          findings were closed how, without depending on color, and must not give away hidden ballots.
+          The conclusion is the record that the review leaves behind, so it must say which findings were closed how.
+        tests:
+          - ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners
+          - ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-Outcome
+        title: >-
+          The ReviewPage unit shall show the outcome of a concluded review on the conclusion card as an icon that
+          is hidden from assistive technology and as a word.
+        justification: |
+          The outcome must not depend on color.
         tests:
           - ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners
           - ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-Text
+        title: >-
+          The ReviewPage unit shall show the conclusion text on the card of a concluded review.
+        justification: |
+          The record says why the outcome was decided.
+        tests:
+          - ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-Signers
+        title: >-
+          The ReviewPage unit shall show the signers with the time they signed on the card of a concluded review.
+        justification: |
+          The record says who decided and when.
+        tests:
+          - ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners
+          - ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-NoFindings
+        title: >-
+          The ReviewPage unit shall show no list of findings on the conclusion card when no Finding is in the
+          report.
+        justification: |
+          An empty list would look like missing content.
+        tests:
+          - ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-InProgress
+        title: >-
+          The ReviewPage unit shall show no outcome and no signers on the conclusion card of a review that is not
+          concluded.
+        justification: |
+          Nothing is decided yet.
+        tests:
           - ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-Empty
+        title: >-
+          The ReviewPage unit shall show the empty state "No conclusion written." on the conclusion card to a
+          viewer who may not write the conclusion while none is written.
+        justification: |
+          The card must not look broken while the conclusion is still to be written.
+        tests:
+          - ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings-Masked
+        title: >-
+          The ReviewPage unit shall show no finding, no outcome, no signer and no empty state on the conclusion
+          card of a viewer who may not see the answers of the others.
+        justification: |
+          The card must not give away hidden ballots.
+        tests:
           - ReviewPage_ConclusionCard_MaskedViewer_ShowsNoticeOnly
 
       - id: ReviewCenter-ReviewPage-StatusPanel
         title: >-
-          The ReviewPage unit shall show at the top of the page a "Where are we?" panel that lists each reviewer with
-          the state of the ballot (Not started, Draft, or Handed in) and of the signature (Signed, Not signed, or
-          Signed, then the review changed), lists the checks that the reviewers answered differently with a Discuss
-          button that starts a discussion about the check (and, when that would make a signature stale, first shows the
-          signature warning and stores nothing until it is confirmed), shows the number of open questions and of open
-          findings as
-          an icon and text, shows exactly one primary next-action button or sentence for the viewer, and shows a
-          viewer who may not see the others yet a notice that the rest stays hidden until the own ballot is handed in,
-          with no disputed check and no check thread.
+          The ReviewPage unit shall show at the top of the page a "Where are we?" panel that lists each reviewer
+          with the state of the ballot: Not started, Draft or Handed in.
         justification: |
-          A reviewer opens the page to learn what to do. One panel that answers who is done, what is disputed, what
-          is open, and what to do next replaces reading several cards, and the notice keeps independent judgment
-          intact.
+          A reviewer opens the page to learn who is done.
         tests:
           - ReviewStatusPanel_ShowsReviewerBallotAndSignedStates
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-Signature
+        title: >-
+          The ReviewPage unit shall show in the "Where are we?" panel for each reviewer whether the review is
+          Signed or Not signed by that reviewer.
+        justification: |
+          A reviewer sees who still has to sign.
+        tests:
+          - ReviewStatusPanel_ShowsReviewerBallotAndSignedStates
+          - ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-Disputed
+        title: >-
+          The ReviewPage unit shall list in the "Where are we?" panel the checks that the reviewers answered
+          differently.
+        justification: |
+          A disagreement between reviewers must be settled by discussion, so it is shown.
+        tests:
           - ReviewStatusPanel_DisputedCheck_DiscussStartsThread
+          - ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-Discuss
+        title: >-
+          The ReviewPage unit shall offer a Discuss button on a disputed check that starts a discussion about the
+          check, and remove the button once the discussion exists.
+        justification: |
+          Reviewers settle a dispute from the panel without searching for the place to start a discussion.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_DiscussStartsThread
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+        title: >-
+          The ReviewPage unit shall show the signature warning in the form first when starting the discussion would
+          make a signature stale.
+        justification: |
+          Signers must know that they will have to sign again.
+        tests:
           - ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+        title: >-
+          The ReviewPage unit shall store that discussion only when the signature warning is confirmed.
+        justification: |
+          Nothing may change the report without a deliberate decision.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+        title: >-
+          The ReviewPage unit shall store nothing and keep the typed text in the form when the signature warning is
+          cancelled.
+        justification: |
+          The reader may change their mind without losing the typed text.
+        tests:
           - ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+        title: >-
+          The ReviewPage unit shall show in the "Where are we?" panel the number of open questions and of open
+          findings, each with its kind icon and word.
+        justification: |
+          The panel answers what is still open.
+        tests:
           - ReviewStatusPanel_ShowsQuestionAndFindingCounts
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-NextAction
+        title: >-
+          The ReviewPage unit shall show in the "Where are we?" panel exactly one next action, a button or a
+          sentence, for the viewer.
+        justification: |
+          A reviewer opens the page to learn what to do next.
+        tests:
           - ReviewStatusPanel_ShowsExactlyOneNextActionButton
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-Hidden
+        title: >-
+          The ReviewPage unit shall show a viewer who may not see the answers of the others a notice that the rest
+          stays hidden until the own ballot is handed in.
+        justification: |
+          Independent judgment stays intact only when the answers of the others stay hidden.
+        tests:
           - ReviewStatusPanel_MaskedViewer_HidesDisputes
-          - ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes
-          - ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes
+
+      - id: ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
+        title: >-
+          The ReviewPage unit shall show a viewer who may not see the answers of the others no disputed check and
+          no Discuss button.
+        justification: |
+          A dispute would give the hidden answers away.
+        tests:
+          - ReviewStatusPanel_MaskedViewer_HidesDisputes
 
       - id: ReviewCenter-ReviewPage-StatusPanelGuidance
         title: >-
-          The ReviewPage unit shall show in the "Where are we?" panel, for a viewer who may see the answers of the
-          others, who answered what to each disputed check with the justification of the other reviewer as plain text,
-          the plain statement that the review will be Rejected and which check the reviewers failed, and a caution that
-          names the reviewers who have not handed in a ballot when the viewer is about to sign, shall tell the viewer
-          whose signature no longer counts so in plain words, shall show the person who asked the open question a
-          sentence that says whom they wait for instead of a button while the other reviewer is still asked to answer,
-          and shall show a reviewer who signed whom the review waits for, in the same meaning as the next-step line,
-          and shall show none of the answers, the failed checks, the outcome or the caution to a viewer who has not
-          handed in a ballot.
+          The ReviewPage unit shall show in the "Where are we?" panel, to a viewer who may see the answers of the
+          others, who answered what to each disputed check.
         justification: |
-          A reviewer who sees "Different answers" wants to know the other answer and why, and a reviewer who is told to
-          answer their own question, or to wait when they signed, is misled. The answers and the outcome are content of
-          the ballots, so they follow the same visibility rule as the ballots.
+          A reviewer who sees "Different answers" wants to know the other answer.
         tests:
           - ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification
-          - ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-Justification
+        title: >-
+          The ReviewPage unit shall show with a disputed check the justification of the other reviewer and never
+          that of the viewer.
+        justification: |
+          The reason of the other reviewer is what settles the dispute.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-PlainText
+        title: >-
+          The ReviewPage unit shall show the justification of the other reviewer as plain text.
+        justification: |
+          Nothing typed by a reviewer can change the page.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-Outcome
+        title: >-
+          The ReviewPage unit shall state in plain words that the review will be Rejected, and which check the
+          reviewers failed, when all reviewers failed a check.
+        justification: |
+          The reviewer is not left to guess the outcome.
+        tests:
           - ReviewStatusPanel_BothFailed_NamesTheOutcome
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-Caution
+        title: >-
+          The ReviewPage unit shall caution a viewer who is about to sign, naming the reviewers who have not handed
+          in a ballot.
+        justification: |
+          Signing early may mean signing again.
+        tests:
           - ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer
-          - ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-SignatureLost
+        title: >-
+          The ReviewPage unit shall tell a reviewer whose signature no longer counts so in plain words, and tell
+          nobody else.
+        justification: |
+          The reviewer is told what to do about the lost signature.
+        tests:
           - ReviewStatusPanel_SignatureLost_StatedToTheSigner
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-AskerWaits
+        title: >-
+          The ReviewPage unit shall show the person who asked an open question a sentence that says whom they
+          wait for, instead of a button, while the other reviewer is still asked to answer.
+        justification: |
+          The asker must not be told to answer their own question.
+        tests:
+          - ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-OtherParty
+        title: >-
+          The ReviewPage unit shall show the reviewer who is asked a link to answer the open questions.
+        justification: |
+          The person who is asked knows what to do.
+        tests:
+          - ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-AfterSigning
+        title: >-
+          The ReviewPage unit shall say to a reviewer who signed whom the review waits for, in the same meaning as
+          the next-step line.
+        justification: |
+          Two lines of the same panel must not disagree.
+        tests:
           - ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance-Masked
+        title: >-
+          The ReviewPage unit shall show none of the answers, the failed checks, the outcome or the caution to a
+          viewer who has not handed in a ballot.
+        justification: |
+          The answers and the outcome are content of the ballots and follow the visibility rule of the ballots.
+        tests:
+          - ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution
 
       - id: ReviewCenter-ReviewPage-ChangesSinceSigning
         title: >-
-          The ReviewPage unit shall show a reviewer whose signature no longer matches the report the words "Signed,
-          then the review changed" and an expandable list, "What changed since {name} signed", of the changes that
-          can alter the report, with the time, the person and a reason in plain words, with a note that the list
-          explains what happened and the signature check decides, and shall say in the warning before a change that
-          alters the report that the signed reviewers will need to look again and sign again.
+          The ReviewPage unit shall show a reviewer whose signature no longer matches the report the words
+          "Signed, then the review changed".
         justification: |
-          "Out of date" tells nobody what to do. Saying what changed, and that signing again is the way forward,
-          lets a reviewer act without help, and the note keeps the list honest: it is derived from the audit trail,
-          not from the signature check.
+          "Out of date" tells nobody what to do, so the status says in plain words what happened.
         tests:
           - ReviewPage_SignedThenChanged_ExplainsWhatChanged
           - ReviewPage_NoJargonOutOfDateText
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning-NoJargon
+        title: >-
+          The ReviewPage unit shall not describe such a signature as "out of date" or "outdated" in any text of the
+          page.
+        justification: |
+          The reader is told in plain words and not in jargon.
+        tests:
+          - ReviewPage_NoJargonOutOfDateText
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning-List
+        title: >-
+          The ReviewPage unit shall show for such a reviewer an expandable list "What changed since {name} signed".
+        justification: |
+          The reviewer sees what happened since the signature.
+        tests:
+          - ReviewPage_SignedThenChanged_ExplainsWhatChanged
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning-Change
+        title: >-
+          The ReviewPage unit shall show each change in that list with the time, the person and a reason in plain
+          words.
+        justification: |
+          The reviewer sees who changed what and when.
+        tests:
+          - ReviewPage_SignedThenChanged_ExplainsWhatChanged
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning-Note
+        title: >-
+          The ReviewPage unit shall tell the reviewer above that list when they signed and that they need to look
+          again and sign again.
+        justification: |
+          Signing again is the way forward, so the reviewer is told so before the list.
+        tests:
+          - ReviewStatusPanel_SignedThenChanged_NoteSaysToLookAgainAndSignAgain
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning-Warning
+        title: >-
+          The ReviewPage unit shall say in the warning before a change that alters the report that the signed
+          reviewers will need to look again and sign again.
+        justification: |
+          The person who makes the change knows its effect on the signers.
+        tests:
           - SignatureWarning_UsesPlainLanguage

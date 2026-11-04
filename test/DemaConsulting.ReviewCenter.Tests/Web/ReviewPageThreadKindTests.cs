@@ -325,6 +325,10 @@ public class ReviewPageThreadKindTests : PageTestBase
         // Act: cancel, then promote again and confirm
         await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+
+        // Assert: the cancel stored nothing either
+        stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal(ThreadKind.Question, stored.Kind);
         await cut.Find($"[data-testid='thread-promote-{thread.Id}']").ClickAsync();
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 
@@ -397,6 +401,7 @@ public class ReviewPageThreadKindTests : PageTestBase
         // Act: cancel the warning, then resolve again without typing the note again
         await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
         Assert.NotEmpty(cut.FindAll($"[data-testid='resolve-note-{thread.Id}']"));
+        Assert.Equal(ReviewThreadState.Open, Assert.Single(await Threads.ListAsync(projectId, "REV-1", cancellationToken)).State);
         await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 

@@ -105,6 +105,81 @@ public class ReviewPageCheckThreadTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a thread about a check is kept out of the list of the threads of the selected file: the list holds
+    ///     only the thread of the file, and the card of check discussions holds only the thread about the check.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CheckThread_SelectedFile_KeepsCheckThreadOutOfFileList()
+    {
+        // Arrange: a review with a thread about a check and a whole-file thread on a.txt
+        var (projectId, checkThread) = await CreateReviewWithCheckThreadAsync();
+        var fileThread = await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "A note on the file", TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the list of the file holds exactly the thread of the file
+        var listed = cut.Find("[data-testid='threads-list']").QuerySelectorAll("[data-testid^='thread-anchor-']");
+        Assert.Equal([$"thread-anchor-{fileThread.Id}"], listed.Select(e => e.GetAttribute("data-testid")));
+        Assert.Null(cut.Find("[data-testid='threads-list']").QuerySelector($"[data-testid='thread-{checkThread.Id}']"));
+
+        // Assert: the card of check discussions holds exactly the thread about the check
+        var card = cut.Find("[data-testid='check-discussions']");
+        Assert.Equal([$"thread-anchor-{checkThread.Id}"], card.QuerySelectorAll("[data-testid^='thread-anchor-']")
+            .Select(e => e.GetAttribute("data-testid")));
+        Assert.Null(card.QuerySelector($"[data-testid='thread-{fileThread.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the text of a comment of a thread about a check is shown as plain text: markup in it is shown as
+    ///     typed and creates no element.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CheckThread_CommentText_IsShownAsPlainText()
+    {
+        // Arrange: a review with a thread about a check whose text holds markup
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, _) = await CreateReviewWithCheckThreadAsync();
+        var markup = await Threads.StartThreadAsync(
+            projectId, "REV-1", ThreadAnchor.ForCheck(FirstCheck), TestActors.Ann, "<b>x</b>", cancellationToken);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: the text equals the literal typed and the card holds no element made from it
+        var text = cut.Find($"[data-testid='comment-text-{markup.Id}-1']");
+        Assert.Equal("<b>x</b>", text.TextContent);
+        Assert.Empty(text.QuerySelectorAll("b"));
+        Assert.Empty(cut.Find("[data-testid='check-discussions']").QuerySelectorAll("b"));
+    }
+
+    /// <summary>
+    ///     Test that the card of check discussions offers no form to start a thread, while the page offers the form
+    ///     for the selected file outside the card.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CheckThread_Card_OffersNoFormToStartThread()
+    {
+        // Arrange: a review with a thread about a check, and a file selected so that the page offers a form of its own
+        var (projectId, _) = await CreateReviewWithCheckThreadAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        Assert.Single(cut.FindAll("[data-testid='new-thread-form']"));
+
+        // Act
+        var card = cut.Find("[data-testid='check-discussions']");
+
+        // Assert: nothing in the card starts a thread
+        Assert.Empty(card.QuerySelectorAll("form"));
+        Assert.Empty(card.QuerySelectorAll("[data-testid='new-thread-form']"));
+        Assert.Empty(card.QuerySelectorAll("[data-testid='thread-text-input']"));
+        Assert.Empty(card.QuerySelectorAll("[data-testid='start-thread-button']"));
+        Assert.Empty(card.QuerySelectorAll("[data-testid='thread-kind-choice']"));
+    }
+
+    /// <summary>
     ///     Test that a reply and Resolve work in the card, with no file chosen: the reply is stored, and resolving
     ///     moves the thread to the resolved count and collapses it.
     /// </summary>
@@ -157,6 +232,26 @@ public class ReviewPageCheckThreadTests : PageTestBase
             Assert.Contains("focused", cut.Find($"[data-testid='thread-{thread.Id}']").ClassList));
         Assert.Empty(cut.FindAll("[data-testid='deep-link-message']"));
         Assert.NotNull(cut.Find("[data-testid='check-discussions']").QuerySelector($"[data-testid='thread-{thread.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the address of a thread about a check selects no file and shows no content of a file.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CheckThreadDeepLink_SelectsNoFile()
+    {
+        // Arrange: a review with a thread about a check
+        var (projectId, thread) = await CreateReviewWithCheckThreadAsync();
+
+        // Act: open the address of the thread
+        var cut = RenderPage(projectId, thread.Id);
+
+        // Assert: the thread is shown, but no file is chosen and no message is reported
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Contains("focused", cut.Find($"[data-testid='thread-{thread.Id}']").ClassList));
+        Assert.Empty(cut.FindAll("[data-testid='selected-file-path']"));
+        Assert.Empty(cut.FindAll("[data-testid^='line-text-']"));
+        Assert.Empty(cut.FindAll("[data-testid='deep-link-message']"));
     }
 
     /// <summary>

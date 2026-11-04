@@ -76,6 +76,34 @@ public class BallotMaskingPageTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that a slot owner who has not handed in a ballot sees only the progress of the own checklist, with no
+    ///     count of failed checks, although the other reviewers handed in ballots that differ.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_HiddenViewer_SlotOwner_ShowsOwnChecklistProgressOnly()
+    {
+        // Arrange: ann passes and cyd fails the first check; bob, the viewer, has answered only the first check
+        var projectId = await CreateReviewAsync("ann", "cyd", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "cyd", ChecklistOutcome.Fail);
+        await Checklists.SetAnswerAsync(
+            projectId, ReviewKey, FirstItemId, ChecklistOutcome.Pass, null, new Actor("bob", "Bob"), TestContext.Current.CancellationToken);
+        SignInAs("bob", "Bob", false);
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var total = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).Count();
+
+        // Act
+        var cut = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, ReviewKey));
+
+        // Assert: the own progress is shown, and nothing about the failed check of cyd
+        var progress = cut.Find("[data-testid='checklist-progress-summary']").TextContent;
+        Assert.Equal($"1 of {total} checks answered", progress);
+        Assert.DoesNotContain("failed", progress, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Test that the review page of a member without a slot says the checklist standing is hidden.
     /// </summary>
     [Fact]
