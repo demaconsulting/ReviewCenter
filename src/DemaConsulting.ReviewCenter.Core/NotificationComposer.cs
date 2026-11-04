@@ -229,6 +229,26 @@ public sealed class NotificationComposer
     }
 
     /// <summary>
+    ///     Tells whether the count of waiting replies has fallen below the stored one.
+    /// </summary>
+    /// <param name="storedState">The state the user was told about; <c>null</c> when the user was told nothing.</param>
+    /// <param name="currentState">The state of the item now.</param>
+    /// <returns>
+    ///     <c>true</c> when both states are waiting replies and the current count is lower than the stored count. Such
+    ///     an item is not new, but the stored count must follow it down, so that a later rise is measured from the
+    ///     count the item has now.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="currentState"/> is null.</exception>
+    public static bool IsLowered(string? storedState, string currentState)
+    {
+        ArgumentNullException.ThrowIfNull(currentState);
+        return storedState is not null
+               && TryReadReplies(storedState, out var before)
+               && TryReadReplies(currentState, out var now)
+               && now < before;
+    }
+
+    /// <summary>
     ///     Composes the mail for the new items.
     /// </summary>
     /// <param name="fresh">The new items; not empty. Must not be null.</param>

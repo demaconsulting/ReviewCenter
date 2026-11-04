@@ -65,6 +65,12 @@ for a mail about new items, and `<name>: your daily summary` for a daily summary
 - *Returns*: True when nothing was stored, or when the states differ. Two states that both carry reply counts are new
   only when the count rose, because a user who answers replies must not be mailed about the replies that are left.
 
+**IsLowered**: Tells whether the count of waiting replies of an item fell.
+
+- *Parameters*: The state that the user was told about (null when nothing was stored), and the current state.
+- *Returns*: True only when both states carry reply counts and the current count is smaller than the stored one. The
+  dispatcher then stores the lower state without a mail, so a later rise is measured from the current count.
+
 **Compose**: Composes the mail about the new items.
 
 - *Parameters*: The new candidates, the number of outstanding candidates that the user was told about before and that

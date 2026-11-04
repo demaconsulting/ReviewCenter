@@ -172,6 +172,53 @@ public class NotificationDispatcherDedupeTests
     }
 
     /// <summary>
+    ///     Makes a world in which ann has a seat in r1 and some replies of bob waiting, and was told about a number of
+    ///     replies and about the item to answer.
+    /// </summary>
+    /// <param name="mode">The mode of ann.</param>
+    /// <param name="waiting">How many replies wait now.</param>
+    /// <param name="stored">The state token of the waiting replies that ann was told about.</param>
+    /// <returns>The world.</returns>
+    internal static async Task<NotificationDispatcherWorld> ArrangeRepliesAsync(NotificationMode mode, int waiting, string stored)
+    {
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.Inbox.CreateReviewAsync("r1");
+        await world.Inbox.AddSlotAsync("r1", "ann");
+        for (var i = 0; i < waiting; i++)
+        {
+            await AddReplyAsync(world);
+        }
+
+        await world.ChangeAsync();
+        world.Enroll("ann", mode);
+        world.Store.AddNotified(world.IdOf("ann"), new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "to-answer"), NotificationComposer.StateToAnswer);
+        world.Store.AddNotified(world.IdOf("ann"), RepliesKey(world), stored);
+        return world;
+    }
+
+    /// <summary>
+    ///     Lets bob answer one more thread of ann, so one more reply waits for her, and moves the audit sequence.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <returns>A task that completes when the reply exists.</returns>
+    internal static async Task AddReplyAsync(NotificationDispatcherWorld world)
+    {
+        var thread = await world.Inbox.StartThreadAsync("r1", "ann");
+        await world.Inbox.ReplyAsync("r1", thread.Id, "bob");
+        await world.ChangeAsync();
+    }
+
+    /// <summary>
+    ///     Gets the key of the waiting replies of ann in r1.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <returns>The key.</returns>
+    internal static NotifiedKey RepliesKey(NotificationDispatcherWorld world)
+    {
+        return new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.RepliesWaiting, "replies");
+    }
+
+    /// <summary>
     ///     Test that no mail is sent when the number of waiting replies falls.
     /// </summary>
     [Fact]
@@ -193,6 +240,101 @@ public class NotificationDispatcherDedupeTests
 
         // Assert
         Assert.Empty(sent);
+    }
+
+    /// <summary>
+    ///     Test that the stored count of waiting replies follows a fall, without a mail.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Every_RepliesFall_StoredStateLowered()
+    {
+        // Arrange: ann was told about 5 replies; 2 wait now
+        var world = await ArrangeRepliesAsync(NotificationMode.Every, 2, "replies:5");
+
+        // Act
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert
+        Assert.Empty(sent);
+        Assert.Contains("r1/RepliesWaiting=replies:2", world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that a rise after a fall is mailed, although it does not reach the count ann was told about first.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Every_RepliesFallThenRise_Mailed()
+    {
+        // Arrange: ann was told about 5 replies; 2 wait, which is remembered without a mail
+        var world = await ArrangeRepliesAsync(NotificationMode.Every, 2, "replies:5");
+        await world.DeliverEveryAsync();
+
+        // Act: a third reply arrives
+        await AddReplyAsync(world);
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert
+        var message = Assert.Single(sent);
+        Assert.Contains("3 replies are waiting", message.TextBody, StringComparison.Ordinal);
+        Assert.Contains("r1/RepliesWaiting=replies:3", world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that the row of waiting replies is removed when no reply waits any more.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Every_RepliesFallToZero_RowRemoved()
+    {
+        // Arrange: ann was told about 5 replies; none waits now
+        var world = await ArrangeRepliesAsync(NotificationMode.Every, 0, "replies:5");
+
+        // Act
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert
+        Assert.Empty(sent);
+        Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that a count that is lowered once is not written again by the next passes.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Every_RepliesLowered_NoRewriteLater()
+    {
+        // Arrange: the count was lowered at the first time
+        var world = await ArrangeRepliesAsync(NotificationMode.Every, 2, "replies:5");
+        await world.DeliverEveryAsync();
+        var first = Assert.Single(world.Store.NotifiedOf(world.IdOf("ann")), i => i.Section == InboxSection.RepliesWaiting);
+
+        // Act: later passes read the inbox again
+        world.Advance(TimeSpan.FromMinutes(30));
+        await world.ChangeAsync();
+        await world.DeliverEveryAsync();
+
+        // Assert: the time of the record did not move
+        var later = Assert.Single(world.Store.NotifiedOf(world.IdOf("ann")), i => i.Section == InboxSection.RepliesWaiting);
+        Assert.Equal(first.NotifiedUtc, later.NotifiedUtc);
+    }
+
+    /// <summary>
+    ///     Test that lowering the count of waiting replies keeps the flag of a state that was given up.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Every_RepliesFall_GaveUpFlagKept()
+    {
+        // Arrange: the server gave up mailing 5 replies; 2 wait now
+        var world = await ArrangeRepliesAsync(NotificationMode.Every, 2, "replies:5");
+        world.Store.AddNotified(world.IdOf("ann"), RepliesKey(world), "replies:5", gaveUp: true);
+
+        // Act
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert
+        Assert.Empty(sent);
+        var row = Assert.Single(world.Store.NotifiedOf(world.IdOf("ann")), i => i.Section == InboxSection.RepliesWaiting);
+        Assert.Equal("replies:2", row.State);
+        Assert.True(row.GaveUp);
     }
 
     /// <summary>

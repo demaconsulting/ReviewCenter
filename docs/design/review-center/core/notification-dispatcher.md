@@ -26,10 +26,12 @@ kept by `INotificationStore` (table `NotificationPreferences` and its related ta
 - `DigestHandledUtc` — the instant at which the last daily slot was handled;
 - `BatchStartedUtc` — the start of the running batch window of the mode Every, or null;
 - `FailureCount` and `NextAttemptUtc` — the state of the retry of a failed send;
-- the notified items: for each key (project id, review id, section, kind) the state that the user was told about. The
-  kind is the part of the state before the first colon (`NotificationComposer.KindOf`). The inbox lists a standing item
-  to answer and a "Question for you" item in the same section of one review, and the kind keeps them apart, so that a
-  question that is asked after the item to answer was mailed is mailed too.
+- the notified items: for each key (project id, review id, section, kind) the state that the user was told about, and
+  the flag `GaveUp`. The kind is the part of the state before the first colon (`NotificationComposer.KindOf`). The inbox
+  lists a standing item to answer and a "Question for you" item in the same section of one review, and the kind keeps
+  them apart, so that a question that is asked after the item to answer was mailed is mailed too. `GaveUp` is true when
+  the server gave up mailing that state (see step 7): the state was not delivered, and the row only keeps the server
+  from mailing the same state again. A mail of a later new state records the row with `GaveUp` false.
 
 Each mail that is sent is a `NotificationSendLogEntry` of the kind `update` (the mode Every) or `digest` (the mode
 Daily), written when the mail is reserved. The same log holds the confirmation mails of `NotificationPreferenceService`,
@@ -43,7 +45,7 @@ Constants:
 
 - mails per user per day: 24 (`MaxMailsPerUserPerDay`);
 - waits after a failed send: 5 minutes, 15 minutes, 1 hour, 4 hours, and 12 hours (`RetryDelays`); the sixth failure
-  gives up;
+  gives up on the batch, which records its items as given up, not as delivered;
 - interval of the full sweep: 15 minutes (`SweepInterval`);
 - the batch window of the mode Every: the constructor argument, made from the setting `BatchWindowSeconds` (default
   300 seconds).
@@ -71,7 +73,8 @@ Constants:
      mail can not tell more than the recipient sees after the sign-in; in particular the answers of the others stay
      hidden while the own ballot is not handed in. The rows are reduced with `NotificationComposer.Classify`, and the
      candidates are made unique by their key. The read writes no audit entry.
-  3. A pending baseline records the current candidates as notified with `ReplaceAll`, sets `DigestHandledUtc` to now,
+  3. A pending baseline records the current candidates as notified (not given up) with `ReplaceAll`, sets
+     `DigestHandledUtc` to now,
      clears the flag, sends no mail, and writes no log row. The backlog is therefore never mailed, and a user who
      switches the daily summary on gets the first summary on the next local date.
   4. A next attempt in the future ends the work for the user.
@@ -89,13 +92,20 @@ Constants:
      serialized transaction: the number of log rows of any kind in the last hour against the setting for the server,
      and the number of rows of the user in the last day against 24. A mail whose reservation is refused is deferred:
      no state changes, the items stay new, and they go out when the limit allows it. The limits are therefore counted
-     in the shared database and hold across several server instances and across the confirmation mails, and a mail
-     counts from the moment it is reserved, so a mail that is lost between the reservation and the send stays counted.
+     in the database by the reservation, so that concurrent senders inside the one host (the dispatcher and the
+     confirmation requests of the Account page) can not pass the same count, and they cover the confirmation mails. A
+     mail counts from the moment it is reserved, so a mail that is lost between the reservation and the send stays
+     counted.
      The mail is then sent. When the sender throws, whatever the reason, including a cancellation, the dispatcher
      first releases the reservation with `ReleaseSendAsync` (with a token that is not cancelled, so a shutdown does not
      leak the row). Then, for a failure of the sender, `FailureCount` is raised and `NextAttemptUtc` is set according
-     to the waits above; the sixth failure gives up, which records the items as notified, clears the failure state,
-     and passes the error on to the callback once. A cancellation is passed on after the release. When the sender
+     to the waits above; the sixth failure gives up: the server drops that batch, records the new items with `GaveUp`
+     true (at the state they have at that time, so they are not marked as delivered), removes the keys of items that
+     left the inbox, clears the failure state and the batch window, and passes the error on to the callback once. The
+     same state is not mailed again, so the retries stop, but a later new state of an item (a different kind of
+     state, or for waiting replies a higher count) is new and is mailed, and the mail records the row with `GaveUp`
+     false. A given-up item still counts in the number of items that still wait in a daily summary, exactly as an
+     item that was mailed and still waits does. A cancellation is passed on after the release. When the sender
      succeeds, the reserved row stays as the log row of the mail, and one call of `INotificationStore.ApplyAsync`
      records the new items, removes the keys of items that left the inbox, clears the batch window and the failure
      state, and, in the mode Daily, sets `DigestHandledUtc`. The commit carries the address and the generation of the
@@ -106,8 +116,21 @@ Constants:
      between the re-read and the send itself can not be excluded, because the send is outside of the database; in that
      case the mail has gone out and the commit is discarded, so that the new preference starts from its own state.
 
-An item is new when `NotificationComposer.IsNew` says so for the stored state. A key that is not in the inbox any more
-is forgotten, so an item that returns is mailed again.
+An item is new when `NotificationComposer.IsNew` says so for the stored state: nothing is stored, the state differs, or,
+for waiting replies, the count rose. A key that is not in the inbox any more is forgotten, so an item that returns is
+mailed again. When the count of waiting replies of an item is lower than the stored one (`NotificationComposer.IsLowered`),
+the item is not new and is never mailed, but the stored state follows it down, keeping `GaveUp` as stored, so that a
+later rise is measured from the count the item has now. The lowered items are part of the comparison of the pass and
+are written in every commit that also forgets the stale items (the paths of the mode Every and of the mode Daily that
+mail nothing, and the commits after a mail and after the give-up); a pass in which nothing was lowered, forgotten, or
+recorded writes nothing. In the mode Daily the stored count is lowered only at the digest slot, because that is when
+the dispatcher reads the inbox of the recipient; a fall and a rise of the count within one day are therefore compared
+with the count of the previous slot.
+
+**Design constraint: one host per database.** The server is a single instance by design (see the hosting decision in
+the architecture document), and the services that must remain singletons keep state in memory. The dispatcher is not
+coordinated between hosts, so exactly one host may run the notification worker for a database; two hosts on one
+database could send the same mail twice. This is a known limit, not a supported topology.
 
 - *Errors*: An error in the work for one recipient is passed to the error callback, counted as a failure of that user,
   and does not stop the pass. A canceled token ends the pass with an `OperationCanceledException`.

@@ -34,10 +34,11 @@ N/A - standard test environment (the in-memory stand-ins and the fake clock are 
 - In the mode Daily one summary goes out for each local date from the digest hour on, also after a downtime and on the
   days of a clock change, and an unused slot is consumed.
 - An item in the same state is not mailed twice, a changed state is, the draft is no news, rising replies are news,
-  an item that leaves and returns is mailed again, and the record is written only after a successful send or a
-  give-up.
-- A failed send waits 5 minutes, 15 minutes, 1 hour, 4 hours, and 12 hours, the sixth failure gives up, and a success
-  resets the state.
+  falling replies are no news and are stored at the lower number, an item that leaves and returns is mailed again, and
+  the record is written only after a successful send; a give-up records the items as given up and not as delivered.
+- A failed send waits 5 minutes, 15 minutes, 1 hour, 4 hours, and 12 hours, the sixth failure gives up on the mail, an
+  item on which the dispatcher gave up is not mailed again in the same state but is mailed in a new state, and a
+  success resets the state.
 - A mail beyond the limit of the server or of the user is deferred without a change of state, the row of a mail is
   reserved in the store before the send and released when the send fails or is cancelled, a mail that was sent keeps
   its row even when the commit turns out stale, and a sent mail has a log row of the kind `update` or `digest`.
@@ -103,7 +104,8 @@ and `NotificationDispatcher_RunPass_Every_AfterSend_WindowCleared`.
 **Slot of the mode Daily**: No summary goes out before the digest hour, one goes out at the hour when something is new,
 nothing is sent and the slot is used up when nothing is new, two passes on one local date give one mail, an item after
 the slot waits for the next date, a downtime over the hour is made good as soon as the server runs, the hour is the
-local hour of the zone, a day of a clock change gives one mail, the outstanding items are counted, a user who switched
+local hour of the zone, a day of a clock change gives one mail, the outstanding items are counted (an item on which the
+dispatcher gave up is counted as well), a user who switched
 from Every to Daily gets the next summary when the slot opens, and a user who just switched Daily on gets nothing on the
 same date. These scenarios are tested by `NotificationDispatcher_RunPass_Daily_BeforeHour_NothingSent`,
 `NotificationDispatcher_RunPass_Daily_AtHour_Sends`, `NotificationDispatcher_RunPass_Daily_NothingNew_NoMailSlotConsumed`,
@@ -111,7 +113,9 @@ same date. These scenarios are tested by `NotificationDispatcher_RunPass_Daily_B
 `NotificationDispatcher_RunPass_Daily_ItemAfterSlot_SentNextDay`,
 `NotificationDispatcher_RunPass_Daily_DowntimeOverHour_SendsOnRestart`,
 `NotificationDispatcher_RunPass_Daily_ZoneOffset_UsesLocalHour`, `NotificationDispatcher_RunPass_Daily_DstChangeDay_OneMail`,
-`NotificationDispatcher_RunPass_Daily_OutstandingCounted`, `NotificationDispatcher_RunPass_SwitchEveryToDaily_DueWhenSlotOpen`,
+`NotificationDispatcher_RunPass_Daily_OutstandingCounted`,
+`NotificationDispatcher_RunPass_Daily_GaveUpItemCountedAsOutstanding`,
+`NotificationDispatcher_RunPass_SwitchEveryToDaily_DueWhenSlotOpen`,
 and `NotificationDispatcher_RunPass_DailyJustEnabled_NoMailSameDate`.
 
 **No second mail**: The same item in the same state is not mailed twice, a changed state is mailed, "Not started" and
@@ -126,6 +130,18 @@ user saw before the send is dropped. These scenarios are tested by
 `NotificationDispatcher_RunPass_SendSucceeds_ItemsRecorded`, `NotificationDispatcher_RunPass_SendFails_ItemsNotRecorded`,
 `NotificationDispatcher_RunPass_SendInProgress_ItemsNotYetRecorded` (the items are not recorded while the send is still
 running; the log row is already reserved then), and `NotificationDispatcher_RunPass_UpdateSeenBeforeSend_Dropped`.
+
+**Falling replies**: The stored state of waiting replies follows a fall, so that a later rise is measured from the lower
+number. With 5 replies stored and 2 waiting, no mail is sent and the stored state becomes 2 replies (mode Every,
+`NotificationDispatcher_RunPass_Every_RepliesFall_StoredStateLowered`); a rise to 3 is then mailed in the mode Every
+(`NotificationDispatcher_RunPass_Every_RepliesFallThenRise_Mailed`) and in the mode Daily
+(`NotificationDispatcher_RunPass_Daily_RepliesFallThenRise_Mailed`); a fall to none removes the row in both modes
+(`NotificationDispatcher_RunPass_Every_RepliesFallToZero_RowRemoved` and
+`NotificationDispatcher_RunPass_Daily_RepliesFallToZero_RowRemoved`); a count that was lowered is not written again in
+a later pass, which the stable time of the record shows
+(`NotificationDispatcher_RunPass_Every_RepliesLowered_NoRewriteLater`); the lowering keeps the give-up flag as stored
+(`NotificationDispatcher_RunPass_Every_RepliesFall_GaveUpFlagKept`); and the pass that sends a daily summary about
+another item lowers the count too (`NotificationDispatcher_RunPass_Daily_RepliesFallWithNewItem_LoweredAndMailed`).
 
 **Question and standing item**: The inbox returns a standing item to answer and a question for the user in the same
 section of one review. A question that is asked after the item to answer was mailed is mailed, and when both were mailed
@@ -147,14 +163,17 @@ off before the send, nothing is sent. These scenarios are tested by
 
 **Retry**: A failed send stores the failure count and the time of the next attempt, the five waits are 5 minutes, 15
 minutes, 1 hour, 4 hours, and 12 hours, no attempt is made before the next attempt time, a retry uses the inbox as it is
-then, the sixth failure gives up and records the items, a successful retry clears the failure state, and a failed send
+then, the sixth failure gives up and records the items as given up (not as delivered, with no log row), an item on which
+the dispatcher gave up is not mailed again in the same state, and a new state of it is mailed and recorded as
+delivered, a successful retry clears the failure state, and a failed send
 to one user does not keep another user from being mailed. These scenarios are tested by
 `NotificationDispatcher_RunPass_SendFails_FailureCountStored`, `NotificationDispatcher_RunPass_SendFails_NextAttemptStored`,
 `NotificationDispatcher_RunPass_Failure1_Waits5Min`,
 `NotificationDispatcher_RunPass_Failure2_Waits15Min`, `NotificationDispatcher_RunPass_Failure3_Waits1Hour`,
 `NotificationDispatcher_RunPass_Failure4_Waits4Hours`, `NotificationDispatcher_RunPass_Failure5_Waits12Hours`,
 `NotificationDispatcher_RunPass_BeforeNextAttempt_NoSend`, `NotificationDispatcher_RunPass_Retry_UsesCurrentInbox`,
-`NotificationDispatcher_RunPass_Failure6_GivesUp`, `NotificationDispatcher_RunPass_GiveUp_ItemsRecorded`,
+`NotificationDispatcher_RunPass_Failure6_GivesUp`, `NotificationDispatcher_RunPass_GiveUp_ItemsRecordedAsGaveUp`,
+`NotificationDispatcher_RunPass_GiveUp_SameStateNotMailedAgain`, `NotificationDispatcher_RunPass_GiveUp_LaterNewStateMailed`,
 `NotificationDispatcher_RunPass_RetrySucceeds_StateReset`, and `NotificationDispatcher_RunPass_OneSendFails_OtherUserMailed`.
 
 **Limits and log**: A mail is deferred when the hourly limit of the server is reached, mails of every kind count against

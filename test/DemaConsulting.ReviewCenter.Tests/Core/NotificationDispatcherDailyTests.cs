@@ -259,6 +259,96 @@ public class NotificationDispatcherDailyTests
     }
 
     /// <summary>
+    ///     Test that an item whose mail was given up still counts as waiting in the summary, as an item that was mailed
+    ///     does.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Daily_GaveUpItemCountedAsOutstanding()
+    {
+        // Arrange: the server gave up mailing r1; r2 is new
+        var world = await NotificationDispatcherWorld.CreateAsync();
+        await world.SeatAsync("r1", "ann");
+        await world.SeatAsync("r2", "ann");
+        world.Enroll("ann", NotificationMode.Daily);
+        world.Store.AddNotified(
+            world.IdOf("ann"),
+            new NotifiedKey(world.Inbox.ProjectId, "r1", InboxSection.ToAnswer, "to-answer"),
+            NotificationComposer.StateToAnswer,
+            gaveUp: true);
+        world.AdvanceTo(Utc(2025, 3, 4, 8));
+
+        // Act
+        await world.PassAsync();
+
+        // Assert
+        var message = Assert.Single(world.Sender.Sent);
+        Assert.Contains("1 more item you were told about earlier is still waiting for you.", message.TextBody, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the summary lowers the stored count of waiting replies, without a mail, and mails a later rise.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Daily_RepliesFallThenRise_Mailed()
+    {
+        // Arrange: ann was told about 5 replies; 2 wait at the first summary
+        var world = await NotificationDispatcherDedupeTests.ArrangeRepliesAsync(NotificationMode.Daily, 2, "replies:5");
+        world.AdvanceTo(Utc(2025, 3, 4, 8));
+        await world.PassAsync();
+        Assert.Empty(world.Sender.Sent);
+        Assert.Contains("r1/RepliesWaiting=replies:2", world.NotifiedOf("ann"));
+
+        // Act: a third reply arrives; the next summary is due the next day
+        await NotificationDispatcherDedupeTests.AddReplyAsync(world);
+        world.AdvanceTo(Utc(2025, 3, 5, 8));
+        await world.PassAsync();
+
+        // Assert
+        var message = Assert.Single(world.Sender.Sent);
+        Assert.Contains("3 replies are waiting", message.TextBody, StringComparison.Ordinal);
+        Assert.Contains("r1/RepliesWaiting=replies:3", world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that the summary removes the row of waiting replies when no reply waits any more.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Daily_RepliesFallToZero_RowRemoved()
+    {
+        // Arrange: ann was told about 5 replies; none waits at the summary
+        var world = await NotificationDispatcherDedupeTests.ArrangeRepliesAsync(NotificationMode.Daily, 0, "replies:5");
+        world.AdvanceTo(Utc(2025, 3, 4, 8));
+
+        // Act
+        await world.PassAsync();
+
+        // Assert
+        Assert.Empty(world.Sender.Sent);
+        Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
+    ///     Test that a summary that mails something else also lowers the stored count of waiting replies.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_Daily_RepliesFallWithNewItem_LoweredAndMailed()
+    {
+        // Arrange: ann was told about 5 replies; 2 wait, and r2 is new
+        var world = await NotificationDispatcherDedupeTests.ArrangeRepliesAsync(NotificationMode.Daily, 2, "replies:5");
+        await world.SeatAsync("r2", "ann");
+        world.AdvanceTo(Utc(2025, 3, 4, 8));
+
+        // Act
+        await world.PassAsync();
+
+        // Assert: the mail names r2 only, and the stored count is 2
+        var message = Assert.Single(world.Sender.Sent);
+        Assert.Contains("r2", message.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("replies are waiting", message.TextBody, StringComparison.Ordinal);
+        Assert.Contains("r1/RepliesWaiting=replies:2", world.NotifiedOf("ann"));
+    }
+
+    /// <summary>
     ///     Test that a user who switches from every change to the daily summary gets the next summary when the slot opens.
     /// </summary>
     [Fact]

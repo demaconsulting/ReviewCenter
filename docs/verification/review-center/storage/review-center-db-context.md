@@ -272,7 +272,9 @@ for the same key (`NotificationStore_Create_Database_NotifiedItemsKeyUnique`), d
 is created again under the same identifier has none (`NotificationStore_Delete_Review_CascadesNotifiedItems` and
 `NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems`). A database of an earlier version of the notifications
 has neither the table nor the columns and is reported as not available (`NotificationStore_IsAvailable_NoNotifiedItems_False`,
-`NotificationStore_IsAvailable_NoModeColumn_False`, and `NotificationStore_IsAvailable_NoGenerationColumn_False`). These
+`NotificationStore_IsAvailable_NoModeColumn_False`, `NotificationStore_IsAvailable_NoGenerationColumn_False`, and
+`NotificationStore_IsAvailable_NoGaveUpColumn_False` for the give-up column of `NotifiedItems`, which defaults to false).
+These
 tests are described with the `NotificationStore` unit.
 
 **The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.

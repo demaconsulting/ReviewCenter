@@ -37,6 +37,10 @@ the server.
 The constructor refuses a missing delegate, clock, or logger with an `ArgumentNullException`, and a polling interval
 that is zero or negative with an `ArgumentOutOfRangeException`, because such an interval would be a busy loop.
 
+**Design constraint: one host per database.** The worker is not coordinated between hosts, because the server is a
+single instance by design. Exactly one host may run the worker for a database; two hosts on one database could send the
+same mail twice. This is a known limit, not a supported topology.
+
 #### Error Handling
 
 A failing pass is expected: a mail server can be down and a database can be busy. The worker therefore catches every

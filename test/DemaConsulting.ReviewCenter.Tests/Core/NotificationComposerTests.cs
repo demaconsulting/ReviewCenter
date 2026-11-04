@@ -850,6 +850,21 @@ public class NotificationComposerTests
     }
 
     /// <summary>
+    ///     Test that only a fall of the number of waiting replies is lowered; nothing else is.
+    /// </summary>
+    [Fact]
+    public void NotificationComposer_IsLowered_StoredAndCurrentState_OnlyFallingReplies()
+    {
+        // Arrange, Act and Assert
+        Assert.True(NotificationComposer.IsLowered("replies:5", "replies:2"));
+        Assert.False(NotificationComposer.IsLowered("replies:2", "replies:2"));
+        Assert.False(NotificationComposer.IsLowered("replies:2", "replies:5"));
+        Assert.False(NotificationComposer.IsLowered(null, "replies:2"));
+        Assert.False(NotificationComposer.IsLowered("to-answer", "question"));
+        Assert.False(NotificationComposer.IsLowered("question", "replies:1"));
+    }
+
+    /// <summary>
     ///     Test that composing without an item is refused.
     /// </summary>
     [Fact]

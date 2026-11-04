@@ -417,6 +417,15 @@ sections:
         tests:
           - NotificationDispatcher_RunPass_Daily_OutstandingCounted
 
+      - id: ReviewCenter-NotificationDispatcher-DailyOutstandingCounted-GaveUp
+        title: >-
+          The NotificationDispatcher class shall count an item on which it gave up among the items that still wait in
+          the daily summary.
+        justification: |
+          An item that still waits needs attention whether or not the earlier mail about it was delivered.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_GaveUpItemCountedAsOutstanding
+
       - id: ReviewCenter-NotificationDispatcher-DailySwitchFromEvery
         title: >-
           The NotificationDispatcher class shall send the next daily summary when the slot opens for a user who switched
@@ -476,6 +485,60 @@ sections:
           A user who answers replies must not be mailed about the replies that are left.
         tests:
           - NotificationDispatcher_RunPass_RepliesFall_NotMailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-Stored
+        title: >-
+          The NotificationDispatcher class shall store the lower number of waiting replies when the number falls.
+        justification: |
+          A later rise is news when it is measured from the number that waits now, so a rise to a number below the
+          number that was mailed earlier must not be missed.
+        tests:
+          - NotificationDispatcher_RunPass_Every_RepliesFall_StoredStateLowered
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ThenRise
+        title: >-
+          The NotificationDispatcher class shall send a mail when the number of waiting replies rises after it fell.
+        justification: |
+          The rise is news even when the number stays below the number that was mailed before the fall.
+        tests:
+          - NotificationDispatcher_RunPass_Every_RepliesFallThenRise_Mailed
+          - NotificationDispatcher_RunPass_Daily_RepliesFallThenRise_Mailed
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ToZero
+        title: >-
+          The NotificationDispatcher class shall forget the item of waiting replies when no reply waits any more.
+        justification: |
+          A reason that disappeared is forgotten, so that its return is news.
+        tests:
+          - NotificationDispatcher_RunPass_Every_RepliesFallToZero_RowRemoved
+          - NotificationDispatcher_RunPass_Daily_RepliesFallToZero_RowRemoved
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-NoRewrite
+        title: >-
+          The NotificationDispatcher class shall write the lower number of waiting replies once.
+        justification: |
+          A pass that finds nothing changed must not write to the database, so an idle pass costs no write.
+        tests:
+          - NotificationDispatcher_RunPass_Every_RepliesLowered_NoRewriteLater
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-KeepsGaveUp
+        title: >-
+          The NotificationDispatcher class shall keep the give-up flag of an item when it stores the lower number of
+          waiting replies.
+        justification: |
+          Lowering the number is not a send, so it must neither mark an item as delivered nor clear the record of a
+          give-up.
+        tests:
+          - NotificationDispatcher_RunPass_Every_RepliesFall_GaveUpFlagKept
+
+      - id: ReviewCenter-NotificationDispatcher-DedupeRepliesFall-WithMail
+        title: >-
+          The NotificationDispatcher class shall store the lower number of waiting replies in the pass that sends a
+          daily summary of another item.
+        justification: |
+          The summary does not list the replies that fell, and their stored number must still follow them down.
+        tests:
+          - NotificationDispatcher_RunPass_Daily_RepliesFallWithNewItem_LoweredAndMailed
 
       - id: ReviewCenter-NotificationDispatcher-DedupeReappear
         title: >-
@@ -675,11 +738,38 @@ sections:
 
       - id: ReviewCenter-NotificationDispatcher-RetryGiveUpRecordsItems
         title: >-
-          The NotificationDispatcher class shall record the items of the mail as notified when it gives up.
+          The NotificationDispatcher class shall record the items of the mail as given up, not as notified, when it
+          gives up.
         justification: |
-          The items must not be tried again and again in the next passes.
+          The items must not be tried again and again in the next passes, and an item that the user was never told
+          about must not be recorded as delivered.
         tests:
-          - NotificationDispatcher_RunPass_GiveUp_ItemsRecorded
+          - NotificationDispatcher_RunPass_GiveUp_ItemsRecordedAsGaveUp
+
+      - id: ReviewCenter-NotificationDispatcher-RetryGiveUpSameStateNotMailed
+        title: >-
+          The NotificationDispatcher class shall send no mail about an item in the state on which it gave up.
+        justification: |
+          A dead address must not be tried again with the same news in every pass.
+        tests:
+          - NotificationDispatcher_RunPass_GiveUp_SameStateNotMailedAgain
+
+      - id: ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateMailed
+        title: >-
+          The NotificationDispatcher class shall send a mail when an item on which it gave up changes to a new state.
+        justification: |
+          The give-up covers the news that was lost, and a later change of the item is news that has not been tried.
+        tests:
+          - NotificationDispatcher_RunPass_GiveUp_LaterNewStateMailed
+
+      - id: ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateDelivered
+        title: >-
+          The NotificationDispatcher class shall record an item as notified, not as given up, after the mail of a new
+          state of that item.
+        justification: |
+          The user was told about the new state, so the record of the give-up no longer applies to it.
+        tests:
+          - NotificationDispatcher_RunPass_GiveUp_LaterNewStateMailed
 
       - id: ReviewCenter-NotificationDispatcher-RetrySuccessResets
         title: >-
@@ -746,7 +836,7 @@ sections:
           mail.
         justification: |
           The limits count the rows of the send log in the shared database. A row that exists during the send makes
-          a parallel sender, such as another server instance, count the mail that is on its way.
+          a concurrent sender inside the same host, such as a confirmation request, count the mail that is on its way.
         tests:
           - NotificationDispatcher_RunPass_SendInProgress_ReservationExists
 

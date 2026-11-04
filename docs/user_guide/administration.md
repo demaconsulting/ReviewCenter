@@ -643,7 +643,8 @@ When a user switches a mode on, the server first notes what is already in the in
 baseline), so nobody gets a flood of old items. Switching between Daily and Every keeps that memory, and also keeps a
 baseline that is still waiting for the first pass, so a switch before that pass does not mail the backlog. Each item
 is mailed
-once; when it is gone and comes back, it counts as new again.
+once; when it is gone and comes back, it counts as new again. An item whose state changes, for example from a question
+to answers that are needed, is new again; replies that wait for the user are new only when their number rises.
 
 ### What Is Mailed
 
@@ -675,14 +676,21 @@ mode. A disabled user, and a user with a temporary password, get none.
 - **At least once**: the server records what it mailed after the mail server accepted it. If the server stops between
   the two steps, the next pass can send the same mail again. A mail is not lost silently, but it can be repeated.
 - **Retries**: when a mail cannot be sent, the server tries again after 5 minutes, 15 minutes, 1 hour, 4 hours, and 12
-  hours. After the sixth failure it gives up on that batch; the news stays in the inbox of the user, but no mail
-  about those items is sent again.
+  hours. After the sixth failure the server gives up on that batch: the items are not marked as delivered, no further
+  mail is sent about the same state of those items, and a later change of an item is mailed as usual. The news stays
+  in the inbox of the user.
+- **Counts of waiting replies**: when the number of replies that wait for a user falls, the server notes the lower
+  number without a mail, so a later rise is mailed even when it does not pass the earlier number.
 - **Limits**: a user gets at most 24 mails a day, and the server sends at most `Notifications:MaxMailsPerHour` mails in
   an hour, counting every kind of mail. A mail beyond a limit is held back and sent when there is room. The limits are
-  counted in the shared database, so they hold across several server instances that use the same database and across
-  the confirmation mails. A mail is counted from the moment the server reserves its place, before it hands the mail
+  counted in the database by the reservation of each mail, so the senders inside the server, the notification worker
+  and the confirmation requests on the Account page, cannot pass the same count, and the limits include the
+  confirmation mails. A mail is counted from the moment the server reserves its place, before it hands the mail
   to the mail server, so a mail that is lost between the reservation and the send, for example in a crash, is still
   counted. A mail that fails or is cancelled during the send gives its place back.
+- **One host per database**: run exactly one host with the notification worker for a database. The server is a single
+  instance by design, and the notification worker is not coordinated between hosts, so two hosts on one database
+  could send the same mail twice.
 - **Idle cost**: an idle server does not read the inboxes. A look at the audit trail tells that something changed; at
   most every 15 minutes the server checks anyway.
 - **Log**: the server logs a pass that sent or failed a mail as numbers (mails sent, failed, and deferred) and, for a
@@ -698,8 +706,9 @@ mode. A disabled user, and a user with a temporary password, get none.
 - A user who signs in with a temporary password has to choose a new password first and sees no notification card until
   then.
 - The server sends at most `Notifications:MaxMailsPerHour` mails in an hour, over all users, and a user gets at most 24
-  mails a day. Both limits count the confirmation mails, the update mails, and the daily summaries, in the shared
-  database, so they hold across several server instances, and a mail counts from the moment it is reserved.
+  mails a day. Both limits count the confirmation mails, the update mails, and the daily summaries, in the database
+  by the reservation of each mail, so senders inside the server cannot pass the same count, and a mail counts from
+  the moment it is reserved.
 - The send log keeps the target address of each mail in clear text, because the limits need it. Each send deletes the
   entries that are older than one day, so an address stays in the log for about a day after the next mail; removing
   the address on the Account page does not delete its log rows at once.

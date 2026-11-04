@@ -42,11 +42,18 @@ public sealed record NotificationPassResult(int Sent, int Failed, int Deferred);
 ///     <see cref="NotificationMode.Daily"/> one summary per local date is sent at the digest hour, and the slot is
 ///     used up even when nothing was new. A user who has just switched a mode on gets no mail for the backlog: the
 ///     first pass records what exists. A failed send is retried after 5 minutes, 15 minutes, 1 hour, 4 hours and
-///     12 hours; after the sixth failure the items are recorded as notified and the mail is dropped. The server-wide
+///     12 hours; after the sixth failure the server gives up on that batch: the items are recorded as given up
+///     (<see cref="NotifiedItem.GaveUp"/>), not as delivered, so the dead mail is not tried again and no further mail
+///     is sent about the same state, while a later change of an item is mailed as usual. When the count of waiting
+///     replies of an item falls, the stored count follows it down without a mail, so a later rise is measured from
+///     the count the item has now. The server-wide
 ///     hourly limit and a limit per user and day defer a mail without counting it as a failure; both are applied by
-///     the store, which counts the mail (a reservation) right before the send, so the limits hold across several
-///     server instances and across confirmation mails, and a send that fails or is cancelled gives its reservation
-///     back. The items and the state of a mail are recorded (together) only after it was sent, so a crash between
+///     the store, which counts the mail (a reservation) in the database right before the send, so senders inside
+///     the one host (this dispatcher and the confirmation mails of the account page) can not both pass the same
+///     count, and the limits cover the confirmation mails too; a send that fails or is cancelled gives its
+///     reservation back. Exactly one host may run the dispatcher for a database: the server is a single instance by
+///     design and the dispatcher is not coordinated between hosts, so two hosts on one database could send the same
+///     mail twice. The items and the state of a mail are recorded (together) only after it was sent, so a crash between
 ///     the send and the record can repeat a mail but never lose one; the record is conditional on the confirmed
 ///     address and the generation of the
 ///     preference that the mail was prepared for, so a mail whose recipient changed the address or the mode meanwhile
@@ -103,15 +110,20 @@ public sealed class NotificationDispatcher
     }
 
     /// <summary>
-    ///     The new and the stale items of a recipient, and the items that were mailed before and still wait.
+    ///     The new, lowered and stale items of a recipient, and all candidates of the inbox.
     /// </summary>
     /// <param name="Candidates">All candidates of the inbox.</param>
     /// <param name="Fresh">The candidates that are new.</param>
-    /// <param name="Stale">The notified items that are not in the inbox any more.</param>
+    /// <param name="Stale">The stored items that are not in the inbox any more.</param>
+    /// <param name="Lowered">
+    ///     The stored items whose count of waiting replies fell, with the lower current state and the flag as stored;
+    ///     they are not new and are never mailed.
+    /// </param>
     private sealed record Diff(
         IReadOnlyList<NotificationCandidate> Candidates,
         IReadOnlyList<NotificationCandidate> Fresh,
-        IReadOnlyList<NotifiedKey> Stale);
+        IReadOnlyList<NotifiedKey> Stale,
+        IReadOnlyList<NotifiedEntry> Lowered);
 
     /// <summary>
     ///     Lets one pass run at a time.
@@ -409,11 +421,11 @@ public sealed class NotificationDispatcher
             var diff = await ComputeAsync(recipient, cancellationToken);
             if (diff.Fresh.Count > 0)
             {
-                await ApplyAsync(recipient, now, [], diff.Stale, state with { BatchStartedUtc = now }, cancellationToken);
+                await ApplyAsync(recipient, now, [], diff.Stale, diff.Lowered, state with { BatchStartedUtc = now }, cancellationToken);
             }
-            else if (diff.Stale.Count > 0)
+            else if (diff.Stale.Count > 0 || diff.Lowered.Count > 0)
             {
-                await ApplyAsync(recipient, now, [], diff.Stale, state, cancellationToken);
+                await ApplyAsync(recipient, now, [], diff.Stale, diff.Lowered, state, cancellationToken);
             }
 
             return Outcome.None;
@@ -428,7 +440,7 @@ public sealed class NotificationDispatcher
         var current = await ComputeAsync(recipient, cancellationToken);
         if (current.Fresh.Count == 0)
         {
-            await ApplyAsync(recipient, now, [], current.Stale, ClearedState(state, null), cancellationToken);
+            await ApplyAsync(recipient, now, [], current.Stale, current.Lowered, ClearedState(state, null), cancellationToken);
             return Outcome.None;
         }
 
@@ -457,7 +469,7 @@ public sealed class NotificationDispatcher
         var diff = await ComputeAsync(recipient, cancellationToken);
         if (diff.Fresh.Count == 0)
         {
-            await ApplyAsync(recipient, now, [], diff.Stale, ClearedState(state, now), cancellationToken);
+            await ApplyAsync(recipient, now, [], diff.Stale, diff.Lowered, ClearedState(state, now), cancellationToken);
             return Outcome.None;
         }
 
@@ -538,19 +550,21 @@ public sealed class NotificationDispatcher
             if (failures <= RetryDelays.Count)
             {
                 var waiting = state with { FailureCount = failures, NextAttemptUtc = now + RetryDelays[failures - 1] };
-                await ApplyAsync(recipient, now, [], [], waiting, cancellationToken);
+                await ApplyAsync(recipient, now, [], [], [], waiting, cancellationToken);
                 return Outcome.Failed;
             }
 
-            // Give up: the items count as told, so the dead mail is not tried again and again
-            await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
+            // Give up: the items are recorded as given up (not as delivered), so the dead mail is not tried again
+            // and again; the same state is not mailed any more, a later new state of an item still is
+            var gaveUp = diff.Fresh.Select(c => new NotifiedEntry(c.Key, c.State, true)).ToList();
+            await ApplyAsync(recipient, now, gaveUp, diff.Stale, diff.Lowered, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
             _onError?.Invoke(exception);
             return Outcome.Failed;
         }
 
         // The mail is out and its reservation is the log row: record items and state together. When the commit is
         // stale the row stays, because the mail was sent and is counted
-        await ApplyAsync(recipient, now, upserts, diff.Stale, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
+        await ApplyAsync(recipient, now, upserts, diff.Stale, diff.Lowered, ClearedState(state, DigestHandledFor(recipient, now)), cancellationToken);
         return Outcome.Sent;
     }
 
@@ -608,6 +622,7 @@ public sealed class NotificationDispatcher
     /// <param name="now">The time of the pass.</param>
     /// <param name="upserts">The items to record.</param>
     /// <param name="stale">The items to forget.</param>
+    /// <param name="lowered">The items whose stored count of waiting replies follows the current, lower one.</param>
     /// <param name="state">The new state.</param>
     /// <param name="cancellationToken">Cancels the pass.</param>
     /// <returns>A task that completes when the change is stored.</returns>
@@ -616,12 +631,13 @@ public sealed class NotificationDispatcher
         DateTimeOffset now,
         IReadOnlyList<NotifiedEntry> upserts,
         IReadOnlyList<NotifiedKey> stale,
+        IReadOnlyList<NotifiedEntry> lowered,
         NotificationDispatchState state,
         CancellationToken cancellationToken)
     {
         await _store.ApplyAsync(
             recipient.UserId,
-            new NotificationCommit(now, upserts, stale, null, state, recipient.Address, recipient.Generation),
+            new NotificationCommit(now, [.. upserts, .. lowered], stale, null, state, recipient.Address, recipient.Generation),
             cancellationToken);
     }
 
@@ -630,18 +646,31 @@ public sealed class NotificationDispatcher
     /// </summary>
     /// <param name="recipient">The recipient.</param>
     /// <param name="cancellationToken">Cancels the pass.</param>
-    /// <returns>The new and the stale items.</returns>
+    /// <returns>The new, lowered and stale items.</returns>
     private async Task<Diff> ComputeAsync(NotificationRecipient recipient, CancellationToken cancellationToken)
     {
         var candidates = await ReadCandidatesAsync(recipient, cancellationToken);
         var stored = await _store.GetNotifiedAsync(recipient.UserId, cancellationToken);
-        var states = stored.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section, i.Kind), i => i.State);
-        var fresh = candidates
-            .Where(c => NotificationComposer.IsNew(states.GetValueOrDefault(c.Key), c.State))
-            .ToList();
+        var items = stored.ToDictionary(i => new NotifiedKey(i.ProjectId, i.ReviewId, i.Section, i.Kind));
+        var fresh = new List<NotificationCandidate>();
+        var lowered = new List<NotifiedEntry>();
+        foreach (var candidate in candidates)
+        {
+            var item = items.GetValueOrDefault(candidate.Key);
+            if (NotificationComposer.IsNew(item?.State, candidate.State))
+            {
+                fresh.Add(candidate);
+            }
+            else if (item is not null && NotificationComposer.IsLowered(item.State, candidate.State))
+            {
+                // Not new, but the count fell: remember the lower count (as stored otherwise) without a mail
+                lowered.Add(new NotifiedEntry(candidate.Key, candidate.State, item.GaveUp));
+            }
+        }
+
         var present = candidates.Select(c => c.Key).ToHashSet();
-        var stale = states.Keys.Where(key => !present.Contains(key)).ToList();
-        return new Diff(candidates, fresh, stale);
+        var stale = items.Keys.Where(key => !present.Contains(key)).ToList();
+        return new Diff(candidates, fresh, stale, lowered);
     }
 
     /// <summary>

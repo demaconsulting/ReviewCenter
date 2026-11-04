@@ -2178,9 +2178,11 @@ sections:
           - ReviewCenter-NotificationStore-ItemsReviewCascade
           - ReviewCenter-NotificationStore-ItemsRemoveAddress
           - ReviewCenter-NotificationStore-UnavailableNoItemsTable
+          - ReviewCenter-NotificationStore-UnavailableNoGaveUpColumn
           - ReviewCenter-NotificationStore-UnavailableNoModeColumn
           - ReviewCenter-NotificationStore-UnavailableNoGenerationColumn
           - ReviewCenter-DbContext-NotifiedItemsTable
+          - ReviewCenter-DbContext-NotifiedItemsGaveUp
           - ReviewCenter-DbContext-NotifiedItemsUniqueIndex
           - ReviewCenter-DbContext-NotifiedItemsCascade
           - ReviewCenter-DbContext-NotifiedItemsReviewCascade
@@ -2198,6 +2200,8 @@ sections:
         children:
           - ReviewCenter-NotificationStore-ApplyUpsert
           - ReviewCenter-NotificationStore-ApplyUpsert-Update
+          - ReviewCenter-NotificationStore-ApplyUpsert-GaveUp
+          - ReviewCenter-NotificationStore-ApplyUpsert-GaveUpUpdate
           - ReviewCenter-NotificationStore-ApplyRemove
           - ReviewCenter-NotificationStore-ApplyReplaceAll
           - ReviewCenter-NotificationStore-ApplyNoLogRow
@@ -2284,8 +2288,9 @@ sections:
         title: >-
           The Storage subsystem shall refuse to reserve a notification mail that exceeds a sending limit.
         justification: |
-          The limits on mails are counted in the shared database, so they hold across several server instances and
-          across confirmation mails. A mail counts from the moment it is reserved, so a mail that is lost between the
+          The limits on mails are counted in the shared database by the reservation, so concurrent senders inside the
+          one host, such as the dispatcher and a confirmation request, can not pass the same count, and the limits cover
+          the confirmation mails. A mail counts from the moment it is reserved, so a mail that is lost between the
           reservation and the send stays counted, and a release frees the place of a mail that was not sent.
         children:
           - ReviewCenter-NotificationStore-ReserveSendRow

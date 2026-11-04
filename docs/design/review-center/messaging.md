@@ -111,4 +111,5 @@ never starts a background loop. The registration builds the Core `NotificationCo
 `NotificationDispatcher` from the settings and gives the worker the method of the dispatcher that runs one pass. The
 worker runs a pass at once, then at each polling interval (`PollSeconds`) on the clock of the host. A failed pass is
 logged by the type of its exception only, and the loop goes on. A pass that sent or failed nothing is not logged. See
-the `NotificationWorker` unit.
+the `NotificationWorker` unit. Exactly one host may run the worker for a database: the server is a single instance by
+design and the worker is not coordinated between hosts, so two hosts on one database could send the same mail twice.

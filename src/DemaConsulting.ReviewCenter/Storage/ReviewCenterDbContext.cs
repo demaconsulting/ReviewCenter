@@ -469,7 +469,8 @@ internal sealed class ReviewCenterDbContext : DbContext
         });
 
         // Items a user was already told about (the dedupe memory of the notification dispatcher): one row per user,
-        // project, review, inbox section and kind of reason, with the state token the user was told. The kind keeps the
+        // project, review, inbox section and kind of reason, with the state token the user was told (or, when the flag
+        // GaveUp is set, the state the server gave up mailing). The kind keeps the
         // two reasons that one section can show for one review apart (the standing of a reviewer and a question for
         // the user). They go away with the user and with the review: a review that is deleted and created again under
         // the same identifier is new to every user, so nothing of the old one may suppress its first mail
@@ -481,6 +482,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             item.Property(i => i.Kind).IsRequired().HasMaxLength(StateColumnLength);
             item.Property(i => i.State).IsRequired().HasMaxLength(StateColumnLength);
             item.Property(i => i.NotifiedUtc).HasConversion(UtcTextConverter());
+            item.Property(i => i.GaveUp).HasDefaultValue(false);
             item.HasIndex(i => new { i.UserId, i.ProjectId, i.ReviewId, i.Section, i.Kind }).IsUnique();
             item.HasOne<User>().WithMany().HasForeignKey(i => i.UserId).OnDelete(DeleteBehavior.Cascade);
             item.HasOne<Review>()

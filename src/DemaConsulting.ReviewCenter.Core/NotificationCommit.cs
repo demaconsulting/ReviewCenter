@@ -39,7 +39,11 @@ public sealed record NotifiedKey(int ProjectId, string ReviewId, InboxSection Se
 /// </summary>
 /// <param name="Key">The identity of the item.</param>
 /// <param name="State">The state token, for example <c>to-answer</c>.</param>
-public sealed record NotifiedEntry(NotifiedKey Key, string State);
+/// <param name="GaveUp">
+///     <c>true</c> when the server gave up mailing this state, so it was not delivered; <c>false</c> (the default)
+///     when the user was told, or when the item is only recorded without a mail (the baseline).
+/// </param>
+public sealed record NotifiedEntry(NotifiedKey Key, string State, bool GaveUp = false);
 
 /// <summary>
 ///     Everything the dispatcher changes for one user after a pass, applied in one transaction.

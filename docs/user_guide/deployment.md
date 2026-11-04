@@ -780,8 +780,9 @@ message `The database schema does not match this version of ReviewCenter: table 
 code 1. Planned Work in the Introduction lists a migration command as future work.
 
 E-mail notifications are the latest example. They need three new tables, `NotificationPreferences`,
-`NotificationSendLog`, and `NotifiedItems`, and the new columns `Mode`, `BaselinePending`, `BatchStartedUtc`,
-`DigestHandledUtc`, `FailureCount`, and `NextAttemptUtc` in `NotificationPreferences`, which a database of an earlier
+`NotificationSendLog`, and `NotifiedItems` (with its column `GaveUp`), and the new columns `Mode`, `Generation`,
+`BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`, `FailureCount`, and `NextAttemptUtc` in
+`NotificationPreferences`, which a database of an earlier
 version does not have. This includes a database that was created while only the confirmation of an address existed:
 it has the first two tables without the new columns, and must be recreated as well. With `Notifications:Enabled` off,
 such a database keeps working. Before you turn notifications on, the database must be **recreated** (the server
@@ -789,7 +790,9 @@ creates the tables only for a new file, with no migration): for development data
 the Database section of the Administration chapter describes, and create the first administrator again. The server
 then refuses to start with notifications on and without the tables or columns, with a message that says so, and
 `--validate --check-config` reports what is missing. The background work that sends the notification mails runs only
-in the web server, and only when `Notifications:Enabled` is true; the command-line verbs never start it.
+in the web server, and only when `Notifications:Enabled` is true; the command-line verbs never start it. Run exactly
+one host with the notification worker for a database: the server is a single instance by design, and the worker is not
+coordinated between hosts, so two hosts on one database could send the same mail twice.
 
 The supported upgrade procedure is therefore:
 

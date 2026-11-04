@@ -24,18 +24,27 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 
 /// <summary>
 ///     Unit tests for <see cref="NotificationDispatcher"/>: a failed send is retried after 5 minutes, 15 minutes,
-///     1 hour, 4 hours and 12 hours, and given up after the sixth failure.
+///     1 hour, 4 hours and 12 hours, and given up after the sixth failure (the items are recorded as given up, not as
+///     delivered).
 /// </summary>
 public class NotificationDispatcherRetryTests
 {
     /// <summary>
     ///     Makes a world in which ann has a mail due after the window and the sender fails.
     /// </summary>
+    /// <param name="withReply">Whether ann also has one waiting reply from bob.</param>
     /// <returns>The world, with the window running.</returns>
-    private static async Task<NotificationDispatcherWorld> ArrangeAsync()
+    private static async Task<NotificationDispatcherWorld> ArrangeAsync(bool withReply = false)
     {
         var world = await NotificationDispatcherWorld.CreateAsync();
         await world.SeatAsync("r1", "ann");
+        if (withReply)
+        {
+            var thread = await world.Inbox.StartThreadAsync("r1", "ann");
+            await world.Inbox.ReplyAsync("r1", thread.Id, "bob");
+            await world.ChangeAsync();
+        }
+
         world.Enroll("ann", NotificationMode.Every);
         world.Sender.Fail = true;
         await world.PassAsync();
@@ -294,10 +303,10 @@ public class NotificationDispatcherRetryTests
     }
 
     /// <summary>
-    ///     Test that the items are recorded as notified when the dispatcher gives up.
+    ///     Test that the items are recorded as given up, not as delivered, when the dispatcher gives up.
     /// </summary>
     [Fact]
-    public async Task NotificationDispatcher_RunPass_GiveUp_ItemsRecorded()
+    public async Task NotificationDispatcher_RunPass_GiveUp_ItemsRecordedAsGaveUp()
     {
         // Arrange
         var world = await ArrangeAsync();
@@ -307,9 +316,65 @@ public class NotificationDispatcherRetryTests
         // Act
         await world.PassAsync();
 
-        // Assert
+        // Assert: the row is kept with the flag for a given-up item, and no mail was counted
         Assert.Equal(["r1/ToAnswer=to-answer"], world.NotifiedOf("ann"));
+        Assert.True(Assert.Single(world.Store.NotifiedOf(world.IdOf("ann"))).GaveUp);
         Assert.Empty(world.Store.Log);
+    }
+
+    /// <summary>
+    ///     Test that a later new state of an item that was given up is mailed, and that the mail records the item as
+    ///     delivered while the item that is still in the given-up state keeps its flag.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_GiveUp_LaterNewStateMailed()
+    {
+        // Arrange: ann has an item to answer and one waiting reply; both were given up
+        var world = await ArrangeAsync(withReply: true);
+        await FailAsync(world, 5);
+        world.Advance(TimeSpan.FromHours(12));
+        await world.PassAsync();
+        Assert.All(world.Store.NotifiedOf(world.IdOf("ann")), item => Assert.True(item.GaveUp));
+        world.Sender.Fail = false;
+
+        // Act: a second reply arrives, so the count of waiting replies rises
+        var thread = await world.Inbox.StartThreadAsync("r1", "ann", "Another one");
+        await world.Inbox.ReplyAsync("r1", thread.Id, "bob");
+        await world.ChangeAsync();
+        var sent = await world.DeliverEveryAsync();
+
+        // Assert: only the new state is mailed, and only its row is recorded as delivered
+        var message = Assert.Single(sent);
+        Assert.Contains("2 replies are waiting", message.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("your answers are needed", message.TextBody, StringComparison.Ordinal);
+        var items = world.Store.NotifiedOf(world.IdOf("ann"));
+        Assert.False(Assert.Single(items, i => i.Section == InboxSection.RepliesWaiting).GaveUp);
+        Assert.True(Assert.Single(items, i => i.Section == InboxSection.ToAnswer).GaveUp);
+    }
+
+    /// <summary>
+    ///     Test that an item that was given up is not mailed again in the same state, however often the inbox is read.
+    /// </summary>
+    [Fact]
+    public async Task NotificationDispatcher_RunPass_GiveUp_SameStateNotMailedAgain()
+    {
+        // Arrange: the item was given up and the sender works again
+        var world = await ArrangeAsync();
+        await FailAsync(world, 5);
+        world.Advance(TimeSpan.FromHours(12));
+        await world.PassAsync();
+        world.Sender.Fail = false;
+
+        // Act: the audit trail moves, so the inbox is read again, several times
+        for (var i = 0; i < 3; i++)
+        {
+            await world.ChangeAsync();
+            await world.DeliverEveryAsync();
+        }
+
+        // Assert
+        Assert.Empty(world.Sender.Sent);
+        Assert.True(Assert.Single(world.Store.NotifiedOf(world.IdOf("ann"))).GaveUp);
     }
 
     /// <summary>

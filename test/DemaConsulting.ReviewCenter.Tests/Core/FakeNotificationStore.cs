@@ -223,11 +223,12 @@ internal sealed class FakeNotificationStore : INotificationStore
     /// <param name="userId">The user.</param>
     /// <param name="key">The item.</param>
     /// <param name="state">The state token.</param>
-    public void AddNotified(int userId, NotifiedKey key, string state)
+    /// <param name="gaveUp">Whether the row records a state the server gave up mailing.</param>
+    public void AddNotified(int userId, NotifiedKey key, string state, bool gaveUp = false)
     {
         lock (_lock)
         {
-            ReplaceItem(userId, key, state, DateTimeOffset.UnixEpoch);
+            ReplaceItem(userId, key, state, DateTimeOffset.UnixEpoch, gaveUp);
         }
     }
 
@@ -515,7 +516,7 @@ internal sealed class FakeNotificationStore : INotificationStore
                 _notified[userId] = [];
                 foreach (var entry in all)
                 {
-                    ReplaceItem(userId, entry.Key, entry.State, commit.NowUtc);
+                    ReplaceItem(userId, entry.Key, entry.State, commit.NowUtc, entry.GaveUp);
                 }
             }
             else
@@ -527,7 +528,7 @@ internal sealed class FakeNotificationStore : INotificationStore
 
                 foreach (var entry in commit.Upserts)
                 {
-                    ReplaceItem(userId, entry.Key, entry.State, commit.NowUtc);
+                    ReplaceItem(userId, entry.Key, entry.State, commit.NowUtc, entry.GaveUp);
                 }
             }
 
@@ -696,7 +697,8 @@ internal sealed class FakeNotificationStore : INotificationStore
     /// <param name="key">The key.</param>
     /// <param name="state">The state token.</param>
     /// <param name="notifiedUtc">The time to store.</param>
-    private void ReplaceItem(int userId, NotifiedKey key, string state, DateTimeOffset notifiedUtc)
+    /// <param name="gaveUp">Whether the row records a state the server gave up mailing.</param>
+    private void ReplaceItem(int userId, NotifiedKey key, string state, DateTimeOffset notifiedUtc, bool gaveUp = false)
     {
         if (!_notified.TryGetValue(userId, out var items))
         {
@@ -714,6 +716,7 @@ internal sealed class FakeNotificationStore : INotificationStore
             Section = key.Section,
             Kind = key.Kind,
             State = state,
+            GaveUp = gaveUp,
             NotifiedUtc = notifiedUtc
         });
     }

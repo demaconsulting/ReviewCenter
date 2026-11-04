@@ -20,7 +20,8 @@ gate and transaction but writes no audit entry.
 
 The tables are `NotificationPreferences` (one row per user, keyed by the user, with the mode and the dispatcher state),
 `NotifiedItems` (one row per user, project, review, inbox section, and kind that the user was told about, with the
-state token and the time as a fixed width UTC text), and `NotificationSendLog` (one row per mail that was sent or is
+state token, the flag `GaveUp` that marks a state the server gave up mailing, and the time as a fixed width UTC text),
+and `NotificationSendLog` (one row per mail that was sent or is
 on its way, with the
 user, the recipient address, the kind, and the time as a fixed width UTC text, and with indexes on the user and time,
 on the address and time, and on the time alone). All are deleted with the user, and `NotifiedItems` also with the
@@ -42,7 +43,7 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 - *Returns*: True when they can; false when the database was created before they existed and has to be recreated, so
   the server can switch the feature off (or refuse to start) instead of failing on each request. The check reads the
   mode and dispatcher columns of `NotificationPreferences` (including the generation), the send log, and
-  `NotifiedItems` (including its kind), so a database of
+  `NotifiedItems` (including its kind and its `GaveUp` flag), so a database of
   an earlier version of the feature, which lacks the new table and columns, is reported as old. Only the failure of a missing
   table or column (SQLite error 1, "no such table" or "no such column") gives false; every other database failure, such
   as a locked, read-only, or corrupt file, propagates, so a real fault is never mistaken for an old database.
@@ -124,14 +125,15 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 **ApplyAsync**: Records the result of a dispatcher pass for one user.
 
 - *Parameters*: The identity of the user, a `NotificationCommit` (the time, the address and the generation that the mail
-  was prepared for, the items to insert or update, the keys to forget, an optional replace-all set, and the new
+  was prepared for, the items to insert or update with their `GaveUp` flag, the keys to forget, an optional replace-all
+  set, and the new
   dispatcher state), and a cancellation token.
 - *Returns*: True when applied; false, with nothing recorded, when the row is gone, its mode is `None` again, its
   confirmed address is not the address of the commit, or its generation is not the generation of the commit, which can
   happen when the user changed the mode or the address while the pass ran.
 - *Postconditions*: In one transaction the unit first runs a conditional update on the preference row that requires
   the mode not to be `None` and the address and the generation to be those of the commit; when it changes no row,
-  nothing is written. Then it deletes the forgotten items, updates the state of known items and
+  nothing is written. Then it deletes the forgotten items, updates the state and the `GaveUp` flag of known items and
   inserts new ones (one row per user, project, review, section, and kind), or replaces the whole set for a baseline;
   stores the dispatcher state; and deletes the log rows that are older than one day. The commit writes no send log
   row, because the row of a mail is reserved by `ReserveSendAsync` before the send.

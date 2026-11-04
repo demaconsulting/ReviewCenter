@@ -512,6 +512,25 @@ sections:
         tests:
           - NotificationStore_Apply_Upserts_UpdatesExistingItem
 
+      - id: ReviewCenter-NotificationStore-ApplyUpsert-GaveUp
+        title: >-
+          The NotificationStore class shall store the give-up flag of a notified item when a commit is applied.
+        justification: |
+          An item on which the server gave up is not delivered, and the flag keeps that apart from an item that was
+          mailed, so that a later change of the item is still news.
+        tests:
+          - NotificationStore_Apply_GaveUpFlag_RoundTrips
+
+      - id: ReviewCenter-NotificationStore-ApplyUpsert-GaveUpUpdate
+        title: >-
+          The NotificationStore class shall set the give-up flag of an existing notified item to the value of the
+          commit.
+        justification: |
+          The mail of a new state of an item on which the server gave up clears the flag, and the lowering of the
+          stored count keeps it.
+        tests:
+          - NotificationStore_Apply_GaveUpRowUpserted_FlagFollowsCommit
+
       - id: ReviewCenter-NotificationStore-ApplyRemove
         title: >-
           The NotificationStore class shall delete the notified items that the keys of a commit name.
@@ -803,6 +822,16 @@ sections:
           failing in a pass.
         tests:
           - NotificationStore_IsAvailable_NoNotifiedItems_False
+
+      - id: ReviewCenter-NotificationStore-UnavailableNoGaveUpColumn
+        title: >-
+          The NotificationStore class shall report itself as not available when the give-up column of the notified
+          items is missing.
+        justification: |
+          A database from before the give-up flag existed has to be recreated, and the server must say so at the start
+          instead of failing in a pass.
+        tests:
+          - NotificationStore_IsAvailable_NoGaveUpColumn_False
 
       - id: ReviewCenter-NotificationStore-UnavailableNoGenerationColumn
         title: >-

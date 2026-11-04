@@ -642,6 +642,77 @@ public class NotificationStoreModeTests
     }
 
     /// <summary>
+    ///     Test that the flag of a state the server gave up mailing is stored and read back, and that a new item is
+    ///     not flagged unless the commit says so.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_GaveUpFlag_RoundTrips()
+    {
+        // Arrange
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+
+        // Act
+        await ApplyCurrentAsync(
+            db,
+            userId,
+            Commit(
+                upserts:
+                [
+                    Entry(1, "r1", InboxSection.ToAnswer, "to-answer", gaveUp: true),
+                    Entry(1, "r2", InboxSection.ToAnswer, "to-answer")
+                ]));
+
+        // Assert
+        var items = await db.Notifications.GetNotifiedAsync(userId, Token);
+        Assert.True(Assert.Single(items, i => i.ReviewId == "r1").GaveUp);
+        Assert.False(Assert.Single(items, i => i.ReviewId == "r2").GaveUp);
+    }
+
+    /// <summary>
+    ///     Test that an upsert of an existing row that was given up clears the flag when the commit does not carry it,
+    ///     and sets it when the commit does.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_Apply_GaveUpRowUpserted_FlagFollowsCommit()
+    {
+        // Arrange: one item that was given up
+        using var db = new TestStore();
+        var userId = await ConfirmedUserAsync(db, "ann", "ann@example.com");
+        await db.Notifications.SetModeAsync(userId, NotificationMode.Every, _now, Draft(), Token);
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer", gaveUp: true)]));
+
+        // Act and Assert: a mail of a new state clears the flag
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer:2")]));
+        Assert.False(Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token)).GaveUp);
+
+        // Act and Assert: a later give-up sets it again
+        await ApplyCurrentAsync(
+            db, userId, Commit(upserts: [Entry(1, "r1", InboxSection.ToAnswer, "to-answer:3", gaveUp: true)]));
+        Assert.True(Assert.Single(await db.Notifications.GetNotifiedAsync(userId, Token)).GaveUp);
+    }
+
+    /// <summary>
+    ///     Test that a database without the flag column is reported as not available.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_IsAvailable_NoGaveUpColumn_False()
+    {
+        // Arrange: a database from before the flag existed
+        using var db = new TestStore();
+        Execute(db, "ALTER TABLE NotifiedItems DROP COLUMN GaveUp");
+
+        // Act
+        var available = await db.Notifications.IsAvailableAsync(Token);
+
+        // Assert
+        Assert.False(available);
+    }
+
+    /// <summary>
     ///     Test that the named keys are deleted and the others stay.
     /// </summary>
     [Fact]
@@ -1137,7 +1208,11 @@ public class NotificationStoreModeTests
         Execute(
             db,
             string.Format(System.Globalization.CultureInfo.InvariantCulture, insert, userId).Replace("'to-answer'", "'question'", StringComparison.Ordinal));
-        Assert.Equal(3, (await db.Notifications.GetNotifiedAsync(userId, Token)).Count);
+        var items = await db.Notifications.GetNotifiedAsync(userId, Token);
+        Assert.Equal(3, items.Count);
+
+        // A row inserted without the flag is not given up
+        Assert.All(items, item => Assert.False(item.GaveUp));
     }
 
     /// <summary>
@@ -1408,15 +1483,17 @@ public class NotificationStoreModeTests
     /// <param name="section">The section.</param>
     /// <param name="state">The state token.</param>
     /// <param name="kind">The kind of the item.</param>
+    /// <param name="gaveUp">Whether the entry records a state the server gave up mailing.</param>
     /// <returns>The entry.</returns>
     private static NotifiedEntry Entry(
         int projectId,
         string reviewId,
         InboxSection section,
         string state,
-        string kind = "to-answer")
+        string kind = "to-answer",
+        bool gaveUp = false)
     {
-        return new NotifiedEntry(Key(projectId, reviewId, section, kind), state);
+        return new NotifiedEntry(Key(projectId, reviewId, section, kind), state, gaveUp);
     }
 
     /// <summary>

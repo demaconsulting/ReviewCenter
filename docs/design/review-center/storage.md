@@ -312,7 +312,8 @@ state of the dispatcher (a baseline flag, the start of the current batch, the la
 sends, and the time of the next attempt); the `NotificationSendLog` table
 holds one row per mail that was sent or is on its way (a confirmation, an update, or a digest), which the limits
 count; the
-`NotifiedItems` table holds one row per user, project, review, section, and kind that has already been mailed, with a
+`NotifiedItems` table holds one row per user, project, review, section, and kind that has already been mailed (or whose
+mail the server gave up, which the flag `GaveUp` tells), with a
 unique key on those five columns (the kind keeps a "Question for you" item apart from the standing item to answer of the
 same section). The preference rows hold a generation that rises with every change of the mode or of the confirmed
 address. The tables are deleted with the user, and the notified items also with the review. They are separate
@@ -320,8 +321,10 @@ tables, not columns of `Users`, for the same reason as the second factor. `Notif
 one serialized transaction that counts the log, decides, and then stores the log entry, the pending state, and the audit
 entry; an attempt is counted and an address is confirmed only by a conditional update. A notification mail is reserved
 in the same way, by a serialized transaction that counts the log, decides with the shared `SendLimits` rule, and
-stores the log row before the mail is sent, so the limits hold across several server instances that share the
-database and across the confirmation mails; a mail that was not sent is released by deleting its row. Setting the mode
+stores the log row before the mail is sent, so concurrent senders inside the one host (the dispatcher and the
+confirmation requests) can not pass the same count, and the limits cover the confirmation mails; the host is a single
+instance, and one host runs the notification worker for a database. A mail that was not sent is released by deleting
+its row. Setting the mode
 stores the mode, the baseline flag, and the audit entry together; changing between `Every` and `Daily` keeps the
 notified items and the baseline flag, and `None` clears the items and the flag. Applying a mail stores the items and
 the state in one transaction, so a failure leaves

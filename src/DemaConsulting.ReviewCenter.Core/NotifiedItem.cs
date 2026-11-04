@@ -25,7 +25,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     The row is the dedupe memory of the notification dispatcher: an item (user, project, review, inbox
-///     section and kind of reason) is mailed only when it has no row or when its state differs from <see cref="State"/>. The state
+///     section and kind of reason) is mailed only when it has no row or when its state is new compared with
+///     <see cref="State"/> (see <see cref="NotificationComposer.IsNew"/>). The state
 ///     is a short token such as <c>to-answer</c> or <c>replies:3</c>; it never holds an outcome word, a comment
 ///     or any other content. The type is not thread-safe.
 /// </remarks>
@@ -71,4 +72,11 @@ public sealed class NotifiedItem
     ///     Gets the moment the user was told, or the moment the item was recorded without a mail (UTC).
     /// </summary>
     public DateTimeOffset NotifiedUtc { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the server gave up mailing <see cref="State"/> (the sending failed until the
+    ///     retries were used up), so the user was not told. A row like that only keeps the server from mailing the same
+    ///     state again; a later new state of the item is mailed as usual and records the row with <c>false</c>.
+    /// </summary>
+    public bool GaveUp { get; init; }
 }

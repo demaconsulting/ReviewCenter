@@ -62,6 +62,11 @@ by `NotificationComposer_Classify_FailedChecks_ReturnsNull` and
 new, and waiting replies are new when their number rises and not new when it falls or stays. This scenario is tested by
 `NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules`.
 
+**What is lowered**: Waiting replies are lowered only when both states are counts of waiting replies and the current
+number is smaller than the stored one; nothing stored, the same number, a higher number, another kind of state, and a
+state that is not a count are not lowered. This scenario is tested by
+`NotificationComposer_IsLowered_StoredAndCurrentState_OnlyFallingReplies`.
+
 **Kind of an item**: The kind of a state is the part before the first colon, so a state with a count of waiting replies
 has the kind without the count, and a state without a colon is its own kind. A question and a standing item to answer
 of one review have different keys. These scenarios are tested by `NotificationComposer_KindOf_StateWithCount_WithoutCount`,

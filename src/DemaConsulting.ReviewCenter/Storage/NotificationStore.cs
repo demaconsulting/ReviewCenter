@@ -81,7 +81,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
                 .Take(1)
                 .ToListAsync(cancellationToken);
             _ = await context.NotificationSendLog.AsNoTracking().AnyAsync(cancellationToken);
-            _ = await context.NotifiedItems.AsNoTracking().Select(i => new { i.Id, i.Kind }).Take(1).ToListAsync(cancellationToken);
+            _ = await context.NotifiedItems.AsNoTracking().Select(i => new { i.Id, i.Kind, i.GaveUp }).Take(1).ToListAsync(cancellationToken);
             return true;
         }
         catch (SqliteException ex) when (IsMissingTable(ex))
@@ -573,12 +573,14 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             if (byKey.TryGetValue(entry.Key, out var id) && !removeIds.Contains(id))
             {
                 var state = entry.State;
+                var gaveUp = entry.GaveUp;
                 var notified = commit.NowUtc;
                 _ = await context.NotifiedItems
                     .Where(i => i.Id == id)
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(i => i.State, state)
+                            .SetProperty(i => i.GaveUp, gaveUp)
                             .SetProperty(i => i.NotifiedUtc, notified),
                         cancellationToken);
             }
@@ -606,6 +608,7 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             Section = entry.Key.Section,
             Kind = entry.Key.Kind,
             State = entry.State,
+            GaveUp = entry.GaveUp,
             NotifiedUtc = nowUtc
         };
     }

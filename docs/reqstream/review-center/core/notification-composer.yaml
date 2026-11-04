@@ -197,6 +197,15 @@ sections:
         tests:
           - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
 
+      - id: ReviewCenter-NotificationComposer-LoweredWhenRepliesFall
+        title: >-
+          The NotificationComposer class shall treat waiting replies as lowered when their number is smaller than the
+          number that is stored for the user.
+        justification: |
+          The dispatcher stores the lower number, so that a later rise is measured from the number that waits now.
+        tests:
+          - NotificationComposer_IsLowered_StoredAndCurrentState_OnlyFallingReplies
+
       - id: ReviewCenter-NotificationComposer-KindInKey
         title: >-
           The NotificationComposer class shall give a question and a standing item to answer of one review different

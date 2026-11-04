@@ -148,7 +148,9 @@ repository registry is the one exception, see `Repositories`).
   identifier; `Section` is stored as text, at most the width of a state column; `Kind` is the required kind of the
   item (the state token before its first colon), at most the width of a state column, which keeps a "Question for you"
   item apart from the standing item to answer of the same section; `State` is the required state token of the item, at
-  most the width of a state column; `NotifiedUtc` is fixed-width UTC text. A unique index on `UserId`, `ProjectId`,
+  most the width of a state column; `NotifiedUtc` is fixed-width UTC text; `GaveUp` is a boolean (default false) that
+  tells that the server gave up mailing `State`, so the user was not told: the row then only keeps the same state from
+  being mailed again, and a mail of a later state records the row with false. A unique index on `UserId`, `ProjectId`,
   `ReviewId`, `Section`, and `Kind` makes a second row for one item impossible, so the database is the last defense of
   the question "is this news?". The rows hold no text of a review, only identifiers and tokens.
 - **NotificationSendLog** (`NotificationSendLogEntry`): key `Id`, assigned by the database. `UserId` is a foreign key to
@@ -276,7 +278,8 @@ the `NotificationPreferences` and `NotificationSendLog` tables (e-mail notificat
 before them must be deleted and created again, and until then the `NotificationStore` reports itself as not available.
 The same holds for the `NotifiedItems` table and the `Mode`, `BaselinePending`, `BatchStartedUtc`, `DigestHandledUtc`,
 `FailureCount`, `NextAttemptUtc`, and `Generation` columns of `NotificationPreferences` (the notification mode and its
-dispatcher), and for the `Kind` column, the unique index, and the relationship to `Reviews` of `NotifiedItems`:
+dispatcher), and for the `Kind` and `GaveUp` columns, the unique index, and the relationship to `Reviews` of
+`NotifiedItems`:
 a database of an earlier version of the notifications lacks them, must be deleted and created again, and is reported as
 not available in the meantime.
 The checklist keys

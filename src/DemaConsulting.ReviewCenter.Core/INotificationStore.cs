@@ -315,8 +315,9 @@ public interface INotificationStore
 
     /// <summary>
     ///     Applies the sending limits and, when the mail may be sent, counts the mail by writing its send-log row, all
-    ///     in one serialized transaction, so that senders that race (another server instance, a confirmation mail)
-    ///     can not both slip under a limit. Send-log rows older than one day are deleted in the same transaction.
+    ///     in one serialized transaction, so that senders inside the one host that race (the dispatcher, a
+    ///     confirmation mail) can not both slip under a limit. Send-log rows older than one day are deleted in the same
+    ///     transaction.
     /// </summary>
     /// <param name="userId">The user the mail is for.</param>
     /// <param name="kind">The kind of the mail, for example <see cref="NotificationSendLogEntry.KindUpdate"/>.</param>

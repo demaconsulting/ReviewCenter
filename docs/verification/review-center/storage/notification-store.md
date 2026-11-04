@@ -169,13 +169,17 @@ sortable UTC text form and read back unchanged. These scenarios are tested by
 **Commit of a mail**: A commit inserts new items, updates existing ones, removes named keys, can replace all items,
 writes no log row, and is atomic (a failing item write rolls back the state); a commit for a user whose
 mode is `None` returns false and writes nothing; a commit for a user without a row returns false; the same key keeps
-one row, also by the unique key of the database itself; old log rows are pruned. These scenarios are tested by
+one row, also by the unique key of the database itself; old log rows are pruned. The give-up flag of an item is stored
+and read back, and an upsert of an existing row sets or clears the flag as the commit says. These scenarios are tested
+by
 `NotificationStore_Apply_Upserts_InsertsNewItem`, `NotificationStore_Apply_Upserts_UpdatesExistingItem`,
+`NotificationStore_Apply_GaveUpFlag_RoundTrips`, `NotificationStore_Apply_GaveUpRowUpserted_FlagFollowsCommit`,
 `NotificationStore_Apply_RemoveKeys_Deleted`, `NotificationStore_Apply_ReplaceAll_ReplacesSet`,
 `NotificationStore_Apply_Commit_WritesNoLogRow`, `NotificationStore_Apply_Failure_NothingPersisted`,
 `NotificationStore_Apply_ModeNone_ReturnsFalse`, `NotificationStore_Apply_ModeNone_WritesNothing`,
 `NotificationStore_Apply_NoRow_ReturnsFalse`, `NotificationStore_Apply_SameKeyTwice_OneRow`,
-`NotificationStore_Create_Database_NotifiedItemsKeyUnique`, and `NotificationStore_Apply_OldLogRows_Pruned`.
+`NotificationStore_Create_Database_NotifiedItemsKeyUnique` (which also checks that a row inserted without the flag is
+not given up), and `NotificationStore_Apply_OldLogRows_Pruned`.
 
 **Reservation of the send of a mail**: The tests are in `NotificationStoreSendTests.cs`, over the same real database.
 A reservation under the limits is reserved, returns the identity of a new log row of the given kind, address, and
@@ -221,7 +225,9 @@ These scenarios are tested by `NotificationStore_Apply_SameSectionOtherKind_TwoR
 `NotificationStore_Apply_RemoveOneKind_KeepsOtherKind`, `NotificationStore_Delete_Review_CascadesNotifiedItems`, and
 `NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems`.
 
-**Availability of the new parts**: A database without the table of notified items, without the mode column, or without
-the generation column is reported as not available (a database of an earlier version of the notifications). These
+**Availability of the new parts**: A database without the table of notified items, without the mode column, without
+the generation column, or without the give-up column of the notified items is reported as not available (a database of
+an earlier version of the notifications). These
 scenarios are tested by `NotificationStore_IsAvailable_NoNotifiedItems_False`,
-`NotificationStore_IsAvailable_NoModeColumn_False`, and `NotificationStore_IsAvailable_NoGenerationColumn_False`.
+`NotificationStore_IsAvailable_NoModeColumn_False`, `NotificationStore_IsAvailable_NoGenerationColumn_False`, and
+`NotificationStore_IsAvailable_NoGaveUpColumn_False`.

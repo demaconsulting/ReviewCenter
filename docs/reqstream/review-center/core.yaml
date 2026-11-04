@@ -1347,6 +1347,7 @@ sections:
           - ReviewCenter-NotificationComposer-NotNewWhenStateSame
           - ReviewCenter-NotificationComposer-NewWhenRepliesRise
           - ReviewCenter-NotificationComposer-NotNewWhenRepliesFall
+          - ReviewCenter-NotificationComposer-LoweredWhenRepliesFall
         tests:
           - NotificationComposer_IsNew_StoredAndCurrentState_FollowsRules
 
@@ -1665,6 +1666,7 @@ sections:
           - ReviewCenter-NotificationDispatcher-DailyConfiguredZone
           - ReviewCenter-NotificationDispatcher-DailyDst
           - ReviewCenter-NotificationDispatcher-DailyOutstandingCounted
+          - ReviewCenter-NotificationDispatcher-DailyOutstandingCounted-GaveUp
           - ReviewCenter-NotificationDispatcher-DailySwitchFromEvery
           - ReviewCenter-NotificationDispatcher-DailyFirstAfterEnable
         tests:
@@ -1684,6 +1686,12 @@ sections:
           - ReviewCenter-NotificationDispatcher-DedupeToAnswerDraft
           - ReviewCenter-NotificationDispatcher-DedupeRepliesRise
           - ReviewCenter-NotificationDispatcher-DedupeRepliesFall
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-Stored
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ThenRise
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-ToZero
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-NoRewrite
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-KeepsGaveUp
+          - ReviewCenter-NotificationDispatcher-DedupeRepliesFall-WithMail
           - ReviewCenter-NotificationDispatcher-DedupeReappear
           - ReviewCenter-NotificationDispatcher-DedupePruneStale
           - ReviewCenter-NotificationDispatcher-DedupeConcludedThenReopened
@@ -1764,6 +1772,9 @@ sections:
         children:
           - ReviewCenter-NotificationDispatcher-RetryGiveUp
           - ReviewCenter-NotificationDispatcher-RetryGiveUpRecordsItems
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpSameStateNotMailed
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateMailed
+          - ReviewCenter-NotificationDispatcher-RetryGiveUpNewStateDelivered
         tests:
           - NotificationDispatcher_RunPass_Failure6_GivesUp
 
@@ -1788,8 +1799,9 @@ sections:
           The Core subsystem shall reserve a notification mail under the limits on the number of mails before it sends
           the mail.
         justification: |
-          The limits are counted in the shared database, so a reservation that exists during the send keeps parallel
-          senders, such as several server instances, from passing the same count. A mail that was sent stays counted,
+          The limits are counted in the shared database, so a reservation that exists during the send keeps concurrent
+          senders inside the one host, such as the dispatcher and a confirmation request, from passing the same count.
+          A mail that was sent stays counted,
           and a mail that was not sent is released.
         children:
           - ReviewCenter-NotificationDispatcher-CapReserveBeforeSend
