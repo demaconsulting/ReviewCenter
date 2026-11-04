@@ -5,7 +5,8 @@
 `ReviewPlanner` is verified with two groups of tests. The unit tests in `ReviewPlannerTests.cs` use the real
 `ReviewPlanner`, `ReviewService`, `RepositoryService`, and `SigningService` over in-memory fakes of the review store, the
 repository store, the git provider, and the review-set parser, and over the project-access double
-`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), so every branch of the baseline
+`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit; only the tests that show that an actor
+without access is refused before git is reached use the real `ProjectAccess`), so every branch of the baseline
 choice and of the
 classification is reached with exact commits and files, and the number of sessions that git opened can be counted. The
 integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser` over real git
@@ -27,6 +28,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - A missing, oversized, or refused configuration file, an unknown revision, and an unknown project or repository stop the
   plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
   unusable set is only a `CannotPlan` row.
+- An actor who cannot see the project, or may only read it, is refused a plan or a batch before git is reached, and a
+  missing actor is refused.
 - With no baseline every selected file is reviewed; with an explicit baseline every set uses it; with the last reviewed
   mode a set uses the head of the review that was approved last (a signed review that concluded as Rejected is not
   approved) when it is an ancestor of the new head and the selection is
@@ -124,6 +127,13 @@ scenario is tested by `ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInv
 repository, and a disabled repository stop the plan with their own rules. This scenario is tested by
 `ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules`.
 
+**ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit**: With a planner over the real project access, a user
+outside the project is refused with `ProjectNotFound`, an auditor of the project is refused with `ActorNotAllowed`, and
+git is never opened. This scenario is tested by `ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit`.
+
+**ReviewPlanner_PlanAsync_NullActor_Throws**: Planning without an actor is refused with `ArgumentNullException`. This
+scenario is tested by `ReviewPlanner_PlanAsync_NullActor_Throws`.
+
 **ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading**: A baseline mode value that no
 member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-reviewed
 mode. This scenario is tested by `ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading`.
@@ -166,12 +176,17 @@ list was read makes the store report a duplicate, and the planner retries with t
 by `ReviewPlanner_CreateAsync_IdTakenDuringCreate_RetriesWithNextSuffix`.
 
 **ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest**: A baseline that is not a commit, an invalid selection,
-and a set identifier over the limit fail one by one with a plain message, and nothing is stored. This scenario is
-tested by `ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest`.
+and a set identifier over the limit fail one by one, each with a plain message that names its own problem, and nothing
+is stored. This scenario is tested by `ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest`.
 
 **ReviewPlanner_CreateAsync_BadBatch_Throws**: A head that is not a commit, too many requests, a null list, a null actor,
 and an unknown project are refused for the whole batch, and git is never opened. This scenario is tested by
 `ReviewPlanner_CreateAsync_BadBatch_Throws`.
+
+**ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit**: With a planner over the real project access, a
+batch from a user outside the project is refused with `ProjectNotFound`, a batch from an auditor of the project is
+refused with `ActorNotAllowed`, and no review is created and git is never opened. This scenario is tested by
+`ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit`.
 
 **ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits**: A review made from the longest repository name, set
 identifier, and title is created, and its audit detail and title fit their limits. This scenario is tested by
@@ -182,6 +197,11 @@ date, the first row asking for a date of its own. The first review has its own d
 named in the audit detail. In a second batch, a default date in the past fails only the row that takes it (the reason
 names the due date, nothing is stored for it), and the row with a valid date of its own is created. This scenario is
 tested by `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
+
+**ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A project has a checklist of its own (the version
+`plan-1` with one check). A review is filed for a review-set from a plan; the review that the planner creates carries the
+checklist of the project, with its version and its definition text. This scenario is tested by
+`ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`.
 
 **ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId**: Unsafe characters, runs, leading and trailing punctuation, empty
 results, and taken identifiers give the expected safe and unique identifiers. This scenario is tested by

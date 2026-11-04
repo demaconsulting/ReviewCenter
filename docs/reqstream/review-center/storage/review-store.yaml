@@ -1478,6 +1478,16 @@ sections:
           - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ReviewStore-DueDate-AuditAtomic
+        title: >-
+          The ReviewStore class shall leave the due date of a review as it was when the audit entry of the change
+          cannot be stored.
+        justification: |
+          A date that is stored without its entry would leave the history of the due date untrue, so the change and
+          its entry are stored together or not at all.
+        tests:
+          - ReviewStore_UpdateDueDateAsync_AuditInsertFails_LeavesTheDueDateUnchanged
+
       - id: ReviewCenter-ReviewStore-DueDate-ChainIntact
         title: >-
           The ReviewStore class shall leave the hash chain of the audit trail intact after a change of a due date.
@@ -1615,6 +1625,16 @@ sections:
         tests:
           - ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord
           - ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation
+
+      - id: ReviewCenter-ReviewStore-ReviewConclusionText-AuditAtomic
+        title: >-
+          The ReviewStore class shall leave the conclusion text of a review as it was when the audit entry of the
+          change cannot be stored.
+        justification: |
+          A text that is stored without its entry would leave the history untrue, so the change and its entry are
+          stored together or not at all.
+        tests:
+          - ReviewStore_UpdateReviewConclusionTextAsync_AuditInsertFails_LeavesTheTextUnchanged
 
       - id: ReviewCenter-ReviewStore-ReviewConclusionText-ChainIntact
         title: >-
@@ -2806,6 +2826,7 @@ sections:
           atomic rollback of the storage layer, so it is verified against a real database.
         tests:
           - ReviewStore_AddReviewAsync_FailedChange_LeavesNoAuditEntry
+          - ReviewStore_AddReviewAsync_AuditInsertFails_StoresNoReview
           - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
           - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
           - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen

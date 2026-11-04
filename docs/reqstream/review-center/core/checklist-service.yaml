@@ -2,412 +2,1486 @@
 # Software Unit Requirements for the ChecklistService Class
 #
 # The ChecklistService class provides the review checklist: the default checklist, the frozen copy each review
-# keeps, section applicability, the answers to the checks, and the progress derived from them.
+# keeps, the validation of a checklist definition, section applicability, the answers to the checks and the progress
+# derived from them, the ballots of the reviewer slots, the signature impact of a change, and the review conclusion
+# text.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ChecklistService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Default checklist
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Default
         title: >-
-          The ChecklistService class shall provide a built-in default checklist of 14 sections and 58 checks, with
-          the section and check identifiers, titles, and wording of the Continuous Compliance review template, each
-          check identifier unique and starting with the identifier of its section, and a version that names the
-          wording, which is the checklist of every project that has not been given a checklist of its own and
-          which passes the validation of a project checklist.
+          The ChecklistService class shall provide a built-in default checklist of 14 sections with the section
+          identifiers of the review template in template order.
         justification: |
-          Reviewers follow the same checks in every review, and a check keeps one stable identifier. A version
-          names which wording a review was done against, so that the wording can be improved later without
-          changing what earlier reviews recorded. The default is the starting point and the fallback of every
-          project, so it must itself satisfy the rules that a project checklist has to satisfy.
+          Reviewers follow the same checks in every review, and a check keeps one stable identifier. A project that has
+          no checklist of its own needs a reviewed standard to start from.
         tests:
           - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+
+      - id: ReviewCenter-ChecklistService-Default-Checks
+        title: >-
+          The ChecklistService class shall provide in the default checklist 58 checks, with the check count of every
+          section of the template.
+        justification: |
+          A reviewer answers the same checks in every review, so the number of checks of each section must not drift.
+        tests:
+          - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+
+      - id: ReviewCenter-ChecklistService-Default-Version
+        title: >-
+          The ChecklistService class shall give the default checklist a version label.
+        justification: |
+          The version names the wording that a review was answered against.
+        tests:
+          - ChecklistService_DefaultChecklist_HasAVersionLabel
+
+      - id: ReviewCenter-ChecklistService-Default-FirstLast
+        title: >-
+          The ChecklistService class shall make the first check of the default checklist REQ-01 and the last check
+          CODEDOC-04.
+        justification: |
+          The first and the last check mark the ends of the template, so a dropped or added section shows at once.
+        tests:
+          - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+
+      - id: ReviewCenter-ChecklistService-Default-Identifiers
+        title: >-
+          The ChecklistService class shall give every check of the default checklist an identifier that is unique and
+          consists of the identifier of its section, a hyphen, and a two-digit number.
+        justification: |
+          Answers are stored by check identifier, so an ambiguous identifier would mix up two checks.
+        tests:
           - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
-          - ChecklistService_DefaultChecklist_RoundTripsThroughJson
-          - ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException
+
+      - id: ReviewCenter-ChecklistService-Default-Wording
+        title: >-
+          The ChecklistService class shall give every check of the default checklist wording.
+        justification: |
+          A check without wording could not be answered.
+        tests:
+          - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
+
+      - id: ReviewCenter-ChecklistService-Default-Valid
+        title: >-
+          The ChecklistService class shall make the default checklist pass the validation that applies to the checklist
+          of a project.
+        justification: |
+          A project must be able to start from the default and change only what it needs, without first repairing it.
+        tests:
           - ChecklistValidator_Validate_DefaultChecklist_IsValid
 
+      - id: ReviewCenter-ChecklistService-Default-Json
+        title: >-
+          The ChecklistService class shall write the default checklist as JSON and read it back to a checklist with
+          the same version, sections, and checks.
+        justification: |
+          The frozen copy of a review is stored as JSON and must read back unchanged.
+        tests:
+          - ChecklistService_DefaultChecklist_RoundTripsThroughJson
+
+      - id: ReviewCenter-ChecklistService-Default-Incomplete
+        title: >-
+          The ChecklistService class shall refuse to read a JSON checklist definition that lacks a required member
+          with a JSON exception.
+        justification: |
+          A stored copy with a missing part must be reported, not completed silently, so that no reader meets a
+          missing part.
+        tests:
+          - ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Frozen copy of a review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Freeze
         title: >-
-          The ChecklistService class shall read the checklist of a review from the copy that the review received
-          when it was created, taken from the checklist of the project at that time or from the default checklist
-          when the project has none, so that a later change to the default checklist or to the checklist of the
-          project does not change an existing review, and shall report that a review without such a copy has no
-          checklist.
+          The ChecklistService class shall read the checklist of a review from the copy that was stored with the
+          review, so that a later change of the default checklist does not change an existing review.
         justification: |
-          A review is a record. Changing the questions after the answers were given would change the meaning of
-          the answers, so each review keeps the checklist it was started with.
+          A review is a record. Changing the questions after the answers were given would change the meaning of the
+          answers, so each review keeps the checklist it was started with.
         tests:
-          - ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot
           - ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot
-          - ChecklistService_Get_UnknownReview_ReturnsNull
-          - ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected
 
+      - id: ReviewCenter-ChecklistService-Freeze-NoChecklist
+        title: >-
+          The ChecklistService class shall return no checklist for a review that holds no checklist copy.
+        justification: |
+          A review without a copy has nothing to answer, and the caller must be able to tell.
+        tests:
+          - ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull
+
+      - id: ReviewCenter-ChecklistService-Freeze-UnknownReview
+        title: >-
+          The ChecklistService class shall return no checklist for a review that does not exist.
+        justification: |
+          A missing review has no checklist, and reading it is not an error of the caller.
+        tests:
+          - ChecklistService_Get_UnknownReview_ReturnsNull
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Validation of a checklist definition
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Validation
         title: >-
-          The ChecklistValidator class shall accept a checklist definition only when it is valid JSON of at most
-          256 KiB with a version of 1 to 64 characters, 1 to 50 sections and 1 to 500 checks in all, no empty
-          section, identifiers of 1 to 32 letters, digits, dots, underscores, and hyphens that start with a letter
-          or digit and are unique across all sections and checks, section titles and check titles of 1 to 200
-          characters, check wording of 1 to 1000 characters, and an applicability hint of at most 500 characters,
-          and shall report every violation it finds, each with the path of the value in the definition, such as
-          sections[2].items[1].id, and not only the first, using the same canonical path format (lower-case member
-          names, no JSON-path prefix) for the errors found while reading the text as for the errors of the structure.
+          The ChecklistValidator class shall accept a checklist definition that follows every rule of a checklist
+          definition and return the parsed definition.
         justification: |
-          A checklist is entered by a person and then frozen into every review. A definition that is too large,
-          has the same identifier twice, or leaves a section empty would corrupt the answers or the page, so it is
-          refused before it is stored. Naming every problem with its place lets the person correct the definition
-          in one pass.
+          A checklist is entered by a person and then frozen into every review, so only a definition that passes every
+          rule may be stored.
         tests:
-          - ChecklistValidator_Validate_DefaultChecklist_IsValid
           - ChecklistValidator_Validate_SmallDefinition_IsValid
+          - ChecklistValidator_Validate_DefaultChecklist_IsValid
+
+      - id: ReviewCenter-ChecklistService-Validation-EmptyText
+        title: >-
+          The ChecklistValidator class shall report a definition text that is absent, empty, or only white space as one
+          error for the text as a whole.
+        justification: |
+          Nothing was entered, and one clear error says so.
+        tests:
           - ChecklistValidator_Validate_EmptyText_GivesOneError
+
+      - id: ReviewCenter-ChecklistService-Validation-NotJson
+        title: >-
+          The ChecklistValidator class shall report a text that is not JSON of the shape of a definition as one error
+          and return no definition.
+        justification: |
+          A text that cannot be read has no further errors to report.
+        tests:
           - ChecklistValidator_Validate_BadJson_GivesOneError
-          - ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath
+
+      - id: ReviewCenter-ChecklistService-Validation-Size
+        title: >-
+          The ChecklistValidator class shall refuse a definition text of more than 256 KiB.
+        justification: |
+          The size limit keeps the copy that every review stores small.
+        tests:
           - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
+
+      - id: ReviewCenter-ChecklistService-Validation-Size-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition text of exactly 256 KiB.
+        justification: |
+          A limit that is inclusive must let a text of exactly that size through.
+        tests:
+          - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
+
+      - id: ReviewCenter-ChecklistService-Validation-Version
+        title: >-
+          The ChecklistValidator class shall require a version label of 1 to 64 characters.
+        justification: |
+          The version names the wording that a review was answered against.
+        tests:
           - ChecklistValidator_Validate_Version_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Sections
+        title: >-
+          The ChecklistValidator class shall refuse a definition that has no sections.
+        justification: |
+          A checklist without sections cannot be answered.
+        tests:
           - ChecklistValidator_Validate_NoSections_IsRefused
+
+      - id: ReviewCenter-ChecklistService-Validation-SectionCount
+        title: >-
+          The ChecklistValidator class shall refuse a definition with more than 50 sections.
+        justification: |
+          The limit keeps the review page usable.
+        tests:
           - ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections
+
+      - id: ReviewCenter-ChecklistService-Validation-SectionCount-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition with 50 sections.
+        justification: |
+          A limit that is inclusive must let a definition of exactly that size through.
+        tests:
+          - ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections
+
+      - id: ReviewCenter-ChecklistService-Validation-ItemCount
+        title: >-
+          The ChecklistValidator class shall refuse a definition with more than 500 checks in all.
+        justification: |
+          The limit keeps the review page usable.
+        tests:
           - ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems
+
+      - id: ReviewCenter-ChecklistService-Validation-ItemCount-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition with 500 checks in all.
+        justification: |
+          A limit that is inclusive must let a definition of exactly that size through.
+        tests:
+          - ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems
+
+      - id: ReviewCenter-ChecklistService-Validation-EmptySection
+        title: >-
+          The ChecklistValidator class shall refuse a section that has no checks.
+        justification: |
+          A section without a check could never be completed.
+        tests:
           - ChecklistValidator_Validate_EmptySection_IsRefused
+
+      - id: ReviewCenter-ChecklistService-Validation-IdForm
+        title: >-
+          The ChecklistValidator class shall accept as the identifier of a section or a check only letters A to Z and
+          a to z, digits, dots, underscores, and hyphens, starting with a letter or a digit.
+        justification: |
+          Identifiers appear in addresses and in stored answers, so they must be plain.
+        tests:
           - ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters
+
+      - id: ReviewCenter-ChecklistService-Validation-IdLength
+        title: >-
+          The ChecklistValidator class shall require an identifier of a section or a check of 1 to 32 characters.
+        justification: |
+          A long identifier would break the page and the stored answers.
+        tests:
           - ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength
+
+      - id: ReviewCenter-ChecklistService-Validation-IdUnique
+        title: >-
+          The ChecklistValidator class shall refuse an identifier that is used twice among the sections and checks.
+        justification: |
+          An answer must belong to exactly one check.
+        tests:
           - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
+      - id: ReviewCenter-ChecklistService-Validation-IdUnique-CaseInsensitive
+        title: >-
+          The ChecklistValidator class shall treat two identifiers that differ only in letter case as the same
+          identifier.
+        justification: |
+          Identifiers that differ only in case would look alike on the page and in addresses.
+        tests:
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
+      - id: ReviewCenter-ChecklistService-Validation-IdUnique-LaterUse
+        title: >-
+          The ChecklistValidator class shall report the duplicate-identifier error at the later use.
+        justification: |
+          The first use is the one that stays, so the error must point at the one to correct.
+        tests:
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
+      - id: ReviewCenter-ChecklistService-Validation-Titles
+        title: >-
+          The ChecklistValidator class shall require a title of 1 to 200 characters for every section.
+        justification: |
+          A reviewer needs a short name for each part of the checklist.
+        tests:
           - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Wording
+        title: >-
+          The ChecklistValidator class shall require wording of 1 to 1000 characters for every check.
+        justification: |
+          The wording is what the reviewer attests.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Hint
+        title: >-
+          The ChecklistValidator class shall accept an empty applicability hint of a section.
+        justification: |
+          A hint helps but is optional.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Hint-Length
+        title: >-
+          The ChecklistValidator class shall accept an applicability hint of up to 500 characters.
+        justification: |
+          A hint must stay short, and a hint of exactly the limit is still allowed.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Hint-TooLong
+        title: >-
+          The ChecklistValidator class shall refuse an applicability hint of more than 500 characters.
+        justification: |
+          A hint must stay short.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-NullEntries
+        title: >-
+          The ChecklistValidator class shall report a section, a list of checks, and a check that is missing as errors
+          instead of failing.
+        justification: |
+          Broken input must give an error, not a crash.
+        tests:
           - ChecklistValidator_Validate_NullEntries_AreReported
+
+      - id: ReviewCenter-ChecklistService-Validation-AllErrors
+        title: >-
+          The ChecklistValidator class shall report all errors of a definition together, in the order of the text, and
+          not only the first, and return no definition.
+        justification: |
+          The person who enters the definition can correct it in one pass.
+        tests:
           - ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether
+
+      - id: ReviewCenter-ChecklistService-Validation-ErrorPath
+        title: >-
+          The ChecklistValidator class shall give every error the path of the member it concerns, such as
+          sections[2].items[1].id.
+        justification: |
+          The place of the error tells where to correct it.
+        tests:
+          - ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
+      - id: ReviewCenter-ChecklistService-Validation-CanonicalPath
+        title: >-
+          The ChecklistValidator class shall report an error found while reading the text under the same path format as
+          the other errors, with lower-case member names whatever the letter case of the input, plain indexes, and no
+          JSON-path prefix.
+        justification: |
+          An error of the reader must point at a member in the same form as every other error.
+        tests:
+          - ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath
+
+      - id: ReviewCenter-ChecklistService-Validation-MemberNames
+        title: >-
+          The ChecklistValidator class shall read the member names of a definition without regard to letter case.
+        justification: |
+          A definition written by hand should not fail on letter case.
+        tests:
           - ChecklistValidator_Validate_MemberNamesInAnyCase_AreRead
+
+      - id: ReviewCenter-ChecklistService-Validation-ParseOrThrow
+        title: >-
+          The ChecklistValidator class shall, when it is asked to parse a definition that is invalid, throw a domain
+          rule
+          exception with the ChecklistDefinitionInvalid rule whose message names the paths of at most ten errors and
+          says how many more there were.
+        justification: |
+          A message must stay short but tell that more errors exist.
+        tests:
           - ChecklistValidator_ParseOrThrow_Invalid_ThrowsWithPathsAndAtMostTenErrors
+
+      - id: ReviewCenter-ChecklistService-Validation-ErrorText
+        title: >-
+          The ChecklistValidationError class shall show an error as its path, a colon, and its message.
+        justification: |
+          Error lists on pages and in logs are read as text.
+        tests:
           - ChecklistValidationError_ToString_IsPathAndMessage
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Applicability of a section
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Applicability
         title: >-
-          The ChecklistService class shall record whether a section of a review's checklist applies to the
-          review, shall require a reason of at most 2000 characters, stored trimmed, when a section does not
-          apply, shall clear the reason when it applies again, and shall reject a section that is not in the
-          checklist, storing nothing on a violation.
+          The ChecklistService class shall record a section as not applicable with the reason that was given, stored
+          without leading and trailing white space.
         justification: |
-          Not every section is relevant to every review, for example a review without source code has no code
-          checks. Saying why a section was skipped keeps that decision visible to the people who rely on the
-          review.
+          A section may be skipped when it does not apply, and the reviewer says why.
+        tests:
+          - ChecklistService_SetSectionApplicability_NotApplicableWithReason_StoresTrimmedReason
+
+      - id: ReviewCenter-ChecklistService-Applicability-Reason
+        title: >-
+          The ChecklistService class shall refuse to mark a section as not applicable without a reason, or with a blank
+          one, with the ChecklistJustificationInvalid rule and leave the section as it was.
+        justification: |
+          A skipped section without a reason cannot be assessed by the next reader.
         tests:
           - ChecklistService_SetSectionApplicability_NotApplicableWithoutReason_Throws
-          - ChecklistService_SetSectionApplicability_NotApplicableWithReason_StoresTrimmedReason
+
+      - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit
+        title: >-
+          The ChecklistService class shall refuse a reason of more than 2000 characters with the
+          ChecklistJustificationInvalid rule.
+        justification: |
+          Stored text must stay bounded.
+        tests:
+          - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit-AtLimit
+        title: >-
+          The ChecklistService class shall accept a reason of exactly 2000 characters.
+        justification: |
+          A limit that is inclusive must let a reason of exactly that length through.
+        tests:
+          - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit-KeepsEarlier
+        title: >-
+          The ChecklistService class shall keep the earlier reason of a section when it refuses a reason that is too
+          long.
+        justification: |
+          A refused change must leave the record as it was.
+        tests:
+          - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Applicability-Applies
+        title: >-
+          The ChecklistService class shall clear the reason of a section when the section is marked as applicable again.
+        justification: |
+          A reason that no longer applies must not remain.
+        tests:
           - ChecklistService_SetSectionApplicability_Applicable_ClearsReason
+
+      - id: ReviewCenter-ChecklistService-Applicability-UnknownSection
+        title: >-
+          The ChecklistService class shall refuse to change a section that the checklist does not contain with the
+          ChecklistItemNotFound rule.
+        justification: |
+          A change must belong to a section of the checklist of the review.
+        tests:
           - ChecklistService_SetSectionApplicability_UnknownSection_ThrowsChecklistItemNotFound
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Answers
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Answer
         title: >-
-          The ChecklistService class shall record the answer Pass, Fail, or N/A to a check of a review's
-          checklist in the ballot of the reviewer slot of the actor, replacing an earlier answer of that slot to
-          the same check, shall require a justification for Fail and N/A, shall accept a justification of at most
-          2000 characters stored trimmed (none stored for an empty one on a Pass), and shall reject a check that
-          is not in the checklist and a review that has no checklist, storing nothing on a violation.
+          The ChecklistService class shall record the answer Pass, Fail, or Not applicable of the actor to a check of
+          the
+          checklist of a review, with the justification that was given.
         justification: |
-          A failed or not-applicable check is only useful to the next reader when it says why. A pass needs no
-          explanation. Replacing the answer lets a reviewer correct a mistake without leaving two answers of one
-          reviewer to one question, while each reviewer keeps an answer of their own.
+          The answers of the reviewer are the substance of the review.
         tests:
           - ChecklistService_SetAnswer_PassWithoutJustification_Stores
-          - ChecklistService_SetAnswer_FailOrNotApplicableWithoutJustification_Throws
-          - ChecklistService_SetAnswer_JustificationTooLong_Throws
-          - ChecklistService_SetAnswer_UnknownItem_ThrowsChecklistItemNotFound
-          - ChecklistService_SetAnswer_UnknownReview_ThrowsChecklistNotFound
+          - ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims
+          - ChecklistService_SetAnswer_NotApplicableWithJustification_Stores
+
+      - id: ReviewCenter-ChecklistService-Answer-PassNoJustification
+        title: >-
+          The ChecklistService class shall accept a Pass answer without a justification.
+        justification: |
+          A pass needs no explanation.
+        tests:
+          - ChecklistService_SetAnswer_PassWithoutJustification_Stores
+
+      - id: ReviewCenter-ChecklistService-Answer-PassNoJustification-BlankStoredAsNone
+        title: >-
+          The ChecklistService class shall store a blank justification of a Pass answer as none.
+        justification: |
+          A blank text carries no information and must not be shown as if it did.
+        tests:
+          - ChecklistService_SetAnswer_PassWithoutJustification_Stores
+
+      - id: ReviewCenter-ChecklistService-Answer-Replace
+        title: >-
+          The ChecklistService class shall replace the earlier answer to a check when the check is answered again, so
+          that only the new answer counts.
+        justification: |
+          A reviewer may change a mind before handing in.
+        tests:
           - ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims
 
+      - id: ReviewCenter-ChecklistService-Answer-Justification
+        title: >-
+          The ChecklistService class shall refuse a Fail or a Not applicable answer without a justification, or with a
+          blank one, with the ChecklistJustificationInvalid rule and store nothing.
+        justification: |
+          A negative or skipped answer must be explained to be of use.
+        tests:
+          - ChecklistService_SetAnswer_FailOrNotApplicableWithoutJustification_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-JustificationLimit
+        title: >-
+          The ChecklistService class shall refuse a justification of more than 2000 characters with the
+          ChecklistJustificationInvalid rule.
+        justification: |
+          Stored text must stay bounded.
+        tests:
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-JustificationLimit-AtLimit
+        title: >-
+          The ChecklistService class shall accept a justification of exactly 2000 characters.
+        justification: |
+          A limit that is inclusive must let a justification of exactly that length through.
+        tests:
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-JustificationLimit-StoresNothing
+        title: >-
+          The ChecklistService class shall store nothing when it refuses a justification that is too long.
+        justification: |
+          A refused answer must leave the check unanswered.
+        tests:
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-Trimmed
+        title: >-
+          The ChecklistService class shall store the justification without leading and trailing white space.
+        justification: |
+          The same text must have the same digest whatever the padding.
+        tests:
+          - ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims
+
+      - id: ReviewCenter-ChecklistService-Answer-UnknownCheck
+        title: >-
+          The ChecklistService class shall refuse an answer to a check that the checklist does not contain with the
+          ChecklistItemNotFound rule.
+        justification: |
+          An answer must belong to a check of the checklist of the review.
+        tests:
+          - ChecklistService_SetAnswer_UnknownItem_ThrowsChecklistItemNotFound
+
+      - id: ReviewCenter-ChecklistService-Answer-UnknownReview
+        title: >-
+          The ChecklistService class shall refuse an answer for a review that has no checklist with the
+          ChecklistNotFound rule and name the review in the message.
+        justification: |
+          There is nothing to answer for a missing review.
+        tests:
+          - ChecklistService_SetAnswer_UnknownReview_ThrowsChecklistNotFound
+
+      - id: ReviewCenter-ChecklistService-Answer-UndefinedOutcome
+        title: >-
+          The ChecklistService class shall refuse an outcome that is not one of Pass, Fail, and Not applicable with an
+          argument-out-of-range exception and store nothing.
+        justification: |
+          An unknown outcome would be stored as an answer that no rule understands.
+        tests:
+          - ChecklistService_SetAnswer_UndefinedOutcome_Throws
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Who answered
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-AnsweredBy
         title: >-
-          The ChecklistService class shall take the person of each answer and of each change of section
-          applicability as the signed-in actor (user name and display name), reject a missing actor, and store
-          both names with the UTC time of the change in the ballot of the slot of the actor, without making the
-          answerer part of the record digest.
+          The ChecklistService class shall store with every answer the user name and the display name of the actor and
+          the time of the answer in UTC.
         justification: |
-          Every answer must be attributable and dated. The person is the signed-in user, who needs no check, and
-          storing the user name keeps the person identifiable if the display name changes later. The answerer is
-          kept with the ballot row for the history; the digest covers the agreed standing, so another reviewer
-          giving the same answer does not change what a signature approves.
+          Each answer must be attributable to a person.
         tests:
-          - ChecklistService_SetAnswer_NullActor_Throws
           - ChecklistService_SetAnswer_StoresActorAndUtcTime
 
+      - id: ReviewCenter-ChecklistService-AnsweredBy-Section
+        title: >-
+          The ChecklistService class shall store with every change of the applicability of a section the user name and
+          the display name of the actor and the time of the change in UTC.
+        justification: |
+          A skipped section must be attributable like an answer.
+        tests:
+          - ChecklistService_SetSectionApplicability_StoresActorAndUtcTime
+
+      - id: ReviewCenter-ChecklistService-AnsweredBy-NullActor
+        title: >-
+          The ChecklistService class shall refuse a missing actor for an answer and for a change of the applicability of
+          a section with an argument-null exception and store nothing.
+        justification: |
+          A change without an actor could not be attributed.
+        tests:
+          - ChecklistService_SetAnswer_NullActor_Throws
+
+      - id: ReviewCenter-ChecklistService-AnsweredBy-Digest
+        title: >-
+          The ChecklistService class shall keep the signature of a slot current when another reviewer gives the same
+          answer again, because the person who answered is not part of what a signature covers.
+        justification: |
+          A signature covers what was answered, not who typed it.
+        tests:
+          - ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Progress
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Progress
         title: >-
-          The ChecklistService class shall derive from the checklist state of a review, the consolidated standing of
-          its submitted ballots or the ballot of one reviewer slot, the number of answered and total checks per
-          section and overall, counting a failed check as answered, leaving out the checks of a section that does
-          not apply (such a section counts as done) and any answers kept for it, shall report the checklist
-          complete when every check of every applicable section is answered, shall give the first section with
-          unanswered checks and the first unanswered check, and shall count the draft answers of the only slot of
-          a review in the progress of the consolidated standing.
+          The ChecklistService class shall count the answered checks and the total checks of every section of a
+          checklist and of the whole checklist.
         justification: |
-          Reviewers need to see what is left to do without counting. One set of rules in one place keeps every
-          page showing the same numbers, and the first unanswered check lets a page lead the reviewer to the
-          next piece of work. A review with one slot has nobody to agree with and no separate hand-in step, so
-          its partly answered checklist shows its true progress.
+          The reviewer sees how far the review is.
         tests:
           - ChecklistState_Progress_CountsAnsweredPerSectionAndOverall
+
+      - id: ReviewCenter-ChecklistService-Progress-Failed
+        title: >-
+          The ChecklistService class shall count a check that was answered Fail as answered.
+        justification: |
+          A failed check is a finished check.
+        tests:
+          - ChecklistState_Progress_FailedAnswer_CountsAsAnswered
+
+      - id: ReviewCenter-ChecklistService-Progress-NotApplicable
+        title: >-
+          The ChecklistService class shall count a section that is marked as not applicable as done and leave its
+          checks out of the total.
+        justification: |
+          A skipped section must neither block completion nor inflate the count.
+        tests:
           - ChecklistState_Progress_NotApplicableSection_CountsAsDoneAndLeavesTotal
+
+      - id: ReviewCenter-ChecklistService-Progress-IgnoredAnswers
+        title: >-
+          The ChecklistService class shall not count the answers that are kept in a section that is marked as not
+          applicable.
+        justification: |
+          An answer in a skipped section must not count twice.
+        tests:
           - ChecklistState_Progress_AnswersInNotApplicableSection_Ignored
+
+      - id: ReviewCenter-ChecklistService-Progress-Complete
+        title: >-
+          The ChecklistService class shall report a checklist as complete when every check of every applicable section
+          is answered, and also when no section is applicable.
+        justification: |
+          Completeness decides whether the ballot may be handed in.
+        tests:
           - ChecklistState_Progress_AllApplicableAnswered_IsComplete
           - ChecklistState_Progress_AllSectionsNotApplicable_IsComplete
-          - ChecklistState_NextUnansweredItemId_SkipsAnsweredAndNotApplicableSections
-          - ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered
-          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
 
+      - id: ReviewCenter-ChecklistService-Progress-NothingLeft
+        title: >-
+          The ChecklistService class shall name no first incomplete section when the checklist is complete.
+        justification: |
+          The page must know when to stop guiding.
+        tests:
+          - ChecklistState_Progress_AllApplicableAnswered_IsComplete
+
+      - id: ReviewCenter-ChecklistService-Progress-NothingLeft-NextCheck
+        title: >-
+          The ChecklistService class shall name no next unanswered check when the checklist is complete.
+        justification: |
+          The page must know when to stop guiding.
+        tests:
+          - ChecklistState_Progress_AllApplicableAnswered_IsComplete
+
+      - id: ReviewCenter-ChecklistService-Progress-FirstSection
+        title: >-
+          The ChecklistService class shall name as the first incomplete section the first applicable section, in
+          checklist order, that has an unanswered check.
+        justification: |
+          The reviewer is led to where work remains.
+        tests:
+          - ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered
+
+      - id: ReviewCenter-ChecklistService-Progress-NextCheck
+        title: >-
+          The ChecklistService class shall name as the next unanswered check the first unanswered check of the
+          applicable sections, skipping answered checks and sections that are not applicable.
+        justification: |
+          The reviewer is led to the next check to answer.
+        tests:
+          - ChecklistState_NextUnansweredItemId_SkipsAnsweredAndNotApplicableSections
+
+      - id: ReviewCenter-ChecklistService-Progress-SingleSlotDraft
+        title: >-
+          The ChecklistService class shall count the draft answers of the only slot of a review in the progress that is
+          shown to a project member who holds no slot.
+        justification: |
+          With one slot the draft is the whole review, so it must show in the progress.
+        tests:
+          - ChecklistService_GetAsync_SingleSlotDraft_ConsolidatedProgressCountsIt
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit trail
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Audit
         title: >-
-          The ChecklistService class shall record answering a check and changing the applicability of a section in
-          the audit trail, in the same transaction as the change, naming the actor, the identifiers, and the outcome,
-          with a short hash of the justification but never the justification itself.
+          The ChecklistService class shall record an answer as an audit entry with the action checklist.answered that
+          states the check identifier and the outcome.
         justification: |
-          The history must show who answered which check and how, without copying free text into a record that
-          cannot be edited.
+          An auditor must be able to find who answered what.
         tests:
           - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification
 
+      - id: ReviewCenter-ChecklistService-Audit-Section
+        title: >-
+          The ChecklistService class shall record a change of the applicability of a section as an audit entry with the
+          action checklist.applicability-changed that states the section identifier and whether the section applies.
+        justification: |
+          A skipped section changes the review as much as an answer does.
+        tests:
+          - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification
+
+      - id: ReviewCenter-ChecklistService-Audit-Hash
+        title: >-
+          The ChecklistService class shall state in these entries a short SHA-256 hash of a justification or of a
+          reason,
+          and never its text.
+        justification: |
+          The trail stays short and free of free text, while the hash allows a check.
+        tests:
+          - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification
+
+      - id: ReviewCenter-ChecklistService-Audit-Scope
+        title: >-
+          The ChecklistService class shall give these entries the project and the review.
+        justification: |
+          The entries must be found per review.
+        tests:
+          - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification
+
+      - id: ReviewCenter-ChecklistService-Audit-Actor
+        title: >-
+          The ChecklistService class shall name the actor in these entries.
+        justification: |
+          An entry without a person cannot be attributed.
+        tests:
+          - ChecklistService_ChecklistEvents_NameTheActor
+
+      - id: ReviewCenter-ChecklistService-Audit-Refused
+        title: >-
+          The ChecklistService class shall record no audit entry for an answer or a change of the applicability of a
+          section that it refuses.
+        justification: |
+          A refused change did not happen.
+        tests:
+          - ChecklistService_Changes_Refused_RecordNoAuditEntry
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Access to the project
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Access
         title: >-
-          The ChecklistService class shall require, for answering a check and for changing the applicability of a
-          section, that the actor may see the project of the review (through IProjectAccess), refusing an actor who
-          may not with the same ProjectNotFound rule as for a project that does not exist, before anything else is
-          checked or stored.
+          The ChecklistService class shall refuse an answer from an actor who is not a member of the project of the
+          review with the ProjectNotFound rule, whatever else is wrong with the answer, and store nothing.
         justification: |
-          A user outside a project must not be able to change its review checklist, nor learn that the project
-          exists. The service enforces this itself, whatever the page or the API checked, so that a route added later
-          cannot bypass the rule.
+          A project that the actor may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - ChecklistService_SetAnswer_NonMember_ThrowsProjectNotFoundAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-Access-Section
+        title: >-
+          The ChecklistService class shall refuse a change of the applicability of a section from an actor who is not a
+          member of the project of the review with the ProjectNotFound rule, whatever else is wrong with the change,
+          and store nothing.
+        justification: |
+          A change of a section must not leak the project either.
+        tests:
+          - ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-Arguments
+        title: >-
+          The ChecklistService class shall refuse to be created without a store, a project access rule, a user store, or
+          a clock.
+        justification: |
+          A missing collaborator is a programming error that must show at once.
         tests:
           - ChecklistService_Constructor_NullArguments_Throws
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Lock of an approved review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-ApprovalLock
         title: >-
-          The ChecklistService class shall refuse to answer a check, to change the applicability of a section and to
-          hand in a ballot in a review that is approved and therefore locked, with the ReviewLocked rule, after the
-          access check and before anything is stored.
+          The ChecklistService class shall refuse an answer, a change of the applicability of a section in either
+          direction, and the hand-in of a ballot for a review that is approved with the ReviewLocked rule and change
+          nothing.
         justification: |
-          The answers are part of what a signature approves. Changing one after the approval would make the approval
-          describe a record that no longer exists, so the service refuses until an administrator reopens the review.
+          An approved review is a closed record.
         tests:
           - ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked
 
+      - id: ReviewCenter-ChecklistService-ApprovalLock-BeforeImpact
+        title: >-
+          The ChecklistService class shall report the ReviewLocked rule, with no affected slots, for a change to an
+          approved review before it asks for the acknowledgement of signatures.
+        justification: |
+          The reviewer must be told that the review is closed, not asked to acknowledge an effect on signatures that
+          cannot happen.
+        tests:
+          - ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Rule: the author of a review does not answer its checklist
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-AuthorRule
         title: >-
-          The ChecklistService class shall refuse to answer a check and to change the applicability of a section when
-          the project requires that authors do not answer the checklist and the actor is the author of the review
-          (compared by user name, ignoring case), with the AuthorCannotAnswer rule, after the access check and before
-          the lock check and before anything is stored, shall let any other actor and any author of a project that
-          switched the rule off pass, shall tell a page through the ChecklistState whether the viewer is blocked, and
-          shall leave comment threads unaffected.
+          The ChecklistService class shall refuse an answer from the author of the review while the author rule is on
+          with the AuthorCannotAnswer rule and store nothing.
         justification: |
-          A person who wrote the content must not be the one who answers whether the content meets the checks, or the
-          checklist is no independent look. The service enforces the rule itself, whatever the page or the API checked,
-          and reports it before the lock so that the reason that counts is named. The rule is on by default and applies
-          to every project, also those created before it was enforced; an administrator can switch it off per project.
+          Authors must not answer the checklist of their own work.
         tests:
           - ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing
-          - ChecklistService_Answer_AuthorWhileRuleIsOff_Stores
-          - ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock
-          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
-          - ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected
 
+      - id: ReviewCenter-ChecklistService-AuthorRule-Section
+        title: >-
+          The ChecklistService class shall refuse a change of the applicability of a section from the author of the
+          review while the author rule is on, whatever the letter case of the user name, with the AuthorCannotAnswer
+          rule and leave the section as it was.
+        justification: |
+          A skipped section is as much an answer as a check.
+        tests:
+          - ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-Message
+        title: >-
+          The ChecklistService class shall say in the message of the refusal of an answer by the author that authors
+          cannot answer the checklist of their own review.
+        justification: |
+          The author must be told why.
+        tests:
+          - ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-OtherActors
+        title: >-
+          The ChecklistService class shall let another reviewer who holds the slot answer while the author rule is on.
+        justification: |
+          The rule concerns the author only.
+        tests:
+          - ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-RuleOff
+        title: >-
+          The ChecklistService class shall let the author of the review answer while the author rule is off.
+        justification: |
+          The rule is a setting of the project and must be switchable.
+        tests:
+          - ChecklistService_Answer_AuthorWhileRuleIsOff_Stores
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BeforeLock
+        title: >-
+          The ChecklistService class shall report the AuthorCannotAnswer rule before the ReviewLocked rule when the
+          author changes an approved review.
+        justification: |
+          The refusal that tells the author the real reason comes first.
+        tests:
+          - ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag
+        title: >-
+          The ChecklistService class shall mark the checklist as blocked for the author of the review, whatever the
+          letter case of the user name.
+        justification: |
+          The page must not offer the author an answer that will be refused.
+        tests:
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-OtherViewers
+        title: >-
+          The ChecklistService class shall not mark the checklist as blocked for another viewer or without a viewer.
+        justification: |
+          Only the author is refused, so the page must not hide the answers from anybody else.
+        tests:
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-RuleOff
+        title: >-
+          The ChecklistService class shall not mark the checklist as blocked for the author of the review while the
+          author rule is off.
+        justification: |
+          While the rule is off the author may answer, so the page must not block the author.
+        tests:
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Impact of a hand-in on signatures
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-SignatureImpact
         title: >-
-          The ChecklistService class shall refuse to hand in the ballot of a reviewer slot (and, in a review with one
-          slot, the answer or section change that completes and thereby hands in the ballot) when the hand-in would
-          change the record digest and make a current signature of another slot out of date and the caller has not
-          acknowledged the affected slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot
-          number and signer, before anything is stored, shall never require the acknowledgement of the signature of
-          the own slot of the reviewer, shall let a change that does not alter the digest, such as a draft edit or a
-          ballot that agrees with the others, or a review without a current signature, pass without acknowledgement,
-          shall refuse again only for the slots that remain unacknowledged, and shall report a locked review with the
-          ReviewLocked rule first. The exception shall keep its own copy of the affected slots.
+          The ChecklistService class shall refuse the hand-in of a ballot that would put the signature of another slot
+          out of date until the actor has acknowledged every affected slot, with the SignaturesWouldBecomeOutOfDate
+          rule, and not hand the ballot in.
         justification: |
-          The agreed standing of the ballots is what a signature approves. Handing in a ballot that changes that
-          standing silently withdraws the signatures of the other reviewers, so the service tells the caller which
-          signatures would be lost and refuses until the caller confirms. A draft, or a ballot that agrees with the
-          others, changes nothing, so it needs no confirmation, and a reviewer who changes the own ballot knows that
-          the own signature goes out of date.
+          A signature covers a state of the ballots, and the person who changes it must know whom it affects.
+        tests:
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Names
+        title: >-
+          The ChecklistService class shall name in the refusal the number and the signer of every affected slot, whether
+          the primary or the alternate reviewer signed.
+        justification: |
+          The actor must see whom the change affects.
+        tests:
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Names-Unsigned
+        title: >-
+          The ChecklistService class shall not name in the refusal a slot that has no signature.
+        justification: |
+          A slot without a signature is not affected, and naming it would ask for an acknowledgement that means nothing.
+        tests:
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining
+        title: >-
+          The ChecklistService class shall name in the refusal after an incomplete acknowledgement the slots that are
+          still not acknowledged.
+        justification: |
+          The actor must see what is left to acknowledge.
+        tests:
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining-Unrelated
+        title: >-
+          The ChecklistService class shall not let the acknowledgement of a slot that has no signature suppress any of
+          the slots that are still not acknowledged.
+        justification: |
+          An acknowledgement of an unrelated slot must not hide a signature that is still affected.
+        tests:
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Acknowledged
+        title: >-
+          The ChecklistService class shall hand in a ballot after every affected slot is acknowledged and leave the
+          signatures of those slots out of date.
+        justification: |
+          An acknowledged change is allowed and its effect shows.
+        tests:
+          - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-NoSignature
+        title: >-
+          The ChecklistService class shall accept changes to a ballot and its hand-in without an acknowledgement while
+          no signature is current.
+        justification: |
+          Nobody is affected.
         tests:
           - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
-          - ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature
-          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
-          - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
-          - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement
-          - ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-DraftChange
+        title: >-
+          The ChecklistService class shall accept a change to the own ballot without an acknowledgement when the
+          handed-in ballots still agree, and keep the signature current.
+        justification: |
+          A change that does not alter the record must not ask for acknowledgements.
+        tests:
+          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-ExceptionCopy
+        title: >-
+          The ChecklistService class shall keep the affected slots listed in a refusal as they were when it raised the
+          refusal, so that a later change of the signatures does not change the refusal.
+        justification: |
+          An error must not change after it was thrown.
+        tests:
+          - ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards
           - ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Rows carried over into a follow-up review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-CarriedMarking
         title: >-
-          The ChecklistService class shall store an answer, and the applicability of a section, that a person gives or
-          changes in the ballot of the own slot of a review that carries answers from an earlier review without the
-          mark of the earlier review, so that an answer carried into the ballot and then answered again, or a
-          not-applicable section carried into the ballot and then set again, belongs to the review and to the person
-          who gave it, and shall count a carried answer as answered for the progress of the checklist.
+          The ChecklistService class shall store an answer that is given again to a check that was carried over from an
+          earlier review without the carried mark and as the answer of the actor.
         justification: |
-          The mark says that nobody in this review has looked at the answer yet. Once a person answers again, the
-          answer is theirs, and keeping the mark would claim that it was taken over. A carried answer was given by a
-          reviewer and is a real answer, so the checklist is complete when all checks are carried or answered.
+          A carried answer is the earlier word of someone else, and answering again makes it the reviewer's own.
         tests:
-          - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
-          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
+          - ChecklistService_SetAnswer_CarriedAnswer_StoredWithoutTheCarriedMark
 
+      - id: ReviewCenter-ChecklistService-CarriedMarking-Section
+        title: >-
+          The ChecklistService class shall store a change of the applicability of a section that was carried over from
+          an
+          earlier review without the carried mark.
+        justification: |
+          A carried section state becomes the reviewer's own when it is set again.
+        tests:
+          - ChecklistService_SetSectionApplicability_CarriedSection_StoredWithoutTheCarriedMark
+
+      - id: ReviewCenter-ChecklistService-CarriedMarking-Progress
+        title: >-
+          The ChecklistService class shall count the answers that were carried over from an earlier review as answered
+          in the progress of a ballot.
+        justification: |
+          A follow-up starts from the answers that are still valid.
+        tests:
+          - ChecklistService_Get_CarriedAnswers_CountAsAnswered
+
+      - id: ReviewCenter-ChecklistService-CarriedMarking-Progress-NotApplicableSection
+        title: >-
+          The ChecklistService class shall leave a section that was carried over from an earlier review as not
+          applicable out of the total of the progress of a ballot.
+        justification: |
+          A section that does not apply must not block the follow-up.
+        tests:
+          - ChecklistService_Get_CarriedAnswers_CountAsAnswered
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Ballot of a reviewer slot
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-BallotSlot
         title: >-
-          The ChecklistService class shall require, for answering a check, changing the applicability of a section and
-          handing in a ballot, that the actor is the primary or the alternate reviewer of a slot of the review,
-          refusing any other actor with the NoReviewerSlot rule, storing nothing, and shall put the change into the
-          ballot of that slot and into no other.
+          The ChecklistService class shall refuse an answer from an actor who holds no reviewer slot of the review with
+          the NoReviewerSlot rule and store nothing.
         justification: |
-          Each reviewer answers the checklist on their own, so that the reviewers can agree or disagree. An answer
-          needs the slot that owns it, and a person without a slot has no ballot to answer on.
+          Only the reviewers of a review answer its checklist.
         tests:
           - ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot
+
+      - id: ReviewCenter-ChecklistService-BallotSlot-Submit
+        title: >-
+          The ChecklistService class shall refuse the hand-in of a ballot by an actor who holds no reviewer slot of the
+          review with the NoReviewerSlot rule.
+        justification: |
+          There is no ballot to hand in without a slot.
+        tests:
           - ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot
+
+      - id: ReviewCenter-ChecklistService-BallotSlot-Section
+        title: >-
+          The ChecklistService class shall refuse a change of the applicability of a section from an actor who holds no
+          reviewer slot of the review with the NoReviewerSlot rule and store nothing.
+        justification: |
+          A change of a section is part of the ballot of a slot.
+        tests:
+          - ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot
+
+      - id: ReviewCenter-ChecklistService-BallotSlot-OwnBallot
+        title: >-
+          The ChecklistService class shall record an answer in the ballot of the slot of the actor only, so that the
+          ballots of the other slots stay as they are.
+        justification: |
+          Reviewers answer independently.
+        tests:
+          - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
 
       - id: ReviewCenter-ChecklistService-BallotSubmit
         title: >-
-          The ChecklistService class shall keep the ballot of a slot of a review with more than one slot a draft until
-          its reviewer hands it in with SubmitBallotAsync, shall refuse to hand in a ballot in which a check of an
-          applicable section has no answer with the BallotIncomplete rule and store nothing, and shall treat handing
-          in a ballot that is submitted already as no change.
+          The ChecklistService class shall keep the ballot of a slot of a review with several slots a draft until the
+          reviewer hands it in.
         justification: |
-          Another reviewer must not see, or be bound by, an answer that its reviewer has not finished. The hand-in is
-          the moment the ballot counts in the record, so it needs a complete ballot, and repeating it must be safe.
+          A reviewer must be able to finish and check before the ballot counts.
         tests:
           - ChecklistService_SubmitBallotAsync_TwoSlots_StaysDraftUntilSubmit
+
+      - id: ReviewCenter-ChecklistService-BallotSubmit-Incomplete
+        title: >-
+          The ChecklistService class shall refuse to hand in a ballot that is not complete with the BallotIncomplete
+          rule
+          and leave it a draft.
+        justification: |
+          A hand-in is the statement that every applicable check was answered.
+        tests:
           - ChecklistService_SubmitBallotAsync_Incomplete_ThrowsBallotIncomplete
+
+      - id: ReviewCenter-ChecklistService-BallotSubmit-Repeat
+        title: >-
+          The ChecklistService class shall leave a ballot that is already handed in as it is when it is handed in again.
+        justification: |
+          A double click must not change the record.
+        tests:
+          - ChecklistService_SubmitBallotAsync_TwoSlots_StaysDraftUntilSubmit
 
       - id: ReviewCenter-ChecklistService-SingleSlotAutoSubmit
         title: >-
-          The ChecklistService class shall hand in the ballot of the only slot of a review with the answer or the
-          section change that completes it, and shall keep it a draft until then, so that answering in a review with one
-          reviewer needs no separate hand-in step (a complete ballot that no edit produced, such as a follow-up with
-          every check carried, is handed in with SubmitBallotAsync).
+          The ChecklistService class shall hand in the ballot of the only slot of a review when an answer completes it,
+          and record the user name of the actor as the submitter.
         justification: |
-          With one reviewer there is nobody to agree with and nobody to hide a draft from, so answering stays as
-          simple as it was before each reviewer had a ballot.
+          A single reviewer has no use for a separate hand-in step.
         tests:
           - ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits
 
+      - id: ReviewCenter-ChecklistService-SingleSlotAutoSubmit-Draft
+        title: >-
+          The ChecklistService class shall keep the ballot of the only slot of a review a draft until the answer that
+          completes it.
+        justification: |
+          The hand-in must follow completion, not precede it.
+        tests:
+          - ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits
+
+      - id: ReviewCenter-ChecklistService-SingleSlotAutoSubmit-Section
+        title: >-
+          The ChecklistService class shall hand in the ballot of the only slot of a review when a change of the
+          applicability of a section completes it.
+        justification: |
+          Marking the last open section as not applicable completes the ballot as much as answering does.
+        tests:
+          - ChecklistService_SetSectionApplicabilityAsync_SingleSlotCompleting_AutoSubmits
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # What a viewer is shown
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-OwnBallotView
         title: >-
-          The ChecklistService class shall give a viewer who holds a slot of a review the own ballot, drafts
-          included, and never the draft of another slot, and shall give a viewer who holds no slot the consolidated
-          standing of the submitted ballots (marked as without a slot) in a review with a single slot or a concluded
-          review, and, in a review with several slots that is not concluded, a masked state instead for such a viewer
-          unless the viewer is the lead, an administrator or an Auditor (see
-          ReviewCenter-BallotVisibility-BallotView-HiddenState).
+          The ChecklistService class shall show a viewer who holds a slot the ballot of that slot, including its draft
+          answers.
         justification: |
-          A reviewer needs to see and continue the own work, while an unfinished ballot of somebody else must stay
-          private until it is handed in. Where the answers of the others are open to the viewer, the agreed standing
-          is what the record covers.
+          The reviewer continues where the reviewer left off.
+        tests:
+          - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
+
+      - id: ReviewCenter-ChecklistService-OwnBallotView-NoOtherDraft
+        title: >-
+          The ChecklistService class shall not show a viewer the draft answers of the ballots of the other slots.
+        justification: |
+          Drafts are private until they are handed in.
         tests:
           - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
           - ChecklistService_GetAsync_NoSlot_Consolidated
 
+      - id: ReviewCenter-ChecklistService-OwnBallotView-NoSlot
+        title: >-
+          The ChecklistService class shall mark the checklist given to a viewer who holds no slot as being without a
+          slot and as not the own ballot.
+        justification: |
+          The page must not offer editing to someone who cannot answer.
+        tests:
+          - ChecklistService_GetAsync_NoSlot_Consolidated
+
+      - id: ReviewCenter-ChecklistService-OwnBallotView-Consolidated
+        title: >-
+          The ChecklistService class shall show a viewer who holds no slot in a review with a single slot the answers of
+          that slot, not masked.
+        justification: |
+          The only ballot is the whole result of the review, so nothing of it needs to be hidden.
+        tests:
+          - ChecklistService_GetAsync_NoSlotViewerOfSingleSlotReview_GetsConsolidatedStanding
+
       - id: ReviewCenter-ChecklistService-BallotViewDetails
         title: >-
-          The ChecklistService class shall, in the ballot view for a viewer who may see the other ballots and may view
-          the project, give the checks the submitted ballots answer differently with the answer and the justification
-          of every slot, the number of checks the submitted ballots agree on as Fail, and the position of the own
-          slot, shall name, for every viewer of the project, the other reviewers whose ballot is not handed in, and
-          shall give a viewer who has not handed in, a user with no access to the project, and an API token no
-          justification, no differing check, and no failed check.
+          The ChecklistService class shall give a viewer who handed in a ballot the checks on which the handed-in
+          ballots differ, with the justification that the other reviewers gave.
         justification: |
-          The page can then show why a reviewer answered differently, and who is still to come, without a second read,
-          while a reviewer who has not answered yet is not swayed by the others and a stranger learns nothing. Who has
-          handed in is progress, never an answer, so it stays visible in a masked view. The API reads the consolidated
-          standing, which is unchanged.
+          The reviewers reconcile their differences.
+        tests:
+          - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
+
+      - id: ReviewCenter-ChecklistService-BallotViewDetails-FailedCount
+        title: >-
+          The ChecklistService class shall give a viewer who handed in a ballot the number of checks that every
+          handed-in ballot failed.
+        justification: |
+          The result is visible at a glance.
+        tests:
+          - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
+
+      - id: ReviewCenter-ChecklistService-BallotViewDetails-OwnSlot
+        title: >-
+          The ChecklistService class shall give a viewer who handed in a ballot the number of the own slot.
+        justification: |
+          The page marks which slot is the own one.
+        tests:
+          - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
+
+      - id: ReviewCenter-ChecklistService-BallotViewDetails-MissingNames
+        title: >-
+          The ChecklistService class shall name to a viewer who is a member of the project the other reviewers whose
+          ballot is not handed in, without the own slot of the viewer, and name nobody to a viewer outside the project.
+        justification: |
+          The reviewers know whom they are waiting for.
         tests:
           - ChecklistService_GetBallotView_OtherBallotMissing_NamesThemForViewersOfTheProject
-          - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
-          - ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck
-          - ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers
-          - ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck
 
+      - id: ReviewCenter-ChecklistService-BallotViewDetails-Hidden
+        title: >-
+          The ChecklistService class shall give a viewer who has not handed in a ballot, whether the viewer holds a
+          draft, holds no slot, uses an API token, or is outside the project, no differing check, no failed check
+          count, and no reason of another reviewer.
+        justification: |
+          Reviewers must not copy each other.
+        tests:
+          - ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Hand-in of a ballot and the signatures of other slots
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-BallotImpact
         title: >-
-          The ChecklistService class shall, when a ballot is handed in, compare the record digest after the hand-in
-          with the digest now, shall refuse with the SignaturesWouldBecomeOutOfDate rule when the digest would change
-          and a current signature of another slot is not acknowledged in the acknowledgedSlotIds argument, shall let a
-          hand-in that leaves the digest as it is pass without a warning, and shall not ask a reviewer to acknowledge
-          the signature of the own slot.
+          The ChecklistService class shall leave the current signatures of the other slots as they are while a reviewer
+          changes the ballot of the own slot and has not handed it in.
         justification: |
-          A ballot that changes the agreed standing withdraws the signatures of the other reviewers, so they are named
-          before the ballot counts. A ballot that agrees with the others changes nothing. A reviewer who changes the
-          own ballot knows that the own signature goes out of date.
+          A draft is not part of what a signature covers, so only the hand-in can affect a signature.
         tests:
           - ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots
+
+      - id: ReviewCenter-ChecklistService-BallotImpact-NoWarning
+        title: >-
+          The ChecklistService class shall accept the hand-in of a ballot that agrees with the other handed-in ballots
+          without an acknowledgement and keep the signatures of the other slots current.
+        justification: |
+          Nobody is affected.
+        tests:
           - ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning
+
+      - id: ReviewCenter-ChecklistService-BallotImpact-OwnSlot
+        title: >-
+          The ChecklistService class shall not ask the actor to acknowledge the signature of the own slot when the actor
+          changes and hands in the own ballot.
+        justification: |
+          The signer knows the own signature.
+        tests:
           - ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Rule: the person who reopened a review does not sign it again
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-ReopenerBallot
         title: >-
-          The ChecklistService class shall let the person who reopened a review, while the project requires that the
-          person who reopened a review does not sign it again, answer a check, change the applicability of a section
-          and hand in the ballot of the own slot like any other reviewer, so that the person is barred from signing
-          only (with the ReopenerCannotSign rule of the SigningService) and not from the ballot.
+          The ChecklistService class shall let the person who reopened a review change an answer in the ballot of the
+          own slot while the reopener rule is on.
         justification: |
-          The rule keeps the person who reopened a review from approving it alone. It does not say that the person may
-          not review. A reopener who holds a slot has to be able to correct and hand in the own ballot, or the review
-          could not be completed by the slot.
+          The rule bars signing, not preparing the ballot.
         tests:
           - ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign
 
+      - id: ReviewCenter-ChecklistService-ReopenerBallot-Submit
+        title: >-
+          The ChecklistService class shall let the person who reopened a review hand in the ballot of the own slot while
+          the reopener rule is on.
+        justification: |
+          The ballot is the work of the reviewer, whoever reopened the review.
+        tests:
+          - ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Ballot access of read-only members
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-BallotAccess
         title: >-
-          The ChecklistService class shall refuse an actor who may only read the project, such as an auditor, with the
-          ActorNotAllowed rule when the actor answers a check, changes the applicability of a section or hands in a
-          ballot, also when the actor still holds a slot of the review, before the slot of the actor is looked up (so
-          that the NoReviewerSlot rule is not the reason) and storing nothing.
+          The ChecklistService class shall refuse an answer, a change of the applicability of a section, and the hand-in
+          of a ballot from an auditor who holds a slot with the ActorNotAllowed rule and store nothing.
         justification: |
-          An auditor reads the record and never changes it. A person who was a reviewer and became an auditor can still
-          hold a slot, so the role, not the slot, decides, and the refusal names the role.
+          Auditors observe and do not decide.
         tests:
           - ChecklistService_BallotWrites_AuditorHoldingSlot_ThrowsActorNotAllowed
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Review conclusion text
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-ReviewConclusionText
         title: >-
-          The ChecklistService class shall let the primary or the alternate reviewer of any slot of a review, and the
-          lead of the review (its creator who can still contribute, or an administrator of the project), set, change
-          or clear the review conclusion text (the free text of the record, at most 4000 characters, not the approved
-          or rejected conclusion), shall refuse a person outside the project as a missing project, and an auditor, an
-          API token and a member who is neither a reviewer nor the lead as not allowed, shall tell a page through
-          CanSetReviewConclusionTextAsync who may write it, shall store the text with line breaks written as LF and
-          without leading and trailing white space and a blank text as none, shall refuse a text that is too long or
-          has a control character other than a line feed or a tab with the ConclusionTextInvalid rule, shall refuse a
-          concluded review with the ReviewLocked rule, shall refuse a change that would make a current signature out
-          of date, naming each affected slot and signer, until the caller acknowledges the slots, shall treat the same
-          text again as no change without an acknowledgement and without an audit entry, and shall refuse with the
-          RecordChanged rule, storing nothing, when someone else changed the text between the read and the store.
+          The ChecklistService class shall let a reviewer who holds a slot of the review, as the primary or as the
+          alternate reviewer, write the review conclusion text and store it.
         justification: |
-          The text is what the people behind the record conclude in words, so only they and the lead may write it. It
-          is part of what a signature approves, so a concluded review is locked, and a change while a signature is
-          current withdraws the signature and must be confirmed. The comparison against the text that was read keeps
-          two people from silently overwriting each other. A normalized text keeps the digest the same whatever the
-          browser sent. The rule that a rejected review needs a text to be signed is a separate, later rule.
+          The reviewers who made the review sum it up.
         tests:
           - ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores
-          - ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed
+          - ChecklistService_SetReviewConclusionTextAsync_AlternateOfSlot_Stores
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Lead
+        title: >-
+          The ChecklistService class shall let the lead of the review write the review conclusion text and store it.
+        justification: |
+          The lead owns the outcome of the review.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NonMember
+        title: >-
+          The ChecklistService class shall refuse a user who is not a member of the project with the ProjectNotFound
+          rule
+          when the user writes the review conclusion text, and store nothing.
+        justification: |
+          The project must not leak.
+        tests:
           - ChecklistService_SetReviewConclusionTextAsync_NonMember_ThrowsProjectNotFound
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-OtherMember
+        title: >-
+          The ChecklistService class shall refuse a project member who holds no slot of the review and is not its lead
+          with the ActorNotAllowed rule when the member writes the review conclusion text, and store nothing.
+        justification: |
+          The text speaks for the reviewers of the review.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Auditor
+        title: >-
+          The ChecklistService class shall refuse an auditor with the ActorNotAllowed rule when the auditor writes the
+          review conclusion text, and store nothing.
+        justification: |
+          Auditors observe and do not write conclusions.
+        tests:
           - ChecklistService_SetReviewConclusionTextAsync_Auditor_Refused
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-ApiToken
+        title: >-
+          The ChecklistService class shall refuse a call that comes through an API token, also for the lead, with the
+          ActorNotAllowed rule when it writes the review conclusion text, and store nothing.
+        justification: |
+          A conclusion is written by a person in the web pages.
+        tests:
           - ChecklistService_SetReviewConclusionTextAsync_ApiToken_Refused
-          - ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked
-          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
-          - ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing
-          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
-          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
-          - ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-CanSet
+        title: >-
+          The ChecklistService class shall tell that a reviewer who holds a slot and the lead may write the review
+          conclusion text, and that another member, an auditor, and a user outside the project may not.
+        justification: |
+          The page shows the editor only to those who may use it.
+        tests:
           - ChecklistService_CanSetReviewConclusionTextAsync_Roles
-          - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-CanSetNobody
+        title: >-
+          The ChecklistService class shall tell that nobody may write the review conclusion text when there is no actor,
+          when the actor uses an API token, or when the review does not exist.
+        justification: |
+          A missing identity or a missing review means no right.
+        tests:
+          - ChecklistService_CanSetReviewConclusionTextAsync_Roles
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Normalized
+        title: >-
+          The ChecklistService class shall store the review conclusion text with each carriage return and line feed pair
+          as a single line feed and without leading and trailing white space.
+        justification: |
+          The same text then has the same digest.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Blank
+        title: >-
+          The ChecklistService class shall store a review conclusion text that is blank as no text.
+        justification: |
+          A blank text clears the conclusion.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-MaxLength
+        title: >-
+          The ChecklistService class shall accept a review conclusion text of exactly 4000 characters.
+        justification: |
+          The limit is inclusive.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-TooLong
+        title: >-
+          The ChecklistService class shall refuse a review conclusion text of more than 4000 characters with the
+          ConclusionTextInvalid rule.
+        justification: |
+          Stored text must stay bounded.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Control
+        title: >-
+          The ChecklistService class shall refuse a review conclusion text that contains a control character, such as
+          U+0001, with the ConclusionTextInvalid rule.
+        justification: |
+          Control characters are not text.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-CarriageReturn
+        title: >-
+          The ChecklistService class shall refuse a review conclusion text that contains a carriage return that is not
+          part of a carriage return and line feed pair, also at the start or at the end of the text, with the
+          ConclusionTextInvalid rule, and store and record nothing.
+        justification: |
+          A lone carriage return is not a line break, and trimming must not hide it.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Concluded
+        title: >-
+          The ChecklistService class shall refuse a change of the review conclusion text of a concluded review with the
+          ReviewLocked rule, and store and record nothing.
+        justification: |
+          A concluded review is a closed record.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Acknowledge
+        title: >-
+          The ChecklistService class shall refuse a change of the review conclusion text while a signature is current,
+          with the SignaturesWouldBecomeOutOfDate rule and the affected slot named in the message, until the actor has
+          acknowledged every affected slot, and store nothing when it refuses.
+        justification: |
+          The text is covered by the signatures, so the person who changes it must know whom it affects.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Acknowledged
+        title: >-
+          The ChecklistService class shall store the changed review conclusion text after every affected slot is
+          acknowledged and leave the signatures of those slots out of date.
+        justification: |
+          An acknowledged change is allowed and its effect shows.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange
+        title: >-
+          The ChecklistService class shall report that nothing changed when the review conclusion text is the same as
+          the stored one.
+        justification: |
+          A change that changes nothing must be told as such.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgement
+        title: >-
+          The ChecklistService class shall need no acknowledgement of a signature when the review conclusion text is
+          the same as the stored one.
+        justification: |
+          Nobody is affected by a change that changes nothing, so nobody needs to be asked.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Signature
+        title: >-
+          The ChecklistService class shall keep the signatures current when the review conclusion text is the same as
+          the stored one.
+        justification: |
+          A change that changes nothing must not invalidate a signature.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-Concurrent
+        title: >-
+          The ChecklistService class shall refuse a change of the review conclusion text that is overtaken by another
+          change of the text with the RecordChanged rule, and keep the text of the other change.
+        justification: |
+          Two writers must not overwrite each other silently.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged
 
       - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit
         title: >-
-          The ChecklistService class shall record every change of the review conclusion text in the audit trail as
-          review.conclusion-changed, in the same transaction as the change, with the actor, the project, the review
-          and only the old and the new length of the text in the detail, and shall never write the text itself into
-          the audit trail.
+          The ChecklistService class shall record a change of the review conclusion text as an audit entry with the
+          action review.conclusion-changed that states the old and the new length of the text.
         justification: |
-          The audit trail is read by people who may not be allowed to read the review, and it can never be corrected,
-          so what a reviewer wrote must not be copied into it. The lengths show that and how much the text changed.
+          An auditor must find the change.
         tests:
           - ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit-NoText
+        title: >-
+          The ChecklistService class shall never write the review conclusion text into the audit entry.
+        justification: |
+          The trail stays free of free text.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Scope
+        title: >-
+          The ChecklistService class shall give the audit entry of a change of the review conclusion text the project
+          and
+          the review.
+        justification: |
+          The entries must be found per review.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Actor
+        title: >-
+          The ChecklistService class shall name the user who changed the review conclusion text in the audit entry.
+        justification: |
+          The entry must be attributable.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores
+          - ChecklistService_SetReviewConclusionTextAsync_AlternateOfSlot_Stores
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit-NoChange
+        title: >-
+          The ChecklistService class shall record no audit entry when the review conclusion text is the same as the
+          stored one.
+        justification: |
+          A change that changes nothing did not happen.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Refused
+        title: >-
+          The ChecklistService class shall record no audit entry for a change of the review conclusion text that it
+          refuses.
+        justification: |
+          A refused change did not happen.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed
+          - ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked
+          - ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing

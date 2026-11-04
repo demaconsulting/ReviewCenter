@@ -683,6 +683,10 @@ own. This scenario is tested by `ReviewStore_UpdateDueDateAsync_Change_ChangesOn
 with different new dates are released together; exactly one wins, the stored date is the winner's, one entry exists,
 and the chain verifies. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`.
 
+**ReviewStore_UpdateDueDateAsync_AuditInsertFails_LeavesTheDueDateUnchanged**: A review has a date and the audit insert
+fails; the change throws, the date is as it was and no entry was added. With the insert possible again, the same change
+succeeds. This scenario is tested by `ReviewStore_UpdateDueDateAsync_AuditInsertFails_LeavesTheDueDateUnchanged`.
+
 **The review conclusion text** is verified in `ReviewStoreReviewConclusionTextTests.cs`.
 
 **ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord**: A text is set with a matching
@@ -693,6 +697,11 @@ and in the record that `GetRecordAsync` returns, and the digest changes. This sc
 **ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation**: A change that expects another
 text than the stored one reports `false`; the stored text is as it was and no entry is written. This scenario is
 tested by `ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_AuditInsertFails_LeavesTheTextUnchanged**: A review has a stored text and
+the audit insert fails; the change throws, the text is as it was and no entry was added. With the insert possible
+again, the same change succeeds. This scenario is tested by
+`ReviewStore_UpdateReviewConclusionTextAsync_AuditInsertFails_LeavesTheTextUnchanged`.
 
 **ReviewStore_UpdateReviewConclusionTextAsync_Change_ChangesOnlyThatReviewAndKeepsTheChainIntact**: A project holds a
 review without text and a second review with its own text. The text of the first review is set; the first review has

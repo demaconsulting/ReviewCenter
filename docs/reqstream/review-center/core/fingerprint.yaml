@@ -3,6 +3,9 @@
 #
 # The Fingerprint class calculates the SHA-256 hash of a file's bytes and the content fingerprint of a set of
 # files, using the algorithm of the ReviewMark tool.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: Fingerprint Unit Requirements
@@ -10,29 +13,70 @@ sections:
       - id: ReviewCenter-Fingerprint-FileHash
         title: >-
           The Fingerprint class shall calculate the SHA-256 hash of the exact bytes of a file as 64 lowercase
-          hexadecimal characters, without converting line endings or any other content.
+          hexadecimal characters.
         justification: |
-          ReviewMark hashes raw file bytes. Converting line endings would give a different fingerprint than
-          ReviewMark for the same files, and would make files that differ only in line endings look identical.
+          ReviewMark hashes raw file bytes and shows the hash in lowercase hexadecimal, so the same file must give the
+          same hash text in both tools.
         tests:
           - Fingerprint_ComputeFileHash_KnownText_MatchesKnownAnswer
-          - Fingerprint_ComputeFileHash_BinaryWithCrLf_MatchesKnownAnswer
+
+      - id: ReviewCenter-Fingerprint-FileHash-LineEndings
+        title: >-
+          The Fingerprint class shall not convert the line endings of a file before hashing it, so that the same text
+          with different line endings gives a different hash.
+        justification: |
+          Converting line endings would give a different fingerprint than ReviewMark for the same files, and would
+          make files that differ only in line endings look identical.
+        tests:
           - Fingerprint_ComputeFileHash_CrLfVersusLf_DiffersBecauseNoNormalization
+          - Fingerprint_ComputeFileHash_BinaryWithCrLf_MatchesKnownAnswer
+
+      - id: ReviewCenter-Fingerprint-FileHash-Verbatim
+        title: >-
+          The Fingerprint class shall hash the bytes of a file that are not valid text exactly as they are.
+        justification: |
+          Binary files are part of a repository. Decoding or re-encoding their bytes would give a different hash than
+          ReviewMark for the same file.
+        tests:
+          - Fingerprint_ComputeFileHash_BinaryWithCrLf_MatchesKnownAnswer
 
       - id: ReviewCenter-Fingerprint-SetHash
         title: >-
           The Fingerprint class shall calculate the content fingerprint of a set of files as the SHA-256 hash,
-          in lowercase hexadecimal, of the per-file hashes sorted in ordinal order and joined without a
-          separator, so that the result does not depend on file order or names.
+          in lowercase hexadecimal, of the per-file hashes sorted in ordinal order and joined without a separator.
         justification: |
-          This is the ReviewMark fingerprint algorithm. Sorting makes the result independent of the order in
-          which files were selected, and hashing only contents makes it independent of paths, so the same
-          content always yields the same fingerprint.
+          This is the ReviewMark fingerprint algorithm. A review recorded here can be matched with a review plan of
+          ReviewMark only when both tools calculate the same fingerprint for the same files.
         tests:
           - Fingerprint_Compute_SingleFile_MatchesKnownAnswer
           - Fingerprint_Compute_ThreeFilesIncludingBinary_MatchesKnownAnswer
-          - Fingerprint_Compute_DifferentOrder_GivesSameFingerprint
           - Fingerprint_Compute_FromFileHashes_EqualsFromContents
+
+      - id: ReviewCenter-Fingerprint-SetHash-Order
+        title: >-
+          The Fingerprint class shall give the same fingerprint for the same files in any order.
+        justification: |
+          Sorting makes the result independent of the order in which files were selected, so the same content always
+          yields the same fingerprint.
+        tests:
+          - Fingerprint_Compute_DifferentOrder_GivesSameFingerprint
+
+      - id: ReviewCenter-Fingerprint-SetHash-FromContents
+        title: >-
+          The Fingerprint class shall give the same fingerprint from the per-file hashes of a set of files as from the
+          contents of those files.
+        justification: |
+          Callers that already hold the per-file hashes must not read the files again, and both ways must agree.
+        tests:
+          - Fingerprint_Compute_FromFileHashes_EqualsFromContents
+
+      - id: ReviewCenter-Fingerprint-SetHash-Arguments
+        title: >-
+          The Fingerprint class shall refuse a missing set of per-file hashes and a missing set of file contents.
+        justification: |
+          A missing input is a caller error. It must fail loudly and must not give the fingerprint of an empty set.
+        tests:
+          - Fingerprint_Compute_NullSet_Throws
 
       - id: ReviewCenter-Fingerprint-Duplicates
         title: >-

@@ -357,6 +357,25 @@ public class RecordDigestReportTests
     }
 
     /// <summary>
+    ///     Test that a carried thread that has only chat is not written, so the digest is that of a record without the
+    ///     thread.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_CarriedChatThread_WritesNothing()
+    {
+        // Arrange: a record with a carried thread that has only chat comments, and a record without the thread
+        var chatOnly = Record([Thread(1, "a.txt", [Comment(1, "Why?", "Ann", false), Comment(2, "Because", "Bob", false)], carriedFrom: "rev-0")]);
+        var without = Record();
+
+        // Act
+        var chatText = RecordDigest.Canonicalize(chatOnly);
+
+        // Assert
+        Assert.Equal(RecordDigest.Compute(without), RecordDigest.Compute(chatOnly));
+        Assert.DoesNotContain("carried", chatText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that chat added to a Finding does not change the digest, and that an included reply does.
     /// </summary>
     [Fact]
@@ -433,6 +452,23 @@ public class RecordDigestReportTests
     }
 
     /// <summary>
+    ///     Test that a reply that is excluded from the report is not written: the record gives the digest and the
+    ///     canonical text of the record without the reply.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ExcludedReply_EqualsRecordWithoutIt()
+    {
+        // Arrange: a Finding alone, and the same Finding with an excluded reply
+        var none = Record([Thread(1, "a.txt", [Claim()])]);
+        var excluded = Record([Thread(1, "a.txt", [Claim(), Comment(11, "More", "Bob", false)])]);
+
+        // Act, Assert: the digest and the text are those of the record without the reply
+        Assert.Equal(RecordDigest.Compute(none), RecordDigest.Compute(excluded));
+        Assert.Equal(RecordDigest.Canonicalize(none), RecordDigest.Canonicalize(excluded));
+        Assert.Equal(Expected(FindingLines()), RecordDigest.Canonicalize(excluded));
+    }
+
+    /// <summary>
     ///     Test that a resolution note is covered when it is included, and that an excluded one changes nothing.
     /// </summary>
     [Fact]
@@ -446,6 +482,7 @@ public class RecordDigestReportTests
         // Act, Assert
         Assert.NotEqual(RecordDigest.Compute(none), RecordDigest.Compute(included));
         Assert.Equal(RecordDigest.Compute(none), RecordDigest.Compute(excluded));
+        Assert.DoesNotContain("resolution", RecordDigest.Canonicalize(excluded));
     }
 
     /// <summary>

@@ -79,6 +79,7 @@ public class ReviewPlannerTests
     /// <param name="ProjectId">The project the reviews go into.</param>
     /// <param name="RepositoryId">The enabled repository.</param>
     /// <param name="AnnId">The identity of the user <c>ann</c>.</param>
+    /// <param name="Users">The fake user store that knows the users of the fixture.</param>
     private sealed record Fixture(
         FakeReviewStore Store,
         MovableTimeProvider Clock,
@@ -91,7 +92,8 @@ public class ReviewPlannerTests
         ReviewPlanner Planner,
         int ProjectId,
         int RepositoryId,
-        int AnnId);
+        int AnnId,
+        FakeUserStore Users);
 
     /// <summary>
     ///     Creates the fixture. The history is <c>H0</c> (<c>v0</c>), <c>H1</c> (<c>v1</c>) and <c>H2</c>
@@ -179,7 +181,8 @@ public class ReviewPlannerTests
             TestServices.Planner(store, reviews, repositories, git, signing, parser),
             project.Id,
             repository.Id,
-            ann.Id);
+            ann.Id,
+            userStore);
     }
 
     /// <summary>
@@ -1123,9 +1126,11 @@ public class ReviewPlannerTests
         var results = await f.Planner.CreateAsync(
             f.ProjectId, f.RepositoryId, H2, requests, _actor, TestContext.Current.CancellationToken);
 
-        // Assert: all three failed with a message, and nothing was stored
+        // Assert: all three failed with a message that names their own problem, and nothing was stored
         Assert.All(results, result => Assert.Equal(PlanCreateOutcome.Failed, result.Outcome));
-        Assert.All(results, result => Assert.False(string.IsNullOrWhiteSpace(result.Message)));
+        Assert.Contains("full hexadecimal identifier", results[0].Message);
+        Assert.Contains("'..'", results[1].Message);
+        Assert.Contains("review-set id", results[2].Message);
         Assert.Empty(f.Store.Reviews);
     }
 
@@ -1269,6 +1274,86 @@ public class ReviewPlannerTests
         Assert.Equal("Core (bbbbbbb..ccccccc)", small);
         ReviewService.ValidateTitle(full);
         ReviewService.ValidateTitle(delta);
+    }
+
+    /// <summary>
+    ///     Test that an actor who cannot see the project, or may only read it, is refused a plan before git is reached.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit()
+    {
+        // Arrange: a planner over the real access rules, a user outside the project and an auditor of the project
+        var f = await CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var (planner, outsider, auditor) = await RealAccessAsync(f);
+
+        // Act: plan the head as each of them
+        var hidden = await Assert.ThrowsAsync<DomainRuleException>(
+            () => planner.PlanAsync(outsider, f.ProjectId, f.RepositoryId, "main", BaselineMode.None, null, token));
+        var readOnly = await Assert.ThrowsAsync<DomainRuleException>(
+            () => planner.PlanAsync(auditor, f.ProjectId, f.RepositoryId, "main", BaselineMode.None, null, token));
+
+        // Assert: the project is hidden from the outsider, the auditor is not allowed, and git was never opened
+        Assert.Equal(DomainRule.ProjectNotFound, hidden.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, readOnly.Rule);
+        Assert.Empty(f.Git.Opened);
+    }
+
+    /// <summary>
+    ///     Test that an actor who cannot see the project, or may only read it, is refused a batch before git is reached.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit()
+    {
+        // Arrange: a planner over the real access rules, a user outside the project and an auditor of the project
+        var f = await CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var (planner, outsider, auditor) = await RealAccessAsync(f);
+        var request = new PlanCreateRequest("core", "Core", "src/**", null);
+
+        // Act: create a review from a valid head as each of them
+        var hidden = await Assert.ThrowsAsync<DomainRuleException>(
+            () => planner.CreateAsync(f.ProjectId, f.RepositoryId, H2, [request], outsider, token));
+        var readOnly = await Assert.ThrowsAsync<DomainRuleException>(
+            () => planner.CreateAsync(f.ProjectId, f.RepositoryId, H2, [request], auditor, token));
+
+        // Assert: the project is hidden from the outsider, the auditor is not allowed, nothing was created and git was never opened
+        Assert.Equal(DomainRule.ProjectNotFound, hidden.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, readOnly.Rule);
+        Assert.Empty(f.Store.Reviews);
+        Assert.Empty(f.Git.Opened);
+    }
+
+    /// <summary>
+    ///     Test that a plan without an actor is refused.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_NullActor_Throws()
+    {
+        // Arrange: the fixture
+        var f = await CreateAsync();
+
+        // Act and Assert: planning without an actor is refused
+        await Assert.ThrowsAsync<ArgumentNullException>(() => f.Planner.PlanAsync(
+            null!, f.ProjectId, f.RepositoryId, "main", BaselineMode.None, null, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Builds a planner over the real access rules, with a user who is not a member of the project and an auditor
+    ///     of the project.
+    /// </summary>
+    /// <param name="f">The fixture.</param>
+    /// <returns>The planner, the outsider and the auditor.</returns>
+    private static async Task<(ReviewPlanner Planner, Actor Outsider, Actor Auditor)> RealAccessAsync(Fixture f)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var users = new UserService(f.Users, new FakePasswordHasher(), f.Clock);
+        await users.CreateAsync("outsider", "Outsider", UserRole.Reviewer, Password, cancellationToken);
+        var auditor = await users.CreateAsync("audrey", "Audrey", UserRole.Reviewer, Password, cancellationToken);
+        await f.Store.AddMembershipAsync(auditor.Id, f.ProjectId, ProjectRole.Auditor, cancellationToken);
+        var planner = new ReviewPlanner(
+            f.Store, f.Reviews, f.Repositories, f.Git, f.Signing, f.Parser, new ProjectAccess(f.Users, f.Store));
+        return (planner, new Actor("outsider", "Outsider"), new Actor("audrey", "Audrey"));
     }
 
     /// <summary>

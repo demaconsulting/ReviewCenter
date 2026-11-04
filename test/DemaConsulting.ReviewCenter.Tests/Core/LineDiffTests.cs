@@ -448,6 +448,16 @@ public class LineDiffTests
         // Arrange, Act, Assert: each argument is checked
         Assert.Throws<ArgumentNullException>(() => LineDiff.Compute(null!, []));
         Assert.Throws<ArgumentNullException>(() => LineDiff.Compute([], null!));
+    }
+
+    /// <summary>
+    ///     Test that a null list of rows and a negative number of context rows are rejected when the rows are
+    ///     segmented.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Segment_InvalidArguments_Throw()
+    {
+        // Arrange, Act, Assert: each argument is checked
         Assert.Throws<ArgumentNullException>(() => LineDiff.Segment(null!));
         Assert.Throws<ArgumentOutOfRangeException>(() => LineDiff.Segment([], -1));
     }
@@ -710,6 +720,43 @@ public class LineDiffTests
     }
 
     /// <summary>
+    ///     Test that every row of random patterns of unchanged, removed, and added rows appears in exactly one
+    ///     side-by-side row, and that the rows keep their order on each side.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_RandomPatterns_ShowEveryRowExactlyOnceInOrder()
+    {
+        // Arrange: a fixed seed and random patterns of unchanged (c), removed (-) and added (+) rows
+        var random = new Random(31);
+        for (var round = 0; round < 200; round++)
+        {
+            var pattern = new string(Enumerable.Range(0, random.Next(0, 30)).Select(_ => "c-+"[random.Next(0, 3)]).ToArray());
+            var rows = Pattern(pattern);
+
+            // Act: pair all the rows
+            var paired = LineDiff.Pair(rows, 0, rows.Count);
+
+            // Assert: an unchanged row is shown once on each side (twice in all), a removed or added row once, and
+            // each side is in ascending order
+            var occurrences = paired
+                .SelectMany(p => new[] { p.LeftIndex, p.RightIndex })
+                .Where(i => i is not null)
+                .GroupBy(i => i!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+            Assert.Equal(rows.Count, occurrences.Count);
+            for (var i = 0; i < rows.Count; i++)
+            {
+                Assert.Equal(pattern[i] == 'c' ? 2 : 1, occurrences[i]);
+            }
+
+            var left = paired.Where(p => p.LeftIndex is not null).Select(p => p.LeftIndex!.Value).ToList();
+            var right = paired.Where(p => p.RightIndex is not null).Select(p => p.RightIndex!.Value).ToList();
+            Assert.Equal(left.Order(), left);
+            Assert.Equal(right.Order(), right);
+        }
+    }
+
+    /// <summary>
     ///     Test that pairing the visible segments of a real diff keeps three lines of context, collapsed gaps stay
     ///     out of the rows, a pinned unchanged row keeps its place, and every visible row appears exactly once.
     /// </summary>
@@ -732,8 +779,17 @@ public class LineDiffTests
         // Assert: the gaps are what Segment collapsed, the replacement pairs 1 removed with 2 added, and the
         // pinned row (index 3) is shown with its context
         Assert.Equal(2, segments.Count(s => s.IsGap));
-        var indexes = paired.SelectMany(p => new[] { p.LeftIndex, p.RightIndex }).Where(i => i is not null).Select(i => i!.Value).Distinct().Order().ToList();
-        Assert.Equal(visible.SelectMany(s => Enumerable.Range(s.Start, s.Count)).ToList(), indexes);
+        var occurrences = paired
+            .SelectMany(p => new[] { p.LeftIndex, p.RightIndex })
+            .Where(i => i is not null)
+            .GroupBy(i => i!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var visibleIndexes = visible.SelectMany(s => Enumerable.Range(s.Start, s.Count)).ToList();
+        Assert.Equal(visibleIndexes, occurrences.Keys.Order().ToList());
+        foreach (var index in visibleIndexes)
+        {
+            Assert.Equal(result.Lines[index].Kind == DiffLineKind.Context ? 2 : 1, occurrences[index]);
+        }
         Assert.Contains(new DiffRow(3, 3), paired);
         var replaced = paired.Single(p => p.LeftIndex is { } l && result.Lines[l].Kind == DiffLineKind.Removed && p.RightIndex is not null && result.Lines[p.LeftIndex.Value].Text == "l15");
         Assert.Equal("n15a", result.Lines[replaced.RightIndex!.Value].Text);

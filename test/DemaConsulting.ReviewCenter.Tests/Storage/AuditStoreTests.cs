@@ -53,6 +53,21 @@ public class AuditStoreTests
     }
 
     /// <summary>
+    ///     Runs a query that returns one number against the database of the test store.
+    /// </summary>
+    /// <param name="db">The test store.</param>
+    /// <param name="sql">The query.</param>
+    /// <returns>The number the query returns.</returns>
+    private static long Scalar(TestStore db, string sql)
+    {
+        using var connection = new SqliteConnection(db.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
     ///     Reads the whole trail in sequence order.
     /// </summary>
     /// <param name="db">The test database.</param>
@@ -347,6 +362,31 @@ public class AuditStoreTests
         Assert.Empty(await db.Store.ListProjectsAsync(TestContext.Current.CancellationToken));
         Execute(db, "DROP TRIGGER refuse_audit");
         Assert.Empty(await ReadAll(db));
+    }
+
+    /// <summary>
+    ///     Test that a review whose audit entry cannot be stored is not stored either: no review, no file, and no
+    ///     entry exist afterwards.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddReviewAsync_AuditInsertFails_StoresNoReview()
+    {
+        // Arrange: a project, and a database that refuses every audit entry
+        using var db = new TestStore();
+        var project = await db.Store.AddProjectAsync(new Project { Name = "A", Created = _created }, TestContext.Current.CancellationToken);
+        var before = (await ReadAll(db)).Count;
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Store.AddReviewAsync(NewReview(project.Id, "rev-1"), Draft("first", project.Id, "rev-1"), TestContext.Current.CancellationToken));
+
+        // Assert: neither the review nor its file is there, and no entry was added
+        Assert.Null(await db.Store.GetReviewAsync(project.Id, "rev-1", TestContext.Current.CancellationToken));
+        Assert.Equal(0L, Scalar(db, "SELECT COUNT(*) FROM Reviews"));
+        Assert.Equal(0L, Scalar(db, "SELECT COUNT(*) FROM ReviewFiles"));
+        Execute(db, "DROP TRIGGER refuse_audit");
+        Assert.Equal(before, (await ReadAll(db)).Count);
     }
 
     /// <summary>

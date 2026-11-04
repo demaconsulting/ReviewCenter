@@ -20,6 +20,7 @@
 
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.Data.Sqlite;
 
 namespace DemaConsulting.ReviewCenter.Tests.Storage;
 
@@ -126,6 +127,50 @@ public class ReviewDueDateStoreTests
         Assert.Equal(2, entries.Count);
         Assert.All(entries, e => Assert.Equal("REV-1", e.ReviewId));
         Assert.True(AuditChain.Verify(await db.Audit.ReadAfterAsync(0, 100, cancellationToken)).IsIntact);
+    }
+
+    /// <summary>
+    ///     Test that a change of the due date whose audit entry cannot be stored is rolled back: the due date stays
+    ///     as it was, and the same change works once the entry can be stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateDueDateAsync_AuditInsertFails_LeavesTheDueDateUnchanged()
+    {
+        // Arrange: a review that has a date, and a database that refuses every audit entry
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var current = new DateOnly(2031, 1, 2);
+        var projectId = await AddReviewAsync(db, current);
+        var draft = AuditDraft.By(TestActors.Ann, Action, "change", projectId, "REV-1");
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 100, cancellationToken)).Count;
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Store.UpdateDueDateAsync(projectId, "REV-1", current, new DateOnly(2032, 1, 1), draft, cancellationToken));
+
+        // Assert: the date is as it was and no entry was added
+        Assert.Equal(current, (await db.Store.GetReviewAsync(projectId, "REV-1", cancellationToken))!.DueDate);
+        Execute(db, "DROP TRIGGER refuse_audit");
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 100, cancellationToken)).Count);
+
+        // Act, Assert: with the entry storable again, the same change succeeds
+        Assert.True(await db.Store.UpdateDueDateAsync(projectId, "REV-1", current, new DateOnly(2032, 1, 1), draft, cancellationToken));
+        Assert.Equal(new DateOnly(2032, 1, 1), (await db.Store.GetReviewAsync(projectId, "REV-1", cancellationToken))!.DueDate);
+    }
+
+    /// <summary>
+    ///     Runs a SQL statement directly against the database file, as someone with file access would.
+    /// </summary>
+    /// <param name="db">The test database.</param>
+    /// <param name="sql">The statement.</param>
+    private static void Execute(TestStore db, string sql)
+    {
+        using var connection = new SqliteConnection(db.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 
     /// <summary>

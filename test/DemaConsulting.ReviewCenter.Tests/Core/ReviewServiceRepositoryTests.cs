@@ -523,7 +523,7 @@ public class ReviewServiceRepositoryTests
     }
 
     /// <summary>
-    ///     Test that a missing head revision is refused, and that a git failure is passed on as its own rule.
+    ///     Test that a git failure is passed on as its own rule and stores nothing.
     /// </summary>
     [Fact]
     public async Task ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn()
@@ -538,13 +538,48 @@ public class ReviewServiceRepositoryTests
         // Assert: the rule is kept, nothing stored
         Assert.Equal(DomainRule.GitAccessFailed, ex.Rule);
         Assert.Empty(f.Store.Reviews);
+    }
 
-        // Act, Assert: a blank head revision is refused before git is touched
-        f.Git.OpenFailure = null;
+    /// <summary>
+    ///     Test that a blank head revision is refused with the revision rule before the repository is opened.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_BlankHeadRevision_IsRefusedBeforeOpening()
+    {
+        // Arrange: the fixture, and the number of times the repository was opened so far
+        var f = await CreateAsync();
         var opened = f.Git.Opened.Count;
+
+        // Act: create a review with a blank head revision
         var blank = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.CreateFromRepositoryAsync(
-            f.ProjectId, "rev-2", "Title", new RepositorySource(f.RepositoryId, " ", null, "**/*"), _actor, TestContext.Current.CancellationToken));
+            f.ProjectId, "rev-2", "Title", new RepositorySource(f.RepositoryId, "  ", null, "**/*"), _actor, TestContext.Current.CancellationToken));
+
+        // Assert: the revision rule is reported and the repository was not opened
         Assert.Equal(DomainRule.RevisionInvalid, blank.Rule);
+        Assert.Equal(opened, f.Git.Opened.Count);
+        Assert.Empty(f.Store.Reviews);
+    }
+
+    /// <summary>
+    ///     Test that an empty or white-space selection is refused with the selection rule before the repository is
+    ///     opened.
+    /// </summary>
+    /// <param name="selection">The blank selection text.</param>
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task ReviewService_CreateFromRepositoryAsync_BlankSelection_ThrowsSelectionInvalid(string selection)
+    {
+        // Arrange: the fixture, and the number of times the repository was opened so far
+        var f = await CreateAsync();
+        var opened = f.Git.Opened.Count;
+
+        // Act: create a review with the blank selection
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => CreateReviewAsync(f, selection: selection));
+
+        // Assert: the selection rule is reported, nothing is stored and the repository was not opened
+        Assert.Equal(DomainRule.SelectionInvalid, ex.Rule);
+        Assert.Empty(f.Store.Reviews);
         Assert.Equal(opened, f.Git.Opened.Count);
     }
 
@@ -636,6 +671,133 @@ public class ReviewServiceRepositoryTests
         Assert.Equal(DomainRule.SelectionInvalid, exception.Rule);
         Assert.Equal(0, opened);
         Assert.Null(f.Store.Reviews.Single().ReviewSetId);
+    }
+
+    /// <summary>
+    ///     Test that a repository of another project is refused as not found, and nothing is stored or fetched.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_RepositoryOfOtherProject_IsRefusedAsNotFound()
+    {
+        // Arrange: a second project with a repository of its own
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var other = await TestServices.Projects(f.Store, new FixedTimeProvider(_now)).CreateAsync("Other", null, cancellationToken);
+        var foreign = await f.Repositories.CreateAsync(
+            other.Id, "foreign-repo", "https://example.com/org/foreign.git", null, null, _actor, cancellationToken);
+
+        // Act: create a review in the first project from the repository of the second
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => CreateReviewAsync(f, repositoryId: foreign.Id));
+
+        // Assert: refused as a repository that does not exist; nothing stored and the repository was not opened
+        Assert.Equal(DomainRule.RepositoryNotFound, ex.Rule);
+        Assert.Empty(f.Store.Reviews);
+        Assert.Empty(f.Git.Opened);
+    }
+
+    /// <summary>
+    ///     Test that a head revision that the repository does not know is refused as not found, and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_UnknownHeadRevision_ThrowsRevisionNotFound()
+    {
+        // Arrange: the fixture, which knows the revisions main and v1
+        var f = await CreateAsync();
+
+        // Act: create a review whose head revision is not known
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.CreateFromRepositoryAsync(
+            f.ProjectId, "rev-1", "Title", new RepositorySource(f.RepositoryId, "nope", "v1", "**/*"), _actor, TestContext.Current.CancellationToken));
+
+        // Assert: the revision rule, and nothing stored
+        Assert.Equal(DomainRule.RevisionNotFound, ex.Rule);
+        Assert.Empty(f.Store.Reviews);
+    }
+
+    /// <summary>
+    ///     Test that disabling the repository afterwards leaves the review, its head and baseline content and its
+    ///     record digest unchanged.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_RepositoryDisabledLater_ReviewIsUnaffected()
+    {
+        // Arrange: a created review and its digest
+        var f = await CreateAsync();
+        await CreateReviewAsync(f);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var digestBefore = await DigestAsync(f, "rev-1");
+
+        // Act: an administrator disables the repository, then the review is read
+        await f.Repositories.SetEnabledAsync(f.RepositoryId, false, _actor, cancellationToken);
+        var review = await f.Service.GetAsync(f.ProjectId, "rev-1", cancellationToken);
+        var head = await f.Service.GetFileContentAsync(f.ProjectId, "rev-1", "src/mod.txt", cancellationToken);
+        var baseline = await f.Service.GetBaselineContentAsync(f.ProjectId, "rev-1", "src/mod.txt", cancellationToken);
+
+        // Assert: the review, both contents and the digest are what they were
+        Assert.Equal(HeadSha, review!.HeadSha);
+        Assert.Equal("hello\n", Encoding.UTF8.GetString(head!));
+        Assert.Equal("world\n", Encoding.UTF8.GetString(baseline!));
+        Assert.Equal(digestBefore, await DigestAsync(f, "rev-1"));
+    }
+
+    /// <summary>
+    ///     Test that a valid due date is stored with a review from a repository.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_DueDate_IsStored()
+    {
+        // Arrange: the fixture and a date ten days after today (the clock stands at 4 March 2025)
+        var f = await CreateAsync();
+        var due = new DateOnly(2025, 3, 14);
+        var source = new RepositorySource(f.RepositoryId, "main", "v1", "**/*");
+
+        // Act: create the review with the date
+        var result = await f.Service.CreateFromRepositoryAsync(
+            f.ProjectId, "rev-1", "Title", source, _actor, TestContext.Current.CancellationToken, due);
+
+        // Assert: the returned and the stored review carry the date
+        Assert.Equal(due, result.Review.DueDate);
+        Assert.Equal(due, Assert.Single(f.Store.Reviews).DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a valid due date is named in the audit entry of a review from a repository.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_DueDate_IsAudited()
+    {
+        // Arrange: the fixture and a date ten days after today (the clock stands at 4 March 2025)
+        var f = await CreateAsync();
+        var source = new RepositorySource(f.RepositoryId, "main", "v1", "**/*");
+
+        // Act: create the review with the date
+        await f.Service.CreateFromRepositoryAsync(
+            f.ProjectId, "rev-1", "Title", source, _actor, TestContext.Current.CancellationToken, new DateOnly(2025, 3, 14));
+
+        // Assert: the one creation entry ends with the date
+        Assert.EndsWith(", due 2025-03-14", Assert.Single(CreatedAudits(f)).Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a due date in the past is refused for a review from a repository before the repository is
+    ///     opened, and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_DueDateInThePast_IsRefusedBeforeOpening()
+    {
+        // Arrange: the fixture, with yesterday as the date (the clock stands at 4 March 2025)
+        var f = await CreateAsync();
+        var source = new RepositorySource(f.RepositoryId, "main", "v1", "**/*");
+        var opened = f.Git.Opened.Count;
+
+        // Act: create the review with the date in the past
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.CreateFromRepositoryAsync(
+            f.ProjectId, "rev-1", "Title", source, _actor, TestContext.Current.CancellationToken, new DateOnly(2025, 3, 3)));
+
+        // Assert: the due-date rule is reported, nothing is stored or audited and the repository was not opened
+        Assert.Equal(DomainRule.DueDateInvalid, refused.Rule);
+        Assert.Empty(f.Store.Reviews);
+        Assert.Empty(CreatedAudits(f));
+        Assert.Equal(opened, f.Git.Opened.Count);
     }
 
     /// <summary>

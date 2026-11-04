@@ -455,8 +455,28 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
-    ///     Test that a check whose wording changed in the project's checklist, and a check that the new checklist
-    ///     does not have, are not carried at the create path of an upload.
+    ///     Test that the person who creates a follow-up does not become the answerer of the answers that it carries.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_FollowUp_CarriedAnswers_AreNotAnsweredByTheCreator()
+    {
+        // Arrange: everything passed in the earlier review, by Bob
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+        await AnswerAllAsync(w, "rev-1");
+
+        // Act: Ann creates the follow-up
+        await UploadAsync(w, "rev-2", follows: "rev-1", creator: TestActors.Ann);
+
+        // Assert: answers are carried, and none of them names Ann
+        var carried = await CarriedAnswersAsync(w, "rev-2");
+        Assert.NotEmpty(carried);
+        Assert.All(carried, a => Assert.NotEqual("ann", a.AnsweredByUsername));
+    }
+
+    /// <summary>
+    ///     Test that a check whose wording changed in the project's checklist is not carried at the create path of an
+    ///     upload.
     /// </summary>
     [Fact]
     public async Task ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried()
@@ -839,6 +859,111 @@ public class ReviewServiceFollowUpTests
         // Assert
         Assert.Contains("another review-set", other.Message, StringComparison.Ordinal);
         Assert.Equal("set-1", same.Review.FollowsReviewId);
+    }
+
+    /// <summary>
+    ///     Creates a review from a plan session: a review of the repository head <c>main</c> that holds
+    ///     <c>src/code.txt</c>, as the review planner makes it.
+    /// </summary>
+    /// <param name="w">The world.</param>
+    /// <param name="id">The review id.</param>
+    /// <param name="reviewSetId">The review-set identifier.</param>
+    /// <returns>The created review and the skipped entries.</returns>
+    private static async Task<RepositoryReviewResult> PlannedAsync(World w, string id, string reviewSetId)
+    {
+        var access = await w.Repositories.GetAccessAsync(w.ProjectId, w.RepositoryId, TestContext.Current.CancellationToken);
+        await using var session = await w.Git.OpenAsync(access, TestContext.Current.CancellationToken);
+        var (patterns, text) = ReviewService.ParseSelection("src/code.txt");
+        return await w.Reviews.CreateFromSessionAsync(
+            session,
+            access,
+            w.ProjectId,
+            new SessionReviewRequest(id, "Planned " + id, HeadOne, null, patterns, text, reviewSetId, "main", null, null),
+            TestActors.Ann,
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Test that the review-set identifier of a planned review is stored with the review and is named last in the
+    ///     audit entry of its creation.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromSessionAsync_ReviewSetId_IsRecordedAndNamedLastInAudit()
+    {
+        // Arrange: the world with an open repository session
+        var w = await CreateAsync();
+
+        // Act: create a review for the review-set "core-set"
+        var result = await PlannedAsync(w, "set-1", "core-set");
+
+        // Assert: the review records the set, and the audit entry ends with it
+        Assert.Equal("core-set", result.Review.ReviewSetId);
+        Assert.Equal("core-set", (await w.Reviews.GetAsync(w.ProjectId, "set-1", TestContext.Current.CancellationToken))!.ReviewSetId);
+        Assert.EndsWith(", set 'core-set'", CreatedDetail(w, "set-1"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an empty review-set identifier and one of 101 characters are refused, and nothing is stored.
+    /// </summary>
+    /// <param name="length">The number of characters of the identifier.</param>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(101)]
+    public async Task ReviewService_CreateFromSessionAsync_ReviewSetIdOutOfRange_ThrowsReviewSetConfigInvalid(int length)
+    {
+        // Arrange: the world with an open repository session
+        var w = await CreateAsync();
+
+        // Act: create a review with an identifier of that length
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => PlannedAsync(w, "set-1", new string('s', length)));
+
+        // Assert: refused with the review-set rule and nothing stored
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Empty(w.Store.Reviews);
+    }
+
+    /// <summary>
+    ///     Test that a review-set identifier of exactly 100 characters is accepted.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromSessionAsync_ReviewSetIdOfMaxLength_IsAccepted()
+    {
+        // Arrange: the world with an open repository session and an identifier of the longest allowed length
+        var w = await CreateAsync();
+        var set = new string('s', ReviewLimits.MaxReviewSetIdLength);
+
+        // Act: create the review
+        var result = await PlannedAsync(w, "set-1", set);
+
+        // Assert: the whole identifier is stored
+        Assert.Equal(set, result.Review.ReviewSetId);
+    }
+
+    /// <summary>
+    ///     Test that a follow-up of a reopened review carries no reopening: the earlier review keeps its reopening and
+    ///     the new review has none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_FollowUp_ReopenedSource_CarriesNoReopening()
+    {
+        // Arrange: rev-1 is approved by Bob and then reopened
+        var w = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await UploadAsync(w, "rev-1");
+        await AnswerAllAsync(w, "rev-1");
+        var slot = Assert.Single(await w.Store.ListSlotsAsync(w.ProjectId, "rev-1", cancellationToken));
+        var digest = (await w.Signing.GetApprovalAsync(w.ProjectId, "rev-1", cancellationToken))!.Digest;
+        await w.Signing.SignAsync(TestActors.Bob, w.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken);
+        await w.Signing.ReopenReviewAsync(_cyd, w.ProjectId, "rev-1", "Needs another look", cancellationToken);
+        Assert.Equal(1, (await RecordAsync(w, "rev-1")).Reopens);
+
+        // Act: create the follow-up
+        await UploadAsync(w, "rev-2", follows: "rev-1");
+
+        // Assert: the follow-up has no reopening and is not approved
+        Assert.Equal(0, (await RecordAsync(w, "rev-2")).Reopens);
+        Assert.False((await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", cancellationToken))!.IsApproved);
+        Assert.Equal(1, (await RecordAsync(w, "rev-1")).Reopens);
     }
 
     /// <summary>

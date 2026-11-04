@@ -2,27 +2,107 @@
 # Software Unit Requirements for the RevisionValidator Class
 #
 # The RevisionValidator class checks the revision name an author gives, before it can reach git.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: RevisionValidator Unit Requirements
     requirements:
       - id: ReviewCenter-RevisionValidator-Accept
         title: >-
-          The RevisionValidator class shall accept a plain branch name, tag name, or commit identifier, up to the
-          length limit inclusive, and return it unchanged.
+          The RevisionValidator class shall accept a plain branch name, tag name, or commit identifier and return it
+          unchanged.
         justification: |
           Authors must be able to name the usual revisions of a repository.
         tests:
           - RevisionValidator_Validate_ValidRevision_ReturnsIt
+
+      - id: ReviewCenter-RevisionValidator-Accept-LengthLimit
+        title: >-
+          The RevisionValidator class shall accept a revision that has exactly the length limit.
+        justification: |
+          The limit is a maximum that can be used, so the longest allowed name must still pass.
+        tests:
           - RevisionValidator_Validate_LengthLimit_IsInclusive
+
+      - id: ReviewCenter-RevisionValidator-Accept-Verdict
+        title: >-
+          The RevisionValidator class shall report whether a revision is acceptable without throwing.
+        justification: |
+          Callers that only need a yes or no, such as a page that shows a hint, must not handle an exception.
+        tests:
+          - RevisionValidator_Validate_ValidRevision_ReturnsIt
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
 
       - id: ReviewCenter-RevisionValidator-Refuse
         title: >-
-          The RevisionValidator class shall refuse a revision that is empty, too long, or not a plain name, such as
-          one that starts with a dash, uses a revision expression, or contains white space or control characters,
-          with a rule violation that names the revision rule.
+          The RevisionValidator class shall refuse a revision that is not a plain name with a rule violation that names
+          the revision rule.
         justification: |
           A revision is handed to git. A value that git could read as an option or as an expression could change what
-          git does, so only plain names pass.
+          git does, so only plain names pass, and the user is told which rule was broken.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Empty
+        title: >-
+          The RevisionValidator class shall refuse an empty or missing revision.
+        justification: |
+          An empty revision names nothing, and git could fall back to a default instead of failing.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-TooLong
+        title: >-
+          The RevisionValidator class shall refuse a revision that is longer than the length limit.
+        justification: |
+          A bounded name keeps the value small wherever it is stored, shown, or passed to git.
+        tests:
+          - RevisionValidator_Validate_LengthLimit_IsInclusive
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Start
+        title: >-
+          The RevisionValidator class shall refuse a revision that does not start with a letter or a digit, such as one
+          that starts with a dash.
+        justification: |
+          A revision that starts with a dash could be read by git as an option, such as an option that runs a program.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Expression
+        title: >-
+          The RevisionValidator class shall refuse a revision that is a git revision expression, such as a range, an
+          ancestor form, or a reference-log form.
+        justification: |
+          An expression selects commits by a rule instead of naming one revision, so it could pick content that the
+          author did not intend.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Whitespace
+        title: >-
+          The RevisionValidator class shall refuse a revision that contains white space or a control character.
+        justification: |
+          White space could split the revision into several arguments, and a control character could hide text.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Characters
+        title: >-
+          The RevisionValidator class shall refuse a revision that contains a character other than letters, digits,
+          and the characters . _ / + @  # -.
+        justification: |
+          A strict list of characters is safer than a copy of the naming rules of git, which allow characters that a
+          shell or git could read in a special way.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid
+
+      - id: ReviewCenter-RevisionValidator-Refuse-Malformed
+        title: >-
+          The RevisionValidator class shall refuse a revision with an empty path part or one that ends with a slash,
+          a dot, or the suffix .lock.
+        justification: |
+          Git itself treats these names in a special way or refuses them, so they never name a normal branch or tag.
         tests:
           - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid

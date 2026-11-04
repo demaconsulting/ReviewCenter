@@ -3,130 +3,682 @@
 #
 # The ReviewPlanner class works out which reviews a head revision of a repository needs, one for every review-set of
 # the .reviewmark.yaml of that revision, and creates the reviews that the user picks.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ReviewPlanner Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Plan: one row per review-set of the configuration file at the head of a repository
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-Plan
         title: >-
-          The ReviewPlanner shall read the review-sets from the configuration file at the head commit of a repository,
-          using one session for the whole plan, and shall return one row per review-set in file order with the files
-          added, modified, and deleted within its selection, listing the changes once per distinct baseline and holding
-          only one change list at a time, and shall refuse a plan whose project (one that does not exist or that the
-          actor may not see, with the same refusal), repository (one that is not a repository of the project),
-          revision, or configuration file is not valid, with the rule of the problem, while a problem with one
-          review-set can only be planned as it stands, so a broken one affects only its own row.
+          The ReviewPlanner class shall read the review-sets from the configuration file at the head commit of a
+          repository and give one row per review-set in file order.
         justification: |
-          A repository says in one file which sets of files are reviewed together. Reading that file at the head, once
-          and from one fetch, shows the user in one place everything that needs a review, and a broken set must not
-          hide the others. A change list can be large, and a plan can span many baselines, so holding only one at a
-          time keeps the memory of a plan bounded. A user who cannot see a project must learn nothing about it, and
-          git must not be reached on their behalf.
+          A repository says in one file which sets of files are reviewed together. Reading that file at the head shows
+          the user in one place everything that needs a review.
         tests:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
-          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
-          - ReviewPlanner_PlanAsync_NoConfiguration_ThrowsConfigMissing
-          - ReviewPlanner_PlanAsync_ConfigurationTooLarge_ThrowsConfigInvalidWithoutReading
-          - ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid
-          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
-          - ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading
-          - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
-          - ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules
           - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
+
+      - id: ReviewCenter-ReviewPlanner-Plan-Session
+        title: >-
+          The ReviewPlanner class shall use one session on the repository for the whole plan.
+        justification: |
+          One session means one fetch of the repository, however many sets and baselines the plan has.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_ExplicitBaseline_UsesItForEverySet
+
+      - id: ReviewCenter-ReviewPlanner-Plan-Counts
+        title: >-
+          The ReviewPlanner class shall give for every row the numbers of files added, modified, and deleted within the
+          selection of its review-set.
+        justification: |
+          The counts show the user how much there is to review before a review is created.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_ExplicitBaseline_UsesItForEverySet
+          - ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote
+
+      - id: ReviewCenter-ReviewPlanner-Plan-ChangeLists
+        title: >-
+          The ReviewPlanner class shall list the changes once for every distinct baseline of a plan.
+        justification: |
+          Sets that share a baseline share its change list, so the repository is asked once per baseline and not once
+          per set.
+        tests:
+          - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
+
+      - id: ReviewCenter-ReviewPlanner-Plan-OneList
+        title: >-
+          The ReviewPlanner class shall hold only one change list at a time while it classifies the rows of a plan.
+        justification: |
+          A change list can be large, and a plan can span many baselines, so holding only one keeps the memory of a
+          plan bounded.
+        tests:
+          - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
+
+      - id: ReviewCenter-ReviewPlanner-Plan-BrokenSet
+        title: >-
+          The ReviewPlanner class shall give a review-set that cannot be planned a row of its own with the state cannot
+          plan and the reason, without failing the plan or the other rows.
+        justification: |
+          A broken set must not hide the others, and the user must see which set is broken and why.
+        tests:
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+
+      - id: ReviewCenter-ReviewPlanner-Plan-SetPath
+        title: >-
+          The ReviewPlanner class shall refuse a review-set whose path leaves the repository with a reason that names
+          the path segment.
+        justification: |
+          The paths come from a file of the repository, and a path that leaves the repository must never be read.
+        tests:
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+
+      - id: ReviewCenter-ReviewPlanner-Plan-SetId
+        title: >-
+          The ReviewPlanner class shall refuse a review-set whose identifier is too long with a reason that says so.
+        justification: |
+          The identifier is stored, signed, and written to the audit trail, so it is bounded.
+        tests:
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+
+      - id: ReviewCenter-ReviewPlanner-Plan-SetSize
+        title: >-
+          The ReviewPlanner class shall refuse a review-set that selects too many files with a reason that says so.
+        justification: |
+          A review of more files than the limit could not be created, so the user is told when planning.
+        tests:
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+
+      - id: ReviewCenter-ReviewPlanner-Plan-NoConfig
+        title: >-
+          The ReviewPlanner class shall refuse a head that has no configuration file with the rule
+          review-set-configuration-missing.
+        justification: |
+          A head without the file has no review-sets, and the user needs to know that the file is what is missing.
+        tests:
+          - ReviewPlanner_PlanAsync_NoConfiguration_ThrowsConfigMissing
+
+      - id: ReviewCenter-ReviewPlanner-Plan-ConfigTooLarge
+        title: >-
+          The ReviewPlanner class shall refuse a configuration file larger than the limit with the rule
+          review-set-configuration-invalid before reading its content.
+        justification: |
+          The file comes from a repository that the service does not control, so its size is bounded before it is read.
+        tests:
+          - ReviewPlanner_PlanAsync_ConfigurationTooLarge_ThrowsConfigInvalidWithoutReading
+
+      - id: ReviewCenter-ReviewPlanner-Plan-ConfigInvalid
+        title: >-
+          The ReviewPlanner class shall pass on the rule and the message when the configuration file is not valid.
+        justification: |
+          The message of the parser tells the user what is wrong in the file, so it is not replaced.
+        tests:
+          - ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewPlanner-Plan-Mode
+        title: >-
+          The ReviewPlanner class shall refuse a baseline mode that is not defined before anything is read.
+        justification: |
+          A value that no mode has must not be taken for one of the modes, and a wrong call must fail cheaply.
+        tests:
+          - ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading
+
+      - id: ReviewCenter-ReviewPlanner-Plan-HeadUnknown
+        title: >-
+          The ReviewPlanner class shall refuse a head revision that does not exist with the rule revision-not-found.
+        justification: |
+          The user needs to know that the revision is what is wrong.
+        tests:
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+
+      - id: ReviewCenter-ReviewPlanner-Plan-HeadInvalid
+        title: >-
+          The ReviewPlanner class shall refuse a head revision that is not a plain name with the rule revision-invalid.
+        justification: |
+          A revision that could be read by git as an option must never reach git.
+        tests:
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+
+      - id: ReviewCenter-ReviewPlanner-Plan-ProjectMissing
+        title: >-
+          The ReviewPlanner class shall refuse a project that does not exist with the rule project-not-found.
+        justification: |
+          The user needs to know that the project is what is wrong.
+        tests:
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+
+      - id: ReviewCenter-ReviewPlanner-Plan-RepositoryMissing
+        title: >-
+          The ReviewPlanner class shall refuse a repository that is not a repository of the project with the rule
+          repository-not-found.
+        justification: |
+          A repository of another project must not be reachable through this one.
+        tests:
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+
+      - id: ReviewCenter-ReviewPlanner-Plan-RepositoryOff
+        title: >-
+          The ReviewPlanner class shall refuse a repository that is disabled with the rule repository-disabled.
+        justification: |
+          A disabled repository is not to be read, and the user needs to know why the plan was refused.
+        tests:
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+
+      - id: ReviewCenter-ReviewPlanner-Plan-Hidden
+        title: >-
+          The ReviewPlanner class shall refuse a plan for an actor who may not see the project with the rule
+          project-not-found, without reaching git.
+        justification: |
+          A user who cannot see a project must learn nothing about it, and git must not be reached on their behalf.
+        tests:
+          - ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit
+
+      - id: ReviewCenter-ReviewPlanner-Plan-ReadOnly
+        title: >-
+          The ReviewPlanner class shall refuse a plan for an actor who may only read the project with the rule
+          actor-not-allowed, without reaching git.
+        justification: |
+          An auditor may look at reviews but must not start work on them, and git must not be reached on their behalf.
+        tests:
+          - ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit
+
+      - id: ReviewCenter-ReviewPlanner-Plan-Arguments
+        title: >-
+          The ReviewPlanner class shall refuse to be created without any of its collaborators.
+        justification: |
+          A planner without a collaborator would fail later and far from the cause.
+        tests:
           - ReviewPlanner_Constructor_NullArgument_Throws
 
+      - id: ReviewCenter-ReviewPlanner-Plan-ActorMissing
+        title: >-
+          The ReviewPlanner class shall refuse a plan without an actor.
+        justification: |
+          The access rules need to know who plans, so a missing actor is a fault of the caller.
+        tests:
+          - ReviewPlanner_PlanAsync_NullActor_Throws
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Baseline: what a review-set is compared with
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-Baseline
         title: >-
-          The ReviewPlanner shall choose the baseline of every review-set as no baseline, as one revision given by the
-          user for all sets, or as the head of the last approved review of the same set, the one signed last, and shall
-          fall back to a full review with a plain note when the set has no approved review yet (the note says "no
-          approved review of this set yet"; a review that concluded as Rejected is not approved), when that head is
-          not an ancestor of the new head or cannot be checked, or when the selection of the set changed since that
-          review.
+          The ReviewPlanner class shall choose no baseline and a full review of all selected files when the user asks
+          for none.
         justification: |
-          Reviewing only what changed since the last approved review saves effort, but only when that review really is
-          part of the history and covered the same files. In every other case the safe choice is a full review, and
-          the note tells the user why, so that nothing escapes review without anyone seeing it.
+          Reviewing only what changed saves effort, but only when the user wants it. Without a baseline every selected
+          file is reviewed, so that nothing escapes review.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-Explicit
+        title: >-
+          The ReviewPlanner class shall use one revision given by the user as the baseline of every review-set and say
+          so in the note of the row.
+        justification: |
+          A user who reviews everything since a release names that release once, and the note shows where the baseline
+          comes from.
         tests:
           - ReviewPlanner_PlanAsync_ExplicitBaseline_UsesItForEverySet
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-ExplicitUnknown
+        title: >-
+          The ReviewPlanner class shall refuse a given baseline revision that does not exist with the rule
+          revision-not-found.
+        justification: |
+          A baseline that git does not know cannot be compared with, and the user needs to know that it is the cause.
+        tests:
           - ReviewPlanner_PlanAsync_UnknownExplicitBaseline_ThrowsRevisionNotFound
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-Last
+        title: >-
+          The ReviewPlanner class shall choose the head of the last approved review of the same review-set as the
+          baseline when that head is an ancestor of the new head.
+        justification: |
+          Reviewing only what changed since the last approved review saves effort when that review is part of the
+          history of the new head.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-LastSigned
+        title: >-
+          The ReviewPlanner class shall choose the approved review that was signed last as the last approved review,
+          and not the one that was created last.
+        justification: |
+          The review that was approved last is the latest that somebody answered for, whatever the order of creation.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-NoApproved
+        title: >-
+          The ReviewPlanner class shall choose a full review with the note "no approved review of this set yet" for a
+          review-set without an approved review.
+        justification: |
+          Without an approved review nothing of the set was ever accepted, so all of it needs review, and the note says
+          why.
+        tests:
           - ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview
           - ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline
-          - ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast
-          - ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote
-          - ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline
-          - ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote
-          - ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote
-          - ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote
-          - ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview
-          - ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview
-          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
 
+      - id: ReviewCenter-ReviewPlanner-Baseline-Rejected
+        title: >-
+          The ReviewPlanner class shall choose a full review with the note "no approved review of this set yet" when the
+          only review of the review-set concluded as rejected.
+        justification: |
+          A rejected review accepted nothing, so it cannot be a baseline.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-RejectedLater
+        title: >-
+          The ReviewPlanner class shall keep the approved review as the baseline when a later review of the review-set
+          concluded as rejected.
+        justification: |
+          A later rejection does not undo what the earlier approved review accepted.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-NotAncestor
+        title: >-
+          The ReviewPlanner class shall choose a full review with a note when the head of the last approved review is
+          not an ancestor of the new head.
+        justification: |
+          A review of a commit outside the history of the new head says nothing about what changed, so everything is
+          reviewed, and the note says why.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-AncestorUnknown
+        title: >-
+          The ReviewPlanner class shall choose a full review with a note, and not fail the plan, when it cannot be
+          checked whether the head of the last approved review is an ancestor of the new head.
+        justification: |
+          When the history cannot be checked, the safe choice is a full review, and one failing check must not stop the
+          plan of the other sets.
+        tests:
+          - ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote
+
+      - id: ReviewCenter-ReviewPlanner-Baseline-SelectionChanged
+        title: >-
+          The ReviewPlanner class shall choose a full review with a note when the selection of the review-set changed
+          since the last approved review.
+        justification: |
+          Files that the last review did not cover would escape review if only the changes were reviewed.
+        tests:
+          - ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Classification: what each row of a plan means
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-Classification
         title: >-
-          The ReviewPlanner shall mark a review-set as already filed when a review of the same repository, set,
-          head commit, and baseline exists, as nothing to review when no selected file changed or none matches, and
-          as ready to create otherwise.
+          The ReviewPlanner class shall mark a review-set as already filed, with the identity of the review, when a
+          review of the same repository, set, head commit, baseline, and selection exists.
         justification: |
-          Planning the same revision twice must not create the same review twice, and a set without changes needs no
-          review. Telling the user which is which makes the plan something that can be run again safely.
+          Planning the same revision twice must not create the same review twice, and the user sees which review
+          already covers the set.
         tests:
           - ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled
-          - ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate
-          - ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview
-          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
-          - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
 
+      - id: ReviewCenter-ReviewPlanner-Classification-NewSelection
+        title: >-
+          The ReviewPlanner class shall mark a review-set as ready to create when a review of the same commits exists
+          but its selection was different.
+        justification: |
+          A review of other files does not cover this set, so the set still needs its own review.
+        tests:
+          - ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate
+
+      - id: ReviewCenter-ReviewPlanner-Classification-Unchanged
+        title: >-
+          The ReviewPlanner class shall mark a review-set as nothing to review, with a note, when its head equals the
+          head of its last approved review.
+        justification: |
+          A set that has not changed since an approved review needs no review.
+        tests:
+          - ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview
+
+      - id: ReviewCenter-ReviewPlanner-Classification-NoChange
+        title: >-
+          The ReviewPlanner class shall mark a review-set as nothing to review, with a note, when no selected file
+          changed or no file matches the selection.
+        justification: |
+          A set without change needs no review, and the note tells the user whether the set is unchanged or empty.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_ExplicitBaseline_UsesItForEverySet
+
+      - id: ReviewCenter-ReviewPlanner-Classification-WillCreate
+        title: >-
+          The ReviewPlanner class shall mark every other review-set as ready to create.
+        justification: |
+          A set that is neither filed nor without change is what the user comes to the plan for.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled
+
+      - id: ReviewCenter-ReviewPlanner-Classification-Totals
+        title: >-
+          The ReviewPlanner class shall give on the plan the number of rows in each state.
+        justification: |
+          The totals let the user see at a glance how much of the plan is open.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Create: the reviews that the user picks from a plan
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-Create
         title: >-
-          The ReviewPlanner shall create each picked review from the commits of the plan through the review service,
-          recording the review-set identifier, in one session for the batch, with every review stored in its own
-          transaction so that a failing request neither stops nor undoes the others, shall report for every request
-          whether it was created, was already filed, or failed with a plain reason, turning an unexpected fault of one
-          request into a failed result with a generic reason that carries no exception text, replacing the text of a
-          git access failure with a fixed sentence, and shall refuse a batch that is not valid as a whole, including a
-          batch for a project that the actor may not see.
+          The ReviewPlanner class shall create a review for every picked request, in the order given, and give one
+          result per request that says whether the review was created, was already filed, or failed.
         justification: |
-          The pages create many reviews with one click. Creating them through the review service gives every review
-          the same rules, frozen content, and audit entry as one created by hand, and reporting the result of each
-          request lets the user see what happened without losing the reviews that succeeded.
+          The pages create many reviews with one click, so the user must see what happened to every request.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
+          - ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled
+
+      - id: ReviewCenter-ReviewPlanner-Create-Commits
+        title: >-
+          The ReviewPlanner class shall create every review from the commits of the plan.
+        justification: |
+          The user picked rows of a plan at one head and baseline, and the review must cover exactly those commits.
         tests:
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_DeltaRow_UsesBaselineAndRangeTitle
-          - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
-          - ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage
-          - ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence
-          - ReviewPlanner_CreateAsync_Cancellation_Propagates
-          - ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled
-          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
-          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-Content
+        title: >-
+          The ReviewPlanner class shall give every created review the files that changed within the selection.
+        justification: |
+          The content of a review is frozen when it is created, so it must hold what the plan showed.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_DeltaRow_UsesBaselineAndRangeTitle
+
+      - id: ReviewCenter-ReviewPlanner-Create-SetId
+        title: >-
+          The ReviewPlanner class shall record the identifier of the review-set on every created review.
+        justification: |
+          The identifier ties a review to its set, which is how the next plan finds the last approved review of the
+          set.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+
+      - id: ReviewCenter-ReviewPlanner-Create-Session
+        title: >-
+          The ReviewPlanner class shall use one session on the repository for the whole batch.
+        justification: |
+          One session means one fetch of the repository for any number of reviews.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+
+      - id: ReviewCenter-ReviewPlanner-Create-Audit
+        title: >-
+          The ReviewPlanner class shall write one audit entry for every created review that names the review-set last
+          and fits the audit limit.
+        justification: |
+          The audit trail shows who created which review from which set, and an entry that does not fit would make the
+          creation fail.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
 
+      - id: ReviewCenter-ReviewPlanner-Create-Checklist
+        title: >-
+          The ReviewPlanner class shall give every created review the checklist of the project.
+        justification: |
+          A review made from a plan must be answered with the same checklist as one made by hand.
+        tests:
+          - ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview
+
+      - id: ReviewCenter-ReviewPlanner-Create-Isolation
+        title: >-
+          The ReviewPlanner class shall not stop the other requests and not undo their reviews when one request fails.
+        justification: |
+          One failed row must lose nothing of the others.
+        tests:
+          - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
+          - ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage
+
+      - id: ReviewCenter-ReviewPlanner-Create-Failed
+        title: >-
+          The ReviewPlanner class shall give a plain reason for a failed request and store no review for it.
+        justification: |
+          The user must see what went wrong with a row, and a failed row must leave nothing behind.
+        tests:
+          - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
+
+      - id: ReviewCenter-ReviewPlanner-Create-Fault
+        title: >-
+          The ReviewPlanner class shall turn an unexpected fault of one request into a failed result with a generic
+          reason that carries no text of the fault.
+        justification: |
+          The text of a fault can show internal details, which must not reach a user.
+        tests:
+          - ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage
+
+      - id: ReviewCenter-ReviewPlanner-Create-GitFailure
+        title: >-
+          The ReviewPlanner class shall replace the text of a git access failure of one request by a fixed sentence.
+        justification: |
+          The text that git prints can show the location of a repository and parts of a credential.
+        tests:
+          - ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence
+
+      - id: ReviewCenter-ReviewPlanner-Create-Cancel
+        title: >-
+          The ReviewPlanner class shall pass on a cancellation and not report it as a failed request.
+        justification: |
+          A cancelled batch is not a failed row, and the caller must be able to stop the work.
+        tests:
+          - ReviewPlanner_CreateAsync_Cancellation_Propagates
+
+      - id: ReviewCenter-ReviewPlanner-Create-Filed
+        title: >-
+          The ReviewPlanner class shall report a request whose review exists as already filed under that review and
+          create nothing.
+        justification: |
+          Another user may have created the review since the plan was made, and it must not be created twice.
+        tests:
+          - ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled
+
+      - id: ReviewCenter-ReviewPlanner-Create-BadBaseline
+        title: >-
+          The ReviewPlanner class shall fail a request whose baseline is not a full commit identifier.
+        justification: |
+          The requests come from a page and are checked again, because a plan can be stale or forged.
+        tests:
+          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
+
+      - id: ReviewCenter-ReviewPlanner-Create-BadSelection
+        title: >-
+          The ReviewPlanner class shall fail a request whose selection is not valid.
+        justification: |
+          A selection that leaves the repository must never be applied, whatever a page sent.
+        tests:
+          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
+
+      - id: ReviewCenter-ReviewPlanner-Create-BadSetId
+        title: >-
+          The ReviewPlanner class shall fail a request whose review-set identifier is too long.
+        justification: |
+          The identifier is stored, signed, and written to the audit trail, so it is bounded.
+        tests:
+          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
+
+      - id: ReviewCenter-ReviewPlanner-Create-BatchHead
+        title: >-
+          The ReviewPlanner class shall refuse a batch whose head is not a full commit identifier with the rule
+          revision-invalid.
+        justification: |
+          The head comes from a page, so it is checked like anything else that reaches git.
+        tests:
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-BatchSize
+        title: >-
+          The ReviewPlanner class shall refuse a batch of more requests than the limit.
+        justification: |
+          A batch that is too large would hold the repository and the store for too long.
+        tests:
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-BatchArguments
+        title: >-
+          The ReviewPlanner class shall refuse a missing list of requests and a missing actor.
+        justification: |
+          A batch without requests or without an actor is a fault of the caller.
+        tests:
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-BatchProject
+        title: >-
+          The ReviewPlanner class shall refuse a batch for a project that does not exist with the rule
+          project-not-found.
+        justification: |
+          The user needs to know that the project is what is wrong.
+        tests:
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-BatchNoGit
+        title: >-
+          The ReviewPlanner class shall not open the repository for a batch that is refused.
+        justification: |
+          A wrong batch must not start, and must not cost a fetch.
+        tests:
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Create-Hidden
+        title: >-
+          The ReviewPlanner class shall refuse a batch from an actor who may not see the project with the rule
+          project-not-found, without reaching git.
+        justification: |
+          The access rules of a plan apply to the creation too: a user who cannot see a project must learn nothing about
+          it.
+        tests:
+          - ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit
+
+      - id: ReviewCenter-ReviewPlanner-Create-ReadOnly
+        title: >-
+          The ReviewPlanner class shall refuse a batch from an actor who may only read the project with the rule
+          actor-not-allowed, without reaching git.
+        justification: |
+          An auditor may look at reviews but must not create them.
+        tests:
+          - ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Identity: the identifier and the title of a created review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-Identity
         title: >-
-          The ReviewPlanner shall give each created review an identifier made from the review-set identifier that is
-          safe for page addresses, within the length limit, and unique in the project (adding a number when it is
-          taken, also when another user takes it at the same moment), and a title that shows the set title and the
-          range of commits, cut so that the range stays visible.
+          The ReviewPlanner class shall give every created review an identifier made from the review-set identifier
+          with each character that is unsafe for page addresses replaced.
         justification: |
-          The identifier of a review is part of its address and is chosen by the file of a repository, so it must be
-          made safe. Two reviews of the same set, for example before and after a change, need different identifiers,
-          and the title must still tell the user which range a review covers.
+          The identifier of a review is part of its address and comes from a file of the repository, so it must be made
+          safe.
         tests:
           - ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+
+      - id: ReviewCenter-ReviewPlanner-Identity-Fallback
+        title: >-
+          The ReviewPlanner class shall use the identifier "review" when nothing of the review-set identifier is left.
+        justification: |
+          A set identifier of only unsafe characters must still give a usable address.
+        tests:
+          - ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId
+
+      - id: ReviewCenter-ReviewPlanner-Identity-Length
+        title: >-
+          The ReviewPlanner class shall cut the identifier to the length limit so that a number suffix still fits.
+        justification: |
+          A long set identifier must not make the creation fail, and a taken identifier must still get a free one.
+        tests:
           - ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit
-          - ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange
+
+      - id: ReviewCenter-ReviewPlanner-Identity-Unique
+        title: >-
+          The ReviewPlanner class shall add a number to the identifier when it is taken in the project.
+        justification: |
+          Two reviews of the same set, for example before and after a change, need different identifiers.
+        tests:
+          - ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId
           - ReviewPlanner_CreateAsync_IdTaken_UsesSuffix
+
+      - id: ReviewCenter-ReviewPlanner-Identity-Race
+        title: >-
+          The ReviewPlanner class shall try the next number when another user takes the identifier at the same moment.
+        justification: |
+          Checking that an identifier is free cannot exclude a second user, and the loser must not fail.
+        tests:
           - ReviewPlanner_CreateAsync_IdTakenDuringCreate_RetriesWithNextSuffix
 
+      - id: ReviewCenter-ReviewPlanner-Identity-Title
+        title: >-
+          The ReviewPlanner class shall give every created review a title that shows the title of the review-set and
+          the range of commits.
+        justification: |
+          The title tells the user which range a review covers.
+        tests:
+          - ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_DeltaRow_UsesBaselineAndRangeTitle
+
+      - id: ReviewCenter-ReviewPlanner-Identity-TitleCut
+        title: >-
+          The ReviewPlanner class shall cut the title of the review-set so that the whole title fits the limit and the
+          range stays visible.
+        justification: |
+          A long set title must not make the creation fail or hide the range.
+        tests:
+          - ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange
+          - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # DueDate: the due date of a created review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ReviewPlanner-DueDate
         title: >-
-          The ReviewPlanner shall create each picked review with the due date of its own request or, when the
-          request has none, with the default due date of the batch, through the review service so that the same
-          validation applies, and shall fail only the request whose date is refused, with the reason.
+          The ReviewPlanner class shall create a review with the due date of its own request when the request has one.
         justification: |
-          A lead plans many reviews at once and wants one date for all of them, but may need another for one. The
-          same rules as for a review made by hand keep a wrong date from being stored, and a wrong date on one row
-          must not lose the other reviews.
+          A lead plans many reviews with one date but may need another for one.
+        tests:
+          - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
+
+      - id: ReviewCenter-ReviewPlanner-DueDate-Default
+        title: >-
+          The ReviewPlanner class shall create a review with the default due date of the batch when its request has
+          none.
+        justification: |
+          A lead who wants one date for all of the reviews names it once.
+        tests:
+          - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
+
+      - id: ReviewCenter-ReviewPlanner-DueDate-Refused
+        title: >-
+          The ReviewPlanner class shall fail only the request whose due date is refused, with the reason, and store no
+          review for it.
+        justification: |
+          A wrong date on one row must not lose the other reviews, and must not be stored.
+        tests:
+          - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
+
+      - id: ReviewCenter-ReviewPlanner-DueDate-Audit
+        title: >-
+          The ReviewPlanner class shall name the due date in the audit entry of the created review.
+        justification: |
+          The audit trail shows when the review was due from the time it was created.
         tests:
           - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
