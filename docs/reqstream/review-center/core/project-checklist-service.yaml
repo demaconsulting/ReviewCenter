@@ -7,148 +7,506 @@
 # ProjectChecklist type, which carries the definition with its text and hash, is verified with it. The validation
 # itself is the ChecklistValidator class of the ChecklistService unit, and the copy that a review takes is made by the
 # ReviewService unit; their requirements are in their own files.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: ProjectChecklistService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Read: the checklist a project gives to its new reviews
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Read
         title: >-
           The ProjectChecklistService class shall return the checklist a project gives to its new reviews as the
-          parsed definition with its version, its text, whether it is the built-in default, and the SHA-256 hash of
-          the text a change must be based on, which for a project without a definition of its own is the hash of
-          the text of the built-in default checklist, and shall reject a stored text that cannot be read as an
-          invalid checklist definition.
+          parsed definition with its version, its text, whether it is the built-in default, and its number of sections
+          and checks.
         justification: |
-          A project that nobody configured must use the built-in checklist, so reading it has to give a definition
-          and a hash like any other. Because every change is compared against the hash, the reader and the store must
-          calculate it in the same way, and a stored text that cannot be read must be reported, not replaced by the
-          default without anyone noticing.
+          A project that nobody configured must use the built-in checklist, so reading it has to give a definition like
+          any other.
         tests:
           - ProjectChecklistService_GetAsync_NewProject_IsDefault
-          - ProjectChecklistService_HashOf_IsSha256OfTheTextAndOfTheDefaultForNull
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
 
+      - id: ReviewCenter-ProjectChecklistService-Read-Hash
+        title: >-
+          The ProjectChecklistService class shall give with the checklist the SHA-256 hash of its text, written in
+          lower-case hexadecimal, which a change must be based on.
+        justification: |
+          Every change is compared against the hash, so the reader and the store must calculate it in the same way.
+        tests:
+          - ProjectChecklistService_HashOf_IsSha256OfTheTextAndOfTheDefaultForNull
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Read-DefaultHash
+        title: >-
+          The ProjectChecklistService class shall give for a project without a definition of its own the hash of the
+          text of the built-in default checklist.
+        justification: |
+          A project that nobody configured must be changeable like any other, so its hash is the hash of what it uses.
+        tests:
+          - ProjectChecklistService_HashOf_IsSha256OfTheTextAndOfTheDefaultForNull
+          - ProjectChecklistService_GetAsync_NewProject_IsDefault
+
+      - id: ReviewCenter-ProjectChecklistService-Read-Unreadable
+        title: >-
+          The ProjectChecklistService class shall reject a stored checklist text that cannot be read as a checklist
+          definition with the ChecklistDefinitionInvalid rule.
+        justification: |
+          A stored text that cannot be read must be reported, not replaced by the default without anyone noticing.
+        tests:
+          - ProjectChecklistService_GetAsync_UnreadableStoredText_ThrowsChecklistDefinitionInvalid
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Validation: a definition must pass the strict check before it is stored
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Validation
         title: >-
-          The ProjectChecklistService class shall refuse to store a checklist definition that does not pass the
-          strict validation of the ChecklistValidator class, reporting every error with its path in a domain rule
-          exception of the ChecklistDefinitionInvalid rule and storing nothing, including a definition whose stored
-          (normal) form is longer than the size limit although the text that was sent was not, and shall offer the
-          same check as a
-          pure operation that reports every error with its path, or the parsed definition, without storing or
-          recording anything.
+          The ProjectChecklistService class shall refuse to store a checklist definition that does not pass the strict
+          validation of the ChecklistValidator class with the ChecklistDefinitionInvalid rule, storing nothing.
         justification: |
-          The wording of the checklist is frozen into every review and covered by every signature. A definition that
-          is malformed must never be stored, and the person who entered it needs all the errors in one pass, with
-          the place of each, to correct it. A pure check lets a page show the errors and a preview before anything
-          is saved.
+          A malformed wording is frozen into every review and covered by every signature, so it must never be stored.
         tests:
           - ProjectChecklistService_SetAsync_InvalidDefinition_IsRefusedWithAllErrors
+
+      - id: ReviewCenter-ProjectChecklistService-Validation-Errors
+        title: >-
+          The ProjectChecklistService class shall report every error of a refused definition, each with its path, in
+          the message of the refusal.
+        justification: |
+          The person who entered the definition needs all errors with the place of each to correct it in one pass.
+        tests:
+          - ProjectChecklistService_SetAsync_InvalidDefinition_IsRefusedWithAllErrors
+
+      - id: ReviewCenter-ProjectChecklistService-Validation-StoredForm
+        title: >-
+          The ProjectChecklistService class shall refuse a definition whose stored (normal) form is longer than the
+          size limit although the text that was sent was not, with the ChecklistDefinitionInvalid rule, storing
+          nothing.
+        justification: |
+          The limit protects the stored text, so it is applied to what would be stored.
+        tests:
           - ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Validation-Check
+        title: >-
+          The ProjectChecklistService class shall offer the validation as a pure operation that reports every error of
+          a definition text with its path.
+        justification: |
+          A pure check lets a page show the errors before anything is saved.
+        tests:
           - ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing
 
+      - id: ReviewCenter-ProjectChecklistService-Validation-CheckValid
+        title: >-
+          The ProjectChecklistService class shall report a valid definition text as valid in the pure validation.
+        justification: |
+          A page needs to tell a valid text from an invalid one to offer a preview.
+        tests:
+          - ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing
+
+      - id: ReviewCenter-ProjectChecklistService-Validation-CheckNothingStored
+        title: >-
+          The ProjectChecklistService class shall store and record nothing in the pure validation.
+        justification: |
+          A check must not change the checklist or the audit trail.
+        tests:
+          - ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Access: who may read and who may change the checklist
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Access
         title: >-
           The ProjectChecklistService class shall return the checklist of a project to any actor who may see the
-          project, including an actor that came through an API token, and replace or reset it only for a system
-          administrator or a project administrator of that project, checked again at every call, tell a plain member
-          of the project that it may not, give every other actor, including a user outside the project, an
-          administrator of another project, a disabled user, and no actor at all, the answer for a project that does
-          not exist, refuse every replace and reset that comes through an API token, and change and record nothing
-          when it refuses.
+          project.
         justification: |
-          The checklist decides what every later review of the project is answered against, so only the people who
-          administer the project may change it, and only in person: a token that is leaked or scripted must not be
-          able to weaken the standard of a project. Reading is not restricted to administrators or to people: the
-          checklist is shown in every review of the project, so every viewer, a token for tooling included, may read
-          it. A project that the actor may not see must read like a missing
-          one, so that its existence does not leak, and a right that was revoked while a page was open must not
-          get a change through.
+          The checklist is shown in every review of the project, so every viewer may read it.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-ReadToken
+        title: >-
+          The ProjectChecklistService class shall return the checklist of a project also to an actor that came through
+          an API token.
+        justification: |
+          Tooling reads the checklist through a token, and reading shows nothing that a viewer may not see.
+        tests:
+          - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-Change
+        title: >-
+          The ProjectChecklistService class shall replace the checklist of a project only for a system administrator or
+          a project administrator of that project.
+        justification: |
+          The checklist decides what every later review is answered against, so only the people who administer the
+          project may change it.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-Reset
+        title: >-
+          The ProjectChecklistService class shall reset the checklist of a project only for a system administrator or a
+          project administrator of that project.
+        justification: |
+          A reset changes the standard of every later review as much as a replacement does.
+        tests:
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Access-MemberRefused
+        title: >-
+          The ProjectChecklistService class shall refuse a plain member of the project, who may only read the
+          checklist, with the ActorNotAllowed rule when the member replaces or resets it.
+        justification: |
+          A member may see the checklist but not decide it, and the refusal tells the member why.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
+
+      - id: ReviewCenter-ProjectChecklistService-Access-Hidden
+        title: >-
+          The ProjectChecklistService class shall give an actor who may not see the project, a user outside the
+          project, an administrator of another project, a disabled user, or no actor at all, the same answer as for a
+          project that does not exist, the ProjectNotFound rule, when the actor reads, replaces or resets the
+          checklist.
+        justification: |
+          A project that the actor may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
+
+      - id: ReviewCenter-ProjectChecklistService-Access-Missing
+        title: >-
+          The ProjectChecklistService class shall refuse to read, replace or reset the checklist of a project that does
+          not exist with the ProjectNotFound rule.
+        justification: |
+          A missing project has no checklist to give or to change.
+        tests:
+          - ProjectChecklistService_UnknownProject_IsNotFound
+
+      - id: ReviewCenter-ProjectChecklistService-Access-Token
+        title: >-
+          The ProjectChecklistService class shall refuse to replace the checklist when the call comes through an API
+          token, even for a system administrator or a project administrator, with the ActorNotAllowed rule.
+        justification: |
+          A token that is leaked or scripted must not be able to weaken the standard of a project.
+        tests:
+          - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-TokenReset
+        title: >-
+          The ProjectChecklistService class shall refuse to reset the checklist when the call comes through an API
+          token with the ActorNotAllowed rule.
+        justification: |
+          A reset is as strong a change as a replacement and needs the person, not a token.
+        tests:
+          - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-NothingChanged
+        title: >-
+          The ProjectChecklistService class shall change and record nothing when it refuses a replace or a reset
+          because of the actor.
+        justification: |
+          A refused call must leave no trace in the checklist or in the audit trail.
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
-          - ProjectChecklistService_UnknownProject_IsNotFound
+          - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
 
+      - id: ReviewCenter-ProjectChecklistService-Access-Revoked
+        title: >-
+          The ProjectChecklistService class shall check the right to change the checklist again at every call, so that
+          a project administrator whose membership was removed after the checklist was read is refused with the
+          ProjectNotFound rule.
+        justification: |
+          A right that was revoked while a page was open must not get a change through.
+        tests:
+          - ProjectChecklistService_SetAsync_AdminRemovedAfterRead_IsRefused
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Change: replacing the definition of a project
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Change
         title: >-
-          The ProjectChecklistService class shall store a valid definition for the project it names only, in the
-          normal form of the definition and not in the text the caller sent, leaving the checklist of every other
-          project as it is, and shall report that the definition was changed.
+          The ProjectChecklistService class shall store a valid definition for the project it names.
         justification: |
-          Every project has a checklist of its own. A change that reached another project would alter the standard of
-          a body of work whose administrators did not decide it. Storing the normal form means that the same
-          content always has the same text and so the same hash.
+          Every project has a checklist of its own that its administrators decide.
         tests:
           - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
 
+      - id: ReviewCenter-ProjectChecklistService-Change-NormalForm
+        title: >-
+          The ProjectChecklistService class shall store the normal form of a valid definition and not the text the
+          caller sent.
+        justification: |
+          The same content then always has the same text and so the same hash.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Change-OtherProjects
+        title: >-
+          The ProjectChecklistService class shall leave the checklist of every other project as it is when it stores a
+          definition.
+        justification: |
+          A change that reached another project would alter the standard of people who did not decide it.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Change-Reported
+        title: >-
+          The ProjectChecklistService class shall report that the definition was changed when it stored one.
+        justification: |
+          The caller must be able to tell a change from a no change.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # VersionLabel: another wording needs another label
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-VersionLabel
         title: >-
           The ProjectChecklistService class shall refuse a replacement whose content differs from the current
-          definition, the built-in default included, but whose version label is the same as the current one, with the
-          ChecklistDefinitionInvalid rule and a message that names the label, and storing nothing.
+          definition but whose version label is the same as the current one, with the ChecklistDefinitionInvalid rule.
         justification: |
-          The version names the wording a review was answered against. If two different wordings could carry the same
-          label, the label would prove nothing, so a change of the wording must come with a new label.
+          If two different wordings could carry the same label, the label would prove nothing.
+        tests:
+          - ProjectChecklistService_SetAsync_SameVersionOtherContent_IsRefused
+
+      - id: ReviewCenter-ProjectChecklistService-VersionLabel-Default
+        title: >-
+          The ProjectChecklistService class shall refuse a replacement whose content differs from the built-in default
+          but whose version label is the label of the default, with the ChecklistDefinitionInvalid rule.
+        justification: |
+          A project without a definition of its own uses the label of the default, so the same rule must hold for it.
+        tests:
+          - ProjectChecklistService_SetAsync_DefaultLabelOtherContent_IsRefused
+
+      - id: ReviewCenter-ProjectChecklistService-VersionLabel-Message
+        title: >-
+          The ProjectChecklistService class shall say in the message of that refusal that the version label must
+          change.
+        justification: |
+          The person who entered the definition must be told what to correct.
         tests:
           - ProjectChecklistService_SetAsync_SameVersionOtherContent_IsRefused
           - ProjectChecklistService_SetAsync_DefaultLabelOtherContent_IsRefused
 
+      - id: ReviewCenter-ProjectChecklistService-VersionLabel-NothingStored
+        title: >-
+          The ProjectChecklistService class shall store nothing when it refuses a replacement because of the version
+          label.
+        justification: |
+          The refused definition must not become the checklist.
+        tests:
+          - ProjectChecklistService_SetAsync_SameVersionOtherContent_IsRefused
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # NoChange: a change that changes nothing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-NoChange
         title: >-
-          The ProjectChecklistService class shall, when the new definition has the same content as the current one,
-          or when the project already uses the default and is asked to reset, store nothing, record nothing, and
-          report that nothing was changed.
+          The ProjectChecklistService class shall report that nothing was changed when the new definition has the same
+          content as the current one.
         justification: |
-          A change that changes nothing would put an entry in the audit trail that says something happened when it
-          did not.
+          The caller must be able to tell that nothing happened.
         tests:
           - ProjectChecklistService_SetAsync_SameContent_RecordsNothing
+
+      - id: ReviewCenter-ProjectChecklistService-NoChange-Recorded
+        title: >-
+          The ProjectChecklistService class shall store and record nothing when the new definition has the same
+          content as the current one.
+        justification: |
+          A change that changes nothing would put an entry in the audit trail that says something happened when it did
+          not.
+        tests:
+          - ProjectChecklistService_SetAsync_SameContent_RecordsNothing
+
+      - id: ReviewCenter-ProjectChecklistService-NoChange-Reset
+        title: >-
+          The ProjectChecklistService class shall report that nothing was changed when a project that already uses the
+          default is asked to reset.
+        justification: |
+          A reset of what is already the default changes nothing and says so.
+        tests:
           - ProjectChecklistService_ResetAsync_AlreadyDefault_RecordsNothing
 
+      - id: ReviewCenter-ProjectChecklistService-NoChange-ResetRecorded
+        title: >-
+          The ProjectChecklistService class shall store and record nothing when a project that already uses the
+          default is asked to reset.
+        justification: |
+          A reset that resets nothing must not appear in the audit trail.
+        tests:
+          - ProjectChecklistService_ResetAsync_AlreadyDefault_RecordsNothing
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Reset: going back to the built-in default
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Reset
         title: >-
           The ProjectChecklistService class shall, on a reset, remove the definition of the project so that its new
-          reviews use the built-in default checklist again, report that it was changed, and leave every existing
-          review with the copy it was created with.
+          reviews use the built-in default checklist again.
         justification: |
-          A project that no longer wants a checklist of its own must be able to return to the standard one, and a
-          return must not rewrite what earlier reviews were answered against.
+          A project that no longer wants a checklist of its own must be able to return to the standard one.
         tests:
           - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
 
+      - id: ReviewCenter-ProjectChecklistService-Reset-Reported
+        title: >-
+          The ProjectChecklistService class shall report that the definition was changed when a reset removed a
+          definition.
+        justification: |
+          The caller must be able to tell a reset that changed something.
+        tests:
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Reset-ExistingReviews
+        title: >-
+          The ProjectChecklistService class shall leave every existing review with the checklist copy it was created
+          with when it resets the checklist of the project.
+        justification: |
+          A return to the default must not rewrite what earlier reviews were answered against.
+        tests:
+          - ProjectChecklistService_ResetAsync_ExistingReview_KeepsItsChecklistCopy
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit: every change is recorded
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Audit
         title: >-
-          The ProjectChecklistService class shall record a replacement and a reset as one audit entry each, with the
-          action project.checklist-changed, that carries the project and no review, names the actor, and states
-          the new version, the number of sections and checks, a short SHA-256 of the text, and the previous version,
-          or that the checklist was reset to the default, but never the wording, and within the length limit of an
-          audit detail.
+          The ProjectChecklistService class shall record a replacement of the checklist as one audit entry with the
+          action project.checklist-changed.
         justification: |
-          Changing the standard that reviews are answered against is a decision that an auditor must be able to
-          find, date, and attribute. The entry identifies the change and its content without copying the wording into
-          the trail, which must stay short and free of free text.
+          Changing the standard that reviews are answered against is a decision that an auditor must be able to find.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-Reset
+        title: >-
+          The ProjectChecklistService class shall record a reset of the checklist as one audit entry with the action
+          project.checklist-changed.
+        justification: |
+          A return to the default is as much a decision as a replacement.
+        tests:
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-Project
+        title: >-
+          The ProjectChecklistService class shall let the audit entry of a replacement carry the project and no review.
+        justification: |
+          The change belongs to the project, not to any review.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-Actor
+        title: >-
+          The ProjectChecklistService class shall name the actor in the audit entry of a replacement and of a reset.
+        justification: |
+          A change must be attributable.
         tests:
           - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
           - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
 
+      - id: ReviewCenter-ProjectChecklistService-Audit-Detail
+        title: >-
+          The ProjectChecklistService class shall state in the audit entry of a replacement the new version, the number
+          of sections and checks, a short SHA-256 of the text, and the previous version.
+        justification: |
+          The entry identifies the change and its content.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-ResetDetail
+        title: >-
+          The ProjectChecklistService class shall state in the audit entry of a reset that the checklist was reset to
+          the default, with the version of the default and the previous version.
+        justification: |
+          The entry must say what the project uses now and what it used before.
+        tests:
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-NoWording
+        title: >-
+          The ProjectChecklistService class shall never write the wording of the checklist into the audit entry.
+        justification: |
+          The audit trail must stay short and free of free text.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-Length
+        title: >-
+          The ProjectChecklistService class shall keep the detail of the audit entry within the length limit of an
+          audit detail.
+        justification: |
+          A longer detail would be refused or cut by the audit trail.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Conflict: two administrators who edit at the same time
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Conflict
         title: >-
-          The ProjectChecklistService class shall change the definition only when the stored one still has the
-          SHA-256 hash the caller started from, refuse a change that was overtaken by another with the RecordChanged
-          rule and a message that says someone else changed the checklist, store and record nothing then, and let
-          exactly one of two changes that start from the same hash succeed.
+          The ProjectChecklistService class shall refuse a replacement that is based on a hash that is no longer the
+          hash of the stored checklist with the RecordChanged rule.
         justification: |
-          Two administrators who edit the checklist at the same time must not silently overwrite each other. The
-          comparison is repeated atomically by the store, so the guarantee holds even when two requests overlap.
+          Two administrators who edit at the same time must not silently overwrite each other.
         tests:
           - ProjectChecklistService_SetAndReset_ChangedMeanwhile_AreRefusedAsRecordChanged
-          - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ProjectChecklistService-Conflict-Reset
+        title: >-
+          The ProjectChecklistService class shall refuse a reset that is based on a hash that is no longer the hash of
+          the stored checklist with the RecordChanged rule.
+        justification: |
+          A reset would overwrite a change that the administrator has not seen.
+        tests:
+          - ProjectChecklistService_SetAndReset_ChangedMeanwhile_AreRefusedAsRecordChanged
+
+      - id: ReviewCenter-ProjectChecklistService-Conflict-Message
+        title: >-
+          The ProjectChecklistService class shall say in the message of that refusal that someone else changed the
+          checklist.
+        justification: |
+          The administrator must know to read the checklist again before changing it.
+        tests:
+          - ProjectChecklistService_SetAndReset_ChangedMeanwhile_MessageSaysSomeoneElseChanged
+
+      - id: ReviewCenter-ProjectChecklistService-Conflict-NothingStored
+        title: >-
+          The ProjectChecklistService class shall store and record nothing when it refuses a change that was
+          overtaken.
+        justification: |
+          The first change must stay as it was recorded.
+        tests:
+          - ProjectChecklistService_SetAndReset_ChangedMeanwhile_AreRefusedAsRecordChanged
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Arguments: a missing collaborator or argument
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ProjectChecklistService-Arguments
         title: >-
-          The ProjectChecklistService class shall refuse a null store, a null access rule, and a null actor or
-          expected hash for a change.
+          The ProjectChecklistService class shall refuse to be created without a store or without a project access
+          rule.
         justification: |
-          A missing collaborator or argument is a programming error that must show at once, not later as a null
-          reference in the middle of a change.
+          A missing collaborator is a programming error that must show at once.
+        tests:
+          - ProjectChecklistService_NullArguments_AreRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Arguments-Actor
+        title: >-
+          The ProjectChecklistService class shall refuse a null actor for a replacement and for a reset.
+        justification: |
+          A change without an actor could not be attributed in the audit trail.
+        tests:
+          - ProjectChecklistService_NullArguments_AreRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Arguments-ExpectedHash
+        title: >-
+          The ProjectChecklistService class shall refuse a null expected hash for a replacement and for a reset.
+        justification: |
+          A change without the hash it starts from could not be checked for a conflict.
         tests:
           - ProjectChecklistService_NullArguments_AreRefused

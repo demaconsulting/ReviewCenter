@@ -95,7 +95,7 @@ public class ChecklistServiceReviewConclusionTextTests
             project.Id, ReviewId, "First", [new UploadedFile("a.txt", [1, 2, 3])], Who("root"), cancellationToken);
         var signing = new SigningService(store, users, access, clock);
         await signing.AddSlotAsync(Who("root"), project.Id, ReviewId, ids["alt"], null, cancellationToken);
-        return new World(store, new ChecklistService(store, access, userStore, clock), project.Id);
+        return new World(store, new ChecklistService(store, access, userStore, clock), project.Id, ids);
     }
 
     /// <summary>
@@ -141,6 +141,35 @@ public class ChecklistServiceReviewConclusionTextTests
         Assert.True(changed);
         Assert.Equal("Looks good.", await StoredTextAsync(world.Store, world.Project));
         Assert.Equal(user, Assert.Single(ConclusionAudits(world.Store)).ActorUsername);
+    }
+
+    /// <summary>
+    ///     Test that the alternate reviewer of a slot may store a text, which a plain member who holds no slot may not.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetReviewConclusionTextAsync_AlternateOfSlot_Stores()
+    {
+        // Arrange: usr is the primary and mem the alternate of a second slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot
+            {
+                ProjectId = world.Project,
+                ReviewId = ReviewId,
+                PrimaryUserId = world.UserIds["usr"],
+                AlternateUserId = world.UserIds["mem"]
+            },
+            cancellationToken);
+
+        // Act
+        var changed = await world.Checklists.SetReviewConclusionTextAsync(
+            world.Project, ReviewId, "Looks good.", Who("mem"), cancellationToken);
+
+        // Assert
+        Assert.True(changed);
+        Assert.Equal("Looks good.", await StoredTextAsync(world.Store, world.Project));
+        Assert.Equal("mem", Assert.Single(ConclusionAudits(world.Store)).ActorUsername);
     }
 
     /// <summary>
@@ -469,5 +498,6 @@ public class ChecklistServiceReviewConclusionTextTests
     /// <param name="Store">The review store.</param>
     /// <param name="Checklists">The checklist service under test.</param>
     /// <param name="Project">The project identity.</param>
-    private sealed record World(FakeReviewStore Store, ChecklistService Checklists, int Project);
+    /// <param name="UserIds">The identities of the users, by user name.</param>
+    private sealed record World(FakeReviewStore Store, ChecklistService Checklists, int Project, IReadOnlyDictionary<string, int> UserIds);
 }

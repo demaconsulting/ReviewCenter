@@ -324,6 +324,164 @@ public class ChecklistServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that somebody without a slot cannot change the applicability of a section.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot()
+    {
+        // Arrange: a review with one slot, held by ann; the outsider has none
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync("ann");
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", DefaultChecklist.Current.Sections[0].Id, false, "Not relevant.",
+            new Actor("outsider", "outsider"), cancellationToken));
+
+        // Assert: refused, and nothing is stored
+        Assert.Equal(DomainRule.NoReviewerSlot, ex.Rule);
+        Assert.Empty((await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Record.Ballots);
+    }
+
+    /// <summary>
+    ///     Test that the change of a section that completes the only slot of a review hands its ballot in, and that the
+    ///     ballot is a draft before.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicabilityAsync_SingleSlotCompleting_AutoSubmits()
+    {
+        // Arrange: ann answers every check except those of the last section
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync("ann");
+        var ann = new Actor("ann", "ann");
+        var slotId = (await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Slots.Single().Id;
+        var sections = DefaultChecklist.Current.Sections;
+        foreach (var item in sections.Take(sections.Count - 1).SelectMany(s => s.Items))
+        {
+            await service.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, ann, cancellationToken);
+        }
+
+        var before = await BallotOfAsync(store, projectId, slotId);
+
+        // Act: the last section does not apply
+        await service.SetSectionApplicabilityAsync(projectId, "rev-1", sections[^1].Id, false, "Not relevant.", ann, cancellationToken);
+        var after = await BallotOfAsync(store, projectId, slotId);
+
+        // Assert
+        Assert.Equal(BallotStatus.Draft, before!.Status);
+        Assert.Equal(BallotStatus.Submitted, after!.Status);
+        Assert.Equal("ann", after.SubmittedByUsername);
+    }
+
+    /// <summary>
+    ///     Test that a draft answer of the only slot of a review counts in the progress that somebody without a slot
+    ///     sees.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetAsync_SingleSlotDraft_ConsolidatedProgressCountsIt()
+    {
+        // Arrange: one slot, held by ann, who answers one check and has not handed in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync("ann");
+        await service.SetAnswerAsync(projectId, "rev-1", _firstItem, ChecklistOutcome.Pass, null, new Actor("ann", "ann"), cancellationToken);
+
+        // Act
+        var state = (await service.GetAsync(projectId, "rev-1", cancellationToken, "outsider"))!;
+
+        // Assert
+        Assert.Equal(1, state.Overall.Answered);
+    }
+
+    /// <summary>
+    ///     Test that somebody without a slot gets the standing of a review with one slot, which includes the draft
+    ///     answers of that slot, marked as having no slot and as not their own.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetAsync_NoSlotViewerOfSingleSlotReview_GetsConsolidatedStanding()
+    {
+        // Arrange: one slot, held by ann, who answers one check and has not handed in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync("ann");
+        await service.SetAnswerAsync(projectId, "rev-1", _firstItem, ChecklistOutcome.Pass, null, new Actor("ann", "ann"), cancellationToken);
+
+        // Act
+        var state = (await service.GetAsync(projectId, "rev-1", cancellationToken, "outsider"))!;
+
+        // Assert
+        Assert.True(state.NoSlot);
+        Assert.False(state.IsOwnBallot);
+        Assert.False(state.IsMasked);
+        Assert.Equal(ChecklistOutcome.Pass, state.AnswerFor(_firstItem)!.Outcome);
+    }
+
+    /// <summary>
+    ///     Creates a project with the real access rules, the review <c>rev-1</c> with one slot held by a reviewer, and a
+    ///     checklist service over them. The user <c>stranger</c> is no member of the project.
+    /// </summary>
+    /// <returns>The store, the service and the id of the project.</returns>
+    private static async Task<(FakeReviewStore Store, ChecklistService Service, int ProjectId)> CreateWithRealAccessAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var store = new FakeReviewStore();
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var root = new Actor("root", "root");
+        await users.CreateAsync("root", "root", true, "correct horse battery", Actor.CommandLine, cancellationToken);
+        await users.CreateAsync("stranger", "stranger", false, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var reviewer = await users.CreateAsync("rev", "rev", false, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var access = new ProjectAccess(userStore, store);
+        var project = await new ProjectService(store, userStore, access, new FakePasswordHasher(), clock)
+            .CreateAsync("Own", null, root, cancellationToken);
+        await store.AddMembershipAsync(reviewer.Id, project.Id, ProjectRole.User, cancellationToken);
+        await TestServices.Reviews(store, clock).CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        await store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = project.Id, ReviewId = "rev-1", PrimaryUserId = reviewer.Id }, cancellationToken);
+        return (store, new ChecklistService(store, access, userStore, clock), project.Id);
+    }
+
+    /// <summary>
+    ///     Test that somebody who is no member of the project cannot answer, and that the project is reported as not
+    ///     found before the check is looked up.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswer_NonMember_ThrowsProjectNotFoundAndStoresNothing()
+    {
+        // Arrange: a project the stranger is no member of
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateWithRealAccessAsync();
+
+        // Act: answer a check that does not exist, so that the project must be refused first
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
+            projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, new Actor("stranger", "stranger"), cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ProjectNotFound, ex.Rule);
+        Assert.Empty((await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Record.Ballots);
+    }
+
+    /// <summary>
+    ///     Test that somebody who is no member of the project cannot change the applicability of a section, and that the
+    ///     project is reported as not found before the section is looked up.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing()
+    {
+        // Arrange: a project the stranger is no member of
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateWithRealAccessAsync();
+
+        // Act: use a section that does not exist, so that the project must be refused first
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", "NOPE", false, "Reason", new Actor("stranger", "stranger"), cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ProjectNotFound, ex.Rule);
+        Assert.Empty((await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Record.Ballots);
+    }
+
+    /// <summary>
     ///     Test that an auditor who still holds a slot cannot answer, change the applicability of a section or hand a
     ///     ballot in: the read-only role is refused before the slot is looked up, and nothing is stored.
     /// </summary>

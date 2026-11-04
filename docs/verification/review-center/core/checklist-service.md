@@ -8,8 +8,11 @@ unit tests defined in `ChecklistServiceTests.cs`, the ballot rules (slot, hand-i
 the unit tests in `ChecklistValidatorTests.cs`, which need no store. The service is exercised over an in-memory fake
 store and the project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
 unit), so each
-test creates its own review, seats the reviewers in slots and reads the stored result back. The freeze at review
-creation is verified in `ReviewServiceTests.cs`. The real database is covered by the `Storage` subsystem.
+test creates its own review, seats the reviewers in slots and reads the stored result back. The tests of the refusal of
+a person outside the project, of an auditor, and of the alternate reviewer of a slot use the real project access rules
+instead, and the tests of the signature impact and of the conclusion text use the signed-review world of the tests.
+The freeze at review creation is verified by the review service, which is a different unit. The real database is
+covered by the `Storage` subsystem.
 
 #### Test Environment
 
@@ -25,26 +28,32 @@ N/A - standard test environment.
   characters, 1 to 50 sections, 1 to 500 checks, no empty section, identifiers of 1 to 32 allowed characters that are
   unique across the definition, titles of at most 200, wording of at most 1000, and a hint of at most 500 characters;
   it reports every violation with its path and never throws for bad content.
-- A review's checklist is the snapshot stored when the review was created; a later change to the default or to the
-  checklist of the project does not change it, and an unknown review has no checklist.
-- A section marked as not applicable needs a reason, which is stored trimmed; marking it applicable again clears the
-  reason; an unknown section is refused.
-- A Pass is stored without a justification; a Fail or N/A needs one; a justification is trimmed and limited to 2000
-  characters; an unknown review or item is refused; answering again replaces the earlier answer of the slot.
-- The answer carries the user name and the display name of the actor, with the UTC time; a missing actor is refused
-  for an answer and for a section change.
-- Progress is counted per section and overall; a not-applicable section counts as done and leaves the totals; the
+- A review's checklist is the copy stored with the review; a later change to the default does not change it, a review
+  without a copy has no checklist, and an unknown review has no checklist.
+- A section marked as not applicable needs a reason of at most 2000 characters, which is stored trimmed; marking it
+  applicable again clears the reason; an unknown section is refused.
+- A Pass is stored without a justification; a Fail or N/A needs one (an N/A with a justification is stored); a
+  justification is trimmed and limited to 2000 characters; an unknown review or item is refused; an outcome that is not
+  defined is refused and nothing is stored; answering again replaces the earlier answer of the slot.
+- The answer and the change of a section each carry the user name and the display name of the actor, with the UTC
+  time; a missing actor is refused for an answer and for a section change.
+- An answer or a section change by a person outside the project is refused with `ProjectNotFound`, before any other
+  problem of the call is reported, and nothing is stored; the service refuses to be created without its collaborators.
+- The audit entries of an answer and of a section change name the actor, and a refused change records no entry.
+- Progress is counted per section and overall; a failed check counts as answered; a not-applicable section counts as
+  done and leaves the totals; the
   checklist is complete when every applicable check is answered; the next unanswered check and the first incomplete
   section are found; the draft answers of the only slot of a review count in the consolidated progress, and those of
   one of several slots do not.
 - Answering, changing a section and handing in a ballot need a reviewer slot of the review: anybody else is refused
-  with `NoReviewerSlot` and nothing is stored.
+  with `NoReviewerSlot` and nothing is stored (also for the change of a section).
 - With several slots a ballot stays a draft until `SubmitBallotAsync` hands it in; an incomplete ballot is refused with
   `BallotIncomplete`; handing in again changes nothing. With one slot the answer that completes the ballot hands it in,
-  and an earlier answer leaves it a draft.
+  and an earlier answer leaves it a draft; a section change that completes the ballot hands it in as well.
 - A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; a viewer without a
-  slot gets the consolidated standing of the submitted ballots, marked as without a slot, in a review with a single slot
-  or a concluded review (a review with several slots that is not concluded gives such a viewer a masked state, see the
+  slot gets the consolidated standing of the submitted ballots, marked as without a slot and not masked, in a review
+  with a single slot or a concluded review (a review with several slots that is not concluded gives such a viewer a
+  masked state, see the
   verification of *BallotVisibility*); the ballot view names, for every viewer of the project, the other reviewers who
   have not handed in, and gives the justifications of the others, the differing checks and the failed count only to a
   viewer who may see the others and may view the project (never to a viewer who has not handed in, an API token, even
@@ -66,7 +75,8 @@ N/A - standard test environment.
   all carried is complete); answering a carried check again, or setting a carried section again, stores a row without
   the carried mark and with the new person.
 - The review conclusion text (the free text, not the approved or rejected conclusion) can be written by the reviewer
-  of any slot and the lead only, never by an auditor, an API token, another member or a person outside the project; it
+  of any slot, as the primary or as the alternate reviewer, and the lead only, never by an auditor, an API token,
+  another member or a person outside the project; it
   is normalized (LF, trimmed, blank means none) and limited to 4000 characters without control characters; a concluded
   review refuses it with `ReviewLocked`; a change while a signature is current needs the acknowledgement; the same text
   again changes nothing; a change by someone else in between is refused with `RecordChanged`; and every change is
@@ -89,13 +99,12 @@ complete definition (`null`, `{}`, missing or null sections, a null section, a s
 null item, an item without id or text, no version): `ChecklistDefinition.FromJson` and `ReviewChecklist.Parse` both
 raise a `JsonException`. This scenario is tested by `ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException`.
 
-**ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot**: A review is created; it carries the
-version and the sections of the default checklist. This scenario is tested by
-`ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot`.
-
 **ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot**: A review holds a snapshot that differs from the
 current default; the service returns the snapshot. This scenario is tested by
 `ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot`.
+
+**ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull**: A review that exists but holds no checklist copy is
+read; no checklist is returned. This scenario is tested by `ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull`.
 
 **ChecklistService_Get_UnknownReview_ReturnsNull**: The checklist of an unknown review is requested; nothing is
 returned. This scenario is tested by `ChecklistService_Get_UnknownReview_ReturnsNull`.
@@ -116,8 +125,20 @@ again; the reason is cleared. This scenario is tested by
 marked; the call is refused with the not-found rule. This scenario is tested by
 `ChecklistService_SetSectionApplicability_UnknownSection_ThrowsChecklistItemNotFound`.
 
+**ChecklistService_SetSectionApplicability_ReasonTooLong_Throws**: A section is marked as not applicable with a reason
+of 2001 characters; the call is refused with the justification rule and the earlier reason is kept, while a reason of
+exactly 2000 characters is accepted. This scenario is tested by
+`ChecklistService_SetSectionApplicability_ReasonTooLong_Throws`.
+
+**ChecklistService_SetSectionApplicability_StoresActorAndUtcTime**: A section is marked as not applicable by an actor;
+the stored state holds the user name, the display name, and the UTC time. This scenario is tested by
+`ChecklistService_SetSectionApplicability_StoresActorAndUtcTime`.
+
 **ChecklistService_SetAnswer_PassWithoutJustification_Stores**: A Pass is stored without a justification. This
 scenario is tested by `ChecklistService_SetAnswer_PassWithoutJustification_Stores`.
+
+**ChecklistService_SetAnswer_NotApplicableWithJustification_Stores**: An answer of Not applicable with a justification
+is stored as given. This scenario is tested by `ChecklistService_SetAnswer_NotApplicableWithJustification_Stores`.
 
 **ChecklistService_SetAnswer_FailOrNotApplicableWithoutJustification_Throws**: A Fail or N/A is stored without a
 justification; the call is refused. This scenario is tested by
@@ -191,6 +212,10 @@ another user, a member who holds no slot answers a check; the call is refused wi
 no ballot. This scenario is tested by `ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`, which is
 defined in `ChecklistServiceBallotTests.cs`, like the scenarios below up to the hand-in impact.
 
+**ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot marks
+a section as not applicable; the call is refused with `NoReviewerSlot` and nothing is stored. This scenario is tested by
+`ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`.
+
 **ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot hands a ballot
 in; the call is refused with `NoReviewerSlot`. This scenario is tested by
 `ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`.
@@ -207,6 +232,20 @@ scenario is tested by `ChecklistService_SubmitBallotAsync_Incomplete_ThrowsBallo
 **ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits**: The reviewer of the only slot answers every check
 but the last; the ballot is a draft. The last answer hands it in, with the user name of the reviewer. This scenario is
 tested by `ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits`.
+
+**ChecklistService_SetSectionApplicabilityAsync_SingleSlotCompleting_AutoSubmits**: The reviewer of the only slot
+answers every check of the checklist but those of one section; the ballot is a draft. Marking that section as not
+applicable completes the ballot and hands it in. This scenario is tested by
+`ChecklistService_SetSectionApplicabilityAsync_SingleSlotCompleting_AutoSubmits`.
+
+**ChecklistService_GetAsync_SingleSlotDraft_ConsolidatedProgressCountsIt**: The reviewer of the only slot answers one
+check and does not hand in; a read as a member without a slot counts that answer in the overall progress. This scenario
+is tested by `ChecklistService_GetAsync_SingleSlotDraft_ConsolidatedProgressCountsIt`.
+
+**ChecklistService_GetAsync_NoSlotViewerOfSingleSlotReview_GetsConsolidatedStanding**: The reviewer of the only slot
+answers one check Pass and does not hand in; a read as a member without a slot is marked `NoSlot`, is not the own
+ballot, is not masked, and shows the Pass. This scenario is tested by
+`ChecklistService_GetAsync_NoSlotViewerOfSingleSlotReview_GetsConsolidatedStanding`.
 
 **ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly**: In a review with three agreeing, submitted ballots, a reviewer
 changes an answer to Fail and does not hand it in. A read as that reviewer shows the own draft (`IsOwnBallot`, draft,
@@ -234,18 +273,6 @@ where both fail the check, the view has no differing check and counts one failed
 and bob has a draft Fail. The ballot view for bob, for a member without a slot, for that member through an API token and
 for a user outside the project has no differing check and no failed check, and its serialized form does not contain the
 reason. This scenario is tested by `ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck`.
-
-**ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck**: Ann and bob handed in, and
-they differ on a check with a reason. The ballot view for an API token of ann, whose owner has handed in, is masked,
-has no differing check and no failed check, and its serialized form does not contain the reason, while the view for ann
-herself holds the dispute. The consolidated standing read with `GetConsolidatedAsync` is not masked for the token,
-because that read gives the standing of a submitted owner. This scenario is tested by
-`ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck`.
-
-**ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers**: In a review with a single slot
-that ann failed, the view for ann counts one failed check and the view for a user outside the project counts none and
-has no differing check, though the ballots of such a review are open to every viewer of the project. This scenario is
-tested by `ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers`.
 
 **ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots**: Three submitted ballots
 agree and slot 1 has signed. A reviewer of another slot changes an answer to Fail; the edit is stored and the signature
@@ -302,6 +329,30 @@ has an empty list. This scenario is tested by `ChecklistService_DomainRuleExcept
 clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This
 scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.
 
+**ChecklistService_SetAnswer_NonMember_ThrowsProjectNotFoundAndStoresNothing**: With the real access rules, a person
+outside the project answers an unknown check; the call is refused with `ProjectNotFound`, not the not-found rule of the
+check, and nothing is stored. This scenario is tested by
+`ChecklistService_SetAnswer_NonMember_ThrowsProjectNotFoundAndStoresNothing`.
+
+**ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing**: With the real access rules,
+a person outside the project changes a section; the call is refused with `ProjectNotFound` and nothing is stored. This
+scenario is tested by `ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing`.
+
+**ChecklistService_SetAnswer_CarriedAnswer_StoredWithoutTheCarriedMark**: In a follow-up review a carried answer is
+answered again; the stored row has no carried mark, while the other carried answer keeps it. This scenario is tested by
+`ChecklistService_SetAnswer_CarriedAnswer_StoredWithoutTheCarriedMark`.
+
+**ChecklistService_SetSectionApplicability_CarriedSection_StoredWithoutTheCarriedMark**: In a follow-up review a carried
+not-applicable section is set again with a new reason; the stored state has no carried mark. This scenario is tested by
+`ChecklistService_SetSectionApplicability_CarriedSection_StoredWithoutTheCarriedMark`.
+
+**ChecklistService_Get_CarriedAnswers_CountAsAnswered**: In a follow-up review with two carried answers and a carried
+not-applicable section, the progress counts the two answers as answered and the checks of the section leave the total
+(2 of 53). This scenario is tested by `ChecklistService_Get_CarriedAnswers_CountAsAnswered`.
+
+**ChecklistState_Progress_FailedAnswer_CountsAsAnswered**: A check is answered Fail; it counts as answered. This
+scenario is tested by `ChecklistState_Progress_FailedAnswer_CountsAsAnswered`.
+
 **ChecklistState_Progress_CountsAnsweredPerSectionAndOverall**: Some checks are answered; each section and the
 overall progress show the counts. This scenario is tested by
 `ChecklistState_Progress_CountsAnsweredPerSectionAndOverall`.
@@ -328,17 +379,19 @@ check that is neither answered nor in a not-applicable section. This scenario is
 first applicable section with an unanswered check. This scenario is tested by
 `ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered`.
 
-**BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount**: A draft ballot is consolidated; with the
-slot count 1 its answer is in the standing that progress reads, and without the slot count (the view of the digest), or
-with two slots, it is not. This scenario is tested by
-`BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount`, which is defined in
-`BallotProjectionTests.cs`.
+**ChecklistService_Changes_Refused_RecordNoAuditEntry**: A Fail without a justification, an answer to an unknown check,
+a change of an unknown section, and a not-applicable section without a reason are tried; each is refused and none of
+them adds an audit entry. This scenario is tested by `ChecklistService_Changes_Refused_RecordNoAuditEntry`.
 
 **ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification**: A check is answered and the
 applicability of a section is changed; the entries `checklist.answered` and `checklist.applicability-changed` carry
 the check or section and the outcome, and a justification appears only as an eight-character digest prefix. This
 scenario is tested by `ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification`, which is defined
 in `AuditEventTests.cs`.
+
+**ChecklistService_ChecklistEvents_NameTheActor**: A check is answered and a section is changed by a reviewer; both
+audit entries name that reviewer as the actor. This scenario is tested by
+`ChecklistService_ChecklistEvents_NameTheActor`.
 
 **ChecklistValidator_Validate_DefaultChecklist_IsValid**: The built-in default checklist is checked; it has no error.
 This scenario is tested by `ChecklistValidator_Validate_DefaultChecklist_IsValid`.
@@ -414,27 +467,23 @@ are. This scenario is tested by `ChecklistValidator_ParseOrThrow_Invalid_ThrowsW
 **ChecklistValidationError_ToString_IsPathAndMessage**: An error is written as its path, a colon, and its message. This
 scenario is tested by `ChecklistValidationError_ToString_IsPathAndMessage`.
 
-**Carried answers and sections** are verified in `ReviewServiceFollowUpTests.cs`, which runs the real `ChecklistService`
-over the fake store after a follow-up was created.
-
-**ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker**: A carried check is answered again by
-another person and a carried section is set again; the stored rows have the new person and no carried mark, while a
-carried answer that was not touched keeps its mark. This scenario is tested by
-`ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker`.
-
-**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: A review whose checks are all carried has a
-complete checklist with no unanswered check. This scenario is tested by
-`ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
+**Carried answers and sections** are verified in `ChecklistServiceTests.cs`, over a follow-up review that the test
+builds in the fake store with rows carried over from the first review.
 
 **Review conclusion text** is verified in `ChecklistServiceReviewConclusionTextTests.cs`. The tests of who may write
 use the real `ProjectAccess` and `FakeUserStore` with the users root (the lead and creator), alt (the reviewer of a
-slot), usr and mem (plain members), out (not a member) and aud (an auditor). The tests of the lock and of the signature
+slot), usr and mem (plain members, usr also the primary and mem the alternate of a slot in the test of the alternate
+reviewer), out (not a member) and aud (an auditor). The tests of the lock and of the signature
 impact use the signed-review world, in which everybody is a lead. The text under test is the free text, never the
 approved or rejected conclusion of a ballot.
 
 **ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores**: A theory over the reviewer of a slot and the
 lead; each stores a text, the review reads back with it, and exactly one `review.conclusion-changed` entry names the
 writer. This scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores`.
+
+**ChecklistService_SetReviewConclusionTextAsync_AlternateOfSlot_Stores**: A member who is the alternate of a slot, and
+holds no other role, writes the text; it is stored and the single audit entry names that member. This scenario is
+tested by `ChecklistService_SetReviewConclusionTextAsync_AlternateOfSlot_Stores`.
 
 **ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed**: A plain member who holds no slot
 and did not create the review is refused with `ActorNotAllowed`; nothing is stored or audited. This scenario is tested
@@ -488,8 +537,3 @@ and its single audit entry remain. This scenario is tested by
 **ChecklistService_CanSetReviewConclusionTextAsync_Roles**: The lead and the reviewer of a slot may write the text; a
 plain member, an auditor, a person outside the project, no actor, an API token and a missing review give `false`. This
 scenario is tested by `ChecklistService_CanSetReviewConclusionTextAsync_Roles`.
-
-**ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing**: The classification test in
-`ProjectAccessGuardTests.cs` lists `SetReviewConclusionTextAsync` among the changes an auditor is refused and
-`CanSetReviewConclusionTextAsync` among the reads. This scenario is tested by
-`ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing`.

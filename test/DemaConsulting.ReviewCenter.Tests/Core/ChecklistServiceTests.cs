@@ -827,6 +827,273 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that a review that exists but has no checklist copy has no checklist state.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull()
+    {
+        // Arrange: a review that was stored without a checklist copy
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        await store.AddReviewAsync(
+            new Review { ProjectId = projectId, Id = "rev-bare", Title = "Bare", Created = _now },
+            cancellationToken);
+
+        // Act
+        var state = await service.GetAsync(projectId, "rev-bare", cancellationToken);
+
+        // Assert: the review exists, and it has no checklist
+        Assert.True(await store.ReviewExistsAsync(projectId, "rev-bare", cancellationToken));
+        Assert.Null(state);
+    }
+
+    /// <summary>
+    ///     Test that the reason of a not-applicable section may be as long as the justification limit and no longer,
+    ///     and that a refused reason leaves the earlier one in place.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicability_ReasonTooLong_Throws()
+    {
+        // Arrange: a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync();
+        var atLimit = new string('r', ReviewLimits.MaxJustificationLength);
+
+        // Act: a reason of exactly the limit is accepted, one more character is refused
+        await service.SetSectionApplicabilityAsync(projectId, "rev-1", "DES", false, atLimit, TestActors.Ann, cancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", "DES", false, atLimit + "r", TestActors.Ann, cancellationToken));
+
+        // Assert: the rule is named and the accepted reason is still the stored one
+        Assert.Equal(DomainRule.ChecklistJustificationInvalid, exception.Rule);
+        var state = (await service.GetAsync(projectId, "rev-1", cancellationToken))!;
+        Assert.False(state.IsApplicable("DES"));
+        Assert.Equal(atLimit, state.ReasonFor("DES"));
+    }
+
+    /// <summary>
+    ///     Test that a check can be answered as not applicable when a justification is given, and that the
+    ///     justification is stored.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswer_NotApplicableWithJustification_Stores()
+    {
+        // Arrange: a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync();
+
+        // Act
+        await service.SetAnswerAsync(
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.NotApplicable, "Nothing to trace.", TestActors.Ann, cancellationToken);
+        var answer = (await service.GetAsync(projectId, "rev-1", cancellationToken))!.AnswerFor("REQ-01");
+
+        // Assert
+        Assert.NotNull(answer);
+        Assert.Equal(ChecklistOutcome.NotApplicable, answer.Outcome);
+        Assert.Equal("Nothing to trace.", answer.Justification);
+    }
+
+    /// <summary>
+    ///     Test that a section change carries the user name and display name of the actor and the UTC time of the clock.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicability_StoresActorAndUtcTime()
+    {
+        // Arrange: a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync();
+
+        // Act
+        await service.SetSectionApplicabilityAsync(projectId, "rev-1", "DES", false, "No design files", TestActors.Ann, cancellationToken);
+        var section = (await service.GetAsync(projectId, "rev-1", cancellationToken))!.SectionStateFor("DES");
+
+        // Assert: both names and the clock time
+        Assert.NotNull(section);
+        Assert.Equal("Ann", section.SetBy);
+        Assert.Equal("ann", section.SetByUsername);
+        Assert.Equal(_now, section.SetAt);
+        Assert.Equal(TimeSpan.Zero, section.SetAt.Offset);
+    }
+
+    /// <summary>
+    ///     Test that the audit entries of an answer and of a section change name the actor, by user name and by the
+    ///     stored actor text.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_ChecklistEvents_NameTheActor()
+    {
+        // Arrange: a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        var before = store.Audits.Count;
+
+        // Act
+        await service.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        await service.SetSectionApplicabilityAsync(projectId, "rev-1", "DES", false, "No design files", TestActors.Ann, cancellationToken);
+
+        // Assert: both entries are by ann
+        var entries = store.Audits.Skip(before).Where(a => a.Action.StartsWith("checklist.", StringComparison.Ordinal)).ToList();
+        Assert.Equal(["checklist.answered", "checklist.applicability-changed"], entries.Select(e => e.Action));
+        Assert.All(entries, entry =>
+        {
+            Assert.Equal("ann", entry.ActorUsername);
+            Assert.Equal("Ann (ann)", entry.ActorName);
+        });
+    }
+
+    /// <summary>
+    ///     Test that a refused answer or section change records no audit entry.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Changes_Refused_RecordNoAuditEntry()
+    {
+        // Arrange: a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        var before = store.Audits.Count;
+
+        // Act: a failed check without justification, an unknown check, an unknown section and a section without reason
+        await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, null, TestActors.Ann, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
+            projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", "NOPE", false, "Reason", TestActors.Ann, cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", "DES", false, null, TestActors.Ann, cancellationToken));
+
+        // Assert: no entry was recorded
+        Assert.Equal(before, store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Creates the follow-up review <c>rev-2</c> of <c>rev-1</c> whose carried rows are an answer to <c>REQ-01</c>, a
+    ///     failed answer to <c>REQ-02</c> and the section <c>DES</c> marked as not applicable, all carried from
+    ///     <c>rev-1</c>, with <c>ann</c> holding the one slot, so that the slot starts from the carried rows.
+    /// </summary>
+    /// <returns>The store, the service and the id of the project.</returns>
+    private static async Task<(FakeReviewStore Store, ChecklistService Service, int ProjectId)> CreateFollowUpAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        var annId = (await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Slots.Single().PrimaryUserId;
+        ChecklistAnswer Carried(string itemId, ChecklistOutcome outcome, string? justification) => new()
+        {
+            ProjectId = projectId,
+            ReviewId = "rev-2",
+            ItemId = itemId,
+            Outcome = outcome,
+            Justification = justification,
+            AnsweredBy = "Bob",
+            AnsweredByUsername = "bob",
+            AnsweredAt = _now.AddDays(-1),
+            CarriedFromReviewId = "rev-1"
+        };
+        var section = new ChecklistSectionState
+        {
+            ProjectId = projectId,
+            ReviewId = "rev-2",
+            SectionId = "DES",
+            Applicable = false,
+            Reason = "No design files",
+            SetBy = "Bob",
+            SetByUsername = "bob",
+            SetAt = _now.AddDays(-1),
+            CarriedFromReviewId = "rev-1"
+        };
+        await store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = "rev-2",
+                Title = "Follow-up",
+                Created = _now,
+                FollowsReviewId = "rev-1",
+                Checklist = new ReviewChecklist
+                {
+                    ProjectId = projectId,
+                    ReviewId = "rev-2",
+                    Version = DefaultChecklist.Current.Version,
+                    Definition = DefaultChecklist.Current.ToJson()
+                },
+                CarryOver = new ReviewCarryOver(
+                    [Carried("REQ-01", ChecklistOutcome.Pass, null), Carried("REQ-02", ChecklistOutcome.Fail, "Old problem.")],
+                    [section],
+                    [],
+                    0,
+                    [])
+            },
+            cancellationToken);
+        await store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectId, ReviewId = "rev-2", PrimaryUserId = annId }, cancellationToken);
+        return (store, service, projectId);
+    }
+
+    /// <summary>
+    ///     Test that a carried answer that the reviewer answers again is stored without the mark of the earlier review,
+    ///     while the other carried answers keep it.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswer_CarriedAnswer_StoredWithoutTheCarriedMark()
+    {
+        // Arrange: a follow-up review whose carried answers are in the draft ballot of ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateFollowUpAsync();
+        var before = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
+
+        // Act: ann answers the carried check again, with the same outcome
+        await service.SetAnswerAsync(projectId, "rev-2", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        var after = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
+
+        // Assert: the answer was carried before, is her own now, and the other carried answer is untouched
+        Assert.Equal("rev-1", before.AnswerFor("REQ-01")!.CarriedFromReviewId);
+        Assert.Null(after.AnswerFor("REQ-01")!.CarriedFromReviewId);
+        Assert.Equal("ann", after.AnswerFor("REQ-01")!.AnsweredByUsername);
+        Assert.Equal("rev-1", after.AnswerFor("REQ-02")!.CarriedFromReviewId);
+    }
+
+    /// <summary>
+    ///     Test that a carried not-applicable section that the reviewer changes is stored without the mark of the
+    ///     earlier review.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicability_CarriedSection_StoredWithoutTheCarriedMark()
+    {
+        // Arrange: a follow-up review whose carried section is not applicable in the draft ballot of ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateFollowUpAsync();
+        var before = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
+
+        // Act: ann marks the section as not applicable again, with a reason of her own
+        await service.SetSectionApplicabilityAsync(projectId, "rev-2", "DES", false, "Still none", TestActors.Ann, cancellationToken);
+        var after = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
+
+        // Assert: carried before, her own now
+        Assert.Equal("rev-1", before.CarriedFromFor("DES"));
+        Assert.Null(after.CarriedFromFor("DES"));
+        Assert.False(after.IsApplicable("DES"));
+        Assert.Equal("Still none", after.ReasonFor("DES"));
+    }
+
+    /// <summary>
+    ///     Test that carried answers count as answered in the progress, and that the carried not-applicable section
+    ///     leaves the total.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Get_CarriedAnswers_CountAsAnswered()
+    {
+        // Arrange: a follow-up review with two carried answers and a carried not-applicable section (5 checks)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateFollowUpAsync();
+
+        // Act
+        var state = (await service.GetAsync(projectId, "rev-2", cancellationToken, "ann"))!;
+
+        // Assert: two answered of the 53 checks of the sections that apply
+        Assert.Equal(new ChecklistProgress(2, 53), state.Overall);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store, access, user store or clock.
     /// </summary>
     [Fact]
@@ -898,6 +1165,30 @@ public class ChecklistStateTests
         Assert.Equal(new ChecklistProgress(3, 58), state.Overall);
         Assert.Equal(55, state.Overall.Unanswered);
         Assert.False(state.IsComplete);
+    }
+
+    /// <summary>
+    ///     Test that a failed answer counts as answered, like a passed one.
+    /// </summary>
+    [Fact]
+    public void ChecklistState_Progress_FailedAnswer_CountsAsAnswered()
+    {
+        // Arrange: the first check of the first section is answered as failed
+        var failed = new ChecklistAnswer
+        {
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            ItemId = "REQ-01",
+            Outcome = ChecklistOutcome.Fail,
+            Justification = "Not traceable.",
+            AnsweredBy = "Ann",
+            AnsweredAt = _now
+        };
+        var state = new ChecklistState(DefaultChecklist.Current, [], [failed]);
+
+        // Act, Assert: it counts as answered, in its section and overall
+        Assert.Equal(new ChecklistProgress(1, 8), state.SectionProgress("REQ"));
+        Assert.Equal(new ChecklistProgress(1, 58), state.Overall);
     }
 
     /// <summary>
