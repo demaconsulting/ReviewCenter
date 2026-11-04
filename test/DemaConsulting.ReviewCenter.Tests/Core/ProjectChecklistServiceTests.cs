@@ -89,6 +89,32 @@ public class ProjectChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that a stored text that cannot be read as a checklist definition is reported with the
+    ///     invalid-definition rule when the checklist is read.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_GetAsync_UnreadableStoredText_ThrowsChecklistDefinitionInvalid()
+    {
+        // Arrange: the store holds a text that is not a checklist definition
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var stored = await world.Store.UpdateChecklistDefinitionAsync(
+            world.Project,
+            ProjectChecklistService.HashOf(null),
+            "{ not json",
+            AuditDraft.By(Actor.CommandLine, ProjectChecklistService.ChangedAction, "seed", world.Project),
+            cancellationToken);
+        Assert.True(stored);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.GetAsync(new Actor("root", "root"), world.Project, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ChecklistDefinitionInvalid, exception.Rule);
+    }
+
+    /// <summary>
     ///     Test that the checklist is read by anyone who may see the project and changed by a system administrator
     ///     and a project administrator of the project only: a plain member is told it may not change, and everybody
     ///     else (and nobody) is given the answer for a project that does not exist.
@@ -173,6 +199,62 @@ public class ProjectChecklistServiceTests
         // Reading is not a change: the same token may read the checklist
         var read = await world.Service.GetAsync(viaApi, world.Project, cancellationToken);
         Assert.True(read.IsDefault);
+    }
+
+    /// <summary>
+    ///     Test that a plain member and a user outside the project are refused a reset, the member as not allowed and
+    ///     the outsider as the project not found, and that the stored definition stays.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges()
+    {
+        // Arrange: the project has a custom definition
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.Service.SetAsync(
+            new Actor("pa", "pa"), world.Project, ProjectChecklistService.HashOf(null), Custom("moon-1"), cancellationToken);
+        var hash = ProjectChecklistService.HashOf(Custom("moon-1"));
+
+        // Act
+        var member = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.ResetAsync(new Actor("mem", "mem"), world.Project, hash, cancellationToken));
+        var outsider = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.ResetAsync(new Actor("out", "out"), world.Project, hash, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ActorNotAllowed, member.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, outsider.Rule);
+        Assert.Equal(Custom("moon-1"), (await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
+        Assert.Single(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
+    }
+
+    /// <summary>
+    ///     Test that the right to change the checklist is checked again at every call: a project administrator who
+    ///     read the checklist and then lost the membership is refused as the project not found.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_SetAsync_AdminRemovedAfterRead_IsRefused()
+    {
+        // Arrange: the project administrator reads the checklist, then the membership is removed
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var admin = new Actor("pa", "pa");
+        var read = await world.Service.GetAsync(admin, world.Project, cancellationToken);
+        var removed = await world.Store.RemoveMembershipAsync(
+            world.Project,
+            world.UserIds["pa"],
+            AuditDraft.By(Actor.CommandLine, "membership.removed", "pa", world.Project),
+            false,
+            cancellationToken);
+        Assert.True(removed);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.SetAsync(admin, world.Project, read.Hash, Custom("v2"), cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ProjectNotFound, exception.Rule);
+        Assert.Null((await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
     }
 
     /// <summary>
@@ -403,6 +485,76 @@ public class ProjectChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that both refusals of a change that was overtaken carry the message that someone else changed the
+    ///     checklist.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_SetAndReset_ChangedMeanwhile_MessageSaysSomeoneElseChanged()
+    {
+        // Arrange: another administrator changes the checklist first
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var staleHash = ProjectChecklistService.HashOf(null);
+        await world.Service.SetAsync(new Actor("pb", "pb"), world.Project, staleHash, Custom("moon-1"), cancellationToken);
+
+        // Act
+        var set = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.SetAsync(new Actor("pa", "pa"), world.Project, staleHash, Custom("moon-2"), cancellationToken));
+        var reset = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.ResetAsync(new Actor("pa", "pa"), world.Project, staleHash, cancellationToken));
+
+        // Assert
+        Assert.Equal(ProjectChecklistService.ChangedByOthersMessage, set.Message);
+        Assert.Equal(ProjectChecklistService.ChangedByOthersMessage, reset.Message);
+        Assert.Contains("someone else", set.Message, StringComparison.Ordinal);
+        Assert.Contains("someone else", reset.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a review that exists keeps the checklist copy it was created with when the checklist of its
+    ///     project is reset.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_ResetAsync_ExistingReview_KeepsItsChecklistCopy()
+    {
+        // Arrange: a review with a copy of an older definition, and a project that then gets a custom definition
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var copy = new ChecklistDefinition(
+            "old-1",
+            [new ChecklistSection("X", "Old section", "Hint", [new ChecklistItem("X-01", "Old check")])]);
+        await world.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = world.Project,
+                Id = "rev-1",
+                Title = "Existing",
+                Created = _now,
+                Checklist = new ReviewChecklist
+                {
+                    ProjectId = world.Project,
+                    ReviewId = "rev-1",
+                    Version = copy.Version,
+                    Definition = copy.ToJson()
+                }
+            },
+            cancellationToken);
+        var admin = new Actor("pa", "pa");
+        await world.Service.SetAsync(admin, world.Project, ProjectChecklistService.HashOf(null), Custom("moon-1"), cancellationToken);
+
+        // Act
+        var reset = await world.Service.ResetAsync(
+            admin, world.Project, ProjectChecklistService.HashOf(Custom("moon-1")), cancellationToken);
+
+        // Assert
+        Assert.True(reset);
+        var kept = await world.Store.GetChecklistAsync(world.Project, "rev-1", cancellationToken);
+        Assert.NotNull(kept);
+        Assert.Equal("old-1", kept.Version);
+        Assert.Equal(copy.ToJson(), kept.Definition);
+    }
+
+    /// <summary>
     ///     Test that a reset removes the project's definition, so the default applies again, and is recorded with
     ///     the same action, saying that it was a reset and naming the previous version.
     /// </summary>
@@ -538,7 +690,7 @@ public class ProjectChecklistServiceTests
         await store.AddMembershipAsync(ids["off"], project.Id, ProjectRole.User, cancellationToken);
         await store.AddMembershipAsync(ids["offadm"], project.Id, ProjectRole.ProjectAdmin, cancellationToken);
         await store.AddMembershipAsync(ids["padm"], other.Id, ProjectRole.ProjectAdmin, cancellationToken);
-        return new World(store, new ProjectChecklistService(store, access), project.Id, other.Id);
+        return new World(store, new ProjectChecklistService(store, access), project.Id, other.Id, ids);
     }
 
     /// <summary>
@@ -548,5 +700,11 @@ public class ProjectChecklistServiceTests
     /// <param name="Service">The service under test, over the real <see cref="ProjectAccess"/>.</param>
     /// <param name="Project">The project the tests work on.</param>
     /// <param name="Other">A second project.</param>
-    private sealed record World(FakeReviewStore Store, ProjectChecklistService Service, int Project, int Other);
+    /// <param name="UserIds">The user identities by user name.</param>
+    private sealed record World(
+        FakeReviewStore Store,
+        ProjectChecklistService Service,
+        int Project,
+        int Other,
+        IReadOnlyDictionary<string, int> UserIds);
 }
