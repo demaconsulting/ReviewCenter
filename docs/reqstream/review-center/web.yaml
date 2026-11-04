@@ -1011,6 +1011,7 @@ sections:
           - ReviewCenter-App-RouteAuthorization-LoginLink
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - SignIn_PublicPage_Anonymous_IsServed
 
       - id: ReviewCenter-Web-SignIn-LoginPage-Antiforgery
         title: >-
@@ -1144,6 +1145,8 @@ sections:
           - ReviewCenter-UsersPage-Status-Unlock
           - ReviewCenter-UsersPage-Status-UnlockOutcome
           - ReviewCenter-App-UsersLink
+        tests:
+          - SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed
 
       - id: ReviewCenter-Web-SignIn-Enable
         title: >-

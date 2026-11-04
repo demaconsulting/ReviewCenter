@@ -18,7 +18,8 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - The page, rendered with nobody signed in, shows the full version of the program, names DEMA Consulting, and links to
   the project page on GitHub.
-- A visitor who is not signed in is served the page at `/about`.
+- A visitor who is not signed in is shown the page by the router at `/about`, and is not asked to sign in; that the
+  running server serves the page is verified for the `Web` subsystem.
 - The page names the main features: threaded comments, the checklist, and the audit trail.
 
 #### Test Scenarios

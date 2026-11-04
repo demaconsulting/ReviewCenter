@@ -170,18 +170,20 @@ sections:
 
       - id: ReviewCenter-InboxPage-Interactive
         title: >-
-          The InboxPage unit shall be served as an interactive page of a signed-in session, so that a button on it
-          works.
+          The InboxPage unit shall set the interactive marker on its page once the page has rendered, and offer the
+          button that marks everything as read.
         justification: |
-          The button that marks everything as read needs the live session of the user.
+          The button that marks everything as read needs the live session of the user, and the marker tells that the
+          page has become interactive. Serving the page only to a signed-in user belongs to the Web subsystem.
         tests:
           - InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead
 
       - id: ReviewCenter-InboxPage-Interactive-Challenge
         title: >-
-          The InboxPage unit shall challenge a request without a sign-in and not serve the page.
+          The InboxPage unit shall, when it is reached through the router by a visitor who is not signed in, show a link
+          to the login page that returns to the inbox and none of the inbox.
         justification: |
           The page keeps the rule of every other page of the application: no page that holds personal data is open
-          without a sign-in.
+          without a sign-in. That the server challenges the request is verified for the Web subsystem.
         tests:
           - InboxPage_Render_AnonymousThroughRouter_ShowsLoginLinkAndNoInbox

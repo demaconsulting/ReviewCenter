@@ -36,7 +36,7 @@ sections:
 
       - id: ReviewCenter-AboutPage-Version-AnonymousAccess
         title: >-
-          The AboutPage unit shall serve the page at /about to a visitor who is not signed in.
+          The AboutPage unit shall render the about page for a visitor who is not signed in.
         justification: |
           The version must be readable before signing in, for example by somebody who has to say which build of the
           product they are about to use.

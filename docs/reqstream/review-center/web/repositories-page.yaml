@@ -210,8 +210,8 @@ sections:
 
       - id: ReviewCenter-RepositoriesPage-Admin
         title: >-
-          The RepositoriesPage unit shall serve the page to a system administrator and to a project admin of the
-          project.
+          The RepositoriesPage unit shall show the repositories of the project and the controls to change them to a
+          system administrator and to a project admin of the project.
         justification: |
           The repositories control what the server reads and hold secrets, so the people who manage the project, and
           only they, may see and change them.

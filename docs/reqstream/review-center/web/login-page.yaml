@@ -8,7 +8,7 @@ sections:
     requirements:
       - id: ReviewCenter-LoginPage-Form
         title: >-
-          The LoginPage unit shall serve the page at /login to a visitor who is not signed in.
+          The LoginPage unit shall render the sign-in page at /login for a visitor who is not signed in.
         justification: |
           Users need a page to sign in from, and it must be reachable without being signed in.
         tests:

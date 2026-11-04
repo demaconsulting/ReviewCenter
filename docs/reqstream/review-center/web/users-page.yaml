@@ -19,7 +19,8 @@ sections:
 
       - id: ReviewCenter-UsersPage-List-AdminOnly
         title: >-
-          The UsersPage unit shall serve the list at /users to a system administrator only.
+          The UsersPage unit shall show the list at /users, when it is reached through the router, to a system
+          administrator only.
         justification: |
           Other users must not see or change the accounts of others, so the page is closed to everyone who is not a
           system administrator.

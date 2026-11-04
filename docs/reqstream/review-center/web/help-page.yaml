@@ -15,7 +15,7 @@ sections:
     requirements:
       - id: ReviewCenter-HelpPage-Index
         title: >-
-          The HelpPage unit shall serve at /help an index headed Help that lists every help topic with its title and a
+          The HelpPage unit shall show an index headed Help that lists every help topic with its title and a
           link to the page of the topic.
         justification: |
           A user who needs help must be able to see what is covered and to choose a topic without guessing an address.

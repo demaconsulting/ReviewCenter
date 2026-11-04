@@ -9,7 +9,7 @@ sections:
     requirements:
       - id: ReviewCenter-AccountPage-Show
         title: >-
-          The AccountPage unit shall serve at /account, to a signed-in user, a form for changing the password.
+          The AccountPage unit shall show a form for changing the password to a signed-in user.
         justification: |
           Users must be able to change the password without asking an administrator.
         tests:

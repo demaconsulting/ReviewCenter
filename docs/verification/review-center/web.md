@@ -401,6 +401,13 @@ replacing the password sends the browser to the login page with the notice, whic
 `LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`. The refusals on the server side (signatures, access
 tokens, project access) are verified in the `Core` and `Api` subsystems.
 
+**Sign-in pages served over HTTP**: Through the real server pipeline, the login page is answered with status 200 to a
+visitor who is not signed in, which is tested by `SignIn_PublicPage_Anonymous_IsServed`, and the users page is served to
+a system administrator and refused to a reviewer with an explanation, which is tested by
+`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; both tests are defined in `SignInTests.cs` and are evidence of the
+requirements `ReviewCenter-Web-SignIn-LoginPage` and `ReviewCenter-Web-SignIn-UsersPage`. The pages themselves are
+verified in the component tests of `LoginPage` and `UsersPage`, which render them with the router.
+
 **Sign-in with an OpenID Connect provider**: With the provider on and nobody signed in, the login page shows the button
 beside the local form, which is tested by `LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm`. A reviewer
 who signs in at the provider sees, on the review page, the button to confirm the identity and no password field, and
