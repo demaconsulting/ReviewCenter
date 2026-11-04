@@ -9,277 +9,965 @@ sections:
     requirements:
       - id: ReviewCenter-ReviewPage-Show
         title: >-
-          The ReviewPage unit shall show the identifier, title, and content fingerprint of the review (the
-          identifier and fingerprint in the Details section, which does not repeat the approval status), a link
-          back to the owning project labeled with the project name, or a not-found message when the review does
-          not exist.
+          The ReviewPage unit shall show the identifier of the review in the Details section.
         justification: |
-          The fingerprint identifies the exact content under review, so it must be available. A mistyped link
-          must lead to a clear answer, and the reviewer must see which project the review belongs to.
+          The identifier names the review, so the reader can tell which review the page is about.
         tests:
-          - ReviewPage_Render_UnknownReview_ShowsNotFound
           - ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint
           - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-Show-Title
+        title: >-
+          The ReviewPage unit shall show the title of the review.
+        justification: |
+          The title tells the reader at a glance what the review is about.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint
+
+      - id: ReviewCenter-ReviewPage-Show-Fingerprint
+        title: >-
+          The ReviewPage unit shall show the content fingerprint of the review in the Details section.
+        justification: |
+          The fingerprint identifies the exact content under review, so it must be available.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-Show-NoState
+        title: >-
+          The ReviewPage unit shall not repeat the approval status of the review in the Details section.
+        justification: |
+          The status is shown once, where the reader looks for it, so the Details section does not say it again.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-Show-ProjectLink
+        title: >-
+          The ReviewPage unit shall show a link back to the owning project, labeled with the project name.
+        justification: |
+          The reviewer must see which project the review belongs to and be able to go back to it.
+        tests:
+          - ReviewPage_Render_ExistingReview_ProjectLinkPointsToTheProject
           - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
+
+      - id: ReviewCenter-ReviewPage-Show-NotFound
+        title: >-
+          The ReviewPage unit shall show a not-found message when the review does not exist.
+        justification: |
+          A mistyped link must lead to a clear answer.
+        tests:
+          - ReviewPage_Render_UnknownReview_ShowsNotFound
+
+      - id: ReviewCenter-ReviewPage-Show-OtherReview
+        title: >-
+          The ReviewPage unit shall show the new review, with no selected file and no typed thread text, when the page
+          is reused for another review.
+        justification: |
+          A page that is reused for another review must not carry the selection or a half-written comment of the
+          previous review over.
+        tests:
           - ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection
 
       - id: ReviewCenter-ReviewPage-Access
         title: >-
           The ReviewPage unit shall show a user who may not see the project the page for a review that does not
-          exist and none of the data of the project, and shall check the view access again at the start of every
-          action of the open page, so that a user whose membership was removed meanwhile gets that page and
-          nothing that was loaded, and an action that would change the review stores nothing.
+          exist.
         justification: |
-          A page that stays open does not load again, so without a new check a removed member would keep reading
-          files, comments and checklist answers, and could keep commenting, through the open page. A hidden
-          project looks like a missing one, so the page does not reveal it either.
+          A hidden project looks like a missing one, so the page does not reveal that the review exists.
         tests:
           - ReviewPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-ReviewPage-Access-NoData
+        title: >-
+          The ReviewPage unit shall show a user who may not see the project none of the data of the project.
+        justification: |
+          The page must not reveal files, comments or checklist answers of a project to a user who may not see it.
+        tests:
+          - ReviewPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-ReviewPage-Access-SelectFile
+        title: >-
+          The ReviewPage unit shall check the view access again when a file is selected, and show a user whose
+          membership was removed meanwhile the page of a missing review and none of the loaded data.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          files through the open page.
+        tests:
           - ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData
+
+      - id: ReviewCenter-ReviewPage-Access-SelectThread
+        title: >-
+          The ReviewPage unit shall check the view access again when a thread is selected, and show a user whose
+          membership was removed meanwhile the page of a missing review and none of the loaded data.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          comments through the open page.
+        tests:
           - ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData
+
+      - id: ReviewCenter-ReviewPage-Access-FilterIndex
+        title: >-
+          The ReviewPage unit shall check the view access again when the thread index is filtered, and show a user
+          whose membership was removed meanwhile the page of a missing review and none of the loaded data.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading the
+          thread index through the open page.
+        tests:
           - ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData
+
+      - id: ReviewCenter-ReviewPage-Access-Reply
+        title: >-
+          The ReviewPage unit shall check the view access again when a reply is submitted, and show a user whose
+          membership was removed meanwhile the page of a missing review and none of the loaded data.
+        justification: |
+          A page that stays open does not load again, so a removed member must not keep using it for the discussion.
+        tests:
           - ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing
+
+      - id: ReviewCenter-ReviewPage-Access-ReplyNothingStored
+        title: >-
+          The ReviewPage unit shall store no reply that is submitted by a user whose membership was removed meanwhile.
+        justification: |
+          A removed member must not keep writing to the review through a page that was open before the removal.
+        tests:
+          - ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing
+
+      - id: ReviewCenter-ReviewPage-Access-RevealRun
+        title: >-
+          The ReviewPage unit shall check the view access again when a collapsed run of the diff is expanded, reveal
+          no line to a user whose membership was removed meanwhile, and show that user the page of a missing review.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member could keep reading file
+          content through the open diff.
+        tests:
           - ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound
+
+      - id: ReviewCenter-ReviewPage-Access-NewThread
+        title: >-
+          The ReviewPage unit shall store no new thread that is submitted by a user whose membership was removed
+          meanwhile, and show that user the page of a missing review.
+        justification: |
+          Starting a thread is the main write action of the page, and a removed member must not keep writing to the
+          review through a page that was open before the removal.
+        tests:
+          - ReviewPage_StartThread_MembershipRevoked_ShowsNotFoundAndStoresNothing
 
       - id: ReviewCenter-ReviewPage-ReadOnly
         title: >-
-          The ReviewPage unit shall show a member whose role is auditor the whole review with a read-only notice and
-          without any control that changes it, that is the reopening and due date forms, the slot forms and the signing
-          form, the new comment form, the reply box, the resolve toggle, and the line comment controls, and the diff
-          shall say that the access is read-only instead of saying that the review is locked, and shall offer no
-          comment composer even for a stale line selection or after the role changed under an open page.
+          The ReviewPage unit shall show a member whose role is auditor the whole review.
         justification: |
-          An auditor reads everything and changes nothing, so the page must not offer what the rules would refuse, and
-          the notice says why the controls are missing. A read-only reader of an open review must not be told the
-          review is locked.
+          An auditor reads everything and changes nothing, so the page shows the review as it shows it to any member.
         tests:
           - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
-          - ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-Notice
+        title: >-
+          The ReviewPage unit shall show a member whose role is auditor a notice that the access is read-only.
+        justification: |
+          The notice says why the controls that change the review are missing.
+        tests:
+          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-SlotForms
+        title: >-
+          The ReviewPage unit shall offer a member whose role is auditor no reviewer slot form to add, save or remove
+          a slot.
+        justification: |
+          The rules refuse an auditor any change of the reviewer slots, so the page must not offer the forms.
+        tests:
+          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-ThreadForms
+        title: >-
+          The ReviewPage unit shall offer a member whose role is auditor no new comment form, no reply box and no
+          resolve toggle.
+        justification: |
+          The rules refuse an auditor any change of the discussion, so the page must not offer the controls.
+        tests:
+          - ReviewPage_Render_AuditorWithFileSelected_ShowsThreadsWithoutWriteControls
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-SigningForm
+        title: >-
+          The ReviewPage unit shall offer a member whose role is auditor no signing form, also when the auditor holds
+          a reviewer slot.
+        justification: |
+          A role that cannot change the review cannot sign it, even when the slot of the auditor is still seated.
+        tests:
+          - ReviewPage_Render_SlotOccupantWhoIsAuditor_ShowsNoSignForm
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-LineControls
+        title: >-
+          The ReviewPage unit shall disable the line comment controls of the Diff view for a member whose role is
+          auditor.
+        justification: |
+          A control that the rules would refuse must not invite a click.
+        tests:
           - ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-HeadLineControls
+        title: >-
+          The ReviewPage unit shall disable the line comment buttons of the Head version for a member whose role is
+          auditor.
+        justification: |
+          A control that the rules would refuse must not invite a click, in the numbered view as in the diff.
+        tests:
+          - ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-Hint
+        title: >-
+          The ReviewPage unit shall say in the hint of the Diff view that the access is read-only, instead of saying
+          that the review is locked, for a member whose role is auditor.
+        justification: |
+          A reader of an open review must not be told that the review is locked.
+        tests:
+          - ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-NoComposer
+        title: >-
+          The ReviewPage unit shall show a member whose role is auditor no comment composer in the Diff view, even
+          for a stale line selection.
+        justification: |
+          A selection that is left over must not bring back a form that the rules would refuse.
+        tests:
+          - ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-RoleChange
+        title: >-
+          The ReviewPage unit shall drop the comment composer of the Diff view of an open page when the role of the
+          user changes to auditor.
+        justification: |
+          A page that stays open must not keep a form that the new role of the user may not use.
+        tests:
+          - ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft
+
+      - id: ReviewCenter-ReviewPage-ReadOnly-RoleChangeDraft
+        title: >-
+          The ReviewPage unit shall discard the typed comment draft of an open page when the role of the user changes
+          to auditor.
+        justification: |
+          A draft that was typed under the old role must not come back when the form opens again.
+        tests:
           - ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft
 
       - id: ReviewCenter-ReviewPage-Layout
         title: >-
-          The ReviewPage unit shall present the next-step line, the files, the thread index and the content of
-          the selected file ahead of the review identifier, state, content fingerprint and per-file hashes,
-          which it keeps in a Details section that is collapsed by default.
+          The ReviewPage unit shall place the next-step line, the files and the thread index ahead of the Details
+          section.
         justification: |
-          Reviewers come to read code and discussion. Identifiers and hashes are needed rarely, so they must not
-          compete with the code for attention, yet they must stay one click away.
+          Reviewers come to read code and discussion, so what they need first must not be pushed down by identifiers.
         tests:
           - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
 
+      - id: ReviewCenter-ReviewPage-Layout-Collapsed
+        title: >-
+          The ReviewPage unit shall keep the Details section collapsed by default.
+        justification: |
+          Identifiers and hashes are needed rarely, yet they must stay one click away.
+        tests:
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-Layout-Content
+        title: >-
+          The ReviewPage unit shall place the content of the selected file ahead of the Details section.
+        justification: |
+          The code is what the reviewer came to read, so it must not compete with identifiers and hashes.
+        tests:
+          - ReviewPage_Render_FileSelected_ShowsContentBeforeDetails
+
       - id: ReviewCenter-ReviewPage-NextStep
         title: >-
-          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads, the
-          progress of the review's checklist, and the reviewer slots and signatures, that tells the reader what to
-          do next (including "Add a reviewer slot." when the review has no slot and "Approved. Every reviewer
-          slot has a current signature." once the review is approved), and keep it current after every change.
+          The ReviewPage unit shall show one short sentence at the top of the page that tells the reader what to do
+          next.
         justification: |
-          The reader should see what is expected of them without working it out from counts. The wording comes
-          from the signing rules, so the page and the approval can never disagree.
+          The reader should see what is expected of them without working it out from counts.
+        tests:
+          - ReviewPage_Render_NextStep_FollowsThreadState
+
+      - id: ReviewCenter-ReviewPage-NextStep-Threads
+        title: >-
+          The ReviewPage unit shall name in the next-step sentence the open threads that remain to be resolved.
+        justification: |
+          An open thread blocks the approval, so the reader is told how many are left.
+        tests:
+          - ReviewPage_Render_NextStep_FollowsThreadState
+
+      - id: ReviewCenter-ReviewPage-NextStep-Checklist
+        title: >-
+          The ReviewPage unit shall name in the next-step sentence the number of unanswered checks of the checklist.
+        justification: |
+          An unanswered check blocks the approval, so the reader is told how many are left.
         tests:
           - ReviewPage_Render_NextStep_FollowsThreadState
           - ReviewPage_Render_NextStep_IncludesChecklistProgress
+
+      - id: ReviewCenter-ReviewPage-NextStep-Ready
+        title: >-
+          The ReviewPage unit shall say "Ready for signatures." in the next-step sentence when the threads and the
+          checklist are done and the review has a reviewer slot.
+        justification: |
+          The reader must see that nothing but the signatures is left.
+        tests:
+          - ReviewPage_Render_NextStep_IncludesChecklistProgress
+
+      - id: ReviewCenter-ReviewPage-NextStep-Approved
+        title: >-
+          The ReviewPage unit shall say "Approved. Every reviewer slot has a current signature." in the next-step
+          sentence once the review is approved.
+        justification: |
+          The wording comes from the signing rules, so the page and the approval can never disagree.
+        tests:
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-NextStep-Current
+        title: >-
+          The ReviewPage unit shall keep the next-step sentence current after every change of the review.
+        justification: |
+          A stale sentence would mislead the reader about what is left to do.
+        tests:
+          - ReviewPage_Render_NextStep_FollowsThreadState
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-NextStep-HiddenNotice
+        title: >-
+          The ReviewPage unit shall not repeat in the next-step sentence of a viewer who may not see the answers of the
+          others the notice that the answers stay hidden.
+        justification: |
+          The notice is shown once, in the status panel, so the next step stays short.
+        tests:
           - ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce
 
       - id: ReviewCenter-ReviewPage-Checklist
         title: >-
-          The ReviewPage unit shall show the progress of the review's checklist as a summary (for example "37 of
-          58 checks answered", or "Checklist complete, 1 check failed" when the viewer may see the answers of the
-          others and a check was failed) with a link to the checklist page, and shall show neither when the review
-          has no checklist.
+          The ReviewPage unit shall show the progress of the review's checklist as a summary, for example "37 of 58
+          checks answered".
         justification: |
-          The checklist is part of the work of the review, so its progress belongs where the reviewer starts,
-          one click from the checklist itself. The failed count is a content of the ballots, so it is shown only where
-          the ballots may be read.
+          The checklist is part of the work of the review, so its progress belongs where the reviewer starts.
         tests:
           - ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink
-          - ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard
+
+      - id: ReviewCenter-ReviewPage-Checklist-Link
+        title: >-
+          The ReviewPage unit shall show a link to the checklist page next to the progress of the checklist.
+        justification: |
+          The checklist itself is one click away from its progress.
+        tests:
+          - ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink
+          - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
+
+      - id: ReviewCenter-ReviewPage-Checklist-Failed
+        title: >-
+          The ReviewPage unit shall say "Checklist complete, 1 check failed" for a viewer who may see the answers of
+          the others when a check was failed.
+        justification: |
+          A failed check decides the outcome of the review, so a viewer who may read the ballots is told at once.
+        tests:
           - ReviewStatusPanel_BothFailed_NamesTheOutcome
+
+      - id: ReviewCenter-ReviewPage-Checklist-MaskedFailed
+        title: >-
+          The ReviewPage unit shall not show the number of failed checks to a viewer who may not see the answers of
+          the others.
+        justification: |
+          The failed count is a content of the ballots, so it is shown only where the ballots may be read.
+        tests:
           - ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution
+
+      - id: ReviewCenter-ReviewPage-Checklist-None
+        title: >-
+          The ReviewPage unit shall show neither the checklist progress nor the link to the checklist page when the
+          review has no checklist.
+        justification: |
+          Progress of a checklist that does not exist would mislead the reader.
+        tests:
+          - ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard
 
       - id: ReviewCenter-ReviewPage-Summary
         title: >-
-          The ReviewPage unit shall show, in one compact strip at the top of the page below the next-step line, the
-          checklist progress with a link to the checklist, the state of the reviewers ("No reviewer slots yet" or
-          how many of the slots are signed), and the number of open and of resolved threads.
+          The ReviewPage unit shall show the checklist progress with a link to the checklist in one compact strip at
+          the top of the page.
         justification: |
-          A reviewer decides what to do from the state of the whole review: how far the checklist is, who still has
-          to sign, and how much discussion is open. Showing the three together in one place avoids scrolling
-          through the page to collect them.
+          A reviewer decides what to do from the state of the whole review, so the checklist progress is shown with
+          the other counts in one place and one click from the checklist.
         tests:
           - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
 
+      - id: ReviewCenter-ReviewPage-Summary-Reviewers
+        title: >-
+          The ReviewPage unit shall show "No reviewer slots yet" in the summary strip when the review has no reviewer
+          slot.
+        justification: |
+          The reader must see at once that nobody is yet expected to sign.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
+
+      - id: ReviewCenter-ReviewPage-Summary-SignedCount
+        title: >-
+          The ReviewPage unit shall show in the summary strip how many of the reviewer slots are signed, for example
+          "1 of 1 signed".
+        justification: |
+          The reader must see who still has to sign without scrolling to the slots.
+        tests:
+          - ReviewPage_Render_SignedSlot_SummaryShowsSignedCount
+
+      - id: ReviewCenter-ReviewPage-Summary-OpenThreads
+        title: >-
+          The ReviewPage unit shall show the number of open threads in the summary strip.
+        justification: |
+          The reader must see how much discussion is open without scrolling to the thread index.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
+          - ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts
+
+      - id: ReviewCenter-ReviewPage-Summary-ResolvedThreads
+        title: >-
+          The ReviewPage unit shall show the number of resolved threads in the summary strip.
+        justification: |
+          The reader must see how much discussion is settled without scrolling to the thread index.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
+          - ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts
+
+      - id: ReviewCenter-ReviewPage-Summary-Position
+        title: >-
+          The ReviewPage unit shall place the summary strip below the next-step line and above the files.
+        justification: |
+          The strip supports the next step, and the files follow once the reader knows where the review stands.
+        tests:
+          - ReviewPage_Render_ExistingReview_SummaryStripSitsBetweenNextStepAndFiles
+
       - id: ReviewCenter-ReviewPage-Files
         title: >-
-          The ReviewPage unit shall list the files of the review with the path and size of each, show the
-          SHA-256 hash of each file in the Details section, and give each file's View button an accessible name
-          that identifies the file.
+          The ReviewPage unit shall list the files of the review with the path and size of each.
         justification: |
-          Reviewers need to see what the review contains, and the per-file hashes let them verify a file
-          independently of the product.
+          Reviewers need to see what the review contains.
         tests:
           - ReviewPage_Render_ExistingReview_ListsFilesWithPathSizeAndHash
+          - ReviewPage_Render_DeletedFile_ListsBaselineSize
+
+      - id: ReviewCenter-ReviewPage-Files-Hash
+        title: >-
+          The ReviewPage unit shall show the SHA-256 hash of each file in the Details section.
+        justification: |
+          The per-file hashes let reviewers verify a file independently of the product.
+        tests:
+          - ReviewPage_Render_ExistingReview_ListsFilesWithPathSizeAndHash
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-Files-ButtonName
+        title: >-
+          The ReviewPage unit shall give the View button of each file an accessible name that identifies the file.
+        justification: |
+          A reader who uses a screen reader must be able to tell the buttons of the files apart.
+        tests:
           - ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile
+
+      - id: ReviewCenter-ReviewPage-Files-Highlight
+        title: >-
+          The ReviewPage unit shall highlight the row of the selected file in the file list.
+        justification: |
+          The reader must see which file the content on the page belongs to.
+        tests:
+          - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
 
       - id: ReviewCenter-ReviewPage-Content
         title: >-
-          The ReviewPage unit shall show no file content until a file is selected, show the selected file, when
-          it is valid UTF-8 text without NUL bytes, as numbered lines whose text is exactly as stored, without
-          the line ending, as plain text (an empty file shows no lines), and show the lines of another file
-          when that file is selected.
+          The ReviewPage unit shall show the selected file as numbered lines.
         justification: |
           Reviewers must see the true content of a file, and line numbers are what a comment points at.
-          Displaying the text as plain text, never as markup, shows every character and cannot execute anything
-          in the file.
+        tests:
+          - ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText
+
+      - id: ReviewCenter-ReviewPage-Content-NoSelection
+        title: >-
+          The ReviewPage unit shall show no file content until a file is selected.
+        justification: |
+          The page starts with the overview of the review, not with an arbitrary file.
         tests:
           - ReviewPage_Render_NoFileSelected_ShowsNoContent
+
+      - id: ReviewCenter-ReviewPage-Content-ExactText
+        title: >-
+          The ReviewPage unit shall show the text of each line exactly as stored, without the line ending.
+        justification: |
+          Reviewers must see the true content of a file, and a line ending is not part of the line.
+        tests:
           - ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText
+          - ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept
+
+      - id: ReviewCenter-ReviewPage-Content-PlainText
+        title: >-
+          The ReviewPage unit shall show the text of a line as plain text, never as markup.
+        justification: |
+          Plain text shows every character of the file and cannot execute anything in the file.
+        tests:
+          - ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText
+
+      - id: ReviewCenter-ReviewPage-Content-EmptyFile
+        title: >-
+          The ReviewPage unit shall show an empty file with no lines.
+        justification: |
+          A file without content has no line to number or to comment on.
+        tests:
           - ReviewPage_FileSelect_EmptyFile_ShowsNoLines
+
+      - id: ReviewCenter-ReviewPage-Content-OtherFile
+        title: >-
+          The ReviewPage unit shall show the lines of another file when that file is selected.
+        justification: |
+          The reader moves from file to file, and the content must always belong to the selected file.
+        tests:
           - ReviewPage_FileSelect_SecondFile_ReplacesContent
 
       - id: ReviewCenter-ReviewPage-Binary
         title: >-
-          The ReviewPage unit shall show a notice instead of content for a selected file that contains a NUL
-          byte or is not valid UTF-8.
+          The ReviewPage unit shall show a notice instead of content for a selected file that contains a NUL byte.
         justification: |
-          Binary content cannot be shown meaningfully as text, and rendering it would produce unreadable
-          output. The notice tells the reviewer why nothing is shown.
+          Binary content cannot be shown meaningfully as text. The notice tells the reviewer why nothing is shown.
         tests:
           - ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent
+
+      - id: ReviewCenter-ReviewPage-Binary-InvalidUtf8
+        title: >-
+          The ReviewPage unit shall show a notice instead of content for a selected file that is not valid UTF-8.
+        justification: |
+          Bytes that are not valid text cannot be shown meaningfully. The notice tells the reviewer why nothing is
+          shown.
+        tests:
           - ReviewPage_FileSelect_InvalidUtf8_ShowsBinaryNotice
 
       - id: ReviewCenter-ReviewPage-Source
         title: >-
-          The ReviewPage unit shall show, for a review from a repository, the change kind of each file (Added,
-          Modified, or Deleted) in the file list, and the repository name, the baseline and head commit
-          identifiers, and the selection in the Details section, and shall show none of these for an uploaded
-          review.
+          The ReviewPage unit shall show the change kind of each file (Added, Modified or Deleted) in the file list
+          of a review from a repository.
         justification: |
-          Reviewers must see what a review covers - which change, in which repository, between which commits.
+          Reviewers must see what kind of change each file of a repository review has.
         tests:
           - ReviewPage_Render_RepositoryReview_ShowsChangeKindPerFile
+
+      - id: ReviewCenter-ReviewPage-Source-Details
+        title: >-
+          The ReviewPage unit shall show the repository name, the baseline and head commit identifiers and the
+          selection in the Details section of a review from a repository.
+        justification: |
+          Reviewers must see which change a review covers, in which repository and between which commits.
+        tests:
           - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection
-          - ReviewPage_Render_DeletedFile_ListsBaselineSize
+
+      - id: ReviewCenter-ReviewPage-Source-UploadNoKind
+        title: >-
+          The ReviewPage unit shall show no change kind for the files of an uploaded review.
+        justification: |
+          An uploaded review has no baseline, so a change kind would state something that does not exist.
+        tests:
+          - ReviewPage_Render_RepositoryReview_ShowsChangeKindPerFile
+
+      - id: ReviewCenter-ReviewPage-Source-UploadNoDetails
+        title: >-
+          The ReviewPage unit shall show no repository name, commit identifiers or selection in the Details section of
+          an uploaded review.
+        justification: |
+          An uploaded review has no repository, so empty source rows would only mislead the reader.
+        tests:
+          - ReviewPage_Render_UploadedReview_DetailsShowNoSource
 
       - id: ReviewCenter-ReviewPage-Versions
         title: >-
-          The ReviewPage unit shall offer for a file of a review that has a baseline commit a choice between the Diff
-          view, which is the default, and: for a modified file the Head version, which is the numbered view with the
-          comment controls, and the Baseline version, which is a read-only numbered view without comment controls;
-          for an added file the Head version only, because nothing existed at the baseline and the Diff view shows
-          every line added; for a deleted file the Baseline version only, opening on the Diff view; shall show the
-          Diff view again when another file is selected; and shall show a file of an uploaded review, or of a review
-          without a baseline commit, as the Head version only, with no choice.
+          The ReviewPage unit shall open a file of a review that has a baseline commit on the Diff view, which is the
+          default.
         justification: |
           A change is reviewed against what it replaces, so the differences are what the reader sees first, also for
-          a file that is new. The full head and baseline texts stay one click away where they exist, and a file with
-          nothing to compare against keeps the plain numbered view.
+          a file that is new.
         tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
-          - ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile
-          - ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls
-          - ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView
+          - ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice
+
+      - id: ReviewCenter-ReviewPage-Versions-Head
+        title: >-
+          The ReviewPage unit shall offer for a modified file the Head version, which is the numbered view with the
+          comment controls.
+        justification: |
+          The full head text stays one click away, and it is where a comment on a whole line of the file is made.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-ReviewPage-Versions-Baseline
+        title: >-
+          The ReviewPage unit shall offer for a modified file the Baseline version, which is a read-only numbered view
+          without comment controls.
+        justification: |
+          The full baseline text stays one click away, and it is read-only because it is not what is under review.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-ReviewPage-Versions-AddedFile
+        title: >-
+          The ReviewPage unit shall offer for an added file the choice between the Diff view and the Head version
+          only, and no Baseline version.
+        justification: |
+          Nothing existed at the baseline, so the reader must not be offered a version that does not exist.
+        tests:
           - ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice
           - ReviewPage_FileSelect_AddedFile_HeadViewAndBack_ShowsNumberedLinesAndCommentControls
+
+      - id: ReviewCenter-ReviewPage-Versions-DeletedFile
+        title: >-
+          The ReviewPage unit shall offer for a deleted file the Baseline version and no Head version, and open it on
+          the Diff view.
+        justification: |
+          Nothing exists at the head, so the reader must not be offered a version that does not exist.
+        tests:
+          - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
+
+      - id: ReviewCenter-ReviewPage-Versions-DeletedContent
+        title: >-
+          The ReviewPage unit shall show the Baseline version of a deleted file as numbered lines with a "Deleted file"
+          note and without line comment controls.
+        justification: |
+          The reader must see what was deleted and be told that the lines cannot be commented on one by one.
+        tests:
+          - ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls
+
+      - id: ReviewCenter-ReviewPage-Versions-DeletedComment
+        title: >-
+          The ReviewPage unit shall accept for a deleted file a comment on the whole file only.
+        justification: |
+          A deleted file has no head lines, so a comment can only be about the file as a whole.
+        tests:
+          - ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls
+          - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
+
+      - id: ReviewCenter-ReviewPage-Versions-NextFile
+        title: >-
+          The ReviewPage unit shall show the Diff view again when another file is selected after a Baseline version.
+        justification: |
+          The choice of a version belongs to one file, so the next file starts on its default view.
+        tests:
+          - ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile
+
+      - id: ReviewCenter-ReviewPage-Versions-HeadOnly
+        title: >-
+          The ReviewPage unit shall show a file of an uploaded review, or of a review without a baseline commit, as
+          the Head version only, with no choice.
+        justification: |
+          A file with nothing to compare against keeps the plain numbered view.
+        tests:
+          - ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView
+
+      - id: ReviewCenter-ReviewPage-Versions-Switch
+        title: >-
+          The ReviewPage unit shall keep the text of the file and clear the line selection when the reader switches
+          between versions.
+        justification: |
+          A line selection of one version has no meaning in another version, and the reader stays with the same file.
+        tests:
           - ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection
 
       - id: ReviewCenter-ReviewPage-Diff
         title: >-
           The ReviewPage unit shall show the Diff view of a file side by side, the baseline on the left and the head
-          on the right with their own line numbers and the text as plain text, an unchanged line on both sides, a
-          run of removed lines paired row by row with the run of added lines that follows it (the leftover cells of
-          the shorter run being muted empty placeholders), an added file as all added lines and a deleted file as
-          all removed lines, removed and added lines marked by color and by a - or +
-          sign, with a one-line summary "x added, y removed" above the rows, a hint that says to click + to comment
-          on a line, and every run of unchanged lines that is more than three lines from a change collapsed into a
-          button "Show N unchanged lines" that expands it, and shall bring the first change into view when a file
-          opens on its diff.
+          on the right, each with its own line numbers.
         justification: |
-          A reviewer wants to see what changed and nothing else. Old and new next to each other, aligned row by row,
-          show what replaced what. Collapsing the unchanged lines and scrolling to the first change put it in
-          front of the reader, the summary tells how much there is to read, and the sign keeps added and removed
-          lines apart for a reader who cannot tell the colors apart.
+          A reviewer wants to see what changed. Old and new next to each other, aligned row by row, show what
+          replaced what, and each side keeps the numbers that a comment on that side points at.
         tests:
           - ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers
           - ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders
-          - ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest
-          - ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange
-          - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
+
+      - id: ReviewCenter-ReviewPage-Diff-PlainText
+        title: >-
+          The ReviewPage unit shall show the text of a line of the Diff view as plain text, never as markup.
+        justification: |
+          Plain text shows every character of the file and cannot execute anything in the file.
+        tests:
+          - ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-Diff-Unchanged
+        title: >-
+          The ReviewPage unit shall show an unchanged line of the Diff view on both sides.
+        justification: |
+          The unchanged lines give the context in which a change is read, and each side keeps its own numbering.
+        tests:
+          - ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders
+
+      - id: ReviewCenter-ReviewPage-Diff-Pairing
+        title: >-
+          The ReviewPage unit shall pair a run of removed lines row by row with the run of added lines that follows
+          it, and fill the leftover cells of the shorter run with muted empty placeholders.
+        justification: |
+          Pairing shows what replaced what, and the placeholders keep the two sides aligned.
+        tests:
+          - ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders
+
+      - id: ReviewCenter-ReviewPage-Diff-AddedFile
+        title: >-
+          The ReviewPage unit shall show an added file in the Diff view as all added lines.
+        justification: |
+          Nothing existed before an added file, so every line of it is a change.
+        tests:
           - ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice
+
+      - id: ReviewCenter-ReviewPage-Diff-DeletedFile
+        title: >-
+          The ReviewPage unit shall show a deleted file in the Diff view as all removed lines.
+        justification: |
+          Nothing remains after a deleted file, so every line of it is a change.
+        tests:
+          - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
+
+      - id: ReviewCenter-ReviewPage-Diff-Marks
+        title: >-
+          The ReviewPage unit shall mark a removed line of the Diff view with a - sign and an added line with a + sign.
+        justification: |
+          The sign keeps added and removed lines apart for a reader who cannot tell the colors apart.
+        tests:
+          - ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles
+
+      - id: ReviewCenter-ReviewPage-Diff-Colors
+        title: >-
+          The ReviewPage unit shall give the row of a removed line, of an added line and of an unchanged line of the
+          Diff view each a different kind class, so that the stylesheet can color them differently.
+        justification: |
+          Color lets the reader see the changes at a glance, and the kind class is what the stylesheet colors.
+        tests:
+          - ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles
+
+      - id: ReviewCenter-ReviewPage-Diff-Summary
+        title: >-
+          The ReviewPage unit shall show above the rows of the Diff view a one-line summary "x added, y removed".
+        justification: |
+          The summary tells how much there is to read before the reader starts.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers
+
+      - id: ReviewCenter-ReviewPage-Diff-Hint
+        title: >-
+          The ReviewPage unit shall show above the rows of the Diff view a hint that says to click + to comment on a
+          line.
+        justification: |
+          The reader who sees the diff for the first time learns how to comment.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers
+
+      - id: ReviewCenter-ReviewPage-Diff-Collapsed
+        title: >-
+          The ReviewPage unit shall collapse every run of unchanged lines that is more than three lines from a change
+          into a button "Show N unchanged lines" that expands it.
+        justification: |
+          Collapsing the unchanged lines puts the changes in front of the reader, and the button keeps the rest one
+          click away.
+        tests:
+          - ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest
+
+      - id: ReviewCenter-ReviewPage-Diff-ScrollToChange
+        title: >-
+          The ReviewPage unit shall bring the first change into view when a file opens on its Diff view.
+        justification: |
+          The reader wants to start at the first change, not at the top of a long unchanged stretch.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange
+
+      - id: ReviewCenter-ReviewPage-Diff-NoRows
+        title: >-
+          The ReviewPage unit shall show the Diff view of an empty added file without rows and with the summary "No
+          changes.".
+        justification: |
+          A file without content has no line to show, and the reader must not take the empty view for a failure.
+        tests:
           - ReviewPage_FileSelect_EmptyAddedFile_ShowsDiffWithoutRows
 
       - id: ReviewCenter-ReviewPage-DiffStates
         title: >-
-          The ReviewPage unit shall say in plain words, instead of rows, that a file is too large to compare line
-          by line and offer the Head and the Baseline version that the file has, that a file is binary, and that two
-          versions differ only in their line endings.
+          The ReviewPage unit shall say in plain words, instead of rows, that a file is too large to compare line by
+          line.
         justification: |
-          A comparison that cannot be shown must not look like a failure or like an empty change. The reader is
-          told why and what to do instead, and is not offered a version that does not exist.
+          A comparison that cannot be shown must not look like a failure or like an empty change.
         tests:
           - ReviewPage_FileSelect_TooLargeFile_OffersHeadAndBaseline
-          - ReviewPage_FileSelect_BinaryFile_ShowsNotice
-          - ReviewPage_DiffView_OnlyLineEndingsDiffer_SaysSo
           - ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly
+
+      - id: ReviewCenter-ReviewPage-DiffStates-Versions
+        title: >-
+          The ReviewPage unit shall offer for a file that is too large to compare the Head and the Baseline version
+          that the file has, and no version that it lacks.
+        justification: |
+          The reader is told what to do instead, and is not offered a version that does not exist.
+        tests:
+          - ReviewPage_FileSelect_TooLargeFile_OffersHeadAndBaseline
+          - ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly
+
+      - id: ReviewCenter-ReviewPage-DiffStates-Binary
+        title: >-
+          The ReviewPage unit shall say in plain words, instead of rows, that a file is binary.
+        justification: |
+          A comparison that cannot be shown must not look like a failure or like an empty change.
+        tests:
+          - ReviewPage_FileSelect_BinaryFile_ShowsNotice
           - ReviewPage_FileSelect_AddedBinaryFile_ShowsNoticeAndOffersHeadOnly
+
+      - id: ReviewCenter-ReviewPage-DiffStates-LineEndings
+        title: >-
+          The ReviewPage unit shall say "No line changes; only line endings or the final newline differ." when two
+          versions differ only in their line endings.
+        justification: |
+          A change that cannot be seen in the lines must not look like an empty change.
+        tests:
+          - ReviewPage_DiffView_OnlyLineEndingsDiffer_SaysSo
 
       - id: ReviewCenter-ReviewPage-DiffComment
         title: >-
-          The ReviewPage unit shall offer a + control in every cell of the Diff view that opens the comment form
-          under that row, anchored to the Baseline version with the baseline line number for a control in the left
-          cell and to the Head version with the head line number for a control in the right cell, state the version
-          and lines in plain words ("Comment on line 10 (before)"), extend the selection with Shift-click or a
-          "Through line" field only within one version, and offer Cancel and a whole-file comment that keeps the
-          typed text. The control shall appear when the row is hovered or has keyboard focus (and always on screens
-          without hover), and shall stay reachable with the keyboard.
+          The ReviewPage unit shall offer a + control in each cell of the Diff view that holds a line, which opens
+          the comment form under that row.
         justification: |
-          The left cell shows the baseline and the right cell the head, so the cell chosen says which version the
-          comment is about, with the number the reader sees. Keeping a range within one version prevents mixing two
-          numberings, and the plain wording tells the reader what the comment will be attached to. Showing the
-          control only where the reader points keeps the diff calm without hiding it from keyboard or touch users.
+          Discussion is written next to the code it is about, so the control sits in the row of the line.
         tests:
           - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
           - ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads
+
+      - id: ReviewCenter-ReviewPage-DiffComment-Baseline
+        title: >-
+          The ReviewPage unit shall anchor a comment started from the left cell of the Diff view to the Baseline
+          version, with the baseline line number.
+        justification: |
+          The left cell shows the baseline, so the cell chosen says which version the comment is about.
+        tests:
+          - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
           - ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead
-          - ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide
-          - ReviewPage_DiffView_ThroughLineField_ExtendsTheRange
-          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+
+      - id: ReviewCenter-ReviewPage-DiffComment-Head
+        title: >-
+          The ReviewPage unit shall anchor a comment started from the right cell of the Diff view to the Head version,
+          with the head line number.
+        justification: |
+          The right cell shows the head, so the cell chosen says which version the comment is about.
+        tests:
+          - ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads
+          - ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead
           - ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow
-          - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
-          - WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill
+
+      - id: ReviewCenter-ReviewPage-DiffComment-PlainWords
+        title: >-
+          The ReviewPage unit shall state the version and the lines of the comment target in plain words, for example
+          "Comment on line 10 (before)".
+        justification: |
+          The plain wording tells the reader what the comment will be attached to.
+        tests:
+          - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
+
+      - id: ReviewCenter-ReviewPage-DiffComment-ShiftClick
+        title: >-
+          The ReviewPage unit shall extend the selection of the comment target with Shift-click only within one
+          version.
+        justification: |
+          A range must not mix the numbering of the baseline with the numbering of the head.
+        tests:
+          - ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide
+
+      - id: ReviewCenter-ReviewPage-DiffComment-ThroughLine
+        title: >-
+          The ReviewPage unit shall extend the selection of the comment target with a "Through line" field only within
+          one version.
+        justification: |
+          A range must not mix the numbering of the baseline with the numbering of the head.
+        tests:
+          - ReviewPage_DiffView_ThroughLineField_ExtendsTheRange
+
+      - id: ReviewCenter-ReviewPage-DiffComment-Cancel
+        title: >-
+          The ReviewPage unit shall close the comment form and clear the selection when Cancel is chosen.
+        justification: |
+          The reader must be able to leave the form without commenting and without a selection left over.
+        tests:
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+
+      - id: ReviewCenter-ReviewPage-DiffComment-WholeFile
+        title: >-
+          The ReviewPage unit shall offer a whole-file comment in the comment form of the Diff view that keeps the
+          typed text.
+        justification: |
+          A reader who sees that the comment is about the file as a whole must not lose what was typed.
+        tests:
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+
+      - id: ReviewCenter-ReviewPage-DiffComment-Focus
+        title: >-
+          The ReviewPage unit shall move the keyboard focus to the comment field when a line comment control is
+          clicked.
+        justification: |
+          A keyboard user must be able to type at once.
+        tests:
           - ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField
 
       - id: ReviewCenter-ReviewPage-DiffThreads
         title: >-
           The ReviewPage unit shall draw the threads of a file under the row of the last line of their anchor in the
-          Diff view, across the full width, even where the line would be collapsed, highlight the cell of the lines
-          they cover on the side the thread belongs to, show a resolved thread as a collapsed header, reuse the
-          reply, resolve and reopen controls of the thread list, and list only whole-file threads below the diff.
+          Diff view.
         justification: |
-          Discussion is read next to the code it is about. A thread that is hidden inside a collapsed run would be
-          missed, so its line always stays visible.
+          Discussion is read next to the code it is about.
         tests:
           - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
-          - ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible
-          - ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen
-          - ReviewPage_FileList_ThreadCounts_IncludeBothSides
 
-      - id: ReviewCenter-ReviewPage-DiffLayout
+      - id: ReviewCenter-ReviewPage-DiffThreads-FirstLine
         title: >-
-          The ReviewPage unit shall keep the Diff view inside the width of the page on a phone, stacking the left
-          cell of a row above its right cell and hiding the empty placeholders and the repeated baseline copy of an
-          unchanged line, wrapping long lines inside their cell, keeping the collapsed-run buttons and inline
-          threads in view, and using a narrower line-number gutter, and shall give the two sides room on a wide
-          screen.
+          The ReviewPage unit shall keep the first line of a thread that covers several lines visible in the Diff view,
+          even where that line would be in a collapsed run.
         justification: |
-          Reviewers read on phones as well. A long line must never make the whole page scroll sideways, a narrow
-          screen has no room for two columns, and the comment form under a line must stay reachable.
+          The thread index and the links of a thread scroll to its first line, so that line must be on the page.
         tests:
-          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+          - ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible
 
+      - id: ReviewCenter-ReviewPage-DiffThreads-Collapsed
+        title: >-
+          The ReviewPage unit shall keep the last line of a thread visible in the Diff view, even where that line would
+          be in a collapsed run.
+        justification: |
+          A thread that is hidden inside a collapsed run would be missed.
+        tests:
+          - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
+
+      - id: ReviewCenter-ReviewPage-DiffThreads-Highlight
+        title: >-
+          The ReviewPage unit shall highlight the cells of the lines that a thread covers on the side of the Diff view
+          that the thread belongs to.
+        justification: |
+          The reader must see which lines a thread is about, and on which version.
+        tests:
+          - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
+          - ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead
+
+      - id: ReviewCenter-ReviewPage-DiffThreads-Resolved
+        title: >-
+          The ReviewPage unit shall show a resolved thread of the Diff view as a collapsed header.
+        justification: |
+          A settled thread must not push the code apart, yet it stays one click away.
+        tests:
+          - ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen
+
+      - id: ReviewCenter-ReviewPage-DiffThreads-Controls
+        title: >-
+          The ReviewPage unit shall offer on an inline thread of the Diff view the reply, resolve and reopen controls
+          of the thread list.
+        justification: |
+          The reader must be able to take part in the discussion where it is read.
+        tests:
+          - ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen
+
+      - id: ReviewCenter-ReviewPage-DiffThreads-WholeFileOnly
+        title: >-
+          The ReviewPage unit shall list only the whole-file threads of a file below its Diff view.
+        justification: |
+          A thread that is drawn under its line must not be listed a second time.
+        tests:
+          - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+
+      - id: ReviewCenter-ReviewPage-DiffThreads-Counts
+        title: >-
+          The ReviewPage unit shall count the open threads of both sides of a file in the file list.
+        justification: |
+          The thread count of a file must not miss the threads of the baseline.
+        tests:
+          - ReviewPage_FileList_ThreadCounts_IncludeBothSides
       - id: ReviewCenter-ReviewPage-ThreadSummary
         title: >-
           The ReviewPage unit shall show the number of open and of resolved threads of the review (on the filter
@@ -500,71 +1188,270 @@ sections:
       - id: ReviewCenter-ReviewPage-ReviewSet
         title: >-
           The ReviewPage unit shall show in the Details section of a review that was planned from a review-set the
-          identifier of that set, and shall show no such row for any other review.
+          identifier of that set.
         justification: |
           A reviewer must see which review-set a planned review belongs to, because the set links this review to
           the earlier and later reviews of the same files.
         tests:
           - ReviewPage_Render_PlannedReview_DetailsShowReviewSet
+
+      - id: ReviewCenter-ReviewPage-ReviewSet-NoRow
+        title: >-
+          The ReviewPage unit shall show no review-set row in the Details section of a review that was not planned
+          from a review-set.
+        justification: |
+          An empty row would suggest that the review belongs to a set when it does not.
+        tests:
           - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection
 
       - id: ReviewCenter-ReviewPage-DeepLinks
         title: >-
-          The ReviewPage unit shall open a file, a line or a thread of the review from its address (a path of
-          the form /files/{path} with an optional line and side, or /threads/{id}), showing the file in the diff,
-          scrolling to the line or thread and highlighting it; shall replace the address of the browser, without a
-          history entry and without reloading the page, with the link of the file or thread the reader chooses;
-          shall show on every thread a button-styled link to its address and a Copy link button that copies the
-          absolute address to the clipboard and confirms with a brief message (or reports that the copy failed); and
-          shall build every link by escaping each path segment once, so the router returns the same file path.
+          The ReviewPage unit shall open the file named by an address of the form /files/{path} and show it in the
+          diff.
         justification: |
-          A link that names one file, line or thread is how reviewers point each other at a finding. An address bar
-          that always holds a shareable link needs no extra step, a Copy link button saves the reviewer from
-          selecting the address by hand, and escaping once and decoding once keeps names with spaces, hashes,
-          question marks, percent signs and non-ASCII letters working.
+          A link that names one file is how reviewers point each other at it.
         tests:
-          - ReviewLinks_ForReview_ProjectAndReview_BuildsAddress
-          - ReviewLinks_ForFile_Path_EscapesEachSegment
-          - ReviewLinks_ForFile_WithLine_AddsLineAndSide
-          - ReviewLinks_ForFile_SideWithoutLine_AddsNoQuery
-          - ReviewLinks_ForThread_Thread_BuildsAddress
-          - ReviewLinks_AnyAddress_IsLocalAndSurvivesTheReturnUrlCheck
-          - ReviewLinks_NullArguments_Throw
           - ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-Line
+        title: >-
+          The ReviewPage unit shall scroll to the line named by an address of a file with a line, and highlight it.
+        justification: |
+          A link that names one line is how reviewers point each other at a finding.
+        tests:
           - ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow
-          - ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell
           - ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted
           - ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow
           - ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-BaselineLine
+        title: >-
+          The ReviewPage unit shall highlight the baseline line named by a line address with the baseline side in the
+          left cell, and not the head line of the same number.
+        justification: |
+          The two versions of a file have their own numbering, so the side of the address decides which line is meant.
+        tests:
+          - ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell
           - ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-Thread
+        title: >-
+          The ReviewPage unit shall open the file of the thread named by an address of the form /threads/{id} and
+          highlight the thread.
+        justification: |
+          A link that names one thread is how reviewers point each other at a discussion.
+        tests:
           - ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread
           - ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow
-          - ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-ThreadScroll
+        title: >-
+          The ReviewPage unit shall scroll to a whole-file thread named by a thread address.
+        justification: |
+          A whole-file thread has no line, so the thread itself is what the reader must be brought to.
+        tests:
+          - ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-BaselineThread
+        title: >-
+          The ReviewPage unit shall highlight the baseline lines of a baseline thread named by a thread address, and
+          not the lines of the head that have the same numbers.
+        justification: |
+          The two versions of a file have their own numbering, so the side of the thread decides which lines are meant.
+        tests:
           - ReviewPage_ThreadAddress_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
           - ReviewPage_ThreadAddress_BaselineThread_DoesNotHighlightTheSameLinesOfTheHead
-          - ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-ResolvedThread
+        title: >-
+          The ReviewPage unit shall expand a resolved thread that is named by a thread address.
+        justification: |
+          A reader who follows a link to a thread wants to read it, not to find it collapsed.
+        tests:
+          - ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-ThreadCounts
+        title: >-
+          The ReviewPage unit shall keep the thread counts in the file list when a thread address is opened.
+        justification: |
+          Opening a link must not change what the file list tells about the discussion.
+        tests:
           - ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList
-          - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-ReplaceAddress
+        title: >-
+          The ReviewPage unit shall replace the address of the browser, without a history entry and without reloading
+          the page, with the link of the file or thread that the reader chooses.
+        justification: |
+          An address bar that always holds a shareable link needs no extra step.
+        tests:
           - ReviewPage_Choose_FileAndThread_ReplacesAddressWithoutNavigating
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-KeepAddress
+        title: >-
+          The ReviewPage unit shall not replace the address of the browser when it opens an address.
+        justification: |
+          The address that the reader followed is already the shareable link.
+        tests:
           - ReviewPage_OpenDeepLink_DoesNotReplaceAddress
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-ThreadLink
+        title: >-
+          The ReviewPage unit shall show on every thread a link to its address.
+        justification: |
+          A link on the thread is how reviewers point each other at the discussion.
+        tests:
           - ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-CopyButton
+        title: >-
+          The ReviewPage unit shall show on every thread a Copy link button.
+        justification: |
+          A Copy link button saves the reviewer from selecting the address by hand.
+        tests:
+          - ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-CopyLink
+        title: >-
+          The ReviewPage unit shall copy the absolute address of the thread to the clipboard when Copy link is
+          clicked.
+        justification: |
+          An absolute address works wherever the reviewer pastes it.
+        tests:
           - ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-CopyConfirm
+        title: >-
+          The ReviewPage unit shall confirm a copy of the thread address with the message "Copied".
+        justification: |
+          The reader must know that the copy worked.
+        tests:
+          - ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-CopyTiming
+        title: >-
+          The ReviewPage unit shall keep the confirmation of a copy until two seconds after the latest click.
+        justification: |
+          A second click must not lose its confirmation to the timer of the first click.
+        tests:
           - ReviewPage_CopyLink_SecondClick_KeepsFeedbackUntilTwoSecondsAfterTheLatestClick
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-CopyFailed
+        title: >-
+          The ReviewPage unit shall report "Copy failed" when the clipboard refuses the copy.
+        justification: |
+          The reader must not believe that the address was copied when it was not.
+        tests:
           - ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed
-          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-BuildReview
+        title: >-
+          The ReviewPage unit shall build the address of a review from the project and the review identifiers.
+        justification: |
+          One place builds the addresses, so every link of the product agrees with the router.
+        tests:
+          - ReviewLinks_ForReview_ProjectAndReview_BuildsAddress
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-BuildLine
+        title: >-
+          The ReviewPage unit shall add the line and the side to the address of a file when a line is given, and no
+          query when only a side is given.
+        justification: |
+          A side without a line names no line, so it must not leave a query that the router would reject.
+        tests:
+          - ReviewLinks_ForFile_WithLine_AddsLineAndSide
+          - ReviewLinks_ForFile_SideWithoutLine_AddsNoQuery
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-BuildThread
+        title: >-
+          The ReviewPage unit shall build the address of a thread from the project, review and thread identifiers.
+        justification: |
+          One place builds the addresses, so every link of the product agrees with the router.
+        tests:
+          - ReviewLinks_ForThread_Thread_BuildsAddress
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-Escaping
+        title: >-
+          The ReviewPage unit shall escape each path segment of the address of a file once.
+        justification: |
+          Names with spaces, hashes, question marks, percent signs and non-ASCII letters must keep working.
+        tests:
+          - ReviewLinks_ForFile_Path_EscapesEachSegment
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-RoundTrip
+        title: >-
+          The ReviewPage unit shall open the same file and line that a link was built for when the link from the
+          builder is opened.
+        justification: |
+          The router decodes once what the builder escaped once, so no name changes on the way.
+        tests:
           - ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-LocalOnly
+        title: >-
+          The ReviewPage unit shall build only local addresses that the return-address check of the sign-in accepts.
+        justification: |
+          A link that the sign-in would refuse could not bring a signed-out reader back to the page.
+        tests:
+          - ReviewLinks_AnyAddress_IsLocalAndSurvivesTheReturnUrlCheck
+
+      - id: ReviewCenter-ReviewPage-DeepLinks-NullArguments
+        title: >-
+          The ReviewPage unit shall throw an argument-null exception when an address is built from a null argument.
+        justification: |
+          A missing identifier is a mistake of the caller that must not produce an address that names nothing.
+        tests:
+          - ReviewLinks_NullArguments_Throw
 
       - id: ReviewCenter-ReviewPage-DeepLinksNotFound
         title: >-
-          The ReviewPage unit shall answer an address that names a file, line, side or thread that does not exist in
-          the review (including a thread of another review and a baseline line of a file without a baseline) with a
-          plain message in the page and a link back to the file list of the review, and shall keep the page and the
-          file list working.
+          The ReviewPage unit shall answer an address that names nothing in the review, such as a missing file, line,
+          thread, a thread of another review or a baseline line of a file without a baseline, with a plain message
+          in the page.
         justification: |
-          Links outlive the files and threads they point at. A friendly message with a way back is better than an
-          error page, and it must not reveal anything about other reviews.
+          Links outlive the files and threads they point at. A friendly message is better than an error page, and it
+          must not reveal anything about other reviews.
         tests:
           - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound-WayBack
+        title: >-
+          The ReviewPage unit shall show with that message a link back to the file list of the review.
+        justification: |
+          The reader must have a way back from a link that leads nowhere.
+        tests:
+          - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound-FileList
+        title: >-
+          The ReviewPage unit shall keep the file list working when it shows that message.
+        justification: |
+          The reader must be able to pick another file at once.
+        tests:
+          - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound-NoErrorPage
+        title: >-
+          The ReviewPage unit shall show that message in the page with no highlight, and not an error page.
+        justification: |
+          An address that names nothing is not a failure of the page.
+        tests:
+          - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound-UnknownSide
+        title: >-
+          The ReviewPage unit shall read an unknown side in the address of a line as the head, and show no message.
+        justification: |
+          A side that the page does not know is no reason to refuse a line that exists.
+        tests:
+          - ReviewPage_Address_UnknownSideAndLaterChoice_UsesHeadAndClearsMessage
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound-Cleared
+        title: >-
+          The ReviewPage unit shall clear that message when the reader chooses a file.
+        justification: |
+          A message about a link that was followed must not stay once the reader has moved on.
+        tests:
           - ReviewPage_Address_UnknownSideAndLaterChoice_UsesHeadAndClearsMessage
 
       - id: ReviewCenter-ReviewPage-Attestation
