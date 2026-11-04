@@ -296,6 +296,9 @@ public class ChecklistPageSubmitAndSignTests : BallotPageTestBase
         await cut.Find("[data-testid='submit-sign-form']").SubmitAsync();
 
         // Assert: the ballot is in, nothing is signed yet, and the re-authentication form is ready
+        Assert.Equal(
+            BallotState.Submitted,
+            (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken, external.Username))!.BallotState);
         Assert.Equal(SlotSignatureState.NotSigned, await SignatureOfAsync(projectId, external.Username));
         var form = cut.Find("[data-testid='submit-sign-reauth-form']");
         Assert.Equal("/auth/oidc/reauth", form.GetAttribute("action"));

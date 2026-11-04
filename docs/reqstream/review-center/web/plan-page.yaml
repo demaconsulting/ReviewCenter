@@ -459,7 +459,6 @@ sections:
           A lead plans many reviews at once and normally wants one date for them.
         tests:
           - PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow
-          - PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow
 
       - id: ReviewCenter-PlanPage-DueDate-Row
         title: >-

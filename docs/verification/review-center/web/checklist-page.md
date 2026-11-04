@@ -137,6 +137,11 @@ the page has no name field, "Answered by" shows the display name of that user, a
 user name and display name of that user. This scenario is tested by
 `ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy`.
 
+**ChecklistPage_Answer_TwoReviewerSlots_StoresTheAnswerInTheBallotOfTheSignedInUser**: A review has the slots of
+"ann" and "bea" and "bea" is signed in; Pass is clicked on the first check, the ballot of "bea" holds the Pass answer
+and the ballot of "ann" holds none. This scenario is tested by
+`ChecklistPage_Answer_TwoReviewerSlots_StoresTheAnswerInTheBallotOfTheSignedInUser`.
+
 **ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError**: A section is switched to not applicable and
 saved without a reason; an error is shown and the section is still applicable in the store. This scenario is tested
 by `ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError`.
