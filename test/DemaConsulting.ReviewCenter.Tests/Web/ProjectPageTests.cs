@@ -246,6 +246,8 @@ public class ProjectPageTests : PageTestBase
         // Arrange: a review fully signed by its only slot, so that it is Approved
         var token = TestContext.Current.CancellationToken;
         var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", token);
+        // Bob only has to be a live account: the arranging Signing service allows every project action (see
+        // PageTestBase), so he needs no membership to reopen. The reopen is arranging a changed record, not testing access.
         await Users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", token);
         var project = await Projects.CreateAsync("Apollo", null, token);
         await Store.AddMembershipAsync(ann.Id, project.Id, token);

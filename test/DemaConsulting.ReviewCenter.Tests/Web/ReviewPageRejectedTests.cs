@@ -238,7 +238,7 @@ public class ReviewPageRejectedTests : PageTestBase
     [Fact]
     public async Task ReviewPage_ConclusionCard_ServiceRefuses_ShowsRuleMessage()
     {
-        // Arrange: a rejection with its text, and ann types another text into the open form
+        // Arrange: a rejection with its text, and Ann types another text into the open form
         var (projectId, slotId) = await CreateRejectedAsync(withText: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='review-conclusion-input']").InputAsync("Other reasons.");
