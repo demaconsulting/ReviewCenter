@@ -101,7 +101,7 @@ public class ProjectPageTests : PageTestBase
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
         await Repositories.CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, admin, TestContext.Current.CancellationToken);
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, admin, TestContext.Current.CancellationToken);
 
         // Act: render the page again
         var with = RenderProjectPage(project.Id);
@@ -151,7 +151,7 @@ public class ProjectPageTests : PageTestBase
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", token);
         var repository = await Repositories.CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, admin, token);
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, admin, token);
         await Repositories.SetEnabledAsync(repository.Id, false, admin, token);
 
         // Act: render the page

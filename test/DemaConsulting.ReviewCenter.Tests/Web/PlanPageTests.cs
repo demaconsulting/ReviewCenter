@@ -895,7 +895,7 @@ public class PlanPageTests : PageTestBase
         // Arrange: a shown plan, and a second repository to choose
         var (projectId, repositoryId) = await ArrangeAsync();
         var second = await Repositories.CreateAsync(
-            "second-repo", "https://example.com/two.git", null, null, _admin, TestContext.Current.CancellationToken);
+            projectId, "second-repo", "https://example.com/two.git", null, null, _admin, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='plan-repository-select']").ChangeAsync(second.Id.ToString(CultureInfo.InvariantCulture));
         await ShowPlanAsync(cut);
