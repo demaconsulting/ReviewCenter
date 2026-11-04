@@ -10,66 +10,391 @@
 # - System requirements are validated by the real-browser end-to-end tests, which are linked
 #   with the windows@ and ubuntu@ filters to prove they passed on both supported platforms. CI
 #   installs Chromium and makes a missing browser fail those tests.
+# - Every requirement states one criterion. The first criterion of a topic keeps the original id; the further
+#   criteria of the same topic are named <original id>-<Aspect>.
+# - The unit requirements are children of the system requirement that shows the same behavior: starts under the
+#   start requirement, the control file under the control-file requirement, start failures under the start-failure
+#   requirement, rejections and failure results under the failure requirements, result lines under the result
+#   requirements, and each Playwright capability under the requirement that uses it. Units with no system
+#   counterpart stay with the main requirement of their topic.
 
 sections:
   - title: ReviewCenterPuppet Requirements
     requirements:
       - id: ReviewCenterPuppet-System-Lifecycle
         title: >-
-          The tool shall start one persistent headless browser that stays open between commands, report
-          when it is already running or not running, and stop the browser and remove its control file
-          when told to stop.
+          The tool shall start one persistent headless browser that stays open between commands.
         tags: [system]
         justification: |
           A coding agent runs one shell command at a time. A browser that lives between commands lets it
           keep the page, the scroll position, and the hover state while it decides what to do next.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-ControlFile
+        title: >-
+          The tool shall let every command find the running browser through a control file.
+        tags: [system]
+        justification: |
+          Each command is a new process, so it has nothing but a file to tell it where the browser listens. Where
+          the file lives is decided in one place, so that the commands and the start agree on it. The end-to-end
+          test shows the commands finding the browser through its control file.
         children:
-          - ReviewCenterPuppet-PuppetProgram-Arguments
-          - ReviewCenterPuppet-ControlChannel-Protocol
+          - ReviewCenterPuppet-ControlChannel-Protocol-EnvironmentVariable
+          - ReviewCenterPuppet-ControlChannel-Protocol-DefaultFile
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-Ready
+        title: >-
+          The tool shall have the browser ready to take commands when the start command returns.
+        tags: [system]
+        justification: |
+          The agent runs its first command right after start, so it must not have to wait or retry until the
+          browser has come up.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-AlreadyRunning
+        title: >-
+          The tool shall refuse to start a second browser while one is running and exit with code 1.
+        tags: [system]
+        justification: |
+          Two browsers behind one control file would leave the commands talking to an unpredictable one.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-StartFailure
+        title: >-
+          The tool shall exit with code 1 and print the reason when the browser cannot be started, and leave
+          no control file behind.
+        tags: [system]
+        justification: |
+          A start that fails must tell the agent why, in the start command itself, and must not leave a control
+          file that makes the next command think a browser is there. The end-to-end test shows it with a start
+          whose Chromium is missing (an empty browser folder), where the message names the install command.
+        children:
           - ReviewCenterPuppet-BrowserDaemon-Lifecycle
+          - ReviewCenterPuppet-BrowserDaemon-Lifecycle-StartFailureExit
           - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
+          - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure-OtherFailure
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-NotRunning
+        title: >-
+          The tool shall exit with code 2 for a command that is given when no browser is running.
+        tags: [system]
+        justification: |
+          A command without a browser is a usage problem of the agent, not a failed browser action, and its exit
+          code must say so.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningExit
+          - ReviewCenterPuppet-PuppetProgram-Results-NotRunningHint
+          - ReviewCenterPuppet-ControlChannel-Protocol-StaleFile
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-Stop
+        title: >-
+          The tool shall stop the browser when told to stop, so that a later command finds none running.
+        tags: [system]
+        justification: |
+          An agent that has finished must be able to end the session without leaving a browser process behind.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Lifecycle-StopControlFile
+        title: >-
+          The tool shall remove its control file when told to stop.
+        tags: [system]
+        justification: |
+          The control file is how the commands find the browser, so it must not outlive it.
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
       - id: ReviewCenterPuppet-System-Interact
         title: >-
-          The tool shall navigate, click, hover, fill, press keys, wait for an element or text, and read
-          page text or the list of interactive elements, with the hover state persisting between commands
-          until the mouse is moved again; every result shall include the current URL, the page title, and
-          any new console errors, page errors, or failed requests, and a failed command shall print a
-          short message and exit with a non-zero code.
+          The tool shall navigate to a path or URL with the goto command and report the HTTP status of the
+          response.
         tags: [system]
         justification: |
-          The agent decides its next action from what the last command reported, so each result must show
-          where the browser is and what went wrong, and a bad selector must fail fast with a clear
-          message. Hover effects only show in a later screenshot if the hover is not undone in between.
+          Every look at the interface starts with opening a page, and the status tells the agent at once whether
+          the page exists.
+        children:
+          - ReviewCenterPuppet-PlaywrightBrowser-Navigation
+          - ReviewCenterPuppet-PlaywrightBrowser-Navigation-AbsoluteUrl
+          - ReviewCenterPuppet-OTS-Playwright-Chromium
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Command
+        title: >-
+          The tool shall run each command that is given on its command line, one command per shell call, in the
+          running browser.
+        tags: [system]
+        justification: |
+          The agent drives the browser with separate shell calls, so a command line must be turned into a request
+          that reaches the browser that is already running, and the answer must come back to the same call.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Arguments
+          - ReviewCenterPuppet-ControlChannel-Protocol
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-ResultText
+        title: >-
+          The tool shall print the result of a command on standard output.
+        tags: [system]
+        justification: |
+          The agent reads what a command found, such as the status of a page or the text of an element, from the
+          output of the shell call.
         children:
           - ReviewCenterPuppet-PuppetProgram-Results
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-SuccessExit
+        title: >-
+          The tool shall exit with code 0 when a command worked.
+        tags: [system]
+        justification: |
+          The agent separates a command that worked from one that failed by the exit code alone.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-ExitCodeSuccess
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Selector
+        title: >-
+          The tool shall address an element by a test id or by a css= or text= selector.
+        tags: [system]
+        justification: |
+          The pages of the web interface carry stable test ids, so the agent names an element by one; the other
+          selector forms reach what has no test id.
+        children:
           - ReviewCenterPuppet-SelectorResolver-Resolve
-          - ReviewCenterPuppet-PlaywrightBrowser-Navigation
+          - ReviewCenterPuppet-SelectorResolver-Resolve-PassThrough
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Click
+        title: >-
+          The tool shall click an element that is addressed by a selector.
+        tags: [system]
+        justification: |
+          Buttons and links are the main way an agent moves through the interface.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - windows@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
 
-      - id: ReviewCenterPuppet-System-VisualCheck
+      - id: ReviewCenterPuppet-System-Interact-Hover
         title: >-
-          The tool shall save a PNG screenshot of the page or of one element, change the viewport size,
-          emulate the light or dark color scheme, and evaluate a JavaScript expression in the page.
+          The tool shall move the mouse onto an element that is addressed by a selector.
         tags: [system]
         justification: |
-          A coding agent polishing the interface looks at screenshots at several sizes and themes and
-          reads computed styles to confirm what it sees.
+          Some controls and styles only appear while the mouse is over them, so the agent must be able to put
+          the mouse there.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
           - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-HoverPersists
+        title: >-
+          The tool shall keep the hover in effect between commands until the mouse is moved again.
+        tags: [system]
+        justification: |
+          A hover effect only shows in a later screenshot if the hover is not undone between the commands.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Fill
+        title: >-
+          The tool shall set the value of an input field that is addressed by a selector.
+        tags: [system]
+        justification: |
+          Forms are filled field by field, one command each.
+        children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Press
+        title: >-
+          The tool shall press a key on an element that is addressed by a selector.
+        tags: [system]
+        justification: |
+          Keyboard actions such as Enter in a form field are part of normal use and are not always the same as
+          a click.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Wait
+        title: >-
+          The tool shall wait for an element or for text to appear on the page.
+        tags: [system]
+        justification: |
+          The browser reacts to Blazor Server updates asynchronously, and Puppet has no fixed sleeps, so the
+          agent waits for what it expects instead.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Text
+        title: >-
+          The tool shall read the text of the page or of an element that is addressed by a selector.
+        tags: [system]
+        justification: |
+          The text is the cheapest way for the agent to check what the page says.
+        children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-Snapshot
+        title: >-
+          The tool shall list the visible interactive elements of the page with their test ids.
+        tags: [system]
+        justification: |
+          The list tells the agent which selectors it can use next, without reading the page source.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-ResultFooter
+        title: >-
+          The tool shall include the current URL and the page title in the result of every command.
+        tags: [system]
+        justification: |
+          The agent decides its next action from what the last command reported, so each result shows where the
+          browser is.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-PageLine
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-ConsoleErrors
+        title: >-
+          The tool shall report a new console error once, in the result of the command during which it was raised.
+        tags: [system]
+        justification: |
+          A script error that an action caused shows up at once, next to the action, and is not repeated in every
+          later result.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-Events
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-FailedExit
+        title: >-
+          The tool shall exit with a non-zero code when a command fails.
+        tags: [system]
+        justification: |
+          A wrong selector must be noticed from the exit code alone, without reading the text.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownCommand
+          - ReviewCenterPuppet-PuppetProgram-Arguments-UnknownOption
+          - ReviewCenterPuppet-PuppetProgram-Arguments-ArgumentCount
+          - ReviewCenterPuppet-PuppetProgram-Arguments-MalformedValue
+          - ReviewCenterPuppet-PuppetProgram-Results-ExitCodeFailure
+          - ReviewCenterPuppet-SelectorResolver-Resolve-Blank
+          - ReviewCenterPuppet-PlaywrightBrowser-Navigation-MissingBase
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-Interact-FailedMessage
+        title: >-
+          The tool shall print a short message that names the selector when a command fails because the
+          element is not found.
+        tags: [system]
+        justification: |
+          A bad selector must fail fast with a clear message, so that a wrong guess costs little.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results-FailureMessage
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck
+        title: >-
+          The tool shall save a PNG screenshot of the page.
+        tags: [system]
+        justification: |
+          A coding agent polishing the interface looks at screenshots to judge what the user would see.
+        children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck-Element
+        title: >-
+          The tool shall save a PNG screenshot of one element that is addressed by a selector.
+        tags: [system]
+        justification: |
+          A picture of one element is smaller and shows the detail the agent is checking.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck-Viewport
+        title: >-
+          The tool shall change the size of the browser viewport.
+        tags: [system]
+        justification: |
+          The agent checks the interface at several sizes, for example a narrow phone width.
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck-Theme
+        title: >-
+          The tool shall emulate the light or the dark color scheme of the browser.
+        tags: [system]
+        justification: |
+          The agent checks the interface in both themes without changing the settings of the operating system.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck-Eval
+        title: >-
+          The tool shall evaluate a JavaScript expression in the page and print its result.
+        tags: [system]
+        justification: |
+          The agent reads computed styles and other page state to confirm numerically what it sees.
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

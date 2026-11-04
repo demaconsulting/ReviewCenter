@@ -44,13 +44,14 @@ public class SelectorResolverTests
     }
 
     /// <summary>
-    ///     Test that a blank selector is rejected.
+    ///     Test that a null, empty, or blank selector is rejected.
     /// </summary>
     [Fact]
     public void SelectorResolver_Resolve_Blank_ThrowsArgumentException()
     {
-        // Arrange: blank selectors
-        // Act and assert: both are rejected
+        // Arrange: blank selectors, and null
+        // Act and assert: all are rejected
+        Assert.Throws<ArgumentNullException>(() => SelectorResolver.Resolve(null!));
         Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("  "));
         Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve(string.Empty));
         Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("testid:  "));

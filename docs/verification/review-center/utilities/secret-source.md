@@ -4,8 +4,9 @@
 
 `SecretSource` is verified with unit tests defined in `SecretSourceTests.cs`. The tests use real files in a
 `TemporaryDirectory` (a real file system, nothing mocked) and the real `SecretSource`; nothing is read from the
-environment or from the home directory of the user, so the tests are hermetic and leave nothing behind. Every error
-test also checks that the message does not contain the secret.
+environment or from the home directory of the user, so the tests are hermetic and leave nothing behind. The tests for
+both settings set, a file past the size limit and a file that is not UTF-8 also check that the message does not
+contain the secret.
 
 #### Test Environment
 
@@ -16,16 +17,22 @@ can read is deferred (see the design) and is therefore not verified here.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- An inline secret is returned unchanged, with no trimming.
-- With neither setting set (null, empty, or white space), the result is null.
-- The contents of a file are returned as UTF-8 text with surrounding white space and line breaks removed, also for a
-  file of exactly 8192 bytes.
-- Both settings set throws `InvalidOperationException` whose message names both settings and does not contain the
-  secret.
-- A missing file, a directory, an empty file, a file of only white space, a file larger than 8192 bytes, and a file that
-  is not UTF-8 each throw `InvalidOperationException` whose message names the file setting and does not contain the
-  contents of the file.
-- A null setting name throws `ArgumentNullException`.
+- An inline secret is returned unchanged, with no trimming (`Inline`).
+- With neither setting set (null, empty, or white space), the result is null and no error is raised
+  (`Inline-Neither`).
+- The contents of a file are returned as UTF-8 text when only the file setting is set (`File`).
+- The white space and line breaks around the secret in a file are removed, and white space inside it is kept
+  (`File-Trimmed`).
+- A file of exactly 8192 bytes is accepted (`File-SizeLimit`).
+- Both settings set throws `InvalidOperationException` whose message names both settings (`Conflict`).
+- A missing file throws `InvalidOperationException` whose message names the file setting and the file
+  (`FileProblems`).
+- A directory in place of the file, an empty file or a file of only white space, a file larger than 8192 bytes, and
+  a file that is not UTF-8 each throw `InvalidOperationException` whose message names the file setting
+  (`FileProblems-Unreadable`, `-Empty`, `-TooLarge` and `-NotUtf8`).
+- The message of the refusal for both settings set, of a file larger than 8192 bytes, and of a file that is not
+  UTF-8 does not contain the secret or the contents of the file (`NoDisclosure`).
+- A null setting name throws `ArgumentNullException`; no requirement covers this guard.
 
 #### Test Scenarios
 

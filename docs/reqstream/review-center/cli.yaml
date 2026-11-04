@@ -18,6 +18,17 @@ sections:
           CLI arguments.
         children:
           - ReviewCenter-Context-ArgumentParsing
+          - ReviewCenter-Context-ArgumentParsing-Version
+          - ReviewCenter-Context-ArgumentParsing-Help
+          - ReviewCenter-Context-ArgumentParsing-Silent
+          - ReviewCenter-Context-ArgumentParsing-Validate
+          - ReviewCenter-Context-ArgumentParsing-Results
+          - ReviewCenter-Context-ArgumentParsing-ResultAlias
+          - ReviewCenter-Context-ArgumentParsing-Depth
+          - ReviewCenter-Context-ArgumentParsing-DepthDefault
+          - ReviewCenter-Context-ArgumentParsing-Log
+          - ReviewCenter-Context-Serve-Absent
+          - ReviewCenter-Context-CheckConfig-Default
         tests:
           - CliSubsystem_VersionFlow_ContextAndProgram_DisplaysVersionAndExits
           - CliSubsystem_HelpFlow_ContextAndProgram_DisplaysHelpAndExits
@@ -66,6 +77,7 @@ sections:
           cluttering output logs.
         children:
           - ReviewCenter-Context-Silent
+          - ReviewCenter-Context-Silent-ErrorSilent
         tests:
           - CliSubsystem_SilentFlow_ContextAndProgram_SuppressesOutput
 
@@ -99,9 +111,21 @@ sections:
           Provides persistent logging for debugging and audit trails.
         children:
           - ReviewCenter-Context-LogOutput
-          - ReviewCenter-Context-LogFailure
+          - ReviewCenter-Context-LogOutput-LogErrors
         tests:
           - CliSubsystem_LogFlow_ContextAndProgram_WritesLogFile
+
+      - id: ReviewCenter-Cli-Log-OpenFailure
+        title: >-
+          The Cli subsystem shall report an error on stderr and exit with a non-zero code when the log file that
+          `--log` names cannot be opened.
+        justification: |
+          A log that cannot be written would otherwise be lost without a word, so a run that was asked to keep a
+          record must stop and say that it cannot.
+        children:
+          - ReviewCenter-Context-LogFailure
+        tests:
+          - CliSubsystem_LogFlow_ContextAndProgram_UnopenableLogFile_ReportsErrorAndExitsNonZero
 
       - id: ReviewCenter-Cli-ErrorOutput
         title: The Cli subsystem shall write error messages to stderr.
@@ -114,14 +138,44 @@ sections:
           - CliSubsystem_ErrorOutput_ContextAndProgram_WritesErrorToStderr
 
       - id: ReviewCenter-Cli-InvalidArgs
-        title: The Cli subsystem shall reject unknown or malformed command-line arguments with a descriptive error.
+        title: >-
+          The Cli subsystem shall reject an unknown command-line argument with an error message that names the
+          argument.
         justification: |
-          Providing clear feedback for invalid arguments helps users quickly correct
-          mistakes and prevents silent misconfiguration.
+          A mistyped option that is silently ignored would leave the operator believing that it took effect. Naming
+          the argument in the message lets the operator find the typo at once.
         children:
           - ReviewCenter-Context-InvalidArgs
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsUnknownArgumentsAndExitsNonZero
+
+      - id: ReviewCenter-Cli-InvalidArgs-Malformed
+        title: >-
+          The Cli subsystem shall reject an option value that is malformed, which is a heading depth that is not an
+          integer from 1 to 6 or a listen URL that is not an absolute http or https URL, with an error message that
+          names the option.
+        justification: |
+          A value that cannot be used would otherwise be replaced by a default without telling the operator, which
+          hides a misconfiguration of the run.
+        children:
+          - ReviewCenter-Context-InvalidArgs-DepthNotInteger
+          - ReviewCenter-Context-InvalidArgs-DepthOutOfRange
+          - ReviewCenter-Context-Urls-Invalid
+        tests:
+          - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero
+
+      - id: ReviewCenter-Cli-InvalidArgs-MissingValue
+        title: >-
+          The Cli subsystem shall reject an option that needs a value when the value is missing, with an error message
+          that names the option.
+        justification: |
+          An option at the end of the command line has nothing to work with, and guessing a value could change the
+          run in a way that the operator did not choose.
+        children:
+          - ReviewCenter-Context-InvalidArgs-MissingValue
+          - ReviewCenter-Context-Urls-Missing
+        tests:
+          - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMissingValueAndExitsNonZero
 
       - id: ReviewCenter-Cli-ExitCode
         title: The Cli subsystem shall return a non-zero exit code on failure.
@@ -132,6 +186,7 @@ sections:
           - ReviewCenter-Context-ExitCode
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsUnknownArgumentsAndExitsNonZero
+          - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero
 
       - id: ReviewCenter-Cli-ResultAlias
         title: The Cli subsystem shall accept `--result` as a legacy alias for `--results` when parsing arguments.
@@ -140,20 +195,30 @@ sections:
           prevents breakage when upgrading to newer tool versions.
         tests:
           - CliSubsystem_ResultAliasFlow_ContextAndProgram_ParsesResultsFile
-          - Context_Create_ResultAliasFlag_SetsResultsFile
 
       - id: ReviewCenter-Cli-CheckConfig
         title: >-
-          The Cli subsystem shall support the `--check-config` option to add the opt-in checks of the configured
-          database and key ring to a self-validation run, and shall reject the option when `--validate` is not provided.
+          The Cli subsystem shall accept the `--check-config` option together with `--validate` to request the
+          opt-in checks of the configured database and key ring in a self-validation run.
         justification: |
           The default self-validation run is hermetic and never looks at the configured database or keys. Operators who
           also want to know that the deployment's own database can be opened, has the schema of this build, and fits
-          its key ring must ask for that explicitly, and the option only has meaning for a validation run.
+          its key ring must ask for that explicitly.
         children:
           - ReviewCenter-Context-CheckConfig
         tests:
+          - CliSubsystem_CheckConfigFlow_Context_WithValidate_IsParsed
+
+      - id: ReviewCenter-Cli-CheckConfig-RequiresValidate
+        title: The Cli subsystem shall reject the `--check-config` option when `--validate` is not provided.
+        justification: |
+          The option only adds checks to a validation run, so on its own it would silently do nothing. Rejecting it
+          shows the operator that the validation run they believe they requested did not happen.
+        children:
+          - ReviewCenter-Context-CheckConfig-RequiresValidate
+        tests:
           - CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate
+
       - id: ReviewCenter-Cli-Serve
         title: The Cli subsystem shall support the serve verb to signal that the web server is to be run.
         justification: |
@@ -166,58 +231,133 @@ sections:
 
       - id: ReviewCenter-Cli-Urls
         title: >-
-          The Cli subsystem shall support the `--urls` option to specify the URL the web server
-          listens on, and shall reject the option when the serve verb is not provided.
+          The Cli subsystem shall support the `--urls` option to specify the URL the web server listens on.
         justification: |
-          Operators must choose the listen address of the service. The option only has meaning
-          for the serve verb, so accepting it elsewhere would hide a forgotten verb from the
-          operator.
+          Operators must choose the listen address of the service so that it can coexist with other services and sit
+          behind a reverse proxy.
         children:
           - ReviewCenter-Context-Urls
+          - ReviewCenter-Context-Urls-Default
         tests:
           - CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
+
+      - id: ReviewCenter-Cli-Urls-RequiresServe
+        title: The Cli subsystem shall reject the `--urls` option when the serve verb is not provided.
+        justification: |
+          The option only has meaning for the serve verb, so accepting it elsewhere would hide a forgotten verb from
+          the operator.
+        children:
+          - ReviewCenter-Context-Urls-RequiresServe
+        tests:
           - CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination
 
       - id: ReviewCenter-Cli-UserAdd
         title: >-
           The Cli subsystem shall support the user add verb with the `--username` and `--display-name` options and
-          the `--system-admin` switch to signal that a user is to be created, create an ordinary user unless the
-          switch is given, reject a missing user name or display name, options used without the verb, and any
-          option that would put the password on the command line.
+          the `--system-admin` switch to signal that a user is to be created.
         justification: |
           The first system administrator has to be created from the command line, so the tool needs a verb for it.
-          An ordinary user is the safe default, because the right to see every project must be asked for. A
-          password option is deliberately missing, because a password on the command line is visible to other
-          processes and kept in shell history, and options without the verb would hide a forgotten verb.
         children:
           - ReviewCenter-Context-UserAdd
+          - ReviewCenter-Context-UserAdd-SystemAdmin
+        tests:
+          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsAndDocumentsThem
+
+      - id: ReviewCenter-Cli-UserAdd-OrdinaryDefault
+        title: >-
+          The Cli subsystem shall request an ordinary user when the user add verb is given without the
+          `--system-admin` switch.
+        justification: |
+          An ordinary user is the safe default, because the right to see every project must be asked for.
+        children:
+          - ReviewCenter-Context-UserAdd-OrdinaryDefault
+        tests:
+          - CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser
+
+      - id: ReviewCenter-Cli-UserAdd-MissingNames
+        title: >-
+          The Cli subsystem shall reject the user add verb when the user name or the display name is missing.
+        justification: |
+          A user cannot be created without the two names that identify the account, so a missing name must be found
+          when the arguments are parsed.
+        children:
           - ReviewCenter-Context-UserAddMisuse
         tests:
-          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
+          - CliSubsystem_UserAddFlow_ContextAndProgram_MissingNames_AreRejected
+
+      - id: ReviewCenter-Cli-UserAdd-OptionsWithoutVerb
+        title: >-
+          The Cli subsystem shall reject the `--username`, `--display-name`, and `--system-admin` options when the
+          user add verb is not given.
+        justification: |
+          Options without their verb would hide a forgotten verb from the operator.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-OptionsWithoutVerb
+        tests:
+          - CliSubsystem_UserAddFlow_ContextAndProgram_OptionsWithoutVerb_AreRejected
+
+      - id: ReviewCenter-Cli-UserAdd-WrongAction
+        title: >-
+          The Cli subsystem shall reject the user verb when the add action is missing or another action is given, with
+          an error message and a non-zero exit code.
+        justification: |
+          Only the add action exists for the user verb, so a mistyped or missing action must be refused instead of
+          being taken for a request that the tool cannot carry out.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-WrongAction
+        tests:
+          - CliSubsystem_UserAddFlow_ContextAndProgram_WrongAction_RejectsAndExitsNonZero
+
+      - id: ReviewCenter-Cli-UserAdd-NoPasswordOption
+        title: >-
+          The Cli subsystem shall reject a `--password` option for the user add verb, so that no password is given on
+          the command line.
+        justification: |
+          A password on the command line is visible to other processes and kept in shell history.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-PasswordOption
+        tests:
+          - CliSubsystem_UserAddFlow_ContextAndProgram_PasswordOption_IsRejected
 
       - id: ReviewCenter-Cli-AuditVerify
         title: >-
-          The Cli subsystem shall support the audit verify verb to signal that the audit trail is to be verified,
-          and shall reject the audit verb without the verify action or with another action.
+          The Cli subsystem shall support the audit verify verb to signal that the audit trail is to be verified.
         justification: |
-          Verifying the trail from the command line lets scripts and scheduled jobs check it, and a mistyped
-          action must be found when the arguments are parsed.
+          Verifying the trail from the command line lets scripts and scheduled jobs check it.
         children:
           - ReviewCenter-Context-AuditVerify
         tests:
-          - Context_Create_AuditVerifyVerb_SetsAuditVerify
-          - Program_Run_Help_DocumentsAuditVerify
+          - CliSubsystem_AuditVerifyFlow_ContextAndProgram_ParsesVerbAndDocumentsIt
+
+      - id: ReviewCenter-Cli-AuditVerify-Misuse
+        title: >-
+          The Cli subsystem shall reject the audit verb when the verify action is missing or another action is given.
+        justification: |
+          A mistyped action must be found when the arguments are parsed, rather than starting no verification and
+          reporting nothing.
+        children:
+          - ReviewCenter-Context-AuditVerify-Misuse
+        tests:
+          - CliSubsystem_AuditVerifyFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero
 
       - id: ReviewCenter-Cli-KeysReprotect
         title: >-
           The Cli subsystem shall support the keys reprotect verb to signal that the Data Protection key is to be
-          rotated and the stored secrets protected again, and shall reject the keys verb without the reprotect action
-          or with another action.
+          rotated and the stored secrets protected again.
         justification: |
-          Rotating the key writes to the key ring and the database, so it must be an explicit action, and a mistyped
-          action must be found when the arguments are parsed.
+          Rotating the key writes to the key ring and the database, so it must be an explicit action.
         children:
           - ReviewCenter-Context-KeysReprotect
         tests:
-          - Context_Create_KeysReprotectVerb_SetsKeysReprotect
-          - Program_Run_Help_DocumentsKeysReprotect
+          - CliSubsystem_KeysReprotectFlow_ContextAndProgram_ParsesVerbAndDocumentsIt
+
+      - id: ReviewCenter-Cli-KeysReprotect-Misuse
+        title: >-
+          The Cli subsystem shall reject the keys verb when the reprotect action is missing or another action is given.
+        justification: |
+          A mistyped action must be found when the arguments are parsed, because the intended key rotation would
+          otherwise not happen.
+        children:
+          - ReviewCenter-Context-KeysReprotect-Misuse
+        tests:
+          - CliSubsystem_KeysReprotectFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero

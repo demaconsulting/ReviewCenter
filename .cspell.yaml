@@ -189,6 +189,7 @@ words:
   - Zabcdefghijkmnopqrstuvwxyz
   - datalist
   - reprotect
+  - Unopenable
 
 # Exclude common build artifacts, dependencies, and vendored third-party code
 ignorePaths:

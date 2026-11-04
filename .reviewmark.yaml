@@ -2193,6 +2193,7 @@ reviews:
       - "docs/design/review-center-puppet/browser-daemon.md"
       - "docs/verification/review-center-puppet/browser-daemon.md"
       - "tools/puppet/BrowserDaemon.cs"
+      - "test/**/BrowserDaemonTests.cs"
 
   - id: ReviewCenterPuppet-SelectorResolver
     title: Review of ReviewCenterPuppet SelectorResolver unit implementation

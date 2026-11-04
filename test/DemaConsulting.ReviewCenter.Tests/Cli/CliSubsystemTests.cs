@@ -321,6 +321,96 @@ public class CliSubsystemTests
     }
 
     /// <summary>
+    ///     Test that Program rejects a malformed option value, writes an error to stderr, and exits non-zero.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    /// <param name="option">The option that the error message must name.</param>
+    [Theory]
+    [InlineData("--depth abc", "--depth")]
+    [InlineData("--depth 0", "--depth")]
+    [InlineData("--depth 7", "--depth")]
+    [InlineData("serve --urls not-a-url", "--urls")]
+    [InlineData("serve --urls ftp://localhost:21", "--urls")]
+    public void CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero(
+        string arguments,
+        string option)
+    {
+        // Arrange: a malformed option value
+        var args = arguments.Split(' ');
+
+        // Act: invoke the actual CLI entry point with the malformed value
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the malformed value produces a non-zero exit code and an error on stderr that names the option
+        Assert.Equal(1, result);
+        Assert.Contains(option, errorOutput);
+    }
+
+    /// <summary>
+    ///     Test that Program rejects an option whose value is missing, writes an error to stderr, and exits non-zero.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space; the last one is the option without its value.</param>
+    /// <param name="option">The option that the error message must name.</param>
+    [Theory]
+    [InlineData("--log", "--log")]
+    [InlineData("--results", "--results")]
+    [InlineData("--result", "--result")]
+    [InlineData("--depth", "--depth")]
+    [InlineData("serve --urls", "--urls")]
+    public void CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMissingValueAndExitsNonZero(
+        string arguments,
+        string option)
+    {
+        // Arrange: an option at the end of the command line
+        var args = arguments.Split(' ');
+
+        // Act: invoke the actual CLI entry point without the value
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the missing value produces a non-zero exit code and an error on stderr that names the option
+        Assert.Equal(1, result);
+        Assert.Contains($"{option} requires", errorOutput);
+    }
+
+    /// <summary>
+    ///     Runs the CLI entry point with the error stream captured.
+    /// </summary>
+    /// <param name="args">The command-line arguments.</param>
+    /// <returns>The exit code and the text written to the error stream.</returns>
+    private static (int ExitCode, string ErrorOutput) RunMainCapturingError(string[] args)
+    {
+        var originalError = Console.Error;
+        try
+        {
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
+            var result = Program.Main(args);
+            return (result, errWriter.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    /// <summary>
+    ///     Test that Program reports an error and exits non-zero when the log file cannot be opened.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_LogFlow_ContextAndProgram_UnopenableLogFile_ReportsErrorAndExitsNonZero()
+    {
+        // Arrange: a log path that is a directory, which cannot be opened as a file
+        var args = new[] { "--version", "--log", Path.GetTempPath() };
+
+        // Act: invoke the actual CLI entry point
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the run fails with an error on stderr that says the log file could not be opened
+        Assert.Equal(1, result);
+        Assert.Contains("Failed to open log file", errorOutput);
+    }
+
+    /// <summary>
     ///     Test that Context writes error messages to stderr.
     /// </summary>
     [Fact]
@@ -370,19 +460,33 @@ public class CliSubsystemTests
     }
 
     /// <summary>
-    ///     Test that Context and Program work together to handle the --check-config option of a validation run.
+    ///     Test that Context parses the --check-config option of a validation run when --validate is provided.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_CheckConfigFlow_Context_WithValidate_IsParsed()
+    {
+        // Arrange: no setup required; the option together with --validate is the input under test
+
+        // Act: create the context from the command line
+        using var context = Context.Create(["--validate", "--check-config", "--silent"]);
+
+        // Assert: both options are recorded
+        Assert.True(context.Validate);
+        Assert.True(context.CheckConfig);
+    }
+
+    /// <summary>
+    ///     Test that Context rejects the --check-config option when --validate is not provided.
     /// </summary>
     [Fact]
     public void CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate()
     {
-        // Arrange: the opt-in option with and without --validate
+        // Arrange: no setup required; the option without --validate is the input under test
 
-        // Act: create the contexts from the command lines
-        using var withValidate = Context.Create(["--validate", "--check-config", "--silent"]);
+        // Act: create the context from the command line
         var withoutValidate = Assert.Throws<ArgumentException>(() => Context.Create(["--check-config"]));
 
-        // Assert: the option is parsed with --validate and rejected without it
-        Assert.True(withValidate.CheckConfig);
+        // Assert: the option is rejected with a message that names both options
         Assert.Contains("--check-config requires --validate", withoutValidate.Message);
     }
 
@@ -461,16 +565,17 @@ public class CliSubsystemTests
         // Act: parse --urls without serve
         var exception = Record.Exception(() => Context.Create(["--urls", "http://127.0.0.1:6001"]));
 
-        // Assert: the combination is rejected during parsing
-        Assert.IsType<ArgumentException>(exception);
+        // Assert: the combination is rejected during parsing with a message that names the serve verb
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("serve", argumentException.Message);
     }
 
     /// <summary>
-    ///     Test that Context and Program work together for the user add verb: the verb and its options are
-    ///     parsed, the help text documents them, and misuse is rejected during parsing.
+    ///     Test that the user add verb passes through Context and Program: the options are recorded and the help
+    ///     text documents them.
     /// </summary>
     [Fact]
-    public void CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse()
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsAndDocumentsThem()
     {
         // Arrange: capture console output for the help text
         var originalOut = Console.Out;
@@ -479,14 +584,12 @@ public class CliSubsystemTests
             using var outWriter = new StringWriter();
             Console.SetOut(outWriter);
 
-            // Act: parse the verb, print the help, and parse two misuses
+            // Act: parse the verb and print the help
             using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--system-admin"]);
             using var help = Context.Create(["--help"]);
             Program.Run(help);
-            var noName = Record.Exception(() => Context.Create(["user", "add"]));
-            var strayOption = Record.Exception(() => Context.Create(["--username", "ann"]));
 
-            // Assert: the options are recorded, the help documents them, and the misuse is refused
+            // Assert: the options are recorded and the help documents them
             Assert.True(context.UserAdd);
             Assert.Equal("ann", context.Username);
             Assert.Equal("Ann", context.DisplayName);
@@ -494,8 +597,6 @@ public class CliSubsystemTests
             var output = outWriter.ToString();
             Assert.Contains("user add", output);
             Assert.Contains("REVIEWCENTER_PASSWORD", output);
-            Assert.IsType<ArgumentException>(noName);
-            Assert.IsType<ArgumentException>(strayOption);
         }
         finally
         {
@@ -504,90 +605,217 @@ public class CliSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the audit verify verb is parsed and is off when not given.
+    ///     Test that the user add verb is rejected during parsing when a name is missing.
     /// </summary>
     [Fact]
-    public void Context_Create_AuditVerifyVerb_SetsAuditVerify()
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_MissingNames_AreRejected()
     {
-        // Act: parse the verb and a context without it
-        using var context = Context.Create(["audit", "verify"]);
-        using var other = Context.Create([]);
+        // Arrange: command lines without the user name, without the display name, and without both
+        var missingNames = new[]
+        {
+            new[] { "user", "add" },
+            new[] { "user", "add", "--username", "ann" },
+            new[] { "user", "add", "--display-name", "Ann" }
+        };
 
-        // Assert
-        Assert.True(context.AuditVerify);
-        Assert.False(other.AuditVerify);
-        Assert.False(context.UserAdd);
+        // Act: parse each command line
+        var errors = missingNames.Select(args => Record.Exception(() => Context.Create(args))).ToList();
+
+        // Assert: every command line is refused with a message that names the two options
+        Assert.Equal(missingNames.Length, errors.Count);
+        Assert.All(errors, error =>
+        {
+            var argumentException = Assert.IsType<ArgumentException>(error);
+            Assert.Contains("requires --username and --display-name", argumentException.Message);
+        });
     }
 
     /// <summary>
-    ///     Test that incorrect use of the audit verb is rejected with a message.
+    ///     Test that the user options are rejected during parsing when the user add verb is not given.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_OptionsWithoutVerb_AreRejected()
+    {
+        // Arrange: each of the three options without the verb
+        var optionsWithoutVerb = new[]
+        {
+            new[] { "--username", "ann" },
+            new[] { "--display-name", "Ann" },
+            new[] { "--system-admin" }
+        };
+
+        // Act: parse each command line
+        var errors = optionsWithoutVerb.Select(args => Record.Exception(() => Context.Create(args))).ToList();
+
+        // Assert: every command line is refused with a message that names the missing verb
+        Assert.Equal(optionsWithoutVerb.Length, errors.Count);
+        Assert.All(errors, error =>
+        {
+            var argumentException = Assert.IsType<ArgumentException>(error);
+            Assert.Contains("require the user add verb", argumentException.Message);
+        });
+    }
+
+    /// <summary>
+    ///     Test that a user verb without the add action, or with another action, is rejected with an error and a
+    ///     non-zero exit code.
     /// </summary>
     /// <param name="arguments">The arguments, joined by a space.</param>
     [Theory]
-    [InlineData("audit")]
-    [InlineData("audit export")]
-    public void Context_Create_AuditMisuse_ThrowsArgumentException(string arguments)
+    [InlineData("user")]
+    [InlineData("user remove")]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_WrongAction_RejectsAndExitsNonZero(string arguments)
     {
-        // Act: parse the arguments
-        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+        // Arrange: capture the error stream
+        var originalError = Console.Error;
+        try
+        {
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
 
-        // Assert: refused with a message that names the missing action
-        var argumentException = Assert.IsType<ArgumentException>(exception);
-        Assert.Contains("verify", argumentException.Message, StringComparison.Ordinal);
+            // Act: invoke the actual CLI entry point with the misused verb
+            var result = Program.Main(arguments.Split(' '));
+
+            // Assert: the run fails with an error that names the missing action
+            Assert.Equal(1, result);
+            Assert.Contains("user requires the add action", errWriter.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
     }
 
     /// <summary>
-    ///     Test that the keys reprotect verb is parsed and is off when not given.
+    ///     Test that the user add verb without the system administrator switch requests an ordinary user.
     /// </summary>
     [Fact]
-    public void Context_Create_KeysReprotectVerb_SetsKeysReprotect()
+    public void CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser()
     {
-        // Act: parse the verb and a context without it
-        using var context = Context.Create(["keys", "reprotect"]);
-        using var other = Context.Create([]);
+        // Arrange: no setup required; the argument list without the switch is the input under test
 
-        // Assert
-        Assert.True(context.KeysReprotect);
-        Assert.False(other.KeysReprotect);
-        Assert.False(context.AuditVerify);
-        Assert.Equal(0, context.ExitCode);
+        // Act: parse the verb with both names and without the switch
+        using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann"]);
+
+        // Assert: the verb is recorded and the user is not a system administrator
+        Assert.True(context.UserAdd);
+        Assert.False(context.SystemAdmin);
     }
 
     /// <summary>
-    ///     Test that incorrect use of the keys verb is rejected with a message.
-    /// </summary>
-    /// <param name="arguments">The arguments, joined by a space.</param>
-    [Theory]
-    [InlineData("keys")]
-    [InlineData("keys rotate")]
-    public void Context_Create_KeysMisuse_ThrowsArgumentException(string arguments)
-    {
-        // Act: parse the arguments
-        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
-
-        // Assert: refused with a message that names the missing action
-        var argumentException = Assert.IsType<ArgumentException>(exception);
-        Assert.Contains("reprotect", argumentException.Message, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    ///     Test that the help text documents the keys reprotect verb.
+    ///     Test that a password option of the user add verb is rejected and the run fails.
     /// </summary>
     [Fact]
-    public void Program_Run_Help_DocumentsKeysReprotect()
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_PasswordOption_IsRejected()
     {
-        // Arrange: capture console output
+        // Arrange: a user add command line that tries to give the password as an option
+        var args = new[] { "user", "add", "--username", "ann", "--display-name", "Ann", "--password", "secret-value" };
+        var originalError = Console.Error;
+        try
+        {
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
+
+            // Act: invoke the actual CLI entry point
+            var result = Program.Main(args);
+
+            // Assert: the option is unsupported, the run fails, and the password is never echoed
+            Assert.Equal(1, result);
+            var errorOutput = errWriter.ToString();
+            Assert.Contains("Unsupported argument '--password'", errorOutput);
+            Assert.DoesNotContain("secret-value", errorOutput);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the audit verify verb passes through Context and Program: it is recorded without any other
+    ///     verb and the help text documents it.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_AuditVerifyFlow_ContextAndProgram_ParsesVerbAndDocumentsIt()
+    {
+        // Arrange: capture console output for the help text
         var originalOut = Console.Out;
         try
         {
             using var outWriter = new StringWriter();
             Console.SetOut(outWriter);
 
-            // Act
+            // Act: parse the verb and print the help
+            using var context = Context.Create(["audit", "verify"]);
             using var help = Context.Create(["--help"]);
             Program.Run(help);
 
-            // Assert
+            // Assert: only the audit verify verb is recorded, and the help names it
+            Assert.True(context.AuditVerify);
+            Assert.False(context.KeysReprotect);
+            Assert.False(context.UserAdd);
+            Assert.False(context.Serve);
+            Assert.Contains("audit verify", outWriter.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the audit verb is rejected with an error and a non-zero exit code.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("audit")]
+    [InlineData("audit export")]
+    public void CliSubsystem_AuditVerifyFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero(string arguments)
+    {
+        // Arrange: capture the error stream
+        var originalError = Console.Error;
+        try
+        {
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
+
+            // Act: invoke the actual CLI entry point with the misused verb
+            var result = Program.Main(arguments.Split(' '));
+
+            // Assert: the run fails with an error that names the missing action
+            Assert.Equal(1, result);
+            Assert.Contains("audit requires the verify action", errWriter.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the keys reprotect verb passes through Context and Program: it is recorded without any other
+    ///     verb and the help text documents it.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_KeysReprotectFlow_ContextAndProgram_ParsesVerbAndDocumentsIt()
+    {
+        // Arrange: capture console output for the help text
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+
+            // Act: parse the verb and print the help
+            using var context = Context.Create(["keys", "reprotect"]);
+            using var help = Context.Create(["--help"]);
+            Program.Run(help);
+
+            // Assert: only the keys reprotect verb is recorded, and the help names it
+            Assert.True(context.KeysReprotect);
+            Assert.False(context.AuditVerify);
+            Assert.False(context.UserAdd);
+            Assert.False(context.Serve);
             Assert.Contains("keys reprotect", outWriter.ToString(), StringComparison.Ordinal);
         }
         finally
@@ -597,28 +825,31 @@ public class CliSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the help text documents the audit verify verb.
+    ///     Test that incorrect use of the keys verb is rejected with an error and a non-zero exit code.
     /// </summary>
-    [Fact]
-    public void Program_Run_Help_DocumentsAuditVerify()
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("keys")]
+    [InlineData("keys rotate")]
+    public void CliSubsystem_KeysReprotectFlow_ContextAndProgram_RejectsMisuseAndExitsNonZero(string arguments)
     {
-        // Arrange: capture console output
-        var originalOut = Console.Out;
+        // Arrange: capture the error stream
+        var originalError = Console.Error;
         try
         {
-            using var outWriter = new StringWriter();
-            Console.SetOut(outWriter);
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
 
-            // Act
-            using var help = Context.Create(["--help"]);
-            Program.Run(help);
+            // Act: invoke the actual CLI entry point with the misused verb
+            var result = Program.Main(arguments.Split(' '));
 
-            // Assert
-            Assert.Contains("audit verify", outWriter.ToString(), StringComparison.Ordinal);
+            // Assert: the run fails with an error that names the missing action
+            Assert.Equal(1, result);
+            Assert.Contains("keys requires the reprotect action", errWriter.ToString());
         }
         finally
         {
-            Console.SetOut(originalOut);
+            Console.SetError(originalError);
         }
     }
 }

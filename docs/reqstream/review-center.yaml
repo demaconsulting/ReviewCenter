@@ -901,7 +901,9 @@ sections:
           for an unreadable database are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Program-AuditVerify
+          - ReviewCenter-Program-AuditVerify-Help
           - ReviewCenter-Cli-AuditVerify
+          - ReviewCenter-Cli-AuditVerify-Misuse
           - ReviewCenter-Hosting-AuditVerify
           - ReviewCenter-Web-AuditPage
           - ReviewCenter-Web-AuditPage-HeaderLink
@@ -2326,7 +2328,15 @@ sections:
           there.
         children:
           - ReviewCenter-Program-UserAdd
+          - ReviewCenter-Program-UserAdd-Duplicate
+          - ReviewCenter-Program-UserAdd-Help
+          - ReviewCenter-Program-UserAdd-PasswordHelp
           - ReviewCenter-Cli-UserAdd
+          - ReviewCenter-Cli-UserAdd-OrdinaryDefault
+          - ReviewCenter-Cli-UserAdd-MissingNames
+          - ReviewCenter-Cli-UserAdd-OptionsWithoutVerb
+          - ReviewCenter-Cli-UserAdd-WrongAction
+          - ReviewCenter-Cli-UserAdd-NoPasswordOption
           - ReviewCenter-Hosting-UserAdd
           - ReviewCenter-Hosting-UserAdd-StandardInput
         tests:
@@ -2438,6 +2448,11 @@ sections:
         children:
           - ReviewCenter-Hosting-KeyRingProtection
           - ReviewCenter-Utilities-SecretSource
+          - ReviewCenter-Utilities-SecretSource-Inline
+          - ReviewCenter-Utilities-SecretSource-Neither
+          - ReviewCenter-Utilities-SecretSource-Refusal
+          - ReviewCenter-Utilities-SecretSource-NoDisclosure
+          - ReviewCenter-Utilities-SecretSource-Conflict
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
@@ -2506,7 +2521,9 @@ sections:
           one place that writes keys and secrets, so it must be sure first that it loses nothing.
         children:
           - ReviewCenter-Cli-KeysReprotect
+          - ReviewCenter-Cli-KeysReprotect-Misuse
           - ReviewCenter-Program-KeysReprotect
+          - ReviewCenter-Program-KeysReprotect-Help
           - ReviewCenter-Hosting-KeysReprotect
         tests:
           - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
@@ -2618,12 +2635,17 @@ sections:
           - ReviewCenter-Program-Version
           - ReviewCenter-Cli-Version
           - ReviewCenter-Program-Help
+          - ReviewCenter-Program-Help-CheckConfig
           - ReviewCenter-Cli-Help
+          - ReviewCenter-Program-Banner
           - ReviewCenter-Cli-Silent
           - ReviewCenter-Cli-Log
+          - ReviewCenter-Cli-Log-OpenFailure
           - ReviewCenter-Program-ExitCode
           - ReviewCenter-Cli-ExitCode
           - ReviewCenter-Cli-InvalidArgs
+          - ReviewCenter-Cli-InvalidArgs-Malformed
+          - ReviewCenter-Cli-InvalidArgs-MissingValue
           - ReviewCenter-Cli-ErrorOutput
           - ReviewCenter-Cli-ArgumentParsing
           - ReviewCenter-Cli-OutputChannels
@@ -2657,6 +2679,7 @@ sections:
           - ReviewCenter-Program-Validate
           - ReviewCenter-Cli-Validate
           - ReviewCenter-Cli-CheckConfig
+          - ReviewCenter-Cli-CheckConfig-RequiresValidate
           - ReviewCenter-Cli-Results
           - ReviewCenter-Cli-Depth
           - ReviewCenter-Cli-ResultAlias
@@ -2690,8 +2713,12 @@ sections:
           from silently starting nothing, or something other than what was requested.
         children:
           - ReviewCenter-Program-Serve
+          - ReviewCenter-Program-Serve-CleanStop
+          - ReviewCenter-Program-Serve-AddressError
+          - ReviewCenter-Program-Serve-Help
           - ReviewCenter-Cli-Serve
           - ReviewCenter-Cli-Urls
+          - ReviewCenter-Cli-Urls-RequiresServe
           - ReviewCenter-Hosting-Health
           - ReviewCenter-Hosting-Health-Routes
           - ReviewCenter-Hosting-Logging

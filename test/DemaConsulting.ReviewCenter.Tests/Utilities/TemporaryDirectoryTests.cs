@@ -64,6 +64,37 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
+    ///     Test that a directory created with the parameterless constructor keeps retrying a delete that fails for at
+    ///     least a quarter of a second and for less than three seconds before it gives up.
+    /// </summary>
+    [Fact]
+    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open for the whole test in a directory with the default policy
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("locked.txt");
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose and measure how long it takes
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var exception = Record.Exception(directory.Dispose);
+        watch.Stop();
+
+        // Assert: nothing is thrown, the wait lasted at least a quarter of a second and is bounded below three seconds
+        Assert.Null(exception);
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(250), $"Gave up too early: {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+        Assert.False(Directory.Exists(directory.DirectoryPath));
+    }
+
+    /// <summary>
     ///     Test that GetFilePath returns a path inside the directory and creates the folders above it.
     /// </summary>
     [Fact]
@@ -75,9 +106,14 @@ public class TemporaryDirectoryTests
         // Act: ask for a file two folders down
         var path = directory.GetFilePath("one/two/file.txt");
 
-        // Assert: the path is inside the directory and its parent folder exists
+        // Assert: the path is the file inside the directory and its parent folder exists
+        var expected = Path.GetFullPath(Path.Combine(directory.DirectoryPath, "one", "two", "file.txt"));
+        Assert.Equal(expected, Path.GetFullPath(path));
         Assert.StartsWith(directory.DirectoryPath, path, StringComparison.Ordinal);
         Assert.True(Directory.Exists(Path.GetDirectoryName(path)));
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(directory.DirectoryPath, "one", "two")),
+            Path.GetFullPath(Path.GetDirectoryName(path)!));
         Assert.False(File.Exists(path));
     }
 
@@ -218,8 +254,8 @@ public class TemporaryDirectoryTests
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for the whole test and the default policy of 5 attempts, 75 ms apart
-        using var directory = new TemporaryDirectory();
+        // Arrange: a file that stays open for the whole test and an explicit policy of 3 attempts, 50 ms apart
+        using var directory = new TemporaryDirectory(3, TimeSpan.FromMilliseconds(50));
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
@@ -228,10 +264,10 @@ public class TemporaryDirectoryTests
         var exception = Record.Exception(directory.Dispose);
         watch.Stop();
 
-        // Assert: nothing is thrown, the pauses were really taken (4 x 75 ms) and the wait stays bounded
+        // Assert: nothing is thrown, the pauses were really taken (2 x 50 ms) and the wait stays bounded
         Assert.Null(exception);
         Assert.True(Directory.Exists(directory.DirectoryPath));
-        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(200), $"Gave up too early: {watch.Elapsed}");
+        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(80), $"Gave up too early: {watch.Elapsed}");
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
 
         // Cleanup: release the file and remove what is left

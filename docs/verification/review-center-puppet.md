@@ -10,8 +10,9 @@ helpers of `PlaywrightBrowser`.
 The first end-to-end test, `PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer`, starts the real
 ReviewCenter server on a free port with one seeded administrator, runs `puppet start`, signs in and creates a project
 in real headless Chromium with separate commands, and stops Puppet again. It is requirement-linked evidence for the
-three system requirements,
-`ReviewCenterPuppet-BrowserDaemon-Lifecycle`, and `ReviewCenterPuppet-OTS-Playwright-Chromium` on both platforms.
+system requirements of the lifecycle, the interaction commands (all except what the second test adds), and the visual
+checks, and for `ReviewCenterPuppet-OTS-Playwright-Chromium` on both platforms. The unit requirements of the
+`BrowserDaemon` that need a browser are shown here, not by a unit test; only its start-up failure has a unit test.
 The CI pipeline installs Chromium and sets `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing or broken browser
 fails the test instead of skipping it. Without that variable, as on a developer machine without Chromium, the test
 skips itself with a clear reason.
@@ -20,7 +21,8 @@ The second end-to-end test,
 `PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer`, proves in real
 Chromium that a control that is revealed by hovering can be reached with separate commands. It registers a local git
 repository, creates a review of one changed line, and drives the diff of the review page. It is requirement-linked
-evidence for `ReviewCenterPuppet-System-Interact` on both platforms and is skipped locally, like the first test,
+evidence for `ReviewCenterPuppet-System-Interact-Click`, `-Hover`, and `-HoverPersists` on both platforms and is
+skipped locally, like the first test,
 when Chromium (or `git`) is not available.
 
 ## Test Environment
@@ -35,30 +37,50 @@ it creates its repository and the server's clone cache in a temporary folder tha
 ## Acceptance Criteria
 
 - All tests pass with zero failures on all supported platforms.
-- `puppet start` while Puppet is already running (the same control file) fails with exit code 1; `puppet stop` removes
-  the control file and a
-  second `puppet stop` exits with code 2.
+- `puppet start` returns with the browser ready: the first command after it works.
+- `puppet start` while Puppet is already running (the same control file) fails with exit code 1; `puppet stop` exits
+  with 0 and removes the control file, and a second `puppet stop` exits with code 2 because nothing is running.
+- `puppet start` while no Chromium is installed (the test points `PLAYWRIGHT_BROWSERS_PATH` at an empty folder for
+  that one start) fails with exit code 1, prints the reason with the install command and leaves no control file; the
+  normal start that follows works.
 - A hover stays in effect for later commands: after `hover`, a separate `screenshot` and `eval` still see the
   element hovered, until `mouse-move` moves the mouse away.
+- `goto` reports the HTTP status and every result ends with the `@ <url>  "<title>"` line of the current page.
+- A console error that `eval` raises is reported once, in the result of the command that raised it, and is not
+  repeated by the commands after that. Page errors and failed requests are reported the same way by the code but are
+  not claimed by a requirement, because their timing is not deterministic.
 - A command that fails (for example an unknown element) exits with code 1 and a one-line message naming the selector.
-- The end-to-end run signs in, creates a project over the live connection (the project page appears after a `wait`
-  for the asynchronous update), switches the theme on the account page, and produces a PNG screenshot.
+- The end-to-end run signs in (the password is submitted with `press Enter`), creates a project over the live
+  connection (the project page appears after a `wait` for the asynchronous update, and for text), reads page text,
+  switches the theme on the account page, and produces PNG screenshots of the page and of one element.
+- `viewport` changes the inner width of the page, and `theme light` and `theme dark` change the emulated color
+  scheme (checked with `eval`).
 - On a real review diff, the **+** of a line is hidden while the mouse is elsewhere, `hover` on its row reveals it
   (computed opacity `1`), and a `click` on it opens the comment composer under the line.
 
 ## Test Scenarios
 
 **PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer**: Starts Puppet, goes to the home page,
-and checks that `snapshot` lists the sign-in link. After `hover` on that link, a `screenshot` and an `eval` of
+checks the HTTP status and the `@ <url>  "<title>"` line of the result, and checks that `snapshot` lists the sign-in
+link. After `hover` on that link, a `screenshot` and an `eval` of
 `matches(':hover')` show it hovered, and after `mouse-move 0 0` it is not. On the login page a failed sign-in
-(`fill` and `click` of the login button) shows the login error, and the right user name and password sign in and show
+(`fill` and `click` of the login button) shows the login error, and the right user name and password, submitted with
+`press Enter` on the password field, sign in and show
 the display name `Puppet Admin`. A `click` on the projects link of the header, a `wait` for the page marked
 interactive, a `click` on the new project button, a `fill` of the project name, and a `click` on the create button
-create a project over the live connection, and `wait` and `text` show the project page. On the account page a
+create a project over the live connection, and `wait` (for an element and for text) and `text` (of an element and of
+the whole page) show the project page. On the account page a
 `click` on the dark theme button makes `eval` report the `dark` theme attribute on the page and in the stored
-setting. A click on a missing element exits with 1; `screenshot` writes a PNG; `viewport` and
-`theme dark` apply (checked with `eval`); `console` succeeds; `start` while running exits with 1; `stop` exits with 0
-and removes the control file; a second `stop` exits with 2. Tested by
+setting. An `eval` of `console.error('probe')` is reported once, by the `! console.error: probe` line of the
+same command, and not by the two commands after it. A click on a missing element exits with 1 and names the selector;
+`screenshot` writes a PNG of the page and of one element (`--selector`); `viewport` sets the inner width and
+`theme light` and `theme dark` set the emulated color scheme (checked with `eval`); `console` succeeds; a `start`
+with a missing Chromium (an empty browser folder for that one start) exits with 1, prints the reason and leaves no
+control file; a `start` while running exits with 1; `stop` exits with 0
+and removes the control file; a second `stop` exits with 2. It is the evidence for the lifecycle (including the
+control file that every command uses to find the browser), the interaction commands (running a command, its printed
+result and exit code 0, addressing an element by a selector, click, hover, fill, text), and the visual-check system
+requirements. Tested by
 `windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer` and
 `ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer`.
 

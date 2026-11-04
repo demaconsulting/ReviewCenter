@@ -25,6 +25,14 @@ sections:
           - Program_Run_WithHelpFlag_DisplaysUsageInformation
           - Program_Run_WithShortHelpFlag_DisplaysUsage
           - Program_Run_WithQuestionMarkFlag_DisplaysUsage
+
+      - id: ReviewCenter-Program-Help-CheckConfig
+        title: >-
+          The Program class shall list the `--check-config` option next to `--validate` in the help text.
+        justification: |
+          The option makes the self-validation also read the configured database and key ring. An operator who
+          does not find it in the help text cannot know that this read-only check of the installation exists.
+        tests:
           - Program_Run_WithHelpFlag_ListsCheckConfigOption
 
       - id: ReviewCenter-Program-Validate
@@ -43,58 +51,124 @@ sections:
         tests:
           - Program_Main_WithInvalidArgs_ReturnsNonZeroExitCode
 
+      - id: ReviewCenter-Program-Banner
+        title: >-
+          The Program class shall print a banner with the application name, the version and the copyright notice
+          when it is run without arguments.
+        justification: |
+          A run that starts without a requested action shows which product and which release it is, so that an
+          operator who started the tool by mistake, and a log that captured the run, identify the release.
+        tests:
+          - Program_Run_NoArguments_DisplaysDefaultBehavior
+
       - id: ReviewCenter-Program-Serve
         title: >-
-          The Program class shall run the web server until it is stopped when the serve verb is
-          provided, report an unusable listen address as an error, and list the serve verb and
-          the `--urls` option in the help text.
+          The Program class shall run the web server until it is stopped when the serve verb is provided.
         justification: |
-          Program is the single dispatcher for every action of the tool, so it must start the
-          web server on request, stop it cleanly when asked, and turn a start-up failure such
-          as a port that is already in use into an ordinary error with a non-zero exit code
-          instead of an unhandled exception. Operators discover the verb and option from the
-          help text.
+          Program is the single dispatcher for every action of the tool, so it must start the web server on
+          request and keep it answering requests until it is asked to stop.
         tests:
           - Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation
+
+      - id: ReviewCenter-Program-Serve-CleanStop
+        title: >-
+          The Program class shall leave the exit code at 0 when the web server that it runs is stopped on request.
+        justification: |
+          A supervisor or a script that stops the server on purpose must not see that as a failure.
+        tests:
+          - Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation
+
+      - id: ReviewCenter-Program-Serve-AddressError
+        title: >-
+          The Program class shall report a listen address that is already in use as an error with exit code 1
+          instead of throwing an exception, when the serve verb is provided.
+        justification: |
+          A start-up failure caused by the environment, such as a port that another process holds, is an ordinary
+          operator error. It must not surface as an unhandled exception with a stack trace.
+        tests:
           - Program_Run_WithServeVerb_PortInUse_ReportsError
+
+      - id: ReviewCenter-Program-Serve-Help
+        title: >-
+          The Program class shall list the serve verb together with its `--urls` option and the default address in
+          the help text.
+        justification: |
+          Operators discover how to start the server, and on which address it listens when they give none, from the
+          help text without reading other documents.
+        tests:
           - Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption
 
       - id: ReviewCenter-Program-UserAdd
         title: >-
-          The Program class shall create a user in the configured database when the user add verb is provided,
-          report any failure as an error with a non-zero exit code, and list the user add verb and its options in
-          the help text.
+          The Program class shall create a user in the configured database, with the password from the environment,
+          when the user add verb is provided.
         justification: |
           Program is the single dispatcher for every action of the tool, so it must run the command that creates
-          a user and turn a failure into an ordinary error. Operators discover the verb and its options from the
-          help text.
+          the first administrator before anyone can sign in, against the database that the configuration names.
+        tests:
+          - Program_Run_WithUserAddVerb_PasswordFromEnvironment_CreatesUser
+
+      - id: ReviewCenter-Program-UserAdd-Duplicate
+        title: >-
+          The Program class shall report a user name that already exists as an error with exit code 1 when the user
+          add verb is provided.
+        justification: |
+          A second creation of the same user must fail visibly, so that a script notices it and no second account
+          is made.
+        tests:
+          - Program_Run_WithUserAddVerb_DuplicateUser_ReportsErrorWithExitCodeOne
+
+      - id: ReviewCenter-Program-UserAdd-Help
+        title: >-
+          The Program class shall list the user add verb and its `--username`, `--display-name` and `--system-admin`
+          options in the help text.
+        justification: |
+          Operators discover the verb and the options that describe the new user from the help text.
         tests:
           - Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions
-          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Program-UserAdd-PasswordHelp
+        title: >-
+          The Program class shall state in the help text that the password of the user add verb is read from the
+          environment variable, else from standard input, else from a prompt.
+        justification: |
+          The password is never an option, so the help text is the one place where an operator learns how to
+          supply it without exposing it in the process list or the shell history.
+        tests:
+          - Program_Run_WithHelpFlag_ListsUserAddPasswordSources
 
       - id: ReviewCenter-Program-AuditVerify
         title: >-
-          The Program class shall list the audit verify verb in the help text, and shall run the audit trail
-          verification, with exit code 0 for an intact chain and 1 for a broken chain or an unreadable database,
-          when the verb is provided.
+          The Program class shall run the audit trail verification when the audit verify verb is provided.
         justification: |
-          Program is the single dispatcher for every action of the tool, and operators discover the verb from the
-          help text. The dispatch itself is verified through the AuditCommand unit tests, which run the command
-          directly.
+          Program is the single dispatcher for every action of the tool, so the verb must reach the command that
+          checks the hash chain of the audit trail of the configured database. The verdicts of that command are
+          verified through the AuditCommand unit tests.
+        tests:
+          - Program_Run_WithAuditVerifyVerb_MissingDatabase_ReportsErrorWithExitCodeOne
+
+      - id: ReviewCenter-Program-AuditVerify-Help
+        title: >-
+          The Program class shall list the audit verify verb in the help text.
+        justification: |
+          Operators and scheduled jobs discover the command that checks the audit trail from the help text.
         tests:
           - Program_Run_Help_DocumentsAuditVerify
-          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
-          - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
 
       - id: ReviewCenter-Program-KeysReprotect
         title: >-
-          The Program class shall list the keys reprotect verb in the help text, and shall run the key rotation, with
-          exit code 0 on success and 1 for a refusal or a failure, when the verb is provided.
+          The Program class shall run the key rotation when the keys reprotect verb is provided.
         justification: |
-          Program is the single dispatcher for every action of the tool, and operators discover the verb from the
-          help text. The dispatch itself is verified through the KeysCommand unit tests, which run the command
-          directly.
+          Program is the single dispatcher for every action of the tool, so the verb must reach the command that
+          rolls a new key and protects the stored secrets again. The refusals and the results of that command are
+          verified through the KeysCommand unit tests.
+        tests:
+          - Program_Run_WithKeysReprotectVerb_MissingDatabase_ReportsErrorWithExitCodeOne
+
+      - id: ReviewCenter-Program-KeysReprotect-Help
+        title: >-
+          The Program class shall list the keys reprotect verb in the help text.
+        justification: |
+          Operators discover the command that retires old key material from the help text.
         tests:
           - Program_Run_Help_DocumentsKeysReprotect
-          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
-          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing

@@ -162,8 +162,8 @@ public class PathHelpersTests
         // Act: execute the operation being tested
         var result = PathHelpers.SafePathCombine(basePath, relativePath);
 
-        // Assert: verify expected behavior
-        Assert.Equal(Path.Combine(basePath, relativePath), result);
+        // Assert: the base path itself is returned
+        Assert.Equal(basePath, result);
     }
 
     /// <summary>

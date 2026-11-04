@@ -21,6 +21,10 @@ N/A - standard test environment.
   failure is reported through exit code 1 and not an exception.
 - The help text lists the `serve` verb and the `--urls` option with its default value.
 - The help text lists the `user add` verb, its options, and the password sources.
+- The help text lists the `--check-config` option, the `audit verify` verb, and the `keys reprotect` verb.
+- The `user add`, `audit verify`, and `keys reprotect` verbs are dispatched to their commands by `Program.Run`,
+  against the database named by the `Database__ConnectionString` environment variable; the tests put the previous
+  values of the environment variables back.
 
 ### Test Scenarios
 
@@ -39,8 +43,8 @@ self-validation suite is invoked and completes successfully. This scenario is te
 `Program_Run_WithValidateFlag_RunsValidation`.
 
 **Program_Run_NoArguments_DisplaysDefaultBehavior**: `Program.Run` is called with an empty
-argument array; the output contains the tool name and copyright notice and exit code is 0.
-This scenario is tested by `Program_Run_NoArguments_DisplaysDefaultBehavior`.
+argument array; the output contains the banner line with the tool name and the version, the copyright notice, and
+exit code is 0. This scenario is tested by `Program_Run_NoArguments_DisplaysDefaultBehavior`.
 
 **Program_Version_ReturnsNonEmptyString**: The `Program.Version` static property is read; the
 returned string is non-empty and non-null, confirming the version is resolvable from the
@@ -79,16 +83,46 @@ from `["--help"]`; the output contains "serve", "--urls", and the default addres
 `http://localhost:5000`. This scenario is tested by
 `Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption`.
 
+**Program_Run_WithHelpFlag_ListsCheckConfigOption**: `Program.Run` is called with a context from `["--help"]`; the
+output contains "--check-config" and "--validate". This scenario is tested by
+`Program_Run_WithHelpFlag_ListsCheckConfigOption`.
+
 **Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions**: `Program.Run` is called with a context from `["--help"]`;
-the output contains "user add", "--username", "--display-name", "--system-admin", and the password variable
-`REVIEWCENTER_PASSWORD`. This scenario is tested by `Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions`.
+the output contains "user add", "--username", "--display-name", and "--system-admin". This scenario is tested by
+`Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions`.
+
+**Program_Run_WithHelpFlag_ListsUserAddPasswordSources**: `Program.Run` is called with a context from `["--help"]`;
+the output states that the password is read from the `REVIEWCENTER_PASSWORD` environment variable, else standard
+input, else a prompt. This scenario is tested by `Program_Run_WithHelpFlag_ListsUserAddPasswordSources`.
 
 **Program_Run_Help_DocumentsAuditVerify**: `Program.Run` is called with a context from `["--help"]`; the output names
-`audit verify`. This scenario is tested by `Program_Run_Help_DocumentsAuditVerify`, which is defined in
-`CliSubsystemTests.cs`. No test dispatches `Program.Run` to `AuditCommand.Run`; the dispatch is a single branch that
-is verified by inspection, and the command itself is verified by the `AuditCommand` tests.
+`audit verify`. This scenario is tested by `Program_Run_Help_DocumentsAuditVerify`.
 
 **Program_Run_Help_DocumentsKeysReprotect**: `Program.Run` is called with a context from `["--help"]`; the output names
-`keys reprotect`. This scenario is tested by `Program_Run_Help_DocumentsKeysReprotect`, which is defined in
-`CliSubsystemTests.cs`. No test dispatches `Program.Run` to `KeysCommand.Run`; the dispatch is a single branch that is
-verified by inspection, and the command itself is verified by the `KeysCommand` tests.
+`keys reprotect`. This scenario is tested by `Program_Run_Help_DocumentsKeysReprotect`.
+
+**Program_Run_WithUserAddVerb_PasswordFromEnvironment_CreatesUser**: The `Database__ConnectionString` and
+`REVIEWCENTER_PASSWORD` environment variables are set to a new database and a password, and `Program.Run` is called
+with a context from `["user", "add", "--username", "dispatch.user", "--display-name", "Dispatch User"]`; the exit
+code is 0, the output reports the created user and does not contain the password, and the database holds exactly one
+user with that name. The previous values of the variables are put back. This scenario is tested by
+`Program_Run_WithUserAddVerb_PasswordFromEnvironment_CreatesUser`.
+
+**Program_Run_WithUserAddVerb_DuplicateUser_ReportsErrorWithExitCodeOne**: The user of the previous scenario is
+created, and `Program.Run` is called with the same arguments again; the exit code is 1, the error output contains
+"already exists", the password is not printed, and the database still holds exactly one user with that name. This
+scenario is tested by `Program_Run_WithUserAddVerb_DuplicateUser_ReportsErrorWithExitCodeOne`.
+
+**Program_Run_WithAuditVerifyVerb_MissingDatabase_ReportsErrorWithExitCodeOne**: The `Database__ConnectionString`
+environment variable names a database file in a folder that does not exist, and `Program.Run` is called with a
+context from `["audit", "verify"]`; the exit code is 1, the error output contains "The database file does not exist",
+and neither the file nor its folder was created. The message comes from `AuditCommand`, so the verb reached it. This
+scenario is tested by `Program_Run_WithAuditVerifyVerb_MissingDatabase_ReportsErrorWithExitCodeOne`; the command
+itself is verified by the `AuditCommand` tests.
+
+**Program_Run_WithKeysReprotectVerb_MissingDatabase_ReportsErrorWithExitCodeOne**: The set-up is the same, and
+`Program.Run` is called with a context from `["keys", "reprotect"]`; the exit code is 1, the error output contains
+"The database file does not exist", and neither the file nor its folder was created. The message comes from
+`KeysCommand`, so the verb reached it. This scenario is tested by
+`Program_Run_WithKeysReprotectVerb_MissingDatabase_ReportsErrorWithExitCodeOne`; the command itself is verified by the
+`KeysCommand` tests.
