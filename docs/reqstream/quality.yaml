@@ -8,7 +8,7 @@ sections:
   - title: Quality Requirements
     requirements:
       - id: Quality-TestInfrastructure
-        title: The repository shall rely on xUnit to discover and execute its automated tests.
+        title: The repository shall rely on xUnit to execute its automated tests.
         tags: [quality]
         justification: |
           Automated testing depends on xUnit's test execution capabilities. This
@@ -17,6 +17,17 @@ sections:
           falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-xUnit-Execute
+
+      - id: Quality-TestInfrastructure-Discovery
+        title: The repository shall rely on xUnit to discover its automated tests.
+        tags: [quality]
+        justification: |
+          The test run depends on xUnit finding every test without a hand-kept list.
+          This grouping requirement links the xUnit discovery OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-xUnit-Execute-Discovery
 
       - id: Quality-TestInfrastructure-Report
         title: The repository shall rely on the test platform of xUnit to report automated test results.
@@ -98,15 +109,25 @@ sections:
           - ReviewCenter-OTS-ReviewMark-Enforce
 
       - id: Quality-PeerReview-Reporting
-        title: The repository shall rely on ReviewMark to produce the review plan and the review report.
+        title: The repository shall rely on ReviewMark to produce the review plan.
         tags: [quality]
         justification: |
-          Peer-review tracking depends on ReviewMark's plan and report generation.
-          This grouping requirement links those OTS requirements to the quality
-          root so they participate in orphan detection without being falsely
-          reported as disconnected from tool functionality.
+          Peer-review tracking depends on ReviewMark's plan generation. This
+          grouping requirement links that OTS requirement to the quality root so
+          it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-ReviewMark
+
+      - id: Quality-PeerReview-Report
+        title: The repository shall rely on ReviewMark to produce the review report.
+        tags: [quality]
+        justification: |
+          Showing which review-sets are current or stale depends on ReviewMark's
+          report generation. This grouping requirement links that OTS requirement
+          to the quality root so it participates in orphan detection without being
+          falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-ReviewMark-Report
 
       - id: Quality-PeerReview-Elaboration
@@ -258,10 +279,10 @@ sections:
           - ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi
 
       - id: Quality-DataStorage
-        title: The repository shall rely on Entity Framework Core with SQLite to store projects and reviews.
+        title: The repository shall rely on Entity Framework Core with SQLite to persist its data.
         tags: [quality]
         justification: |
-          The Storage subsystem keeps projects and reviews in a SQLite database through
+          The Storage subsystem keeps its data in a SQLite database through
           Entity Framework Core. This grouping requirement links the EF Core OTS
           requirements to the quality root so they participate in orphan detection
           without being falsely reported as disconnected from tool functionality.
@@ -341,6 +362,7 @@ sections:
           - ReviewCenter-OTS-Git-Access-ChildProcess
           - ReviewCenter-OTS-Git-Access-Output
           - ReviewCenter-OTS-Git-Access-ExitCode
+          - ReviewCenter-OTS-Git-Access-ErrorText
           - ReviewCenter-OTS-Git-Access-ResolveRevision
           - ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
           - ReviewCenter-OTS-Git-Access-ListFiles

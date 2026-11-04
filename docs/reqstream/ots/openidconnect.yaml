@@ -111,21 +111,41 @@ sections:
               - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
           - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal
             title: >-
-              Microsoft.AspNetCore.Authentication.OpenIdConnect shall report a failure and create no session when the
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall report a failure to the application when the
               provider refuses the code.
             justification: |
+              The application must learn that a sign-in failed so that it can show the user why. A passing test that
+              makes the token endpoint refuse the code confirms that the failure is reported.
+            tags: [ots]
+            tests:
+              - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal-NoSession
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall create no session when the provider refuses the
+              code.
+            justification: |
               A refusal of the provider must never look like a sign-in. A passing test that makes the token endpoint
-              refuse the code confirms the failure and that no session is created.
+              refuse the code confirms that no session is created.
             tags: [ots]
             tests:
               - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
           - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters
             title: >-
-              Microsoft.AspNetCore.Authentication.OpenIdConnect shall let the application add prompt and max_age to the
-              authorization request.
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall let the application add the prompt parameter to
+              the authorization request.
             justification: |
               The confirmation of identity for a signature asks the provider for a new sign-in. A passing test
-              confirms that the request carries the prompt and the maximum age that the application added.
+              confirms that the request carries the prompt that the application added.
+            tags: [ots]
+            tests:
+              - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters-MaxAge
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall let the application add the max_age parameter to
+              the authorization request.
+            justification: |
+              The provider must accept only a sign-in that is recent enough for a signature. A passing test confirms
+              that the request carries the maximum age that the application added.
             tags: [ots]
             tests:
               - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature

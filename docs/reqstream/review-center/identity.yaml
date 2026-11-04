@@ -396,7 +396,9 @@ sections:
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Issuer
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Audience
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal-NoSession
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters-MaxAge
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
@@ -556,6 +558,7 @@ sections:
           - ReviewCenter-OTS-OtpNet-Totp
           - ReviewCenter-OTS-OtpNet-Totp-TimeStep
           - ReviewCenter-OTS-OtpNet-Totp-Base32
+          - ReviewCenter-OTS-OtpNet-Totp-Base32-Read
         tests:
           - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
           - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession

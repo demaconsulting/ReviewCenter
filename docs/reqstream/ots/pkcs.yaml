@@ -43,12 +43,20 @@ sections:
               - AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
           - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Chain
             title: >-
-              System.Security.Cryptography.Pkcs shall embed the signer certificate and any given intermediate
-              certificates in the CMS signature.
+              System.Security.Cryptography.Pkcs shall embed the signer certificate in the CMS signature.
             justification: |
-              A PDF reader builds the chain of trust from the certificates inside the signature. A passing test that
-              signs with a key and a certificate chain confirms that the signature holds the certificate of the signer
-              and the intermediate certificates.
+              A PDF reader identifies the signer from the certificate inside the signature. A passing test that signs
+              with a key and a certificate chain confirms that the signature holds the certificate of the signer.
+            tags: [ots]
+            tests:
+              - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Chain-Intermediates
+            title: >-
+              System.Security.Cryptography.Pkcs shall embed any given intermediate certificates in the CMS signature.
+            justification: |
+              A PDF reader builds the chain of trust from the intermediate certificates inside the signature. A
+              passing test that signs with a key and a certificate chain confirms that the signature holds the
+              intermediate certificates.
             tags: [ots]
             tests:
               - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates

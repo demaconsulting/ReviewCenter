@@ -15,7 +15,7 @@ confirms that the `OidcSignIn` unit gets all of this from the package.
 Microsoft.AspNetCore.Authentication.OpenIdConnect has no self-validation mode and is verified by the project's own
 tests, which start the real application in memory and run the whole flow against a test provider that signs real tokens
 (see the OpenIddict verification). Each scenario names a specific test method that depends on the package under
-verification. A passing pipeline run for all scenarios constitutes evidence that all thirteen requirements are
+verification. A passing pipeline run for all scenarios constitutes evidence that all fifteen requirements are
 satisfied.
 
 ### Test Scenarios
@@ -75,9 +75,10 @@ no account are created.
 
 **Scenario**: The token endpoint of the provider refuses the code.
 
-**Expected**: The handler reports a failure and no session is created.
+**Expected**: The handler reports a failure to the application and no session is created.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal-NoSession`.
 
 #### OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 
@@ -87,4 +88,5 @@ no account are created.
 including `auth_time` that the application checks.
 
 **Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters-MaxAge`,
 `ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims`.

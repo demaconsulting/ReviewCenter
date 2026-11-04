@@ -36,10 +36,18 @@ sections:
             tests:
               - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
           - id: ReviewCenter-OTS-Git-Access-ExitCode
-            title: git shall end a call that fails with a nonzero exit code and an error text.
+            title: git shall end a call that fails with a nonzero exit code.
             justification: |
-              The service reports a failing git call from the exit code and the error text. A passing test that runs
-              the real program with a call that fails confirms the exit code and the error text.
+              The service decides that a git call failed from its exit code. A passing test that runs the real
+              program with a call that fails confirms that the exit code is nonzero.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+          - id: ReviewCenter-OTS-Git-Access-ErrorText
+            title: git shall write an error text to the error output of a call that fails.
+            justification: |
+              The service reports why a git call failed from the error text, which must not be empty. A passing test
+              that runs the real program with a call that fails confirms that an error text is returned.
             tags: [ots]
             tests:
               - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode

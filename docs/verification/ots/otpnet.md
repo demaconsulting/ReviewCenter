@@ -19,7 +19,7 @@ HOTP and TOTP from RFC 4226 and RFC 6238 with only the HMAC-SHA-1 of the runtime
 writer. The reference is itself checked against the published values of RFC 4226. The self-validation check
 `ReviewCenter_Totp` repeats the published vectors on the installed platform. Each scenario names a specific test method
 that depends on the package under verification. A passing pipeline run for all scenarios constitutes evidence that all
-three requirements are satisfied.
+four requirements are satisfied.
 
 ### Test Scenarios
 
@@ -58,7 +58,7 @@ and verified at an instant in the middle of a step.
 **Expected**: Each secret has 20 bytes, the two differ, the text has 32 symbols without padding, and every way round
 gives the same bytes and the same text.
 
-**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp-Base32`.
+**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp-Base32`, `ReviewCenter-OTS-OtpNet-Totp-Base32-Read`.
 
 #### ValidationChecks_Totp_Run_PassesWithRfcVectors
 

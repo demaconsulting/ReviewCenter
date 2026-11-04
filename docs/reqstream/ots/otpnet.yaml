@@ -33,11 +33,18 @@ sections:
             tests:
               - TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty
           - id: ReviewCenter-OTS-OtpNet-Totp-Base32
-            title: Otp.NET shall convert a secret to and from Base32.
+            title: Otp.NET shall write a secret as Base32 text.
             justification: |
-              Authenticator apps take the secret as Base32 text, so the library must write a secret as Base32 and read
-              it back to the same bytes. A passing test confirms the round trip against an independent reader and
-              writer.
+              Authenticator apps take the secret as Base32 text, so the library must write the bytes of a secret in
+              that form. A passing test confirms the text against an independent reader.
+            tags: [ots]
+            tests:
+              - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
+          - id: ReviewCenter-OTS-OtpNet-Totp-Base32-Read
+            title: Otp.NET shall read Base32 text back to the bytes of a secret.
+            justification: |
+              The server keeps the secret as Base32 text and needs the original bytes to compute a code. A passing
+              test confirms that the text reads back to the same bytes.
             tags: [ots]
             tests:
               - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32

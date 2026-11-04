@@ -11,8 +11,7 @@ sections:
         requirements:
           - id: ReviewCenter-OTS-EfCore-Mapping
             title: >-
-              Entity Framework Core shall map entity classes to database tables and read a saved entity back
-              unchanged.
+              Entity Framework Core shall return an entity class that it saved through its database table unchanged.
             justification: |
               Entity Framework Core is the object-relational mapper behind the Storage subsystem. A passing test
               that saves a project and reads it back from a real database through a new context confirms that it

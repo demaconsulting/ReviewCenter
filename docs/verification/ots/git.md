@@ -15,7 +15,7 @@ functions work correctly.
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all thirteen
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all fourteen
 requirements are satisfied.
 
 ### Test Scenarios
@@ -34,10 +34,10 @@ program and an empty cache folder.
 **Scenario**: The runner starts the installed git program with a call that succeeds and with a call that fails.
 
 **Expected**: The program runs without a shell, the output of the first call is returned, and the failing call returns
-its exit code and error text.
+a nonzero exit code and a non-empty error text.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`, `ReviewCenter-OTS-Git-Access-Output`,
-`ReviewCenter-OTS-Git-Access-ExitCode`.
+`ReviewCenter-OTS-Git-Access-ExitCode`, `ReviewCenter-OTS-Git-Access-ErrorText`.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 

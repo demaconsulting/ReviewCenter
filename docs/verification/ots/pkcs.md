@@ -13,7 +13,7 @@ passing test confirms that the signer of the attestation gets all of this from t
 
 System.Security.Cryptography.Pkcs has no self-validation mode and is verified by the project's own tests, which run the
 real library in memory with temporary keys and certificates. Each scenario names a specific test method that depends on
-the library under verification. A passing pipeline run for all scenarios constitutes evidence that all five
+the library under verification. A passing pipeline run for all scenarios constitutes evidence that all six
 requirements are satisfied.
 
 ### Test Scenarios
@@ -48,7 +48,8 @@ requirements are satisfied.
 
 **Expected**: The signature holds the certificate of the signer and the intermediate certificates.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Chain`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Chain`,
+`ReviewCenter-OTS-Pkcs-DetachedSignature-Chain-Intermediates`.
 
 #### AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
 
