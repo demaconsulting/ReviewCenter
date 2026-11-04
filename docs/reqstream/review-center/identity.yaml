@@ -381,7 +381,7 @@ sections:
           - ReviewCenter-OidcSignIn-LocalSession
           - ReviewCenter-OidcSignIn-LocalSession-LogoutLocalOnly
           - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
-          - ReviewCenter-OidcSignIn-LocalSession-OpenPageChecked
+          - ReviewCenter-Identity-OidcOpenPageChecked
           - ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
           - ReviewCenter-OidcSignIn-NoPassword
           - ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused
@@ -390,6 +390,17 @@ sections:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
           - OidcSignIn_Logout_IsLocalOnly
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-Identity-OidcOpenPageChecked
+        title: >-
+          The Identity subsystem shall end the sign-in state of an open page of a user of a provider when the account
+          is disabled.
+        justification: |
+          A page that stays open makes no request, so an open page of a disabled user of a provider must not keep
+          acting; the user is held to the same check as a local user. Only the check of the open page, which belongs to
+          another unit, shows this for an account created by a provider.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse
 
       - id: ReviewCenter-Identity-OidcStartupSettings
         title: >-
