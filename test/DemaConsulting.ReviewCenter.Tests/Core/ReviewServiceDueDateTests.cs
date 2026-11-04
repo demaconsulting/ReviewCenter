@@ -105,7 +105,7 @@ public class ReviewServiceDueDateTests
         foreach (var (name, admin) in new[]
                  {
                      ("root", true), ("padm", false), ("creator", false), ("member", false),
-                     ("reviewer1", false), ("reviewer2", false)
+                     ("reviewer1", false), ("reviewer2", false), ("auditor", false)
                  })
         {
             var stored = await userStore.AddAsync(
@@ -130,6 +130,8 @@ public class ReviewServiceDueDateTests
         {
             await store.AddMembershipAsync(ids[name], project.Id, ProjectRole.User, cancellationToken);
         }
+
+        await store.AddMembershipAsync(ids["auditor"], project.Id, ProjectRole.Auditor, cancellationToken);
 
         var users = new UserService(userStore, new FakePasswordHasher(), clock);
         return new World(
@@ -561,5 +563,76 @@ public class ReviewServiceDueDateTests
             var ex = Assert.Throws<DomainRuleException>(() => ReviewService.ParseDueDate(bad));
             Assert.Equal(DomainRule.DueDateInvalid, ex.Rule);
         }
+    }
+
+    /// <summary>
+    ///     Test that an actor who is not a member of the project is refused as if the project did not exist, whatever
+    ///     the request is, and that nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_ActorWithoutAccess_ThrowsProjectNotFound()
+    {
+        // Arrange: a project and a user who is not a member of it
+        var world = await WorldAsync();
+        var stranger = new Actor("stranger", "Stranger");
+
+        // Act: create a review with a valid request, and one with an invalid id, a blank title and no files
+        var valid = await Assert.ThrowsAsync<DomainRuleException>(() => world.Reviews.CreateDraftAsync(
+            world.ProjectId, "rev-1", "First", [new UploadedFile("a.txt", TestContent.A)], stranger, TestContext.Current.CancellationToken));
+        var invalid = await Assert.ThrowsAsync<DomainRuleException>(() => world.Reviews.CreateDraftAsync(
+            world.ProjectId, "Not Valid!", " ", [], stranger, TestContext.Current.CancellationToken));
+
+        // Assert: both are refused as a missing project, before anything else is checked, and nothing is stored
+        Assert.Equal(DomainRule.ProjectNotFound, valid.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, invalid.Rule);
+        Assert.Empty(world.Store.Reviews);
+    }
+
+    /// <summary>
+    ///     Test that an actor who is not a member of the project is refused a follow-up preview as if the project did
+    ///     not exist, even when the named review does not exist.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_NotAMember_IsRefusedAsMissingProject()
+    {
+        // Arrange: a project with a review, and a user who is not a member of it
+        var world = await WorldAsync();
+        await CreateReviewAsync(world);
+        var stranger = new Actor("stranger", "Stranger");
+        IReadOnlyList<UploadedFile> files = [new UploadedFile("a.txt", TestContent.A)];
+
+        // Act: preview a follow-up of the existing review and of one that does not exist
+        var existing = await Assert.ThrowsAsync<DomainRuleException>(() => world.Reviews.PreviewFollowUpAsync(
+            world.ProjectId, "rev-1", files, stranger, TestContext.Current.CancellationToken));
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(() => world.Reviews.PreviewFollowUpAsync(
+            world.ProjectId, "nope", files, stranger, TestContext.Current.CancellationToken));
+
+        // Assert: both are refused with the same missing-project rule, so nothing is learned about the reviews
+        Assert.Equal(DomainRule.ProjectNotFound, existing.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, unknown.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a read-only member of the project (an auditor) may preview a follow-up, and that previewing
+    ///     stores and audits nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_Auditor_MayPreview()
+    {
+        // Arrange: a project with a review, and an auditor who may only read
+        var world = await WorldAsync();
+        await CreateReviewAsync(world);
+        var auditor = new Actor("auditor", "Auditor");
+        var auditsBefore = world.Store.Audits.Count;
+
+        // Act: the auditor previews a follow-up of the review
+        var preview = await world.Reviews.PreviewFollowUpAsync(
+            world.ProjectId, "rev-1", [new UploadedFile("a.txt", TestContent.A)], auditor, TestContext.Current.CancellationToken);
+
+        // Assert: the counts are returned and nothing is stored or audited
+        Assert.Equal(0, preview.CarriedAnswers);
+        Assert.Empty(preview.DroppedThreadFiles);
+        Assert.Single(world.Store.Reviews);
+        Assert.Equal(auditsBefore, world.Store.Audits.Count);
     }
 }

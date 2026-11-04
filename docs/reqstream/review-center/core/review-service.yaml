@@ -1,200 +1,557 @@
 ---
 # Software Unit Requirements for the ReviewService Class
 #
-# The ReviewService class creates draft reviews from uploaded files, enforces the review and upload rules,
-# and reads reviews back.
+# The ReviewService class creates reviews (from uploaded files, from a repository, and from a plan session),
+# enforces the review and upload rules, reads reviews and their differences back, changes the due date,
+# and carries the work of an earlier review into a follow-up review.
 
 sections:
   - title: ReviewService Unit Requirements
     requirements:
       - id: ReviewCenter-ReviewService-Draft
         title: >-
-          The ReviewService class shall create a review in the Draft state with the creation time and the title
-          without surrounding white space, and shall keep every uploaded file byte for byte together with its
-          size and SHA-256 hash.
+          The ReviewService class shall create a review in the Draft state with the creation time taken from the clock
+          and the title without surrounding white space.
         justification: |
-          A review is a snapshot of the submitted files. Binary content, Windows line endings, and empty files
-          are valid review content and must come back exactly as they went in.
+          A review starts as a draft, dated at its creation, and a title with stray white space would be hard to find.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+
+      - id: ReviewCenter-ReviewService-Draft-Content
+        title: >-
+          The ReviewService class shall keep every submitted file byte for byte, including binary content, Windows
+          line endings, and empty files, together with its size and SHA-256 hash.
+        justification: |
+          A review is a snapshot of the submitted files, so its content must come back exactly as it went in.
         tests:
           - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
           - ReviewService_CreateDraftAsync_BinaryAndCrLfContent_KeepsBytesVerbatim
 
       - id: ReviewCenter-ReviewService-Fingerprint
         title: >-
-          The ReviewService class shall set the content fingerprint of a review to the fingerprint of the
-          contents of its files, regardless of their names and order.
+          The ReviewService class shall set the content fingerprint of a review to the fingerprint of the contents of
+          its files.
         justification: |
-          The fingerprint identifies the content under review. The same files submitted under other names or in
-          another order are the same content and must give the same fingerprint.
+          The fingerprint identifies the content under review.
         tests:
           - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+
+      - id: ReviewCenter-ReviewService-Fingerprint-Independent
+        title: >-
+          The ReviewService class shall give the same content fingerprint to the same file contents regardless of
+          their names and order.
+        justification: |
+          The same files submitted under other names or in another order are the same content.
+        tests:
           - ReviewService_CreateDraftAsync_SameBytesDifferentPathsAndOrder_GivesSameFingerprint
 
       - id: ReviewCenter-ReviewService-Id
         title: >-
-          The ReviewService class shall accept a review identifier only when it has 1 to 100 characters, starts
-          with an ASCII letter or digit, and otherwise contains only ASCII letters, digits, dots, underscores,
-          and hyphens, and shall refuse an identifier already used by another review of the same project while
-          allowing the same identifier in a different project.
+          The ReviewService class shall refuse a review identifier unless it has 1 to 100 characters, starts with an
+          ASCII letter or digit, and otherwise contains only ASCII letters, digits, dots, underscores, and hyphens.
         justification: |
-          The identifier appears in page addresses and later in reports, so it must be short, stable, and safe
-          to use in a URL. Uniqueness is per project, because each project keeps its own numbering.
+          The identifier appears in page addresses and later in reports, so it must be short and safe to use in a URL.
         tests:
           - ReviewService_CreateDraftAsync_InvalidId_ThrowsReviewIdInvalid
           - ReviewService_CreateDraftAsync_IdLength_LimitIsInclusive
+
+      - id: ReviewCenter-ReviewService-Id-Unique
+        title: >-
+          The ReviewService class shall refuse an identifier that is already used by another review of the same
+          project.
+        justification: |
+          Two reviews under one identifier in one project would be ambiguous.
+        tests:
           - ReviewService_CreateDraftAsync_DuplicateIdInSameProject_ThrowsReviewIdDuplicate
+
+      - id: ReviewCenter-ReviewService-Id-OtherProject
+        title: >-
+          The ReviewService class shall allow an identifier that is used only in a different project.
+        justification: |
+          Each project keeps its own numbering, so projects must not compete for identifiers.
+        tests:
           - ReviewService_CreateDraftAsync_SameIdInOtherProject_IsAllowed
 
       - id: ReviewCenter-ReviewService-Title
         title: >-
-          The ReviewService class shall reject a review whose title is blank or longer than 200 characters.
+          The ReviewService class shall refuse a review whose title is blank.
         justification: |
-          A title is how people recognize a review in lists, so it must exist and must stay displayable.
+          A title is how people recognize a review in lists, so it must exist.
         tests:
           - ReviewService_CreateDraftAsync_BlankTitle_ThrowsReviewTitleInvalid
+
+      - id: ReviewCenter-ReviewService-Title-Length
+        title: >-
+          The ReviewService class shall refuse a review whose title is longer than 200 characters.
+        justification: |
+          A title must stay displayable in lists and headings.
+        tests:
           - ReviewService_CreateDraftAsync_TitleTooLong_ThrowsReviewTitleInvalid
 
       - id: ReviewCenter-ReviewService-Project
         title: >-
-          The ReviewService class shall reject a review for a project that does not exist or that the actor may not
-          see, with the same refusal (ProjectNotFound) in both cases, before anything else is checked or stored.
+          The ReviewService class shall refuse a review for a project that does not exist, with the ProjectNotFound
+          rule.
         justification: |
-          A review that belongs to no project could never be found again and would break the project hierarchy.
-          A project that a user may not see must not be told apart from a missing one, so creating a review in it
-          reveals nothing.
+          A review that belongs to no project could never be found again.
         tests:
           - ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound
-          - ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening
+
+      - id: ReviewCenter-ReviewService-Project-Hidden
+        title: >-
+          The ReviewService class shall refuse a review for a project that the actor may not see with the same
+          ProjectNotFound rule as for a missing project, before it checks the identifier, the title, or the files, and
+          store nothing.
+        justification: |
+          A project that a user may not see must not be told apart from a missing one, not even by a validation
+          message.
+        tests:
+          - ReviewService_CreateDraftAsync_ActorWithoutAccess_ThrowsProjectNotFound
 
       - id: ReviewCenter-ReviewService-Files
         title: >-
-          The ReviewService class shall reject a review that has no files, a file path that is blank or longer
-          than 400 characters, or two files with the same path, comparing paths exactly so that paths differing
-          only in letter case are different.
+          The ReviewService class shall refuse a review that has no files.
         justification: |
-          A review without files has nothing to review. A path must be present to identify a file, and two files
-          under one path would be ambiguous. Paths on some systems are case-sensitive, so they are compared
-          exactly.
+          A review without files has nothing to review.
         tests:
           - ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles
-          - ReviewService_CreateDraftAsync_DuplicatePaths_ThrowsDuplicatePath
-          - ReviewService_CreateDraftAsync_PathsDifferingInCase_AreDistinct
+
+      - id: ReviewCenter-ReviewService-Files-BlankPath
+        title: >-
+          The ReviewService class shall refuse a file whose path is blank.
+        justification: |
+          A path identifies a file within a review.
+        tests:
           - ReviewService_CreateDraftAsync_BlankPath_ThrowsPathInvalid
+
+      - id: ReviewCenter-ReviewService-Files-PathLength
+        title: >-
+          The ReviewService class shall refuse a file whose path is longer than 400 characters.
+        justification: |
+          Paths must stay bounded for storage and display.
+        tests:
           - ReviewService_CreateDraftAsync_PathTooLong_ThrowsPathInvalid
+
+      - id: ReviewCenter-ReviewService-Files-DuplicatePath
+        title: >-
+          The ReviewService class shall refuse a review that has two files with the same path.
+        justification: |
+          Two files under one path would be ambiguous.
+        tests:
+          - ReviewService_CreateDraftAsync_DuplicatePaths_ThrowsDuplicatePath
+
+      - id: ReviewCenter-ReviewService-Files-PathCase
+        title: >-
+          The ReviewService class shall treat paths that differ only in letter case as different paths.
+        justification: |
+          Paths on some systems are case-sensitive, so they are compared exactly.
+        tests:
+          - ReviewService_CreateDraftAsync_PathsDifferingInCase_AreDistinct
 
       - id: ReviewCenter-ReviewService-Limits
         title: >-
-          The ReviewService class shall reject a review with a file larger than 2 MiB, more than 200 files, or
-          more than 20 MiB of file content in total, accepting the limit values themselves.
+          The ReviewService class shall refuse a review with a file larger than 2 MiB and accept a file of exactly 2
+          MiB.
         justification: |
-          Review content is stored in the database and held in memory while it is saved, so it must be bounded
-          to keep the service responsive and the database a reasonable size.
+          Content is held in memory and in the database, so the size of a file must be bounded.
         tests:
           - ReviewService_CreateDraftAsync_FileSize_LimitIsInclusive
+
+      - id: ReviewCenter-ReviewService-Limits-FileCount
+        title: >-
+          The ReviewService class shall refuse a review with more than 200 files.
+        justification: |
+          The number of files must be bounded for the same reason as their size.
+        tests:
           - ReviewService_CreateDraftAsync_TooManyFiles_ThrowsTooManyFiles
+
+      - id: ReviewCenter-ReviewService-Limits-TotalSize
+        title: >-
+          The ReviewService class shall refuse a review whose files together are larger than 20 MiB.
+        justification: |
+          The total size of a review must be bounded for the same reason as the size of a file.
+        tests:
           - ReviewService_CreateDraftAsync_TotalTooLarge_ThrowsTotalSizeExceeded
 
       - id: ReviewCenter-ReviewService-Read
         title: >-
-          The ReviewService class shall return a review of a project with its file list, list the reviews of a
-          project, and return the content of one file of a review, or nothing when the review or the file does
-          not exist.
+          The ReviewService class shall return a review of a project with its file list.
         justification: |
-          Pages show a review and its files without loading all file content, and load the content of one file
-          only when a reviewer asks for it. A stored link to a review or file that is gone must lead to a clear
-          answer rather than to a failure.
+          Pages show a review and its files without loading all of the content.
         tests:
           - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
+
+      - id: ReviewCenter-ReviewService-Read-List
+        title: >-
+          The ReviewService class shall list the reviews of a project.
+        justification: |
+          A project page shows the reviews of the project.
+        tests:
+          - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
+
+      - id: ReviewCenter-ReviewService-Read-Content
+        title: >-
+          The ReviewService class shall return the content of one file of a review exactly as it is stored.
+        justification: |
+          Content is loaded only when a reviewer asks for it, and it must be what was submitted.
+        tests:
+          - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
+
+      - id: ReviewCenter-ReviewService-Read-NotFound
+        title: >-
+          The ReviewService class shall return nothing for a review that does not exist and for a file that does not
+          exist in a review.
+        justification: |
+          A stored link to something that is gone must lead to a clear answer, not to a failure.
+        tests:
           - ReviewService_GetFileContentAsync_MissingFileOrReview_ReturnsNull
+          - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
 
       - id: ReviewCenter-ReviewService-Audit
         title: >-
-          The ReviewService class shall record the creation of a draft review in the audit trail, in the same
-          transaction as the review, naming the actor, the title, the content fingerprint, and the number of files.
+          The ReviewService class shall record the creation of a draft review in the audit trail, naming the actor,
+          the title, the content fingerprint, and the number of files.
         justification: |
-          The fingerprint in the history ties the creation of a review to the exact content it covers.
+          The fingerprint in the history ties the creation to the exact content that it covers.
         tests:
           - ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint
+
+      - id: ReviewCenter-ReviewService-Audit-FileCount
+        title: >-
+          The ReviewService class shall write the file count of that audit entry in the singular for one file and in
+          the plural otherwise.
+        justification: |
+          The entry is read by people, who expect correct wording.
+        tests:
           - ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount
 
       - id: ReviewCenter-ReviewService-FromRepository
         title: >-
-          The ReviewService class shall create a review from a registered, enabled git repository of the same
-          project as the review (a repository of another project is refused as not found) that covers the
-          files changed between an optional baseline revision and a head revision and matching a selection,
-          freezing in the database, for each file, its path, its change kind (Added, Modified, or Deleted), and
-          its baseline and head content, together with the repository, the two resolved commit identifiers, and
-          the selection text, and shall set the content fingerprint from the files that exist at the head.
+          The ReviewService class shall create a review from the files changed between an optional baseline revision
+          and a head revision of a registered, enabled git repository of the same project, freezing for each file its
+          path, change kind (Added, Modified, or Deleted), and baseline and head content, together with the
+          repository, the two resolved commit identifiers, and the selection text.
         justification: |
-          A review of a change must keep exactly what was reviewed. Freezing the content and the resolved
-          commits means a later change of the repository, or a moved branch, cannot alter the review, and the
-          fingerprint stays comparable with that of an uploaded review of the same files.
+          A review of a change must keep exactly what was reviewed.
         tests:
           - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
-          - ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly
+
+      - id: ReviewCenter-ReviewService-FromRepository-Selection
+        title: >-
+          The ReviewService class shall review only the changed files that match the selection.
+        justification: |
+          A reviewer chooses what to review.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles
+
+      - id: ReviewCenter-ReviewService-FromRepository-AllFiles
+        title: >-
+          The ReviewService class shall review every changed file when no selection is given.
+        justification: |
+          No selection means everything that changed.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile
+
+      - id: ReviewCenter-ReviewService-FromRepository-DeletedFiles
+        title: >-
+          The ReviewService class shall match a deleted file against the selection by its path like any other file and
+          review it when it matches.
+        justification: |
+          A deletion is a change that must be reviewed.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt
+
+      - id: ReviewCenter-ReviewService-FromRepository-Baseline
+        title: >-
+          The ReviewService class shall review every file at the head as Added when the baseline revision is blank.
+        justification: |
+          Without a baseline the whole content is new.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_BlankBaseline_ReviewsAllHeadFilesAsAdded
+
+      - id: ReviewCenter-ReviewService-FromRepository-Fingerprint
+        title: >-
+          The ReviewService class shall set the content fingerprint of a review from a repository from the files that
+          exist at the head only.
+        justification: |
+          The fingerprint stays comparable with that of an uploaded review of the same files.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly
+
+      - id: ReviewCenter-ReviewService-FromRepository-Digest
+        title: >-
+          The ReviewService class shall make the record digest of a review from a repository depend on its selection,
+          its head commit, and its repository, so that the same files from another source give another digest.
+        justification: |
+          A signature must not carry over to a review of another source.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest
+
+      - id: ReviewCenter-ReviewService-FromRepository-Disabled
+        title: >-
+          The ReviewService class shall refuse a review from a disabled repository with the RepositoryDisabled rule.
+        justification: |
+          An administrator disables a repository for a reason, so it must not be used.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+
+      - id: ReviewCenter-ReviewService-FromRepository-RepositoryUnknown
+        title: >-
+          The ReviewService class shall refuse a review from a repository that does not exist with the
+          RepositoryNotFound rule.
+        justification: |
+          Nothing can be fetched from a repository that is not there.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+
+      - id: ReviewCenter-ReviewService-FromRepository-OtherProject
+        title: >-
+          The ReviewService class shall refuse a review from a repository of another project as not found, with the
+          RepositoryNotFound rule, storing nothing and not opening the repository.
+        justification: |
+          A project must not use, or learn about, the repositories of another project.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RepositoryOfOtherProject_IsRefusedAsNotFound
+
+      - id: ReviewCenter-ReviewService-FromRepository-RevisionUnknown
+        title: >-
+          The ReviewService class shall refuse a review whose baseline or head revision cannot be found in the
+          repository with the RevisionNotFound rule.
+        justification: |
+          A review must name real commits.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+          - ReviewService_CreateFromRepositoryAsync_UnknownHeadRevision_ThrowsRevisionNotFound
+
+      - id: ReviewCenter-ReviewService-FromRepository-RevisionInvalid
+        title: >-
+          The ReviewService class shall refuse a revision that is not a valid revision name with the RevisionInvalid
+          rule.
+        justification: |
+          A revision that looks like a command option must never reach git.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+
+      - id: ReviewCenter-ReviewService-FromRepository-RevisionBlank
+        title: >-
+          The ReviewService class shall refuse a blank head revision with the RevisionInvalid rule before it opens the
+          repository.
+        justification: |
+          A review needs a head to be reviewed, and a request without one must fail fast without a fetch.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn
+
+      - id: ReviewCenter-ReviewService-FromRepository-SelectionInvalid
+        title: >-
+          The ReviewService class shall refuse a blank selection with the SelectionInvalid rule.
+        justification: |
+          Typed-in empty text is a mistake, not a request for all files.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+          - ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile
+
+      - id: ReviewCenter-ReviewService-FromRepository-SelectionLength
+        title: >-
+          The ReviewService class shall refuse a selection that is longer than 2000 characters with the
+          SelectionInvalid rule before it opens the repository.
+        justification: |
+          The selection is stored with the review and written to the audit trail, so it is bounded.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet
+
+      - id: ReviewCenter-ReviewService-FromRepository-IdInvalid
+        title: >-
+          The ReviewService class shall refuse an invalid review identifier of a review from a repository with the
+          ReviewIdInvalid rule.
+        justification: |
+          The same identifier rules apply to every way of creating a review.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+
+      - id: ReviewCenter-ReviewService-FromRepository-Refusal
+        title: >-
+          The ReviewService class shall store no review and write no audit entry for a request for a review from a
+          repository that it refuses.
+        justification: |
+          A refused request must leave no trace except the refusal.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+
+      - id: ReviewCenter-ReviewService-FromRepository-GitFailure
+        title: >-
+          The ReviewService class shall pass on a failure to reach the repository with its own GitAccessFailed rule.
+        justification: |
+          The creator must learn that the repository, not the request, is the problem.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn
+
+      - id: ReviewCenter-ReviewService-FromRepository-BeforeOpening
+        title: >-
+          The ReviewService class shall refuse a review from a repository for a project that does not exist, or with
+          an identifier that is already used, before it opens the repository.
+        justification: |
+          A bad request must fail fast without fetching anything.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening
+
+      - id: ReviewCenter-ReviewService-FromRepository-NoRepositories
+        title: >-
+          The ReviewService class shall refuse, with an invalid-operation error, to create a review from a repository
+          when it was created without access to repositories.
+        justification: |
+          A misconfigured service must fail loudly instead of doing nothing.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws
+
+      - id: ReviewCenter-ReviewService-FromRepository-SourceRequired
+        title: >-
+          The ReviewService class shall refuse a missing source of a review from a repository with an argument-null
+          error.
+        justification: |
+          A request without a source is a programming error that must be reported at once.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws
 
       - id: ReviewCenter-ReviewService-Frozen
         title: >-
-          The ReviewService class shall read a review created from a repository only from its frozen copies, never
-          from the repository, so that a later commit, a moved branch, or a removed repository changes neither
-          the review, nor its content, nor its record digest.
+          The ReviewService class shall keep a review created from a repository, and the content of its files,
+          unchanged when the repository later receives a commit or a branch moves.
         justification: |
-          A signature binds to the record digest. If the review followed the repository, the same signature
-          would cover content nobody has seen.
+          A signature binds to the record digest, and a review that followed the repository would cover content that
+          nobody saw.
         tests:
           - ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected
-          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
+
+      - id: ReviewCenter-ReviewService-Frozen-NoGit
+        title: >-
+          The ReviewService class shall read a review created from a repository without opening the repository again.
+        justification: |
+          Reading must not depend on the repository staying available.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected
+
+      - id: ReviewCenter-ReviewService-Frozen-Digest
+        title: >-
+          The ReviewService class shall keep the record digest of a review created from a repository unchanged when
+          the repository changes later.
+        justification: |
+          A signature must stay valid for the content that it covered.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected
+
+      - id: ReviewCenter-ReviewService-Frozen-Disabled
+        title: >-
+          The ReviewService class shall keep a review created from a repository, its content, and its baseline content
+          readable and unchanged after the repository is disabled, and keep its record digest unchanged.
+        justification: |
+          Administrative changes of the repository must not alter reviews that exist.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RepositoryDisabledLater_ReviewIsUnaffected
 
       - id: ReviewCenter-ReviewService-ProjectChecklist
         title: >-
-          The ReviewService class shall give every review it creates, from uploaded files and from a repository or
-          a review plan alike, a frozen copy of the checklist of the project, validated at that moment, or of the
-          built-in default checklist when the project has none, shall refuse to create the review, storing nothing,
-          with the ChecklistDefinitionInvalid rule when the stored definition of the project cannot be read or
-          is not valid, never falling back to the default, and shall leave the checklist, and so the record digest,
-          of every review that exists unchanged when the checklist of the project changes later, whether the review
-          is approved or not.
+          The ReviewService class shall give every review that it creates from uploaded files or from a repository a
+          frozen copy of the checklist of the project, validated at that moment.
         justification: |
-          The checklist of a project is the standard its reviews are answered against, so a review must carry the
-          wording that was in force when it was created. A silent fallback to the default would let a review be
-          answered against a standard the project did not choose, and a later edit that reached an existing review
-          would change what the reviewers answered and what a signature covers.
+          A review must carry the wording of the checklist that was in force when it was created.
         tests:
           - ReviewService_Create_ProjectChecklist_IsFrozenAtBothCreatePaths
+
+      - id: ReviewCenter-ReviewService-ProjectChecklist-Default
+        title: >-
+          The ReviewService class shall give a review the built-in default checklist when the project has none.
+        justification: |
+          Every review needs a checklist to be answered.
+        tests:
           - ReviewService_Create_NoProjectChecklist_FreezesTheDefaultAtBothCreatePaths
+
+      - id: ReviewCenter-ReviewService-ProjectChecklist-Unusable
+        title: >-
+          The ReviewService class shall refuse to create a review, storing nothing, with the
+          ChecklistDefinitionInvalid rule when the stored checklist of the project cannot be read or is not valid, and
+          not fall back to the default.
+        justification: |
+          A silent fallback would let a review be answered against a standard that the project did not choose.
+        tests:
           - ReviewService_Create_UnusableProjectChecklist_FailsClosed
+
+      - id: ReviewCenter-ReviewService-ProjectChecklist-Later
+        title: >-
+          The ReviewService class shall leave the checklist, and so the record digest, of every existing review
+          unchanged when the checklist of the project changes later.
+        justification: |
+          A later edit must not change what reviewers have answered.
+        tests:
           - ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected
+
+      - id: ReviewCenter-ReviewService-ProjectChecklist-LaterApproved
+        title: >-
+          The ReviewService class shall leave an approved review and its record digest unchanged when the checklist of
+          the project changes later.
+        justification: |
+          A signature covers the checklist, so an approved review must stay approved.
+        tests:
           - ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected
-          - ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview
 
       - id: ReviewCenter-ReviewService-NothingToReview
         title: >-
-          The ReviewService class shall refuse to create a review from a repository when no changed file matches
-          the selection, storing nothing, and shall say "Nothing to review: no files matching the selection
-          changed between" the baseline and the head.
+          The ReviewService class shall refuse a review from a repository, storing nothing, with the NothingToReview
+          rule when no changed file matches the selection.
         justification: |
-          A review without files has nothing to review. The creator must learn that the selection or the
-          revisions are wrong instead of getting an empty review.
+          A review without files has nothing to review.
         tests:
           - ReviewService_CreateFromRepositoryAsync_NoMatchingChange_RefusesWithNothingToReview
+
+      - id: ReviewCenter-ReviewService-NothingToReview-Message
+        title: >-
+          The ReviewService class shall name the baseline and the head revision in the refusal "Nothing to review: false
+          files matching the selection changed between".
+        justification: |
+          The creator must learn that the selection or the revisions are wrong.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_NoMatchingChange_RefusesWithNothingToReview
+
+      - id: ReviewCenter-ReviewService-NothingToReview-NoBaseline
+        title: >-
+          The ReviewService class shall name the beginning of the history as the baseline in that refusal when no
+          baseline is given.
+        justification: |
+          The message must still read correctly without a baseline.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_NoBaselineNoMatch_NamesBeginningOfHistory
 
       - id: ReviewCenter-ReviewService-RepositoryLimits
         title: >-
-          The ReviewService class shall apply the limits of an upload (2 MiB per file, 200 files, 20 MiB in
-          total) to a review from a repository, counting both the baseline and the head content, and shall
-          refuse a review that exceeds them before reading file content.
+          The ReviewService class shall refuse a review from a repository with a file larger than 2 MiB on its
+          baseline or head side.
         justification: |
-          The frozen copies live in the database and in memory like uploaded files, so the same bounds protect
-          the service, and a refusal before the content is read keeps a huge change from being fetched.
+          Frozen copies live in the database and in memory like uploads, so the size of a file must be bounded.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading
+
+      - id: ReviewCenter-ReviewService-RepositoryLimits-TotalSize
+        title: >-
+          The ReviewService class shall refuse a review from a repository whose baseline and head content together are
+          larger than 20 MiB.
+        justification: |
+          The total size of a review must be bounded for the same reason as the size of a file.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_TotalTooLarge_RefusedBeforeReading
+
+      - id: ReviewCenter-ReviewService-RepositoryLimits-FileCount
+        title: >-
+          The ReviewService class shall refuse a review from a repository with more than 200 files.
+        justification: |
+          The number of files must be bounded for the same reason as their size.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_TooManyFiles_Refused
+
+      - id: ReviewCenter-ReviewService-RepositoryLimits-BeforeReading
+        title: >-
+          The ReviewService class shall refuse a review from a repository that exceeds these limits before it reads
+          any file content.
+        justification: |
+          A refusal before the read keeps a huge change from being fetched.
         tests:
           - ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading
           - ReviewService_CreateFromRepositoryAsync_TotalTooLarge_RefusedBeforeReading
@@ -202,252 +559,781 @@ sections:
 
       - id: ReviewCenter-ReviewService-SkippedEntries
         title: >-
-          The ReviewService class shall leave symbolic links and submodules out of a review from a repository,
-          return them with their reasons to the creator, and count them in the audit entry.
+          The ReviewService class shall leave symbolic links and submodules out of a review from a repository and
+          return them, with their reasons, to the creator.
         justification: |
-          Only regular files can be reviewed. Silently dropping the others would hide parts of the change.
+          Only regular files can be reviewed, and dropping entries silently would hide parts of the change.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_SkippedEntries_ReturnedAndCounted
+
+      - id: ReviewCenter-ReviewService-SkippedEntries-Audit
+        title: >-
+          The ReviewService class shall count the skipped entries in the audit entry of the creation.
+        justification: |
+          The history must show that part of the change could not be reviewed.
         tests:
           - ReviewService_CreateFromRepositoryAsync_SkippedEntries_ReturnedAndCounted
 
       - id: ReviewCenter-ReviewService-RepositoryAudit
         title: >-
-          The ReviewService class shall record the creation of a review from a repository in the audit trail, in
-          the same transaction as the review, naming the repository, the baseline and head commits, the number
-          of files by change kind, the number of skipped entries, and the content fingerprint.
+          The ReviewService class shall record the creation of a review from a repository in the audit trail, naming
+          the actor, the repository, the baseline and head commits, the number of files by change kind, the number of
+          skipped entries, and the content fingerprint.
         justification: |
-          The history must show which commits and selection a review covers without opening the review.
+          The history must show which commits a review covers without opening the review.
         tests:
           - ReviewService_CreateFromRepositoryAsync_Changes_AuditDetailDescribesSource
-          - ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest
 
       - id: ReviewCenter-ReviewService-ReviewSet
         title: >-
-          The ReviewService class shall let a review created from a plan record the identifier of the review-set it
-          comes from (1 to 100 characters, refused otherwise), create that review through an already open
-          repository session so that a batch of reviews fetches the repository once, name the set last in the audit
-          entry, and keep the identifier empty for every other review.
+          The ReviewService class shall record on a review created from a plan the identifier of the review set that
+          it comes from.
         justification: |
-          A review that was planned from a set must say which set it covers, so that the next plan can find the
-          last approved review of the same set. A shared session keeps a plan of many sets from fetching the
-          repository once per review, and a bounded identifier keeps the stored value and the audit text bounded.
+          The next plan can find the last approved review of the same set.
         tests:
-          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
-          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
-          - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
+          - ReviewService_CreateFromSessionAsync_ReviewSetId_IsRecordedAndNamedLastInAudit
+
+      - id: ReviewCenter-ReviewService-ReviewSet-Audit
+        title: >-
+          The ReviewService class shall name the review-set identifier last in the audit entry of the creation.
+        justification: |
+          The identifier must survive the length limit of the audit entry.
+        tests:
+          - ReviewService_CreateFromSessionAsync_ReviewSetId_IsRecordedAndNamedLastInAudit
+
+      - id: ReviewCenter-ReviewService-ReviewSet-Length
+        title: >-
+          The ReviewService class shall refuse a review-set identifier that is empty or longer than 100 characters
+          with the ReviewSetConfigInvalid rule, storing nothing.
+        justification: |
+          The identifier is stored, bound by signatures, and audited, so it must be bounded.
+        tests:
+          - ReviewService_CreateFromSessionAsync_ReviewSetIdOutOfRange_ThrowsReviewSetConfigInvalid
+          - ReviewService_CreateFromSessionAsync_ReviewSetIdOfMaxLength_IsAccepted
+
+      - id: ReviewCenter-ReviewService-ReviewSet-None
+        title: >-
+          The ReviewService class shall keep the review-set identifier empty for a review that is not created from a
+          plan.
+        justification: |
+          A manual review belongs to no review set.
+        tests:
           - ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet
 
       - id: ReviewCenter-ReviewService-Diff
         title: >-
           The ReviewService class shall give the line differences between the baseline and the head content of a
-          file of a review, computed from the content already stored with the review and without opening the
-          repository, treating an added file as all lines added and a deleted file as all lines removed, and shall
-          report instead of lines that the review has no baseline (an uploaded review or one without a baseline
-          commit), that a side of the file is binary, or that the file is too large to compare, and that the lines
-          are the same when only line endings or the final line ending differ, and shall give nothing for a review
-          or file that does not exist.
+          modified file of a review, computed from the content stored with the review, without opening the repository.
         justification: |
-          A reviewer needs to see what changed in a file. The review froze both contents, so the answer must not
-          depend on the repository still being available or unchanged, and must be the same every time. A file that
-          cannot be compared sensibly is better explained than shown wrongly.
+          The review froze both contents, so the answer must be the same every time.
         tests:
           - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
-          - ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull
+
+      - id: ReviewCenter-ReviewService-Diff-Added
+        title: >-
+          The ReviewService class shall treat an added file as all of its lines added.
+        justification: |
+          An added file has no lines on the baseline side.
+        tests:
+          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
+
+      - id: ReviewCenter-ReviewService-Diff-Deleted
+        title: >-
+          The ReviewService class shall treat a deleted file as all of its lines removed.
+        justification: |
+          A deleted file has no lines on the head side.
+        tests:
+          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
+
+      - id: ReviewCenter-ReviewService-Diff-NoBaseline
+        title: >-
+          The ReviewService class shall report that there is no baseline for an uploaded review and for a review
+          without a baseline commit.
+        justification: |
+          A file that cannot be compared is better explained than shown wrongly.
+        tests:
           - ReviewService_GetDiffAsync_NoBaselineOrUpload_ReportsNoBaseline
+
+      - id: ReviewCenter-ReviewService-Diff-Binary
+        title: >-
+          The ReviewService class shall report that a side of the file is binary instead of comparing it.
+        justification: |
+          Line differences of binary content are meaningless.
+        tests:
           - ReviewService_GetDiffAsync_BinarySide_ReportsBinary
+
+      - id: ReviewCenter-ReviewService-Diff-TooLarge
+        title: >-
+          The ReviewService class shall report that the file is too large to compare when it is beyond the line limit.
+        justification: |
+          An unbounded comparison could exhaust the memory and the time of the server.
+        tests:
           - ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge
+
+      - id: ReviewCenter-ReviewService-Diff-LineEndings
+        title: >-
+          The ReviewService class shall flag that the lines are the same when only the line endings or the final line
+          ending differ.
+        justification: |
+          A reviewer must not be misled into hunting for a change that is not there.
+        tests:
           - ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged
+
+      - id: ReviewCenter-ReviewService-Diff-NotFound
+        title: >-
+          The ReviewService class shall give nothing for a review or a file that does not exist, comparing the path
+          exactly.
+        justification: |
+          A stored link may point at something that is gone.
+        tests:
+          - ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull
 
       - id: ReviewCenter-ReviewService-CreatedVia
         title: >-
-          The ReviewService class shall record the user who created a review, mark a review that an actor created
-          through a personal access token as created through the API, and name the id of the token, never the value,
-          in the audit entry of the creation, both for a draft from files and for a review from a repository.
+          The ReviewService class shall record the user who created a review.
         justification: |
-          Reviewers should see that a script, and not a person at the screen, made a draft, and an investigation
-          should be able to tell which token did it.
+          The creator of a review must be accountable.
+        tests:
+          - ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag
+
+      - id: ReviewCenter-ReviewService-CreatedVia-Api
+        title: >-
+          The ReviewService class shall mark a review that an actor created through a personal access token as created
+          through the API.
+        justification: |
+          Reviewers should see that a script, not a person, made the review.
         tests:
           - ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText
-          - ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag
           - ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText
+
+      - id: ReviewCenter-ReviewService-CreatedVia-Token
+        title: >-
+          The ReviewService class shall name the identifier of the token, never its value, in the audit entry of a
+          draft from files that was created through a token.
+        justification: |
+          An investigation can tell which token created the review without the token being exposed.
+        tests:
+          - ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText
+
+      - id: ReviewCenter-ReviewService-CreatedVia-RepositoryToken
+        title: >-
+          The ReviewService class shall name the identifier of the token, never its value, in the audit entry of a
+          review from a repository that was created through a token.
+        justification: |
+          An investigation can tell which token created the review without the token being exposed.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText
+
+      - id: ReviewCenter-ReviewService-CreatedVia-Person
+        title: >-
+          The ReviewService class shall not mark a review created by a signed-in user as created through the API and
+          name no token in its audit entry.
+        justification: |
+          A review made at the screen must read as an ordinary review.
+        tests:
+          - ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag
 
       - id: ReviewCenter-ReviewService-DueDate
         title: >-
-          The ReviewService class shall let a review be created, from files, from a repository, or from a plan,
-          with an optional due date that is a calendar day in UTC, shall keep it outside the record digest, shall
-          refuse a date before today or more than two years ahead with the DueDateInvalid rule, storing nothing,
-          shall name the date in the audit entry of the creation only when one is set, and shall treat a review as
-          overdue only while its due date is before today (UTC) and the review is not approved.
+          The ReviewService class shall let a review created from files have an optional due date that is a calendar
+          day in UTC, from today up to exactly two years ahead.
         justification: |
-          A lead needs to say when a review is expected without every review having a deadline. A date in the past
-          is a mistake at creation, and one far in the future is most likely a typing error. The date is planning
-          information, not review content, so it must not change what a signature covers, and a review that is
-          approved has met its purpose and must not be reported as late.
+          A lead states when a review is expected to be done.
+        tests:
+          - ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt
+
+      - id: ReviewCenter-ReviewService-DueDate-None
+        title: >-
+          The ReviewService class shall create a review without a due date when none is given.
+        justification: |
+          The due date is optional.
+        tests:
+          - ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText
+
+      - id: ReviewCenter-ReviewService-DueDate-Range
+        title: >-
+          The ReviewService class shall refuse a due date before today or more than two years ahead with the
+          DueDateInvalid rule, storing nothing.
+        justification: |
+          A date in the past or far in the future is a mistake.
+        tests:
+          - ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing
+
+      - id: ReviewCenter-ReviewService-DueDate-Audit
+        title: >-
+          The ReviewService class shall name the due date in the audit entry of the creation only when one is set.
+        justification: |
+          The history shows the expectation that was set at the creation.
         tests:
           - ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt
           - ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText
-          - ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing
-          - ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase
-          - ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses
+
+      - id: ReviewCenter-ReviewService-DueDate-Repository
+        title: >-
+          The ReviewService class shall apply the same due-date rules to a review created from a repository: store and
+          audit a valid date, and refuse a date in the past with the DueDateInvalid rule before it opens the
+          repository.
+        justification: |
+          The due date must work in the same way however the review is created.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange
+
+      - id: ReviewCenter-ReviewService-DueDate-OutsideDigest
+        title: >-
+          The ReviewService class shall keep the due date outside the record digest, so that changing it does not
+          affect a signature.
+        justification: |
+          Moving a deadline is planning, not a change of what was reviewed.
+        tests:
           - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
+
+      - id: ReviewCenter-ReviewService-DueDate-Overdue
+        title: >-
+          The ReviewService class shall treat a review as overdue only while its due date is before today (UTC) and
+          the review is not approved.
+        justification: |
+          An approved review has met its purpose, and a review due today is not late yet.
+        tests:
+          - ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase
+          - ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue
+
+      - id: ReviewCenter-ReviewService-DueDate-IsoText
+        title: >-
+          The ReviewService class shall read the text of a due date only as an ISO calendar date (yyyy-MM-dd),
+          treating blank text as no date and refusing other text with the DueDateInvalid rule.
+        justification: |
+          Forms and API clients send the date as text, and one unambiguous format avoids misread dates.
+        tests:
+          - ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses
 
       - id: ReviewCenter-ReviewService-DueDateChange
         title: >-
-          The ReviewService class shall let only a project administrator, a system administrator, or the user who
-          created the review and can still contribute to the project (not a read-only member), and never an actor
-          that works through a personal access token, set, change, or clear
-          the due date of a review after its creation, accepting a date in the past but not one more than two years
-          ahead, shall refuse the change of an approved review with the ReviewLocked rule, shall store the change
-          only when the stored date is still the one it started from, and shall record in the audit trail, in the
-          same transaction, the old and the new date.
+          The ReviewService class shall let a project administrator set, change, or clear the due date of a review
+          after its creation.
         justification: |
-          The due date is a commitment that the people in charge of the project make, so a member who is neither
-          the creator nor an administrator, and a script, must not move it. A lead may record that something was
-          due last week, so the past is allowed on edit. An approved review is locked so that nothing changes, and
-          it is never overdue, so a change has no purpose until it is reopened. The comparison is part of the update
-          and the entry is stored with it, so two people cannot both succeed and the history cannot disagree with
-          the date.
+          Oversight of a project includes planning its reviews.
         tests:
           - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Creator
+        title: >-
+          The ReviewService class shall let the user who created the review, while that user can still contribute to
+          the project, change its due date.
+        justification: |
+          The person who created a review owns the planning of it.
+        tests:
           - ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed
+
+      - id: ReviewCenter-ReviewService-DueDateChange-SystemAdmin
+        title: >-
+          The ReviewService class shall let a system administrator change the due date of a review.
+        justification: |
+          A system administrator oversees every project.
+        tests:
+          - ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed
+
+      - id: ReviewCenter-ReviewService-DueDateChange-OtherMember
+        title: >-
+          The ReviewService class shall refuse a member who is neither a project administrator nor the creator with
+          the ActorNotAllowed rule, changing nothing.
+        justification: |
+          Only the people who own the planning of a review may move its deadline.
+        tests:
           - ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Outsider
+        title: >-
+          The ReviewService class shall refuse a user who may not see the project with the ProjectNotFound rule,
+          changing nothing.
+        justification: |
+          A project that a user may not see must not be told apart from a missing one.
+        tests:
+          - ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing
+
+      - id: ReviewCenter-ReviewService-DueDateChange-ReadOnlyCreator
+        title: >-
+          The ReviewService class shall refuse the creator of a review who has become a read-only member of the
+          project.
+        justification: |
+          A user who may no longer contribute must not change the planning.
+        tests:
           - ReviewService_SetDueDateAsync_CreatorNowReadOnly_IsRefused
+
+      - id: ReviewCenter-ReviewService-DueDateChange-ApiToken
+        title: >-
+          The ReviewService class shall refuse an actor that works through a personal access token.
+        justification: |
+          The due date can be set through the API only when the review is created.
+        tests:
           - ReviewService_SetDueDateAsync_ApiToken_IsRefused
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Clear
+        title: >-
+          The ReviewService class shall clear the due date when no date is given.
+        justification: |
+          A deadline that no longer applies must be removable.
+        tests:
           - ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Unchanged
+        title: >-
+          The ReviewService class shall change nothing and write no audit entry when the due date already has the
+          given value.
+        justification: |
+          A change that changes nothing must not clutter the history.
+        tests:
+          - ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Past
+        title: >-
+          The ReviewService class shall accept a date in the past when it changes the due date.
+        justification: |
+          A deadline may have to be set on a day that has already passed.
+        tests:
+          - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
+
+      - id: ReviewCenter-ReviewService-DueDateChange-FarAhead
+        title: >-
+          The ReviewService class shall refuse a date more than two years ahead with the DueDateInvalid rule.
+        justification: |
+          A date that far ahead is a mistake.
+        tests:
           - ReviewService_SetDueDateAsync_TooFarAhead_IsRefused
+
+      - id: ReviewCenter-ReviewService-DueDateChange-NotFound
+        title: >-
+          The ReviewService class shall refuse a review that does not exist with the ReviewNotFound rule.
+        justification: |
+          A change cannot be made to a review that is not there.
+        tests:
           - ReviewService_SetDueDateAsync_MissingReview_IsNotFound
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Locked
+        title: >-
+          The ReviewService class shall refuse the change of the due date of an approved review with the ReviewLocked
+          rule.
+        justification: |
+          An approved review is closed and must not be altered.
+        tests:
           - ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Concurrent
+        title: >-
+          The ReviewService class shall store the change only when the stored date is still the one that it started
+          from, and otherwise refuse with the RecordChanged rule.
+        justification: |
+          Two people changing the date at the same time must not silently overwrite each other.
+        tests:
           - ReviewService_SetDueDateAsync_ChangedByOtherMeanwhile_FailsAsRecordChanged
+
+      - id: ReviewCenter-ReviewService-DueDateChange-Audit
+        title: >-
+          The ReviewService class shall record the old and the new due date in the audit trail.
+        justification: |
+          The history must show who moved a deadline and from where.
+        tests:
+          - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
+          - ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange
 
       - id: ReviewCenter-ReviewService-FollowUp
         title: >-
-          The ReviewService class shall let a review be created, from files, from a repository, or from a plan, as a
-          follow-up of an earlier review of the same project, given by an optional review identifier, that points to
-          that review only (a follow-up of a follow-up points to the one before it), shall accept the earlier review
-          whether it is still in review or approved, shall refuse with the FollowUpInvalid rule, storing nothing, an
-          earlier review that does not exist in the project (with one message that does not tell whether it exists in
-          another project), reviews that both belong to a review-set but to different ones, reviews that do not have
-          the same kind of source or were made from different repositories, and reviews that have no file in common,
-          shall refuse the same way, naming the files, a follow-up that would drop open threads of files that the new
-          review does not have unless the creator acknowledges it, and shall name the followed review and what was
-          carried in the audit entry of the creation, and only when a review follows another.
+          The ReviewService class shall let a review created from files, from a repository, or from a plan be a
+          follow-up of one earlier review of the same project, and point to that review only.
         justification: |
-          A review that failed is followed by a new review of the corrected content, and the people who answered the
-          earlier review should not have to do their work twice. The rules keep a follow-up to a real continuation of
-          the same work: a review of other files, another repository or another set would carry answers and threads
-          that do not belong to it. Nothing that is dropped may be dropped silently, so the creator confirms it. A
-          message that did not distinguish an unknown review from one of another project would let a user probe the
-          reviews of projects they cannot see.
+          A follow-up lets the work of an earlier review be reused, and it must be clear which review it continues.
         tests:
           - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+
+      - id: ReviewCenter-ReviewService-FollowUp-Optional
+        title: >-
+          The ReviewService class shall create an ordinary review with no carried data when no earlier review is
+          given.
+        justification: |
+          Most reviews are not follow-ups.
+        tests:
           - ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData
-          - ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing
-          - ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile
-          - ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused
-          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
-          - ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless
+
+      - id: ReviewCenter-ReviewService-FollowUp-Source
+        title: >-
+          The ReviewService class shall accept an earlier review whether it is still in review or approved.
+        justification: |
+          The work of an earlier review is reusable whatever its state.
+        tests:
           - ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource
+          - ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile
+
+      - id: ReviewCenter-ReviewService-FollowUp-Chain
+        title: >-
+          The ReviewService class shall make a follow-up of a follow-up point to the review that is directly before
+          it.
+        justification: |
+          The chain of follow-ups must be traceable one step at a time.
+        tests:
+          - ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource
+
+      - id: ReviewCenter-ReviewService-FollowUp-Unknown
+        title: >-
+          The ReviewService class shall refuse an earlier review that does not exist in the project with the
+          FollowUpInvalid rule, storing nothing, with one message that does not tell whether the review exists in
+          another project.
+        justification: |
+          A project must not learn about the reviews of another project.
+        tests:
+          - ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing
+
+      - id: ReviewCenter-ReviewService-FollowUp-ReviewSet
+        title: >-
+          The ReviewService class shall refuse with the FollowUpInvalid rule an earlier review and a new review that
+          both belong to a review set but to different ones.
+        justification: |
+          A follow-up carries answers from the same body of work only.
+        tests:
+          - FollowUpCarry_CheckFit_Matrix
           - ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch
+
+      - id: ReviewCenter-ReviewService-FollowUp-Repository
+        title: >-
+          The ReviewService class shall refuse with the FollowUpInvalid rule an earlier review and a new review that
+          do not have the same kind of source or that were made from different repositories.
+        justification: |
+          Answers about files of one source say nothing about files of another source.
+        tests:
+          - ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused
+          - FollowUpCarry_CheckFit_Matrix
+
+      - id: ReviewCenter-ReviewService-FollowUp-CommonFile
+        title: >-
+          The ReviewService class shall refuse with the FollowUpInvalid rule an earlier review and a new review that
+          have no file in common.
+        justification: |
+          Without a common file there is nothing that a follow-up could carry.
+        tests:
+          - ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile
+          - FollowUpCarry_CheckFit_Matrix
+
+      - id: ReviewCenter-ReviewService-FollowUp-DroppedThreads
+        title: >-
+          The ReviewService class shall refuse with the FollowUpInvalid rule a follow-up that would drop open threads
+          of files that the new review does not have, unless the creator acknowledges it.
+        justification: |
+          Open discussions must not disappear without the creator knowing.
+        tests:
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+
+      - id: ReviewCenter-ReviewService-FollowUp-DroppedMessage
+        title: >-
+          The ReviewService class shall name the files of the dropped threads in that refusal.
+        justification: |
+          The creator must see which discussions would be lost.
+        tests:
+          - FollowUpCarry_DroppedMessage_ListsFilesAndTheRest
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+
+      - id: ReviewCenter-ReviewService-FollowUp-Acknowledged
+        title: >-
+          The ReviewService class shall create a follow-up normally when the creator acknowledges dropped threads that
+          do not exist.
+        justification: |
+          An unneeded acknowledgement, for example from an API client that always sends it, must do no harm.
+        tests:
+          - ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless
+
+      - id: ReviewCenter-ReviewService-FollowUp-Audit
+        title: >-
+          The ReviewService class shall name the followed review, by its whole identifier, and what was carried in the
+          audit entry of the creation.
+        justification: |
+          The history must show on which earlier review a review builds and what it took over.
+        tests:
           - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
           - ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId
+
+      - id: ReviewCenter-ReviewService-FollowUp-AuditNone
+        title: >-
+          The ReviewService class shall name no followed review in the audit entry of a review that follows none.
+        justification: |
+          An ordinary review must read as an ordinary review.
+        tests:
+          - ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData
+
+      - id: ReviewCenter-ReviewService-FollowUp-DuplicateId
+        title: >-
+          The ReviewService class shall refuse a follow-up whose identifier is already used, changing nothing.
+        justification: |
+          A refused follow-up must not damage the review that already has the identifier.
+        tests:
           - ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges
-          - FollowUpCarry_CheckFit_Matrix
-          - FollowUpCarry_DroppedMessage_ListsFilesAndTheRest
+
+      - id: ReviewCenter-ReviewService-FollowUp-InputValidation
+        title: >-
+          The ReviewService class shall refuse a missing argument when it checks whether a follow-up fits and when it
+          works out what a follow-up takes over, with an argument-null error.
+        justification: |
+          A missing argument is a programming error that must be reported at once.
+        tests:
           - FollowUpCarry_NullArguments_Throw
 
       - id: ReviewCenter-ReviewService-FollowUpCarry
         title: >-
-          The ReviewService class shall, for a follow-up review, work out what it takes over with a pure function and
-          store it together with the review in one call: the Pass and N/A answers that the submitted ballots of the
-          earlier review agree on, and, for a check that no submitted ballot answered, the ones that the earlier review
-          itself carried (its review-level baseline rows, so that a follow-up without a submitted ballot still passes
-          them on), of checks that are in the checklist of the new review with the same wording, with their outcome,
-          justification, answerer and time, but not the Fail answers and never a draft; the not-applicable sections that
-          are in the new checklist with the same title, with their reasons, taken in the same way; and the open threads
-          whose file is in the new review, with every comment unchanged, the kind of the thread and the report flag of
-          every comment kept (a carried Finding stays a Finding and carried chat stays chat), and the thread open. A
-          thread keeps its line anchor only when the file has the same content on the side it is anchored to,
-          and otherwise refers to the whole file, with a note from the system, added after the comments and not
-          included in the report, that gives the
-          original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
-          creates the follow-up does not become the answerer of anything, and everything that is carried is marked with
-          the review it came from, and shall not carry the review conclusion text (the free text, not the approved or
-          rejected conclusion).
+          The ReviewService class shall, for a follow-up review, carry the Pass and Not applicable answers on which
+          the submitted ballots of the earlier review agree, for checks that are in the checklist of the new review
+          with the same wording, with their outcome, justification, answerer, and time.
         justification: |
-          What the reviewers have handed in, agreed on and not failed is still true of unchanged wording, and answering
-          it again wastes time and invites mistakes. A draft is not an answer of the review yet, and a check on which
-          the ballots disagree has no agreed answer to take over, so neither is carried. A Fail is the reason for the
-          follow-up, so it must be answered again. A
-          line number of a file that changed would point at other code, so the thread moves to the whole file and says
-          where it was. The original text and author of a comment are evidence, so they are copied unchanged. Slots and
-          signatures belong to the record that was signed, and the person who creates the review must not look like
-          the one who answered. A failed carry must not leave a half-built review, so all rows are stored together.
-          The review conclusion text is the free text the reviewers wrote about the earlier record, so it is not
-          carried either: the follow-up starts without one. A follow-up whose reviewers have not handed in a ballot (or
-          that has no reviewer slot) still holds what it carried, and a chain of follow-ups must not lose that, so the
-          carried rows are passed on where no submitted ballot has a row of its own.
+          Answering again what is still true wastes the time of the reviewers.
         tests:
           - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
           - FollowUpCarry_Compute_ConsolidatedSource_CarriesAgreedPassOnly
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Disputed
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry an answer on which the ballots disagree.
+        justification: |
+          A disputed answer needs a new decision.
+        tests:
           - FollowUpCarry_Compute_DisputedNotCarried
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Draft
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry an answer of a draft ballot.
+        justification: |
+          A draft ballot is not a decision yet.
+        tests:
           - FollowUpCarry_Compute_DraftBallot_IsIgnored
           - FollowUpCarry_Compute_OnlyDraftBallots_CarriesNothing
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Fail
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry a Fail answer.
+        justification: |
+          A Fail is the reason for the follow-up and must be answered again.
+        tests:
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Wording
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry an answer to a check whose wording changed
+          or that is missing from the checklist of the new review.
+        justification: |
+          An answer is about a check as it was worded, so it must not be applied to another one.
+        tests:
+          - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
+          - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-NoChecklist
+        title: >-
+          The ReviewService class shall, for a follow-up review, carry no checklist answers from an earlier review
+          that has no checklist.
+        justification: |
+          Without a checklist there is nothing to carry.
+        tests:
           - FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Sections
+        title: >-
+          The ReviewService class shall, for a follow-up review, carry the not-applicable sections that are in the
+          checklist of the new review with the same title, with their reasons, in the same way as the answers.
+        justification: |
+          A section that does not apply to a file set usually still does not apply to the follow-up.
+        tests:
           - FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Baseline
+        title: >-
+          The ReviewService class shall, for a follow-up review, pass on the answers and sections that the earlier
+          review itself carried for a check or section that no submitted ballot answered, and prefer a submitted
+          ballot over them.
+        justification: |
+          A chain of follow-ups must not lose the work of the earlier reviews.
+        tests:
           - FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward
           - FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline
           - ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Threads
+        title: >-
+          The ReviewService class shall, for a follow-up review, carry the open threads whose file is in the new
+          review, still open, with every comment unchanged.
+        justification: |
+          The original text and author of a comment are evidence, so they are copied unchanged.
+        tests:
           - FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-ThreadKind
+        title: >-
+          The ReviewService class shall, for a follow-up review, keep the kind of a carried thread and the report flag
+          of its comments, so that a carried finding stays a finding and carried chat stays chat.
+        justification: |
+          What a discussion means for the report must not change by carrying it.
+        tests:
           - FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments
           - FollowUpCarry_CarryThreads_CarriedChat_StaysChat
-          - FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment
-          - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
-          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Anchor
+        title: >-
+          The ReviewService class shall, for a follow-up review, keep the line anchor of a carried thread only when
+          the file has the same content on the side that the thread is anchored to, and otherwise let the thread refer
+          to the whole file.
+        justification: |
+          A line number of changed content would point at the wrong line.
+        tests:
           - FollowUpCarry_Compute_LineAnchor_IsKeptOnlyForIdenticalContent
           - FollowUpCarry_Compute_SingleLineWholeFileAndUnknownHash_AreHandled
-          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
-          - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
           - ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors
           - ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-MovedNote
+        title: >-
+          The ReviewService class shall, for a follow-up review, add to a thread that moved to the whole file a note
+          from the system, after the comments and excluded from the report, that gives the original anchor.
+        justification: |
+          The reviewers must be able to see where the discussion was first held.
+        tests:
+          - FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment
+          - ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Resolved
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry resolved threads, but count them and the
+          dropped ones.
+        justification: |
+          A resolved discussion is finished, yet the creator should know how many there were.
+        tests:
+          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Slots
+        title: >-
+          The ReviewService class shall, for a follow-up review, carry no reviewer slots and no signatures.
+        justification: |
+          Slots and signatures belong to the record that was signed, not to its follow-up.
+        tests:
+          - ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Reopenings
+        title: >-
+          The ReviewService class shall, for a follow-up review, carry no reopenings of the earlier review.
+        justification: |
+          A reopening is part of the history of the earlier review only.
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_ReopenedSource_CarriesNoReopening
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Answerer
+        title: >-
+          The ReviewService class shall, for a follow-up review, not make the person who creates the follow-up the
+          answerer of anything that it carries.
+        justification: |
+          The creator of a follow-up must not become the author of answers that others gave.
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Marked
+        title: >-
+          The ReviewService class shall, for a follow-up review, mark everything that it carries with the review that
+          it came from.
+        justification: |
+          Reviewers must be able to tell carried work from new work.
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry-Conclusion
+        title: >-
+          The ReviewService class shall, for a follow-up review, not carry the free text of the review conclusion.
+        justification: |
+          The conclusion text is about the earlier state of the review.
+        tests:
           - ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried
-          - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
-          - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened
 
       - id: ReviewCenter-ReviewService-FollowUpCheckThreads
         title: >-
-          The ReviewService class shall not carry a thread about a check into a follow-up review, open or resolved,
-          shall count such threads as left out and tell that count in the preview of the follow-up, shall count them
-          neither as resolved threads that are not carried nor as threads on dropped files, and shall therefore ask
-          for no acknowledgement of dropped threads because of them.
+          The ReviewService class shall not carry a thread about a check into a follow-up review, whether it is open
+          or resolved.
         justification: |
-          The checklist of the follow-up may differ from the earlier one, so a thread about one of its checks may
-          have nothing left to discuss, and a thread without a file must never be mistaken for one on a file that
-          left the review. The person who creates the follow-up still learns how many discussions stay behind.
+          The checklist of the follow-up may differ, so the discussion may have nothing left to be about.
         tests:
           - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
-          - FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement
           - ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut
+
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-Counted
+        title: >-
+          The ReviewService class shall count the threads about checks that it leaves out and tell that count in the
+          preview of the follow-up.
+        justification: |
+          The creator learns how many discussions stay behind.
+        tests:
+          - ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut
+
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-NotDropped
+        title: >-
+          The ReviewService class shall count threads about checks neither as resolved threads that are not carried
+          nor as threads of dropped files.
+        justification: |
+          A thread without a file must not be mistaken for a thread of a file that left the review.
+        tests:
+          - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
+
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgement
+        title: >-
+          The ReviewService class shall ask for no acknowledgement of dropped threads because of an open thread about
+          a check.
+        justification: |
+          Threads that are never carried are not lost by the creator's choice.
+        tests:
+          - FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement
 
       - id: ReviewCenter-ReviewService-FollowUpPreview
         title: >-
-          The ReviewService class shall tell a member of the project who may see it, without storing anything and
-          without an audit entry, what a follow-up of a given earlier review would carry over for a given set of files:
-          the number of answers and of not-applicable sections, the number of open threads, the number of resolved
-          threads that are not carried, and the files of open threads that the new review does not have, by the same
-          rule that the creation applies, refusing an unfit earlier review with the FollowUpInvalid rule, and refusing
-          a user who may not see the project as for a project that does not exist. The files must obey the file rules
-          of the creation (count, paths, sizes, unique paths), so that a set the creation would refuse is refused with
-          the same rule and message instead of failing.
+          The ReviewService class shall tell a member of the project who may see it, for a given earlier review and a
+          given set of files, the number of answers, not-applicable sections, open threads, resolved threads that are
+          not carried, and the files of open threads that the new review does not have, by the same rule that creation
+          applies.
         justification: |
-          The person who creates a follow-up should see what it takes over, and what would be dropped, before the
-          review exists. Using the rule of the creation keeps the preview from promising what the creation does not
-          do, and a preview that changes nothing and needs no more right than reading the review cannot be used to
-          probe the reviews of other projects.
+          The creator sees what a follow-up takes over before the review exists.
         tests:
           - ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries
+
+      - id: ReviewCenter-ReviewService-FollowUpPreview-ReadOnly
+        title: >-
+          The ReviewService class shall store nothing and write no audit entry when it previews a follow-up.
+        justification: |
+          Looking at what would happen must not change anything.
+        tests:
           - ReviewService_PreviewFollowUpAsync_ChangesNothing
+
+      - id: ReviewCenter-ReviewService-FollowUpPreview-UnfitSource
+        title: >-
+          The ReviewService class shall refuse an earlier review that is blank, missing, of another project, or
+          without a file in common with the given files, with the FollowUpInvalid rule.
+        justification: |
+          The preview must refuse what creation would refuse.
+        tests:
           - ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid
+
+      - id: ReviewCenter-ReviewService-FollowUpPreview-Files
+        title: >-
+          The ReviewService class shall refuse a set of files that creation would refuse, such as no file, a duplicate
+          path, or a path that is too long, with the same rule and message.
+        justification: |
+          The preview must refuse what creation would refuse.
+        tests:
           - ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation
-          - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
-          - ReviewReads_Auditor_AreAllowed
-          - AccessCoverage_PublicActorMethods_AreAllClassified
+
+      - id: ReviewCenter-ReviewService-FollowUpPreview-Hidden
+        title: >-
+          The ReviewService class shall refuse a user who may not see the project as for a project that does not
+          exist, with the ProjectNotFound rule, even when the named review does not exist.
+        justification: |
+          A project that a user may not see, and its reviews, must not be revealed.
+        tests:
+          - ReviewService_PreviewFollowUpAsync_NotAMember_IsRefusedAsMissingProject
+
+      - id: ReviewCenter-ReviewService-FollowUpPreview-Auditor
+        title: >-
+          The ReviewService class shall let a read-only member of the project, such as an auditor, preview a
+          follow-up.
+        justification: |
+          Previewing is reading, which needs only the right to view the project.
+        tests:
+          - ReviewService_PreviewFollowUpAsync_Auditor_MayPreview

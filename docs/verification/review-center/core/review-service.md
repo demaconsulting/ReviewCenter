@@ -109,6 +109,11 @@ rejected with `ReviewTitleInvalid`. This scenario is tested by
 is rejected with `ProjectNotFound`, which is also the refusal for a project the actor may not see. This scenario is
 tested by `ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound`.
 
+**ReviewService_CreateDraftAsync_ActorWithoutAccess_ThrowsProjectNotFound**: Arrange a project and a user who is not a
+member of it; act by creating a review as that user, once with a valid request and once with an invalid identifier, a
+blank title, and no files; assert both are refused with `ProjectNotFound` and nothing is stored. This scenario is
+tested by `ReviewService_CreateDraftAsync_ActorWithoutAccess_ThrowsProjectNotFound`.
+
 **ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles**: A review without files is rejected with `NoFiles`. This
 scenario is tested by `ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles`.
 
@@ -213,6 +218,11 @@ reads the repository again. This scenario is tested by
 (a further commit after the creation) by
 `ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits`.
 
+**ReviewService_CreateFromRepositoryAsync_RepositoryDisabledLater_ReviewIsUnaffected**: Arrange a review created from a
+repository and remember its record digest; act by disabling the repository and reading the review; assert the review,
+its head and baseline content, and its record digest are unchanged. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_RepositoryDisabledLater_ReviewIsUnaffected`.
+
 **ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading**: A baseline or head blob over the
 per-file limit is refused before any blob is read. This scenario is tested by
 `ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading`, the total limit by
@@ -228,6 +238,22 @@ unknown or invalid revision, an unusable selection, and a bad identifier are eac
 refused before the repository is opened
 (`ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening`), and a service built
 without repositories throws (`ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws`).
+
+**ReviewService_CreateFromRepositoryAsync_RepositoryOfOtherProject_IsRefusedAsNotFound**: Arrange a repository of
+another project; act by creating a review from it; assert the creation is refused with `RepositoryNotFound`, nothing is
+stored, and the repository is not opened. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_RepositoryOfOtherProject_IsRefusedAsNotFound`.
+
+**ReviewService_CreateFromRepositoryAsync_UnknownHeadRevision_ThrowsRevisionNotFound**: Arrange a repository that does
+not know the head revision; act by creating a review with that head; assert the creation is refused with
+`RevisionNotFound` and nothing is stored. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_UnknownHeadRevision_ThrowsRevisionNotFound`.
+
+**ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange**: Arrange a repository; act
+by creating a review with a due date ten days ahead and again with yesterday; assert the first stores the date and
+its audit entry ends with `, due yyyy-MM-dd`, and the second is refused with `DueDateInvalid`, stores nothing, and
+does not open the repository. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_DueDate_IsStoredAuditedAndRefusedWhenOutOfRange`.
 
 **ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest**: Two reviews with the same head files
 but another selection text, head commit, or repository have different record digests. This scenario is tested by
@@ -522,6 +548,23 @@ second one carried, still naming the original answerer and marked with the secon
 different sets are refused with `FollowUpInvalid`. This scenario is tested by
 `ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch`.
 
+**ReviewService_CreateFromSessionAsync_ReviewSetId_IsRecordedAndNamedLastInAudit**: Arrange an open repository session;
+act by creating a review for the review set `core-set`; assert the review records the set identifier and its audit
+entry ends with `, set 'core-set'`. This scenario is tested by
+`ReviewService_CreateFromSessionAsync_ReviewSetId_IsRecordedAndNamedLastInAudit`.
+
+**ReviewService_CreateFromSessionAsync_ReviewSetIdOutOfRange_ThrowsReviewSetConfigInvalid**: Arrange an open
+repository session; act by creating a review with a review-set identifier of zero or 101 characters; assert it is
+refused with `ReviewSetConfigInvalid` and nothing is stored; an identifier of exactly 100 characters is accepted and
+stored whole. This scenario is tested by
+`ReviewService_CreateFromSessionAsync_ReviewSetIdOutOfRange_ThrowsReviewSetConfigInvalid` and
+`ReviewService_CreateFromSessionAsync_ReviewSetIdOfMaxLength_IsAccepted`.
+
+**ReviewService_CreateDraftAsync_FollowUp_ReopenedSource_CarriesNoReopening**: Arrange an earlier review that was
+approved and then reopened; act by creating a follow-up of it; assert the follow-up has no reopening and is not
+approved, and the earlier review keeps its reopening. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_ReopenedSource_CarriesNoReopening`.
+
 **ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker**: Answering a carried check again, and
 setting a carried section again, stores a row with no carried mark and with the new person. This scenario is tested by
 `ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker`.
@@ -567,6 +610,15 @@ with `FollowUpInvalid`; the last message says that there is no file in common. T
 that is too long, or no file at all is refused with the rule of the creation (`DuplicatePath`, `PathInvalid`,
 `NoFiles`) before any path is compared, and the message of the duplicate names the path. This scenario is tested by
 `ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation`.
+
+**ReviewService_PreviewFollowUpAsync_NotAMember_IsRefusedAsMissingProject**: Arrange a project with a review and a user
+who is not a member of it; act by previewing a follow-up of the review and of a review that does not exist; assert both
+are refused with `ProjectNotFound`. This scenario is tested by
+`ReviewService_PreviewFollowUpAsync_NotAMember_IsRefusedAsMissingProject`.
+
+**ReviewService_PreviewFollowUpAsync_Auditor_MayPreview**: Arrange a project with a review and a read-only member (an
+auditor); act by previewing a follow-up as the auditor; assert the counts are returned and nothing is stored or
+audited. This scenario is tested by `ReviewService_PreviewFollowUpAsync_Auditor_MayPreview`.
 
 **FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped**: Open and resolved threads
 about a check are not carried and are counted only as threads left out, neither as resolved threads nor as dropped
