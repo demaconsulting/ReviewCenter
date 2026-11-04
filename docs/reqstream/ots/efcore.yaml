@@ -11,30 +11,61 @@ sections:
         requirements:
           - id: ReviewCenter-OTS-EfCore-Mapping
             title: >-
-              Entity Framework Core shall map entity classes to database tables, including composite keys and
-              binary columns, and save and read them back unchanged.
+              Entity Framework Core shall map entity classes to database tables and read a saved entity back
+              unchanged.
             justification: |
-              Entity Framework Core is the object-relational mapper behind the Storage subsystem. Passing tests
-              that save projects, reviews, and binary file content, and read them back from a real database,
-              confirm that it maps the model correctly, including keys that span a project and a review
-              identifier.
+              Entity Framework Core is the object-relational mapper behind the Storage subsystem. A passing test
+              that saves a project and reads it back from a real database through a new context confirms that it
+              maps the model correctly.
             tags: [ots]
             tests:
               - ReviewStore_AddProjectAsync_ValidProject_RoundTrips
+
+          - id: ReviewCenter-OTS-EfCore-Mapping-BinaryColumns
+            title: Entity Framework Core shall save a binary column and read its bytes back unchanged.
+            justification: |
+              The content of the files of a review is binary and may hold carriage returns or nothing. A passing
+              test confirms that every byte array comes back byte for byte.
+            tags: [ots]
+            tests:
               - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
+
+          - id: ReviewCenter-OTS-EfCore-Mapping-CompositeKeys
+            title: Entity Framework Core shall map a composite key that spans a project and a review identifier.
+            justification: |
+              A review is identified within its project, so the same review identifier occurs in several projects. A
+              passing test confirms that both reviews are saved and that each is read back from its own project.
+            tags: [ots]
+            tests:
               - ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
 
           - id: ReviewCenter-OTS-EfCore-Sqlite
             title: >-
               The Entity Framework Core SQLite provider shall create a database file with the tables of the model
-              on first use and shall make the database enforce key uniqueness and the relationship between
-              reviews and projects.
+              on first use.
             justification: |
-              SQLite is the supported database. Passing tests that create a database in a new folder and that
-              show the database refusing a duplicate key and a review without a project confirm the provider
-              behaves as the Storage subsystem relies on.
+              SQLite is the supported database, and a new installation starts without a database. A passing test
+              that creates a database in a new folder confirms that the provider creates the file and the tables.
             tags: [ots]
             tests:
               - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+
+          - id: ReviewCenter-OTS-EfCore-Sqlite-KeyUniqueness
+            title: The Entity Framework Core SQLite provider shall make the database refuse a duplicate key.
+            justification: |
+              The Storage subsystem relies on the database to refuse a second review with the same key. A passing
+              test confirms that the database reports the duplicate.
+            tags: [ots]
+            tests:
               - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
+
+          - id: ReviewCenter-OTS-EfCore-Sqlite-Relationship
+            title: >-
+              The Entity Framework Core SQLite provider shall make the database refuse a review that belongs to no
+              project.
+            justification: |
+              A review without a project would be unreachable. A passing test confirms that the database refuses
+              such a review and that nothing is stored.
+            tags: [ots]
+            tests:
               - ReviewStore_AddReviewAsync_UnknownProject_IsNotStored

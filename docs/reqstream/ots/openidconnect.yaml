@@ -12,19 +12,94 @@ sections:
           - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow
             title: >-
               Microsoft.AspNetCore.Authentication.OpenIdConnect shall perform the authorization code flow with a proof
-              key, a state, and a nonce against the provider, shall accept the identity token only when its signature,
-              issuer, audience, and lifetime are valid and the state is the one it issued, and shall let the
-              application add prompt and max_age to the request and read the claims of the token.
+              key, a state, and a nonce against the provider.
             justification: |
               The sign-in with a provider and the confirmation of identity for a signature rely on this package to
-              speak the protocol and to check the token. Passing tests that run the whole flow against a test provider
-              that signs real tokens, and that tamper with the state or make the provider refuse, confirm that a valid
-              answer signs the user in, that a wrong one does not, and that the request carries what the application
-              asked for.
+              speak the protocol. Passing tests that run the whole flow against a test provider that signs real
+              tokens confirm that the request asks for a code with a proof key challenge, a state, and a nonce, and
+              that a valid answer signs the user in.
             tags: [ots]
             tests:
               - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
               - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-State
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an answer of the provider whose state is
+              not the one that it issued.
+            justification: |
+              An answer that does not belong to the request that the handler sent could be forged. A passing test that
+              tampers with the state confirms that the handler refuses the answer and that no session is created.
+            tags: [ots]
+            tests:
               - OidcSignIn_TamperedState_IsRefused
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Signature
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an identity token whose signature is not
+              made with a key of the provider.
+            justification: |
+              A token that the provider did not sign proves nothing about the user. A passing test confirms that a
+              token with a wrong signature creates no session and no account.
+            tags: [ots]
+            tests:
+              - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Lifetime
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an identity token whose lifetime has
+              expired.
+            justification: |
+              An old token could be replayed. A passing test confirms that an expired token creates no session and no
+              account.
+            tags: [ots]
+            tests:
+              - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Issuer
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an identity token whose issuer is not the
+              provider that is configured.
+            justification: |
+              A token of another issuer says nothing about the users of the configured provider. A passing test
+              confirms that a validly signed token of a wrong issuer creates no session and no account.
+            tags: [ots]
+            tests:
+              - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Audience
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall refuse an identity token whose audience is not
+              the client of the application.
+            justification: |
+              A token that was issued for another client must not sign a user in here. A passing test confirms that a
+              validly signed token of a wrong audience creates no session and no account.
+            tags: [ots]
+            tests:
+              - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall report a failure and create no session when the
+              provider refuses the code.
+            justification: |
+              A refusal of the provider must never look like a sign-in. A passing test that makes the token endpoint
+              refuse the code confirms the failure and that no session is created.
+            tags: [ots]
+            tests:
               - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall let the application add prompt and max_age to the
+              authorization request.
+            justification: |
+              The confirmation of identity for a signature asks the provider for a new sign-in. A passing test
+              confirms that the request carries the prompt and the maximum age that the application added.
+            tags: [ots]
+            tests:
+              - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall give the application the claims of the identity
+              token.
+            justification: |
+              The application creates the account from the claims and checks the time of the login. Passing tests
+              confirm that the claims, including the authentication time, reach the application.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
               - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature

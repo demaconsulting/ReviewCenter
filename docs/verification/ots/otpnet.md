@@ -49,7 +49,7 @@ and verified at an instant in the middle of a step.
 **Expected**: The code is accepted and the step that the library reports equals the independently computed
 `floor(unix time / 30)` plus the offset.
 
-**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp`.
+**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp-TimeStep`.
 
 #### TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
 
@@ -58,7 +58,7 @@ and verified at an instant in the middle of a step.
 **Expected**: Each secret has 20 bytes, the two differ, the text has 32 symbols without padding, and every way round
 gives the same bytes and the same text.
 
-**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp`.
+**Requirement coverage**: `ReviewCenter-OTS-OtpNet-Totp-Base32`.
 
 #### ValidationChecks_Totp_Run_PassesWithRfcVectors
 

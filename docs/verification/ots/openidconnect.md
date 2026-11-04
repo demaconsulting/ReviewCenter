@@ -26,7 +26,8 @@ verification. A passing pipeline run for the scenario constitutes evidence that 
 **Expected**: The handler accepts the valid identity token, the claims reach the application, and the person is signed
 in.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims`.
 
 #### OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
 
@@ -42,7 +43,29 @@ in.
 
 **Expected**: The handler refuses the answer and no session is created.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-State`.
+
+#### OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+
+**Scenario**: The test provider issues an identity token that has expired, and one that is signed with a key it does
+not serve.
+
+**Expected**: The handler refuses each token, the person is sent to the sign-in page with an error, and no session and
+no account are created.
+
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-Signature`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-Lifetime`.
+
+#### OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+
+**Scenario**: The test provider issues an identity token with a wrong issuer, one with a wrong audience, and one with a
+wrong nonce.
+
+**Expected**: The handler refuses each token, the person is sent to the sign-in page with an error, and no session and
+no account are created.
+
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-Issuer`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-Audience`.
 
 #### OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
 
@@ -50,7 +73,7 @@ in.
 
 **Expected**: The handler reports a failure and no session is created.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal`.
 
 #### OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 
@@ -59,4 +82,5 @@ in.
 **Expected**: The handler sends `prompt=login` and `max_age=0` that the application added, and delivers the claims
 including `auth_time` that the application checks.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters`,
+`ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims`.

@@ -9,15 +9,24 @@ sections:
       - title: ReviewMark Requirements
         requirements:
           - id: ReviewCenter-OTS-ReviewMark
-            title: ReviewMark shall produce review documentation from the review configuration.
+            title: ReviewMark shall produce a review plan from the review configuration.
             justification: |
-              DemaConsulting.ReviewMark reads the .reviewmark.yaml configuration and the review
-              evidence store to produce a review plan and review report documenting file review
-              coverage and currency. It runs in the same CI pipeline that produces the TRX test
-              results, so a successful pipeline run is evidence that ReviewMark executed without error.
+              DemaConsulting.ReviewMark reads the .reviewmark.yaml configuration to produce a review plan documenting
+              file review coverage. It runs in the same CI pipeline that produces the TRX test results, so a
+              successful pipeline run is evidence that ReviewMark executed without error.
             tags: [ots]
             tests:
               - ReviewMark_ReviewPlanGeneration
+
+          - id: ReviewCenter-OTS-ReviewMark-Report
+            title: ReviewMark shall produce a review report from the review configuration and the review evidence.
+            justification: |
+              DemaConsulting.ReviewMark reads the .reviewmark.yaml configuration and the review evidence store to
+              produce a review report documenting the currency of the reviews. It runs in the same CI pipeline that
+              produces the TRX test results, so a successful pipeline run is evidence that ReviewMark executed
+              without error.
+            tags: [ots]
+            tests:
               - ReviewMark_ReviewReportGeneration
 
           - id: ReviewCenter-OTS-ReviewMark-Lint

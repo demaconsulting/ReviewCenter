@@ -34,7 +34,10 @@ switches the theme, reads texts, changes the viewport and color scheme, takes a 
 **Expected**: Every command succeeds, the hover persists, the project page appears after the project is created,
 the theme attribute of the page is `dark` after the theme button is clicked, and the screenshot is a PNG.
 
-**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`.
+**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`,
+`ReviewCenterPuppet-OTS-Playwright-Chromium-Click`, `ReviewCenterPuppet-OTS-Playwright-Chromium-Hover`,
+`ReviewCenterPuppet-OTS-Playwright-Chromium-Fill`, `ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText`,
+`ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme`, `ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot`.
 
 ### Limitations
 

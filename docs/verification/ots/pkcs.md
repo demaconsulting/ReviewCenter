@@ -32,7 +32,7 @@ satisfied.
 
 **Expected**: The library verifies the signature.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Ecdsa`.
 
 #### AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
 
@@ -40,7 +40,7 @@ satisfied.
 
 **Expected**: The library signs through the key handle, and the signature verifies.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey`.
 
 #### AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
 
@@ -48,7 +48,7 @@ satisfied.
 
 **Expected**: The signature holds the certificate of the signer and the intermediate certificates.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Chain`.
 
 #### AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
 
@@ -56,4 +56,4 @@ satisfied.
 
 **Expected**: The library reports that the signature does not match.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Tamper`.

@@ -23,7 +23,15 @@ the scenario constitutes evidence that the requirement is satisfied.
 
 **Expected**: Every review-set is read with its identifier, title, and paths, and the other keys are left alone.
 
-**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse`.
+**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse`, `ReviewCenter-OTS-YamlDotNet-Parse-UnknownKeys`.
+
+#### ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
+
+**Scenario**: A file with other top-level keys and with an extra key in an entry is read.
+
+**Expected**: The known keys are read, and the unknown keys do not cause an error.
+
+**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse-UnknownKeys`.
 
 #### ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
 
@@ -41,7 +49,7 @@ read.
 **Expected**: Each is reported as an error, and the error of the library carries the line and the column that appear in
 the message of the tool.
 
-**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse`.
+**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse-ErrorPosition`.
 
 #### ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
 
@@ -49,4 +57,4 @@ the message of the tool.
 
 **Expected**: The event parser of the library reports the alias, and the tool refuses the file before anything is built.
 
-**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse`.
+**Requirement coverage**: `ReviewCenter-OTS-YamlDotNet-Parse-Alias`.

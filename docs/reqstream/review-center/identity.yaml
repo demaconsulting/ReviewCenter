@@ -386,6 +386,14 @@ sections:
           - ReviewCenter-OidcSignIn-NoPassword
           - ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-State
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Signature
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Lifetime
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Issuer
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Audience
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-ProviderRefusal
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
           - OidcSignIn_Logout_IsLocalOnly
@@ -542,6 +550,8 @@ sections:
           - ReviewCenter-SignInThrottle-ReleaseAddress-Once
           - ReviewCenter-SignInThrottle-ReleaseAddress-InputValidation
           - ReviewCenter-OTS-OtpNet-Totp
+          - ReviewCenter-OTS-OtpNet-Totp-TimeStep
+          - ReviewCenter-OTS-OtpNet-Totp-Base32
         tests:
           - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
           - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession

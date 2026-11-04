@@ -152,6 +152,10 @@ sections:
           - ReviewCenter-AttestationSigner-Refusals-NotAttestation
           - ReviewCenter-AttestationSigner-Arguments
           - ReviewCenter-OTS-Pkcs-DetachedSignature
+          - ReviewCenter-OTS-Pkcs-DetachedSignature-Ecdsa
+          - ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey
+          - ReviewCenter-OTS-Pkcs-DetachedSignature-Chain
+          - ReviewCenter-OTS-Pkcs-DetachedSignature-Tamper
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 

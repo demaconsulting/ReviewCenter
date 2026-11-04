@@ -7,18 +7,27 @@ defined in the git OTS Software Requirements document.
 
 git mirrors a repository, resolves revisions, lists the files of a commit and the changes between two commits, and
 gives the exact bytes of a file, when it is run as a child process without a shell. It sends credentials that it is
-given in its process environment as an HTTP header without storing them. Passing tests confirm that both function
-correctly.
+given in its process environment as an HTTP header without storing them. Passing tests confirm that all of these
+functions work correctly.
 
 ### Verification Approach
 
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that both
-requirements are satisfied.
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all
+eight requirements are satisfied.
 
 ### Test Scenarios
+
+#### GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository
+
+**Scenario**: Two registered repositories at the same origin are each opened for the first time, with the real git
+program and an empty cache folder.
+
+**Expected**: git creates one bare mirror folder per repository, with no working tree, and leaves no temporary folder.
+
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
 
 #### GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
 
@@ -27,7 +36,7 @@ requirements are satisfied.
 **Expected**: The program runs without a shell, the output of the first call is returned, and the failing call returns
 its exit code and error text.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
@@ -36,7 +45,7 @@ unsafe revision are resolved too.
 
 **Expected**: The first three give the commit identity, and the others are refused.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`.
 
 #### GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 
@@ -46,7 +55,7 @@ link, a submodule, and a change of the file mode only.
 **Expected**: git is run with `--no-renames`, so renames are not detected and the source lists a rename as one deleted
 file and one added file; it also skips the link and the submodule.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ListChanges`.
 
 #### GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
 
@@ -54,7 +63,7 @@ file and one added file; it also skips the link and the submodule.
 
 **Expected**: Every file is listed as added.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ListFiles`.
 
 #### GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
 
@@ -62,7 +71,7 @@ file and one added file; it also skips the link and the submodule.
 
 **Expected**: The bytes are returned unchanged, and the oversized file is refused.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ReadFile`.
 
 #### GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
 
@@ -80,4 +89,4 @@ failure, and the token appears nowhere in the message.
 
 **Expected**: The configuration of the mirror holds no part of the token.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Credentials`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Credentials-NotStored`.

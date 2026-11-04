@@ -11,19 +11,38 @@ sections:
         requirements:
           - id: ReviewCenter-OTS-YamlDotNet-Parse
             title: >-
-              YamlDotNet shall read YAML text written in block, flow, quoted, and plain styles into typed objects,
-              shall ignore the keys that the objects do not have, shall report an alias as an event that can be
-              refused before any object is built, and shall report invalid YAML as an error that names the line and
-              the column.
+              YamlDotNet shall read YAML text written in block, flow, quoted, and plain styles into typed objects.
             justification: |
-              The configuration file of a repository is written by other people and has many more keys than the
-              review-sets that ReviewCenter reads. Passing tests that read the configuration file of this
-              repository, other styles of YAML, and files with errors confirm that the library reads what is needed,
-              leaves the rest alone, lets the tool refuse aliases, and gives the position of a mistake so that the
-              user can correct it.
+              The configuration file of a repository is written by other people in any YAML style. Passing tests that
+              read the configuration file of this repository and files in other styles confirm that the library reads
+              what is needed.
             tags: [ots]
             tests:
               - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
               - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
-              - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+          - id: ReviewCenter-OTS-YamlDotNet-Parse-UnknownKeys
+            title: YamlDotNet shall ignore the keys of YAML text that the typed objects do not have.
+            justification: |
+              The configuration file of a repository has many more keys than the review-sets that ReviewCenter reads.
+              Passing tests confirm that the library leaves the other keys alone at every level.
+            tags: [ots]
+            tests:
+              - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+              - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
+          - id: ReviewCenter-OTS-YamlDotNet-Parse-Alias
+            title: >-
+              YamlDotNet shall report an alias as an event that the tool can refuse before any object is built.
+            justification: |
+              An alias can expand a small file into a very large one. A passing test confirms that the event parser of
+              the library reports the alias, so that the tool refuses the file before anything is built.
+            tags: [ots]
+            tests:
               - ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
+          - id: ReviewCenter-OTS-YamlDotNet-Parse-ErrorPosition
+            title: YamlDotNet shall report invalid YAML as an error that names the line and the column.
+            justification: |
+              The user must be able to find and correct a mistake in the file. A passing test confirms that the error
+              of the library carries the line and the column that appear in the message of the tool.
+            tags: [ots]
+            tests:
+              - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid

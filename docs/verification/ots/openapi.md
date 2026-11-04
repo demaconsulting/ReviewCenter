@@ -26,7 +26,7 @@ pipeline run for the scenario constitutes evidence that the requirement is satis
 **Expected**: The generated document lists only paths under `/api/`, does not list the address of the document itself,
 has the fixed version, no servers, an HTTP bearer security scheme, and one security requirement on every operation.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenApi-Document`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenApi-Document`, `ReviewCenter-OTS-OpenApi-Document-SecurityScheme`.
 
 #### ApiDocument_Get_MatchesCommittedSnapshot
 
@@ -43,4 +43,4 @@ routes is the reviewed one.
 
 **Expected**: The two documents are byte for byte the same, so the output is stable.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenApi-Document`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenApi-Document-Stable`.

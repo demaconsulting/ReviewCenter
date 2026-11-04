@@ -26,7 +26,8 @@ requirement is satisfied.
 **Expected**: The application finds the discovery document and the keys, and accepts the identity token, so the token is
 signed with the keys that the provider serves.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`,
+`ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken`.
 
 #### OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 
@@ -34,7 +35,7 @@ signed with the keys that the provider serves.
 
 **Expected**: The identity token carries an `auth_time` that the application accepts as recent.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime`.
 
 #### OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
 
@@ -42,4 +43,4 @@ signed with the keys that the provider serves.
 
 **Expected**: The tokens carry exactly that time (or none), so the application refuses them.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime`.
