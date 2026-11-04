@@ -162,6 +162,49 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the diff of an approved review says that comments are read-only and disables every line comment
+    ///     control, while the same diff of the open review offers them.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments()
+    {
+        // Arrange: the open review shows enabled controls
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var admin = new Actor("adm", "Adm");
+        var reviewer = await Users.CreateAsync("rev", "Rev", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(reviewer.Id, projectId, cancellationToken);
+        var slot = await Signing.AddSlotAsync(admin, projectId, "REV-1", reviewer.Id, null, cancellationToken);
+        var open = RenderPage(projectId);
+        await SelectFileAsync(open, ModPath);
+        Assert.All(open.FindAll("[data-testid^='diff-comment-']"), button => Assert.False(button.HasAttribute("disabled")));
+
+        // Act: the reviewer answers every check and signs, so that the review is approved; then render the page
+        var actor = new Actor("rev", "Rev");
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+        }
+
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", actor, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(
+            actor, projectId, "REV-1", slot.Id, approval!.Digest, "correct horse battery", cancellationToken);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+
+        // Assert: the hint says so, and every comment control is disabled and marked as locked
+        Assert.Equal("This review is locked; comments are read-only.", cut.Find("[data-testid='diff-hint']").TextContent);
+        var buttons = cut.FindAll("[data-testid^='diff-comment-']");
+        Assert.NotEmpty(buttons);
+        Assert.All(buttons, button =>
+        {
+            Assert.True(button.HasAttribute("disabled"));
+            Assert.Equal("true", button.GetAttribute("data-locked"));
+        });
+    }
+
+    /// <summary>
     ///     Test that a modified file opens as a diff with the "x added, y removed" summary, the hint, and the
     ///     rows numbered on both sides.
     /// </summary>

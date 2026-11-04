@@ -1438,93 +1438,419 @@ sections:
 
       - id: ReviewCenter-ReviewPage-SignatureWarning
         title: >-
-          The ReviewPage unit shall post a new thread, a reply, and the resolving and reopening of a thread as chat
-          that is not included in the report, store each at once without a warning on a review with a current
-          signature and leave that signature current, resolve a thread without a resolution note, and show a refusal
-          for another reason, such as a review that was concluded meanwhile, as the normal error message and not as
-          a warning.
+          The ReviewPage unit shall store a new thread, a reply, and the resolving and reopening of a thread at once
+          and without a warning on a review with a current signature.
         justification: |
-          Chat is not part of what a signature covers, so it neither needs the confirmation of the reader nor voids
-          the signature. The page does not offer to include a comment in the report in this version, so it never meets
-          the warning for a thread action; a change of the checklist still warns, which the checklist page tests
-          cover.
+          Chat is not part of what a signature covers, so it needs no confirmation of the reader.
         tests:
           - ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature
+
+      - id: ReviewCenter-ReviewPage-SignatureWarning-SignatureKept
+        title: >-
+          The ReviewPage unit shall leave the signature of a review current after chat was posted on it.
+        justification: |
+          Chat does not void a signature, so the slot keeps showing that it is signed.
+        tests:
+          - ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature
+
+      - id: ReviewCenter-ReviewPage-SignatureWarning-Question
+        title: >-
+          The ReviewPage unit shall post a new thread as a Question, which is not included in the report.
+        justification: |
+          The page only posts chat; it does not offer to include a comment in the report in this version.
+        tests:
+          - ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature
+
+      - id: ReviewCenter-ReviewPage-SignatureWarning-ResolveNote
+        title: >-
+          The ReviewPage unit shall resolve a Question without a resolution note.
+        justification: |
+          The note is optional for a Question, so a reader can close chat with one action.
+        tests:
           - ReviewPage_ResolveThread_Question_PassesNullNoteAndResolves
+
+      - id: ReviewCenter-ReviewPage-SignatureWarning-RefusalMessage
+        title: >-
+          The ReviewPage unit shall show the refusal of a new thread for a review that was concluded meanwhile as the
+          normal error message and not as a signature warning.
+        justification: |
+          A refusal for another reason is an error, not a question about signatures, so it must not look like one.
+        tests:
           - ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning
 
       - id: ReviewCenter-ReviewPage-Reviewers
         title: >-
-          The ReviewPage unit shall show a Reviewers card that lists the reviewer slots of the review as "Slot N"
-          with the primary reviewer, the alternate reviewer ("None" when there is none), and the signature status
-          ("Not signed", "Signed by {name} on {UTC time}", or "Signed, then the review changed"); let a signed-in user
-          add a slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
-          signature, showing the reason next to the control when a change is refused, and naming the signers of
-          other slots whose signature the change would make out of date and storing the change only after the user
-          confirms; offer no change or removal
-          for a slot that has a signature; show the display names as plain text; mark an assignee who is no longer a
-          member of the project with the badge "No longer a project member" and, for the slot, the hint that such a
-          reviewer cannot sign until added again, and no such marker for assignees who are members; keep a primary or
-          alternate reviewer who is disabled or no longer a member as a labeled choice in the change lists instead
-          of a blank one; show next to the controls of an unsigned slot a note that removing or replacing a reviewer
-          also removes the ballot that reviewer handed in; and show next to the review title a badge that reads
-          Approved or In review.
+          The ReviewPage unit shall show a Reviewers card that lists each reviewer slot of the review as "Slot N" with
+          its primary reviewer and its alternate reviewer ("None" when there is none).
         justification: |
-          Approval of a review is by named people. The reviewer must see who has to sign, who has signed and
-          whether a signature still covers the current record. A slot that carries a signature is part of the
-          approval history and must not be edited away from the page. Display names are chosen by users, so they
-          must never be able to change the page. A person who left the project keeps the slot but can no longer
-          sign, so the page says why a slot cannot make progress.
+          Approval of a review is by named people, so the reviewer must see who has to sign.
         tests:
           - ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge
           - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
-          - ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing
           - ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves
+
+      - id: ReviewCenter-ReviewPage-Reviewers-NotSigned
+        title: >-
+          The ReviewPage unit shall show the signature status of a slot without a signature as "Not signed".
+        justification: |
+          The reviewer must see what is still to do.
+        tests:
+          - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+
+      - id: ReviewCenter-ReviewPage-Reviewers-SignedStatus
+        title: >-
+          The ReviewPage unit shall show the signature status of a signed slot as "Signed by {name} on {UTC time}".
+        justification: |
+          The reviewer must see who signed and when.
+        tests:
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-Reviewers-OutOfDate
+        title: >-
+          The ReviewPage unit shall show the signature status of a slot whose record changed after signing as
+          "Signed, then the review changed".
+        justification: |
+          The reviewer must see that a signature no longer covers the current record.
+        tests:
+          - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
+
+      - id: ReviewCenter-ReviewPage-Reviewers-AddSlot
+        title: >-
+          The ReviewPage unit shall let a signed-in user add a slot by choosing a primary reviewer and an optional
+          alternate reviewer.
+        justification: |
+          Any user who may see the project manages the reviewer slots of its reviews.
+        tests:
+          - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
+
+      - id: ReviewCenter-ReviewPage-Reviewers-EnabledOnly
+        title: >-
+          The ReviewPage unit shall offer only enabled users in the choice lists of the add form.
+        justification: |
+          A disabled user cannot sign, so offering one only leads to an error.
+        tests:
+          - ReviewPage_Render_DisabledUser_IsNotOfferedInTheAddForm
+
+      - id: ReviewCenter-ReviewPage-Reviewers-AddRefusal
+        title: >-
+          The ReviewPage unit shall show the reason next to the add control and add nothing when the choices of a new
+          slot are refused.
+        justification: |
+          The user must learn why no slot was added.
+        tests:
+          - ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing
+
+      - id: ReviewCenter-ReviewPage-Reviewers-ChangeSlot
+        title: >-
+          The ReviewPage unit shall let a signed-in user change the primary and the alternate reviewer of a slot that
+          has no signature.
+        justification: |
+          A slot without a signature is not yet part of the approval history.
+        tests:
+          - ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves
+
+      - id: ReviewCenter-ReviewPage-Reviewers-RemoveSlot
+        title: >-
+          The ReviewPage unit shall let a signed-in user remove a slot that has no signature.
+        justification: |
+          A slot without a signature is not yet part of the approval history.
+        tests:
+          - ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves
+
+      - id: ReviewCenter-ReviewPage-Reviewers-ChangeRefusal
+        title: >-
+          The ReviewPage unit shall show the reason next to the slot and keep the slot unchanged when a change of the
+          slot is refused.
+        justification: |
+          The user must learn why the slot did not change.
+        tests:
+          - ReviewPage_EditSlot_InvalidChoices_ShowsErrorNextToTheSlot
+
+      - id: ReviewCenter-ReviewPage-Reviewers-EditWarning
+        title: >-
+          The ReviewPage unit shall show, before a change of a slot that would make the signatures of other slots out
+          of date, a warning that names the signers of those slots.
+        justification: |
+          A change of the record withdraws signatures, so the reader must know whose.
+        tests:
           - ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm
+
+      - id: ReviewCenter-ReviewPage-Reviewers-EditConfirm
+        title: >-
+          The ReviewPage unit shall store the change of a slot that carries such a warning only after the user
+          confirms.
+        justification: |
+          The reader decides whether to withdraw the signatures.
+        tests:
+          - ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm
+
+      - id: ReviewCenter-ReviewPage-Reviewers-RemoveWarning
+        title: >-
+          The ReviewPage unit shall show, before the removal of a slot that would make the signatures of other slots
+          out of date, a warning that names the signers of those slots.
+        justification: |
+          The removal of a slot changes the record, so the reader must know whose signatures it withdraws.
+        tests:
           - ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm
+
+      - id: ReviewCenter-ReviewPage-Reviewers-RemoveConfirm
+        title: >-
+          The ReviewPage unit shall remove a slot that carries such a warning only after the user confirms.
+        justification: |
+          The reader decides whether to withdraw the signatures.
+        tests:
+          - ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm
+
+      - id: ReviewCenter-ReviewPage-Reviewers-SignedNoChange
+        title: >-
+          The ReviewPage unit shall offer no change or removal for a slot that has a signature.
+        justification: |
+          A slot that carries a signature is part of the approval history and must not be edited away from the page.
+        tests:
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
           - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
+
+      - id: ReviewCenter-ReviewPage-Reviewers-PlainName
+        title: >-
+          The ReviewPage unit shall show the display names of the reviewers as plain text.
+        justification: |
+          Display names are chosen by users, so they must never be able to change the page.
+        tests:
           - ReviewPage_Render_SlotDisplayName_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-Reviewers-NonMemberBadge
+        title: >-
+          The ReviewPage unit shall mark an assignee who is no longer a member of the project with the badge "No
+          longer a project member".
+        justification: |
+          A person who left the project keeps the slot but can no longer sign.
+        tests:
           - ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem
+
+      - id: ReviewCenter-ReviewPage-Reviewers-NonMemberHint
+        title: >-
+          The ReviewPage unit shall show for a slot with such an assignee the hint that this reviewer cannot sign until
+          added to the project again.
+        justification: |
+          The page says why the slot cannot make progress.
+        tests:
+          - ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem
+
+      - id: ReviewCenter-ReviewPage-Reviewers-MemberUnmarked
+        title: >-
+          The ReviewPage unit shall show neither the badge nor the hint for assignees who are members of the project.
+        justification: |
+          A marker on a member would mislead the reader.
+        tests:
+          - ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem
+
+      - id: ReviewCenter-ReviewPage-Reviewers-DisabledChoice
+        title: >-
+          The ReviewPage unit shall keep a primary or alternate reviewer who is disabled as a labeled choice in the
+          change lists instead of a blank one.
+        justification: |
+          A blank choice would silently drop the stored reviewer when the form is saved.
+        tests:
           - ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists
+
+      - id: ReviewCenter-ReviewPage-Reviewers-NonMemberChoice
+        title: >-
+          The ReviewPage unit shall keep a primary or alternate reviewer who is no longer a member of the project as a
+          labeled choice in the change lists instead of a blank one.
+        justification: |
+          A blank choice would silently drop the stored reviewer when the form is saved.
+        tests:
+          - ReviewPage_EditSlot_NonMemberReviewers_KeepCurrentChoiceInTheLists
+
+      - id: ReviewCenter-ReviewPage-Reviewers-NoExtraOption
+        title: >-
+          The ReviewPage unit shall add no extra option to the change lists for a current reviewer who is an enabled
+          member.
+        justification: |
+          The labeled extra option is only for a reviewer who cannot be chosen again.
+        tests:
           - ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption
+
+      - id: ReviewCenter-ReviewPage-Reviewers-AuthorChoice
+        title: >-
+          The ReviewPage unit shall label the extra option of a review author who holds a slot as not offered for a new
+          choice because of the review author when the project requires independent reviewers.
+        justification: |
+          The label names the rule that applies instead of calling the author disabled.
+        tests:
           - ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule
+
+      - id: ReviewCenter-ReviewPage-Reviewers-BallotNote
+        title: >-
+          The ReviewPage unit shall show next to the controls of an unsigned slot a note that removing or replacing a
+          reviewer also removes the ballot that reviewer handed in.
+        justification: |
+          The user must know the cost of the change before making it.
+        tests:
           - ReviewPage_Render_UnlockedSlot_NotesThatRemovingTakesTheBallot
+
+      - id: ReviewCenter-ReviewPage-Reviewers-ApprovedBadge
+        title: >-
+          The ReviewPage unit shall show next to the review title the badge "Approved" when the review is approved.
+        justification: |
+          The state of the approval must be visible at a glance.
+        tests:
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-Reviewers-InReviewBadge
+        title: >-
+          The ReviewPage unit shall show next to the review title the badge "In review" while the review is not
+          concluded.
+        justification: |
+          The state of the approval must be visible at a glance.
+        tests:
+          - ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge
+          - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
 
       - id: ReviewCenter-ReviewPage-Sign
         title: >-
-          The ReviewPage unit shall offer the signed-in user who is the primary or the alternate reviewer of a slot
-          that is not currently signed a form with the outcome that the signature will record (Approved or
-          Rejected) and the meaning of that outcome, and a password field, and sign the
-          slot for the record that was on screen when the password is correct; instead of the form it shall list
-          what blocks signing while the review cannot be signed (a Fail answer is not one of them, and a Rejected
-          outcome without a conclusion text is); it shall show no form to anybody else; it shall
-          answer a wrong password with the generic message only and never show the typed password; it shall refuse
-          to sign when the record has changed since the page was drawn; and after a signature it shall show the
-          slot as signed and locked, and the review as Approved, or as Rejected, when every slot is signed.
+          The ReviewPage unit shall offer the signed-in user who is the primary or the alternate reviewer of a slot that
+          is not currently signed a sign form with a password field.
+        justification: |
+          Asking again for the password proves that the person at the keyboard is the reviewer. The page only collects
+          the password and passes it on, so it holds no signing rules of its own.
+        tests:
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+          - ReviewPage_Render_SignableReview_OccupantsSeeSignFormWithApprovedOutcome
+
+      - id: ReviewCenter-ReviewPage-Sign-ApprovedOutcome
+        title: >-
+          The ReviewPage unit shall show in the sign form of a review that can be approved the outcome Approved and the
+          meaning of that outcome.
         justification: |
           A signature is a statement by one person about one exact record, and the statement differs for an approval
-          and a rejection, so the form shows which one the signer is about to make. Asking again for the password
-          proves that the person at the keyboard is the reviewer, signing what was shown prevents approving something
-          that was never seen, and listing the blockers tells the reviewer what is left to do. The page only
-          collects the password and passes it on, so it holds no signing rules of its own.
+          and a rejection, so the form shows which one the signer is about to make.
+        tests:
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+          - ReviewPage_Render_SignableReview_OccupantsSeeSignFormWithApprovedOutcome
+
+      - id: ReviewCenter-ReviewPage-Sign-RejectedOutcome
+        title: >-
+          The ReviewPage unit shall show in the sign form of a review that can be rejected the outcome Rejected and the
+          meaning of that outcome.
+        justification: |
+          The statement of a rejection differs from that of an approval, so the form shows which one the signer is
+          about to make.
+        tests:
+          - ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes
+
+      - id: ReviewCenter-ReviewPage-Sign-Signature
+        title: >-
+          The ReviewPage unit shall sign the slot when the password is correct.
+        justification: |
+          The page passes the password on to the signing service, which holds the signing rules.
+        tests:
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-Sign-StaleRecord
+        title: >-
+          The ReviewPage unit shall not sign a slot when the record has changed since the page was drawn.
+        justification: |
+          Signing what was shown prevents approving something that was never seen.
+        tests:
+          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
+
+      - id: ReviewCenter-ReviewPage-Sign-StaleMessage
+        title: >-
+          The ReviewPage unit shall tell the signer that the record has changed when signing is refused for that
+          reason.
+        justification: |
+          The signer must know to read the record again before signing.
+        tests:
+          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
+
+      - id: ReviewCenter-ReviewPage-Sign-Blockers
+        title: >-
+          The ReviewPage unit shall list what blocks signing instead of the sign form to the reviewer of a slot while
+          the review cannot be signed.
+        justification: |
+          Listing the blockers tells the reviewer what is left to do.
         tests:
           - ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm
+
+      - id: ReviewCenter-ReviewPage-Sign-ConclusionBlocker
+        title: >-
+          The ReviewPage unit shall list the missing conclusion text as the blocker, instead of the sign form, for a
+          Rejected outcome without a conclusion text.
+        justification: |
+          A rejection needs stated reasons, so the reviewer is told to write them.
+        tests:
+          - ReviewPage_Render_RejectedOutcomeBlankConclusion_ShowsBlockerAndNoSignForm
+
+      - id: ReviewCenter-ReviewPage-Sign-OthersNoForm
+        title: >-
+          The ReviewPage unit shall show neither the sign form nor the blockers of a slot to a user who is not its
+          primary or alternate reviewer.
+        justification: |
+          Only the occupants of a slot sign it, so nobody else is offered the action.
+        tests:
           - ReviewPage_Render_SignableReview_NonOccupantSeesNoSignForm
+          - ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm
+
+      - id: ReviewCenter-ReviewPage-Sign-WrongPassword
+        title: >-
+          The ReviewPage unit shall answer a wrong password with the generic message "The password is incorrect." only.
+        justification: |
+          The answer must not help somebody who guesses passwords.
+        tests:
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+
+      - id: ReviewCenter-ReviewPage-Sign-PasswordHidden
+        title: >-
+          The ReviewPage unit shall never show the typed password in the page, neither after a wrong nor after a
+          correct password.
+        justification: |
+          A password must not be echoed back to the browser.
+        tests:
           - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
-          - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
-          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
-          - ReviewPage_Render_RejectedOutcomeBlankConclusion_ShowsBlockerAndNoSignForm
+
+      - id: ReviewCenter-ReviewPage-Sign-NoSecondForm
+        title: >-
+          The ReviewPage unit shall offer no sign form for a slot after it was signed.
+        justification: |
+          A slot is signed once; a second signature of the same slot would only confuse the history.
+        tests:
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-Sign-ApprovedResult
+        title: >-
+          The ReviewPage unit shall show the review as Approved when every slot has a current signature.
+        justification: |
+          The reader must see the outcome of the signing at once.
+        tests:
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+
+      - id: ReviewCenter-ReviewPage-Sign-RejectedResult
+        title: >-
+          The ReviewPage unit shall show the review as Rejected when every slot is signed with the outcome Rejected.
+        justification: |
+          The reader must see the outcome of the signing at once.
+        tests:
           - ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes
 
       - id: ReviewCenter-ReviewPage-Digest
         title: >-
-          The ReviewPage unit shall show the record digest of the review in the Details section, as its first 16
-          characters with the full 64-character value in the title of the element.
+          The ReviewPage unit shall show the record digest of the review in the Details section as its first 16
+          characters.
         justification: |
-          The digest identifies the exact record that signatures cover. It is needed rarely and must stay out of
-          the way, yet it must be available in full to anyone who wants to compare it.
+          The digest identifies the exact record that signatures cover. It is needed rarely and must stay out of the
+          way.
+        tests:
+          - ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle
+
+      - id: ReviewCenter-ReviewPage-Digest-FullValue
+        title: >-
+          The ReviewPage unit shall carry the full 64-character record digest in the title of the element that shows
+          its first 16 characters.
+        justification: |
+          Anyone who wants to compare the digest needs the full value.
         tests:
           - ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle
 
@@ -1817,192 +2143,714 @@ sections:
 
       - id: ReviewCenter-ReviewPage-Attestation
         title: >-
-          The ReviewPage unit shall show, only when the review is concluded (approved or rejected) and its signing key
-          can be used, a button that downloads the signed attestation of the review, with a note that says that the key
-          is a self-signed key
-          and not an organization key (worded by the provider: generated by the server for the SelfSigned provider,
-          supplied by the administrator otherwise), or names the certificate that signs,
-          and a link to the help topic; it shall show, instead of the button, that the attestation is unavailable and
-          why, when the key cannot be used, show the warnings of the key status (such as a certificate that ends soon)
-          next to the button, and shall show nothing about the attestation for a review that is not
-          concluded.
+          The ReviewPage unit shall show a button that downloads the signed attestation of a review that is concluded
+          (approved or rejected) when its signing key can be used.
         justification: |
           The attestation is evidence of how a review concluded, so it is offered when the review is concluded, as an
-          approval or as a rejection whose reasons are worth keeping. The note keeps
-          the default key from being taken for an organization key, and a visible reason is better than a download that
-          fails. A self-signed certificate that the administrator supplied was not generated by the server, so the
-          note must
-          not say that it was. A certificate that ends soon should be noticed by the people who download attestations.
+          approval or as a rejection whose reasons are worth keeping.
         tests:
-          - ReviewPage_Render_ReviewNotApproved_OffersNoAttestation
+          - ReviewPage_Sign_CorrectPassword_OffersAttestationDownload
           - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
           - ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
-          - ReviewPage_Render_ReviewApprovedWithSelfSignedCertificateFromStore_NoteSaysAdministratorSuppliedIt
-          - ReviewPage_Render_ReviewApprovedWithOrganizationKey_NoteNamesTheCertificate
-          - ReviewPage_Render_ReviewApprovedWithKeyProblem_ShowsProblemInsteadOfDownload
-          - ReviewPage_Render_KeyStatusWithExpiryWarning_ShowsTheWarningNextToTheDownload
-          - ReviewPage_Render_KeyStatusWithoutWarnings_ShowsNoWarning
-          - ReviewPage_Sign_CorrectPassword_OffersAttestationDownload
+
+      - id: ReviewCenter-ReviewPage-Attestation-Address
+        title: >-
+          The ReviewPage unit shall link the download button to the attestation address of the project and the review.
+        justification: |
+          The button must lead to the attestation of this review and no other.
+        tests:
           - ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-ReviewPage-Attestation-NotConcluded
+        title: >-
+          The ReviewPage unit shall show nothing about the attestation for a review that is not concluded.
+        justification: |
+          There is nothing to attest before the review concluded.
+        tests:
+          - ReviewPage_Render_ReviewNotApproved_OffersNoAttestation
+
+      - id: ReviewCenter-ReviewPage-Attestation-SelfSignedNote
+        title: >-
+          The ReviewPage unit shall show next to the button a note that the key is a self-signed key generated by the
+          server and not an organization key, for the SelfSigned provider.
+        justification: |
+          The note keeps the default key from being taken for an organization key.
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-ReviewPage-Attestation-SuppliedNote
+        title: >-
+          The ReviewPage unit shall show next to the button a note that the key is a self-signed key supplied by the
+          administrator and not an organization key, for a self-signed certificate from the certificate store.
+        justification: |
+          A self-signed certificate that the administrator supplied was not generated by the server, so the note must
+          not say that it was.
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedCertificateFromStore_NoteSaysAdministratorSuppliedIt
+
+      - id: ReviewCenter-ReviewPage-Attestation-OrganizationNote
+        title: >-
+          The ReviewPage unit shall show next to the button a note that names the certificate that signs, for an
+          organization key.
+        justification: |
+          The reader sees who vouches for the attestation.
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithOrganizationKey_NoteNamesTheCertificate
+
+      - id: ReviewCenter-ReviewPage-Attestation-HelpLink
+        title: >-
+          The ReviewPage unit shall show next to the button a link to the help topic about the signing key.
+        justification: |
+          The reader can learn what the note about the key means.
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-ReviewPage-Attestation-KeyProblem
+        title: >-
+          The ReviewPage unit shall show, instead of the button, that the attestation is unavailable and why when the
+          signing key cannot be used.
+        justification: |
+          A visible reason is better than a download that fails.
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithKeyProblem_ShowsProblemInsteadOfDownload
+
+      - id: ReviewCenter-ReviewPage-Attestation-KeyWarning
+        title: >-
+          The ReviewPage unit shall show the warnings of the key status, such as a certificate that ends soon, next to
+          the button.
+        justification: |
+          A certificate that ends soon should be noticed by the people who download attestations.
+        tests:
+          - ReviewPage_Render_KeyStatusWithExpiryWarning_ShowsTheWarningNextToTheDownload
+
+      - id: ReviewCenter-ReviewPage-Attestation-NoKeyWarning
+        title: >-
+          The ReviewPage unit shall show no key warning when the key status has none.
+        justification: |
+          A warning that is always there is not read.
+        tests:
+          - ReviewPage_Render_KeyStatusWithoutWarnings_ShowsNoWarning
 
       - id: ReviewCenter-ReviewPage-ExternalSignature
         title: >-
-          The ReviewPage unit shall, for a user of a provider, offer a button that confirms identity at the provider
-          instead of the password field, and after a successful confirmation offer the signature that uses it; and
-          after a failed confirmation shall say whether the provider did not report a usable sign-in time (`auth_time`
-          absent, or not a whole number of seconds) or the sign-in was not recent enough, and otherwise give the
-          general message.
+          The ReviewPage unit shall offer a user of a provider a button that confirms the identity at the provider
+          instead of the password field.
         justification: |
-          A user of a provider has no password to type, and the confirmation must come before the signature so that
-          the person knows that the next step records it. When the provider sends no usable authentication time, an
-          administrator must change the provider, and the person who sees the failure is the one who tells them.
+          A user of a provider has no password to type.
         tests:
-          - OidcReauth_ReviewPage_OffersConfirmationThenSigning
-          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+          - ReviewPage_Render_ProviderUser_OffersConfirmationButtonInsteadOfPassword
+
+      - id: ReviewCenter-ReviewPage-ExternalSignature-Confirmed
+        title: >-
+          The ReviewPage unit shall offer a user of a provider the signature after a successful confirmation of
+          identity.
+        justification: |
+          The confirmation must come before the signature so that the person knows that the next step records it.
+        tests:
+          - ReviewPage_Render_ProviderUserWithConfirmation_OffersSignButton
+
+      - id: ReviewCenter-ReviewPage-ExternalSignature-MissingTime
+        title: >-
+          The ReviewPage unit shall say, after a failed confirmation because the provider reported no usable sign-in
+          time (`auth_time` absent, or not a whole number of seconds), that the provider did not report a usable
+          sign-in time.
+        justification: |
+          When the provider sends no usable authentication time, an administrator must change the provider, and the
+          person who sees the failure is the one who tells them.
+        tests:
+          - ReviewPage_Render_ProviderUserMissingAuthTime_NamesTheCause
+
+      - id: ReviewCenter-ReviewPage-ExternalSignature-StaleTime
+        title: >-
+          The ReviewPage unit shall say, after a failed confirmation because the sign-in was not recent enough, that
+          the sign-in was not recent enough.
+        justification: |
+          The person knows to sign in again at the provider when asked.
+        tests:
+          - ReviewPage_Render_ProviderUserStaleAuthTime_NamesTheCause
+
+      - id: ReviewCenter-ReviewPage-ExternalSignature-GeneralMessage
+        title: >-
+          The ReviewPage unit shall give the general message after any other failed confirmation of identity.
+        justification: |
+          The page must not say more than it knows about why the confirmation failed.
+        tests:
+          - ReviewPage_Render_ProviderUserFailedConfirmation_ShowsGeneralMessage
 
       - id: ReviewCenter-ReviewPage-SignTotpCode
         title: >-
-          The ReviewPage unit shall show a code field beside the password field of the sign form only for a signer with
-          a second factor, pass the typed code with the password to the signing service, empty both fields after each
-          attempt, and answer a wrong, reused, or recovery code with the same general message as a wrong password.
+          The ReviewPage unit shall show a code field beside the password field of the sign form for a signer who has
+          a second factor.
         justification: |
-          A signature proves that the person was there, so a person with a second factor must give a fresh code. The
-          field must not be offered to people who cannot use it, and the answer must not tell which part was wrong.
+          A signature proves that the person was there, so a person with a second factor must give a fresh code.
+        tests:
+          - ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-NoCodeField
+        title: >-
+          The ReviewPage unit shall show no code field for a signer without a second factor.
+        justification: |
+          A field that people cannot use must not be offered.
         tests:
           - ReviewPage_Render_SignerNotEnrolled_ShowsNoCodeField
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-CodePassed
+        title: >-
+          The ReviewPage unit shall pass the typed code with the password to the signing service.
+        justification: |
+          The signing service decides whether the code is right; the page only collects it.
+        tests:
+          - ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-FieldsCleared
+        title: >-
+          The ReviewPage unit shall empty both the password field and the code field after each attempt.
+        justification: |
+          A secret must not stay in the page after it was used.
+        tests:
           - ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields
           - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-WrongCode
+        title: >-
+          The ReviewPage unit shall answer a wrong code with the message "The password or the code is incorrect." and
+          sign nothing.
+        justification: |
+          The answer must not tell which part was wrong.
+        tests:
+          - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-ReusedCode
+        title: >-
+          The ReviewPage unit shall answer a code that was already used in its time step with the same message and sign
+          nothing.
+        justification: |
+          A code can be used once, and the answer must not tell which part was wrong.
+        tests:
           - ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode-RecoveryCode
+        title: >-
+          The ReviewPage unit shall answer a recovery code typed in place of the code with the same message and sign
+          nothing.
+        justification: |
+          A recovery code is not a code of the authenticator app, and the answer must not tell which part was wrong.
+        tests:
           - ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused
 
       - id: ReviewCenter-ReviewPage-Locked
         title: >-
-          The ReviewPage unit shall show a review that is concluded, approved or rejected, as locked, with a Locked
-          badge next to the status and a banner that says that the review is concluded and locked, shall offer no
-          form to start a thread or to reply, show the diff hint
-          "This review is locked; comments are read-only." instead of the hint to click +, disable the comment
-          controls on lines and resolving and reopening a thread, show no control to add, change, or remove a
-          reviewer slot but only the note that the reviewers cannot change, list all threads rather than only the
-          open ones at first, and shall keep reading, selecting a file, and following links
-          available.
+          The ReviewPage unit shall show a review that is concluded, approved or rejected, with a Locked badge next to
+          the status.
         justification: |
-          A user who sees a disabled control must also see the reason, or the page looks broken. A form that can
-          never be sent, and a hint to click a control that is disabled, only mislead, so they are not shown.
-          Disabling the controls is a courtesy to the user; the lock itself is enforced by the services, so a stale
-          page that still sends a change is refused with the message of the rule.
+          A user who sees a control that is gone or disabled must also see the reason, or the page looks broken.
+        tests:
+          - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+          - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
+
+      - id: ReviewCenter-ReviewPage-Locked-Banner
+        title: >-
+          The ReviewPage unit shall show on a concluded review a banner that says that the review is concluded and
+          locked.
+        justification: |
+          The banner gives the reason why controls are gone or disabled.
+        tests:
+          - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+          - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
+
+      - id: ReviewCenter-ReviewPage-Locked-NoNewThread
+        title: >-
+          The ReviewPage unit shall offer no form to start a thread on a concluded review.
+        justification: |
+          A form that can never be sent only misleads.
+        tests:
+          - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+
+      - id: ReviewCenter-ReviewPage-Locked-NoReply
+        title: >-
+          The ReviewPage unit shall offer no reply box in the threads of a concluded review.
+        justification: |
+          A form that can never be sent only misleads.
+        tests:
+          - ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox
+
+      - id: ReviewCenter-ReviewPage-Locked-DiffHint
+        title: >-
+          The ReviewPage unit shall show in the diff of a concluded review the hint "This review is locked; comments
+          are read-only." instead of the hint to click +.
+        justification: |
+          A hint to click a control that is disabled only misleads.
+        tests:
+          - ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked
+          - ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments
+
+      - id: ReviewCenter-ReviewPage-Locked-LineButtons
+        title: >-
+          The ReviewPage unit shall disable the comment button of every line of a file shown on a concluded review.
+        justification: |
+          Disabling the controls is a courtesy to the user; the banner gives the reason.
+        tests:
+          - ReviewPage_Render_ApprovedReview_DisablesTheLineCommentButtons
+
+      - id: ReviewCenter-ReviewPage-Locked-DiffButtons
+        title: >-
+          The ReviewPage unit shall disable the comment button of every line of the diff shown on a concluded review.
+        justification: |
+          Disabling the controls is a courtesy to the user; the hint gives the reason.
+        tests:
+          - ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked
+          - ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments
+
+      - id: ReviewCenter-ReviewPage-Locked-NoResolve
+        title: >-
+          The ReviewPage unit shall offer no control to resolve or reopen a thread on a concluded review.
+        justification: |
+          A concluded review cannot change, so a control that would change a thread is not offered.
+        tests:
+          - ReviewPage_Render_ApprovedReviewWithThread_OffersNoResolveOrReopen
+
+      - id: ReviewCenter-ReviewPage-Locked-SlotsNoControls
+        title: >-
+          The ReviewPage unit shall show no control to add, change, or remove a reviewer slot on a concluded review.
+        justification: |
+          The slots are part of the approval history and must not change after the conclusion.
         tests:
           - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
           - ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-Locked-SlotsNote
+        title: >-
+          The ReviewPage unit shall show on a concluded review the note that the reviewers cannot change.
+        justification: |
+          The reader learns why the controls for the slots are gone.
+        tests:
+          - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+
+      - id: ReviewCenter-ReviewPage-Locked-ThreadsAll
+        title: >-
+          The ReviewPage unit shall list all threads, not only the open ones, at first on a concluded review.
+        justification: |
+          The history is what the reader wants on a settled review.
+        tests:
+          - ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll
+
+      - id: ReviewCenter-ReviewPage-Locked-Reading
+        title: >-
+          The ReviewPage unit shall keep selecting a file and reading the comments of its threads available on a
+          concluded review.
+        justification: |
+          The lock must not hide the record.
+        tests:
           - ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox
-          - ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked
-          - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
 
       - id: ReviewCenter-ReviewPage-ConclusionCard
         title: >-
-          The ReviewPage unit shall show the review conclusion text in a card for everybody who can read the review,
-          with an explicit "No conclusion written." state when it is blank and the viewer cannot write it, let a primary
-          reviewer or an alternate of a slot write and save it, asking for the confirmation of the signatures that the
-          change would make out of date before it saves, show the text without an editor to everybody else and for a
-          review that is concluded, and show the message of the rule when the service refuses the change.
+          The ReviewPage unit shall show the review conclusion text in a card for everybody who can read the review.
         justification: |
-          A rejection needs stated reasons, and the person who signs must be able to write them where the review is
-          shown. The text is part of the record that the signatures cover, so a change after a signature is confirmed
-          before it withdraws the signature, and a concluded review cannot be changed at all.
+          A rejection needs stated reasons, shown where the review is.
+        tests:
+          - ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor
+          - ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-EmptyState
+        title: >-
+          The ReviewPage unit shall show "No conclusion written." in the card when the conclusion text is blank and
+          the viewer cannot write it.
+        justification: |
+          An empty card must say why it is empty.
+        tests:
+          - ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-Write
+        title: >-
+          The ReviewPage unit shall let the primary reviewer of a slot write and save the conclusion text in the card.
+        justification: |
+          The person who signs must be able to write the reasons where the review is shown.
         tests:
           - ReviewPage_ConclusionCard_SlotOwnerSavesText_ShowsInCard
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-AlternateWrite
+        title: >-
+          The ReviewPage unit shall let the alternate reviewer of a slot write and save the conclusion text in the
+          card.
+        justification: |
+          The alternate signs in place of the primary reviewer, so the alternate must be able to write the reasons.
+        tests:
+          - ReviewPage_ConclusionCard_AlternateSavesText_ShowsInCard
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-Warning
+        title: >-
+          The ReviewPage unit shall show, before a change of the text that would make a current signature out of date,
+          a confirmation that names the signers concerned.
+        justification: |
+          The text is part of the record that the signatures cover, so the reader must know whose signature a change
+          withdraws.
+        tests:
           - ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-ConfirmSave
+        title: >-
+          The ReviewPage unit shall store a changed text that carries such a confirmation only after the user
+          confirms.
+        justification: |
+          The reader decides whether to withdraw the signature.
+        tests:
+          - ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-NoEditor
+        title: >-
+          The ReviewPage unit shall show the text without an editor to a viewer who owns no slot.
+        justification: |
+          Only the reviewers of the slots write the conclusion.
+        tests:
           - ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor
-          - ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-Concluded
+        title: >-
+          The ReviewPage unit shall show the text without an editor on a concluded review, even to the owner of a
+          slot.
+        justification: |
+          A concluded review cannot be changed.
+        tests:
           - ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly
+
+      - id: ReviewCenter-ReviewPage-ConclusionCard-Refusal
+        title: >-
+          The ReviewPage unit shall show the message of the rule when the service refuses a change of the text.
+        justification: |
+          The user must learn why the text was not stored.
+        tests:
+          - ReviewPage_ConclusionCard_ServiceRefuses_ShowsRuleMessage
 
       - id: ReviewCenter-ReviewPage-Reopen
         title: >-
-          The ReviewPage unit shall show to an administrator of the project or a system administrator, and to nobody
-          else, on a review that is locked, a form with a field for the reason of at most 250 characters and a button
-          that reopens the review through the signing service, shall show the message of the rule and keep the review
-          locked when the service refuses, for example for an empty reason, shall show the review as In review after a
-          reopening, and shall list the reopenings, oldest first, each with who reopened, when, the reason, and the
-          short digest of the approved record.
+          The ReviewPage unit shall show to a system administrator, on a review that is locked, a form with a field for
+          the reason and a button that reopens the review.
         justification: |
-          Reopening is the one way out of the lock, so it is offered only to those who may use it, it asks for the
-          reason that the history keeps, and it shows the history so that every reader of the review can see that an
-          approval was reopened and why.
+          Reopening is the one way out of the lock, so it is offered to those who may use it and asks for the reason
+          that the history keeps.
+        tests:
+          - ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory
+
+      - id: ReviewCenter-ReviewPage-Reopen-ProjectAdmin
+        title: >-
+          The ReviewPage unit shall show the reopen form on a locked review to an administrator of the project who is
+          not a system administrator.
+        justification: |
+          The administrator of the project must be able to reopen the reviews of the project.
+        tests:
+          - ReviewPage_Render_ApprovedReviewProjectAdmin_ShowsReopenForm
+
+      - id: ReviewCenter-ReviewPage-Reopen-NobodyElse
+        title: >-
+          The ReviewPage unit shall show the reopen form to nobody else.
+        justification: |
+          Users who may not reopen a review must not be offered an action that is refused.
         tests:
           - ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm
-          - ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory
+
+      - id: ReviewCenter-ReviewPage-Reopen-ReasonLimit
+        title: >-
+          The ReviewPage unit shall limit the field for the reason of a reopening to 250 characters.
+        justification: |
+          The history keeps the reason, so its size is bounded.
+        tests:
+          - ReviewPage_Render_ReopenForm_LimitsTheReasonLength
+
+      - id: ReviewCenter-ReviewPage-Reopen-Refusal
+        title: >-
+          The ReviewPage unit shall show the message of the rule when the service refuses to reopen the review, for
+          example for an empty reason.
+        justification: |
+          The administrator must learn what to correct.
+        tests:
           - ReviewPage_Reopen_EmptyReason_ShowsError
+
+      - id: ReviewCenter-ReviewPage-Reopen-StaysLocked
+        title: >-
+          The ReviewPage unit shall keep the review locked and record no reopening when the service refuses to reopen
+          it.
+        justification: |
+          A refusal must change nothing.
+        tests:
+          - ReviewPage_Reopen_EmptyReason_ShowsError
+
+      - id: ReviewCenter-ReviewPage-Reopen-InReview
+        title: >-
+          The ReviewPage unit shall show the review as In review, without the Locked badge and banner, after a
+          reopening.
+        justification: |
+          The page must show the new state at once.
+        tests:
+          - ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory
+
+      - id: ReviewCenter-ReviewPage-Reopen-History
+        title: >-
+          The ReviewPage unit shall list each reopening with who reopened the review, when, the reason, and the short
+          digest of the approved record.
+        justification: |
+          Every reader of the review can see that an approval was reopened and why.
+        tests:
+          - ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory
+
+      - id: ReviewCenter-ReviewPage-Reopen-HistoryOrder
+        title: >-
+          The ReviewPage unit shall list the reopenings oldest first.
+        justification: |
+          The history reads in the order of the events.
+        tests:
+          - ReviewPage_Reopen_TwoReopenings_ListsOldestFirst
 
       - id: ReviewCenter-ReviewPage-Independence
         title: >-
-          The ReviewPage unit shall, when the project requires independent reviewers, leave the user who created the
-          review out of the lists of users that can be chosen for a slot, and show to that user, in the Reviewers card,
-          a hint that a different project member has to review and sign the review, and shall offer every user again
-          when the project does not require it.
+          The ReviewPage unit shall leave the user who created the review out of the primary and the alternate choice
+          lists of the add form while the project requires independent reviewers.
         justification: |
-          Offering a choice that the service will refuse only leads to an error message. The hint tells the author what
-          to do instead. The service remains the authority and refuses the author even when a stale page offers the
-          choice.
+          Offering a choice that the service will refuse only leads to an error message.
         tests:
           - ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates
+
+      - id: ReviewCenter-ReviewPage-Independence-AuthorHint
+        title: >-
+          The ReviewPage unit shall show to that user, in the Reviewers card, a hint that a different project member has
+          to review and sign the review.
+        justification: |
+          The hint tells the author what to do instead of choosing the own name.
+        tests:
+          - ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates
+
+      - id: ReviewCenter-ReviewPage-Independence-HintAuthorOnly
+        title: >-
+          The ReviewPage unit shall show that hint to no other user.
+        justification: |
+          Other users have nothing to do about the rule for the author.
+        tests:
+          - ReviewPage_Render_IndependenceOn_OtherMemberSeesNoHint
+
+      - id: ReviewCenter-ReviewPage-Independence-Off
+        title: >-
+          The ReviewPage unit shall offer every user again, including the author, and show no hint while the project
+          does not require independent reviewers.
+        justification: |
+          Whether reviewers must be independent of the author is the choice of the project.
+        tests:
+          - ReviewPage_Render_IndependenceOff_OffersTheAuthorAndShowsNoHint
 
       - id: ReviewCenter-ReviewPage-ReopenerBlocked
         title: >-
           The ReviewPage unit shall show to a user who occupies a slot and reopened the review, while the project does
-          not let that person sign again, a notice that another reviewer must sign, instead of the sign form, shall
-          show the sign form to every other occupant and to the reopener when the rule is switched off, and shall show
-          the message of the rule in the reopen error when a reopening is refused because a slot would have nobody who
-          may sign it.
+          not let that person sign again, a notice that another reviewer must sign instead of the sign form.
         justification: |
-          A user who cannot sign must see why, and an administrator who is refused a reopening must learn what to do.
-          The rules are enforced by the signing service, which refuses a stale page that still sends the request.
+          A user who cannot sign must see why.
         tests:
           - ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm
+
+      - id: ReviewCenter-ReviewPage-ReopenerBlocked-OtherOccupants
+        title: >-
+          The ReviewPage unit shall show the sign form and no such notice to every other occupant of the slot.
+        justification: |
+          The rule concerns the person who reopened the review only.
+        tests:
+          - ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm
+
+      - id: ReviewCenter-ReviewPage-ReopenerBlocked-RuleOff
+        title: >-
+          The ReviewPage unit shall show the sign form to the person who reopened the review when the project switched
+          the rule off.
+        justification: |
+          Whether the person who reopened may sign again is the choice of the project.
+        tests:
+          - ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm
+
+      - id: ReviewCenter-ReviewPage-ReopenerBlocked-StrandRefusal
+        title: >-
+          The ReviewPage unit shall show the message of the rule in the reopen error when a reopening is refused
+          because a slot would have nobody who may sign it.
+        justification: |
+          An administrator who is refused a reopening must learn what to do.
+        tests:
           - ReviewPage_Reopen_WouldStrandSlot_ShowsMessageAndReopensNothing
 
       - id: ReviewCenter-ReviewPage-DueDate
         title: >-
-          The ReviewPage unit shall show the due date of a review in its header, stated as a calendar day in UTC, or
-          that there is none, and shall show a form with a date field and buttons to save and to clear the date to
-          the administrators of the project, the system administrators, and the user who created the review, and to
-          nobody else, and never on a review that is locked, shall show the message of the rule when the service
-          refuses a date, including text that is not a date, and shall keep that message visible even when the review
-          was locked meanwhile and the form is gone, and shall show the new date after a change.
+          The ReviewPage unit shall show the due date of a review in its header as a calendar day in UTC.
         justification: |
-          The date is only useful when everyone sees it, and only the people in charge of the review may move it.
-          The form is a courtesy: the service decides who may change the date and refuses a stale page.
+          The date is only useful when everyone who reads the review sees it.
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-ReviewPage-DueDate-NoDate
+        title: >-
+          The ReviewPage unit shall state in the header that the review has no due date when it has none.
+        justification: |
+          The absence of a date must be visible too.
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-ReviewPage-DueDate-SaveDate
+        title: >-
+          The ReviewPage unit shall show the new date after the save button was pressed with a valid date.
+        justification: |
+          The user must see at once what was stored.
         tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+
+      - id: ReviewCenter-ReviewPage-DueDate-ClearDate
+        title: >-
+          The ReviewPage unit shall remove the due date and state that there is none when the clear button is pressed.
+        justification: |
+          A date that was set by mistake or is no longer planned must be possible to take back.
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-ReviewPage-DueDate-SystemAdminForm
+        title: >-
+          The ReviewPage unit shall show a form with a date field and buttons to save and to clear the date to a system
+          administrator.
+        justification: |
+          Only the people in charge of the review may move the date.
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+
+      - id: ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
+        title: >-
+          The ReviewPage unit shall show the same form to an administrator of the project who is not a system
+          administrator.
+        justification: |
+          Only the people in charge of the review may move the date.
+        tests:
+          - ReviewPage_DueDate_ProjectAdministrator_ShowsTheForm
+
+      - id: ReviewCenter-ReviewPage-DueDate-CreatorForm
+        title: >-
+          The ReviewPage unit shall show the same form to the user who created the review.
+        justification: |
+          Only the people in charge of the review may move the date.
+        tests:
           - ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot
+
+      - id: ReviewCenter-ReviewPage-DueDate-NoFormOthers
+        title: >-
+          The ReviewPage unit shall show the form to no other user.
+        justification: |
+          Only the people in charge of the review may move the date.
+        tests:
+          - ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot
+
+      - id: ReviewCenter-ReviewPage-DueDate-NoFormLocked
+        title: >-
+          The ReviewPage unit shall show the form to nobody on a review that is locked.
+        justification: |
+          A concluded review cannot change.
+        tests:
           - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited
+
+      - id: ReviewCenter-ReviewPage-DueDate-BadText
+        title: >-
+          The ReviewPage unit shall show the message of the rule and store nothing when the typed text is not a date.
+        justification: |
+          The user must learn what to correct.
+        tests:
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+
+      - id: ReviewCenter-ReviewPage-DueDate-LockedRefusal
+        title: >-
+          The ReviewPage unit shall show the message of the rule when the service refuses a date because the review was
+          concluded meanwhile.
+        justification: |
+          A page that is out of date must not fail silently.
+        tests:
+          - ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone
+
+      - id: ReviewCenter-ReviewPage-DueDate-RefusalKept
+        title: >-
+          The ReviewPage unit shall keep that message visible after the form is gone.
+        justification: |
+          The reload removes the form, but the explanation must not go with it.
+        tests:
           - ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone
 
       - id: ReviewCenter-ReviewPage-Overdue
         title: >-
-          The ReviewPage unit shall show an Overdue badge next to the due date while the date is before today (UTC)
-          and the review is not approved, shall show no badge for a date that is today or later, and shall keep the
-          date of an approved review, without the badge, as history.
+          The ReviewPage unit shall show an Overdue badge next to the due date while the date is before today (UTC) and
+          the review is not concluded.
         justification: |
-          A reader must see at a glance that a review is late. An approved review has done its work, so calling it
-          overdue would be wrong, but the date stays as the record of what was planned.
+          A reader must see at a glance that a review is late.
         tests:
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+          - ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot
+
+      - id: ReviewCenter-ReviewPage-Overdue-TodayOrLater
+        title: >-
+          The ReviewPage unit shall show no Overdue badge for a due date that is today or later.
+        justification: |
+          A review is not late before its due day is over.
+        tests:
+          - ReviewPage_DueDate_TodayOrLater_ShowsNoOverdueBadge
+
+      - id: ReviewCenter-ReviewPage-Overdue-Concluded
+        title: >-
+          The ReviewPage unit shall show no Overdue badge on a concluded review, approved or rejected.
+        justification: |
+          A concluded review has done its work, so calling it overdue would be wrong.
+        tests:
+          - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited
+          - ReviewPage_DueDate_RejectedConcluded_ShowsNoOverdueBadge
+
+      - id: ReviewCenter-ReviewPage-Overdue-DateKept
+        title: >-
+          The ReviewPage unit shall keep showing the due date of a concluded review.
+        justification: |
+          The date stays as the record of what was planned.
+        tests:
           - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited
 
       - id: ReviewCenter-ReviewPage-FollowUp
         title: >-
-          The ReviewPage unit shall show on a review that follows another a link to the followed review with the
-          number of answers and of threads that were carried, shall show on the review that is followed a list of
-          the reviews that follow it, each with a link, shall mark each carried thread with a link to the review it
-          came from, and shall show none of this on a review that neither follows nor is followed.
+          The ReviewPage unit shall show on a review that follows another a link to the followed review.
         justification: |
-          A reader of a follow-up must see where its answers and threads came from, and a reader of the earlier review
-          must find the review that took over. The marks are the same facts as in the record, so nothing carried can
-          be mistaken for something that was said in this review.
+          A reader of a follow-up must see where its answers and threads came from.
         tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
+      - id: ReviewCenter-ReviewPage-FollowUp-Counts
+        title: >-
+          The ReviewPage unit shall show next to that link the number of answers and of threads that were carried.
+        justification: |
+          The reader sees how much was taken over from the followed review.
+        tests:
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
+      - id: ReviewCenter-ReviewPage-FollowUp-FollowedBy
+        title: >-
+          The ReviewPage unit shall show on a review that is followed a list of the reviews that follow it, each with a
+          link.
+        justification: |
+          A reader of the earlier review must find the review that took over.
+        tests:
           - ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine
+
+      - id: ReviewCenter-ReviewPage-FollowUp-CarriedMark
+        title: >-
+          The ReviewPage unit shall mark each carried thread, and no thread of the review's own, with a link to the
+          review it came from.
+        justification: |
+          Nothing carried can be mistaken for something that was said in this review.
+        tests:
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
+      - id: ReviewCenter-ReviewPage-FollowUp-Standalone
+        title: >-
+          The ReviewPage unit shall show no follows line, no list of follow-ups, and no carried mark on a review that
+          neither follows nor is followed.
+        justification: |
+          These lines are information about a relation between reviews, so they must not appear where there is none.
+        tests:
+          - ReviewPage_Render_StandaloneReview_ShowsNoFollowUpInformation
 
       - id: ReviewCenter-ReviewPage-UnreadMarkers
         title: >-
