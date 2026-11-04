@@ -10,212 +10,1076 @@ sections:
     requirements:
       - id: ReviewCenter-AuditService-Record
         title: >-
-          The AuditService class shall record an audit draft as the next entry of the trail, letting a failure
-          propagate for the strict operation and, for the best-effort operation, awaiting the write, reporting a
-          failure to an error hook, never letting it reach the caller, and never swallowing cancellation.
+          The AuditService class shall record an audit draft as the next entry of the trail with the strict
+          operation.
         justification: |
-          Sign-in, sign-out, failed sign-in, and lockout change no data, so a failing trail must not stop anybody
-          from signing in, yet the failure must be visible to the operator through the log.
+          Every change of data must appear in the trail as one entry that extends the hash chain.
+        tests:
+          - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
+
+      - id: ReviewCenter-AuditService-Record-Parallel
+        title: >-
+          The AuditService class shall keep every entry in one gap-free chain that verifies when drafts are
+          recorded in parallel.
+        justification: |
+          The web server records from many requests at once, and a lost or doubled sequence would break the chain.
+        tests:
+          - AuditService_RecordAsync_ParallelRecords_FormOneIntactChain
+
+      - id: ReviewCenter-AuditService-Record-StrictFailure
+        title: >-
+          The AuditService class shall let a failure of the store propagate to the caller of the strict record
+          operation.
+        justification: |
+          A change of data whose audit entry cannot be stored must fail, so that no change is left without a trail.
+        tests:
+          - AuditService_RecordAsync_NullDraftOrStoreFailure_Throws
+
+      - id: ReviewCenter-AuditService-Record-BestEffort
+        title: >-
+          The AuditService class shall await the write of the entry in the best-effort record operation, so that the
+          entry is stored when the operation returns.
+        justification: |
+          Sign-in, sign-out, failed sign-in, and lockout change no data, so they use the best-effort operation, which
+          must still store the entry before it returns.
+        tests:
+          - AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue
+
+      - id: ReviewCenter-AuditService-Record-BestEffortReturnsTrue
+        title: >-
+          The AuditService class shall return true from the best-effort record operation when the entry is stored.
+        justification: |
+          The caller of the best-effort operation learns from the result alone whether the trail holds the event.
+        tests:
+          - AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue
+
+      - id: ReviewCenter-AuditService-Record-BestEffortFailure
+        title: >-
+          The AuditService class shall return false instead of letting a failure of the store reach the caller of
+          the best-effort record operation.
+        justification: |
+          A failing trail must not stop anybody from signing in.
+        tests:
+          - AuditService_TryRecordAsync_StoreFailure_IsSwallowedAndReported
+
+      - id: ReviewCenter-AuditService-Record-ErrorHook
+        title: >-
+          The AuditService class shall report a failure of the store to the error hook in the best-effort record
+          operation.
+        justification: |
+          A sign-in event that was lost must be visible to the operator through the log, because the caller sees
+          only false.
+        tests:
+          - AuditService_TryRecordAsync_StoreFailure_IsSwallowedAndReported
+
+      - id: ReviewCenter-AuditService-Record-HookFailure
+        title: >-
+          The AuditService class shall return false from the best-effort record operation when the error hook throws
+          or is missing.
+        justification: |
+          The report of a failure must not become a second failure for the caller.
+        tests:
+          - AuditService_TryRecordAsync_FailingOrMissingHook_StillReturnsFalse
+
+      - id: ReviewCenter-AuditService-Record-Cancellation
+        title: >-
+          The AuditService class shall not swallow cancellation in the best-effort record operation.
+        justification: |
+          A cancelled sign-in must stop, and the record of it must not turn the cancellation into a false result.
+        tests:
+          - AuditService_TryRecordAsync_Cancellation_Propagates
+
+      - id: ReviewCenter-AuditService-Record-Arguments
+        title: >-
+          The AuditService class shall refuse a null store and a null draft with an argument exception.
+        justification: |
+          A missing dependency or a missing draft is a programming error that must fail at once.
         tests:
           - AuditService_Constructor_NullStore_Throws
-          - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
           - AuditService_RecordAsync_NullDraftOrStoreFailure_Throws
-          - AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue
-          - AuditService_TryRecordAsync_StoreFailure_IsSwallowedAndReported
-          - AuditService_TryRecordAsync_FailingOrMissingHook_StillReturnsFalse
-          - AuditService_TryRecordAsync_Cancellation_Propagates
           - AuditService_TryRecordAsync_NullDraft_Throws
 
       - id: ReviewCenter-AuditService-Coalesce
         title: >-
-          The AuditService class shall, for events that a caller can repeat without limit, record the first event of a
-          key in a one-minute window and count the repeats of that key in the window instead of recording them,
-          shall put the number of counted repeats into the detail of the first event of the key in the next window,
-          shall keep at most a fixed number of keys (see the overflow requirement for a full table), shall neither
-          count nor start a window for an event whose cancellation was already requested and shall not swallow
-          cancellation, and shall report a failure of the store like the best-effort operation does.
+          The AuditService class shall, for events that a caller can repeat without limit, record the first event of
+          a key in a one-minute window.
         justification: |
           Failed sign-ins of unknown names and attempts on locked or disabled accounts are not limited by the
           account lockout. Recording each of them would let an attacker fill the audit trail, and its database, at
-          will. One row per key and minute keeps the attack visible and the growth bounded. The count of the last
-          window is lost when the key does not occur again, because entries of the trail are never changed. A
-          request that its caller has cancelled must not change the counts, or the trail would show too few
-          repeats or lose the first event of a window.
+          will. One row per key and minute keeps the attack visible and the growth bounded.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue
+
+      - id: ReviewCenter-AuditService-Coalesce-Repeats
+        title: >-
+          The AuditService class shall count the repeats of a key in the one-minute window instead of recording
+          them.
+        justification: |
+          The first row already shows the attack, so a repeat inside the window adds only to a counter that the next
+          window reports.
         tests:
           - AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst
+
+      - id: ReviewCenter-AuditService-Coalesce-NextWindow
+        title: >-
+          The AuditService class shall put the number of counted repeats into the detail of the first event of the
+          key in the next window.
+        justification: |
+          The count of the last window is lost when the key does not occur again, because entries of the trail are
+          never changed.
+        tests:
           - AuditService_TryRecordCoalescedAsync_NextWindow_StoresEntryWithSuppressedCount
+
+      - id: ReviewCenter-AuditService-Coalesce-DifferentKeys
+        title: >-
+          The AuditService class shall keep a separate window for each key of a coalesced event.
+        justification: |
+          The repeats of one key must not hide the first event of another key.
+        tests:
           - AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries
+
+      - id: ReviewCenter-AuditService-Coalesce-KeyLimit
+        title: >-
+          The AuditService class shall keep at most a fixed number of keys, so that it records no event of a new key
+          while that many keys have not expired.
+        justification: |
+          The keys come from the caller, so the table of keys must be bounded. What is written instead of the
+          dropped events is stated by ReviewCenter-AuditService-CoalesceOverflow.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
+
+      - id: ReviewCenter-AuditService-Coalesce-KeyLimitRecovery
+        title: >-
+          The AuditService class shall record the event of a new key again once a window has passed after its table
+          of keys was full.
+        justification: |
+          The keys expire with their window, so the limit must not block new keys for ever.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
+
+      - id: ReviewCenter-AuditService-Coalesce-CancelledRepeat
+        title: >-
+          The AuditService class shall not count a repeat whose cancellation was already requested.
+        justification: |
+          A request that its caller has cancelled must not change the counts, or the trail would show too few
+          repeats.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat
+
+      - id: ReviewCenter-AuditService-Coalesce-CancelledFirst
+        title: >-
+          The AuditService class shall not start a window for a first event whose cancellation was already
+          requested.
+        justification: |
+          A cancelled request must not use up the first event of a window, or the trail would lose it.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow
+
+      - id: ReviewCenter-AuditService-Coalesce-Cancellation
+        title: >-
+          The AuditService class shall not swallow cancellation in the coalescing record operation.
+        justification: |
+          A cancelled request for a repeated event must stop, and counting or storing it must not hide the
+          cancellation.
+        tests:
           - AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat
           - AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow
-          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
+
+      - id: ReviewCenter-AuditService-Coalesce-StoreFailure
+        title: >-
+          The AuditService class shall return false instead of letting a failure of the store reach the caller of
+          the coalescing record operation.
+        justification: |
+          The coalescing operation serves the same sign-in events as the best-effort operation and must not stop
+          anybody from signing in.
+        tests:
           - AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported
+
+      - id: ReviewCenter-AuditService-Coalesce-StoreFailureReported
+        title: >-
+          The AuditService class shall report a failure of the store to the error hook in the coalescing record
+          operation.
+        justification: |
+          A failed sign-in or lockout event that the store lost must be visible to the operator through the log,
+          because the caller sees only false.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported
+
+      - id: ReviewCenter-AuditService-Coalesce-Arguments
+        title: >-
+          The AuditService class shall refuse a null draft and a null key in the coalescing record operation with an
+          argument exception.
+        justification: |
+          A missing draft or key is a programming error that must fail at once.
+        tests:
           - AuditService_TryRecordCoalescedAsync_NullArguments_Throw
 
       - id: ReviewCenter-AuditService-CoalesceOverflow
         title: >-
           The AuditService class, when its table of coalesced keys is full of keys that have not expired, shall count
-          the events of new keys instead of recording them, shall record at most one audit entry per one-minute window
-          that says that events were suppressed (with the count of the previous window), and shall report the
-          saturation to the error hook at most once per window.
+          the events of new keys instead of recording them.
         justification: |
           The keys come from the caller (for example typed user names), so an attacker can fill the table. Dropping
-          events silently would let an attacker hide behind the flood; one bounded row per minute and one report to
-          the operator make the gap visible without letting the trail grow. Existing keys keep coalescing, so the
-          rows per minute stay bounded by the table size plus one.
+          events silently would let an attacker hide behind the flood, so they are counted.
         tests:
-          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
           - AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow
           - AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount
+
+      - id: ReviewCenter-AuditService-CoalesceOverflow-OneEntry
+        title: >-
+          The AuditService class shall record at most one audit entry per one-minute window that says that events
+          were suppressed, when its table of coalesced keys is full.
+        justification: |
+          One bounded row per minute makes the gap visible without letting the trail grow. Existing keys keep
+          coalescing, so the rows per minute stay bounded by the table size plus one.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow
+          - AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount
+
+      - id: ReviewCenter-AuditService-CoalesceOverflow-PreviousCount
+        title: >-
+          The AuditService class shall put the count of the events suppressed in the previous window into the
+          overflow entry of the next window.
+        justification: |
+          The count of the last window is lost otherwise, because entries of the trail are never changed.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount
+
+      - id: ReviewCenter-AuditService-CoalesceOverflow-Reported
+        title: >-
+          The AuditService class shall report the saturation of its table of coalesced keys to the error hook at
+          most once per window.
+        justification: |
+          The operator must learn of the flood once, not once per event.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow
+          - AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount
+
+      - id: ReviewCenter-AuditService-CoalesceOverflow-NeverThrows
+        title: >-
+          The AuditService class shall return false instead of throwing when the store or the error hook fails while
+          it handles a full table of coalesced keys.
+        justification: |
+          The handling of a flood must not turn into a failure for the callers that are being flooded.
+        tests:
           - AuditService_TryRecordCoalescedAsync_TableFullAndHookThrows_StillReturnsFalse
 
       - id: ReviewCenter-AuditService-List
         title: >-
-          The AuditService class shall list the audit trail newest first, 50 entries to a page by default and never
-          more than 200, for the whole trail, for one project (every entry of the project, and no entry of another
-          project or without a project), or for one review, with cursors for the older and the newer page that are
-          offered only when entries exist behind them, and with the older position winning when both are given.
+          The AuditService class shall list the whole audit trail newest first.
         justification: |
-          The history of a review, the audit history of a project, and the audit page must show a trail of any
-          length in bounded pages, and every entry must appear exactly once while paging. The administrators of a
-          project may see the history of their project and must see nothing of any other project. The hard cap keeps
-          a hostile page size from reading the whole trail at once.
+          The audit page must show a trail of any length with the latest events on top.
         tests:
           - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
           - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
+
+      - id: ReviewCenter-AuditService-List-DefaultPageSize
+        title: >-
+          The AuditService class shall list 50 entries to a page by default.
+        justification: |
+          A page of a fixed default size keeps the audit page readable and the read bounded.
+        tests:
+          - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
+          - AuditService_ListAsync_PageSize_DefaultsAndIsCapped
+
+      - id: ReviewCenter-AuditService-List-PageSizeAsked
+        title: >-
+          The AuditService class shall list the number of entries to a page that the caller asks for within the
+          limit.
+        justification: |
+          The audit page offers a choice of page sizes.
+        tests:
+          - AuditService_ListAsync_PageSize_DefaultsAndIsCapped
+          - AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries
+
+      - id: ReviewCenter-AuditService-List-PageSizeCap
+        title: >-
+          The AuditService class shall never list more than 200 entries to a page.
+        justification: |
+          The hard cap keeps a hostile page size from reading the whole trail at once.
+        tests:
+          - AuditService_ListAsync_PageSize_DefaultsAndIsCapped
+
+      - id: ReviewCenter-AuditService-List-Project
+        title: >-
+          The AuditService class shall list every entry of one project, in all its reviews.
+        justification: |
+          The administrators of a project may see the history of their project.
+        tests:
+          - AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents
+
+      - id: ReviewCenter-AuditService-List-ProjectScope
+        title: >-
+          The AuditService class shall list no entry of another project and no entry without a project for one
+          project.
+        justification: |
+          The administrators of a project must see nothing of any other project.
+        tests:
+          - AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents
+
+      - id: ReviewCenter-AuditService-List-Review
+        title: >-
+          The AuditService class shall list only the entries of one review for that review.
+        justification: |
+          The history of a review must show that review and no other.
+        tests:
+          - AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview
+
+      - id: ReviewCenter-AuditService-List-Older
+        title: >-
+          The AuditService class shall offer the cursor for the older page only when entries exist behind the page.
+        justification: |
+          A link to an empty page behind the last entry is a dead end.
+        tests:
+          - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
+          - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
+          - AuditService_ListAsync_ExactlyOnePage_HasNoLinks
+          - AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages
+
+      - id: ReviewCenter-AuditService-List-Newer
+        title: >-
+          The AuditService class shall offer the cursor for the newer page only when entries exist before the page.
+        justification: |
+          A link to an empty page before the first entry is a dead end.
+        tests:
+          - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
           - AuditService_ListAsync_PagingNewer_ReturnsThePageBefore
           - AuditService_ListAsync_ExactlyOnePage_HasNoLinks
+
+      - id: ReviewCenter-AuditService-List-PagingOnce
+        title: >-
+          The AuditService class shall show every entry exactly once while the pages are read from newer to older.
+        justification: |
+          A trail of any length must be readable in pages without a gap or a repeat.
+        tests:
+          - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
+
+      - id: ReviewCenter-AuditService-List-PagingNewer
+        title: >-
+          The AuditService class shall return to the page that the older cursor left when the newer cursor is used.
+        justification: |
+          The reader must be able to go back.
+        tests:
+          - AuditService_ListAsync_PagingNewer_ReturnsThePageBefore
+
+      - id: ReviewCenter-AuditService-List-EmptyTrail
+        title: >-
+          The AuditService class shall list an empty page without cursors for an empty trail.
+        justification: |
+          A new installation has no entries, and the page must not fail.
+        tests:
           - AuditService_ListAsync_EmptyTrail_GivesEmptyPage
-          - AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview
-          - AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents
-          - AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages
+
+      - id: ReviewCenter-AuditService-List-BeforeWins
+        title: >-
+          The AuditService class shall list the older page when both the older and the newer position are given.
+        justification: |
+          A request with both positions needs one defined answer.
+        tests:
           - AuditService_ListAsync_BothPositions_BeforeWins
-          - AuditService_ListAsync_PageSize_DefaultsAndIsCapped
 
       - id: ReviewCenter-AuditService-Filter
         title: >-
-          The AuditService class shall narrow the listing of the audit trail by project, review, actor identity, a
-          case-insensitive text in the actor name, one exact action or a group of actions, and a range of UTC days
-          with both ends included, all conditions together, with the paging of the listing following the matching
-          entries only, shall trim the texts and turn an empty text into no condition, shall refuse a text that is
-          longer than the field it is compared with and a range that ends before it starts with the invalid-filter
-          rule, and shall keep to a list of the known actions that matches the actions the code records.
+          The AuditService class shall narrow the listing of the audit trail to the entries that match all conditions
+          of the filter together.
         justification: |
-          An auditor looking for what one person did, or for every change of a kind, cannot read a trail of any length
-          page by page. The filter is checked before the store is read, so a hostile query value cannot cost a scan,
-          and a filter for a project can never return an entry without a project. The list of actions lets the page
-          offer the choices, and the test that scans the sources keeps the list from drifting away from what is really
-          recorded.
+          An auditor looking for what one person did, or for every change of a kind, cannot read a trail of any
+          length page by page.
         tests:
           - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+
+      - id: ReviewCenter-AuditService-Filter-Project
+        title: >-
+          The AuditService class shall never list an entry without a project for a filter that names a project.
+        justification: |
+          A filter for a project can never return an entry without a project.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+
+      - id: ReviewCenter-AuditService-Filter-Review
+        title: >-
+          The AuditService class shall narrow the listing to the entries of the review that the filter names.
+        justification: |
+          The history of one review is read through the same filter.
+        tests:
           - AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries
-          - AuditService_ListAsync_InvalidFilter_IsRefused
-          - AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull
-          - AuditFilter_None_ValidatesToItself
-          - AuditFilter_Validated_TextTooLong_IsRefused
-          - AuditFilter_Validated_ReversedRange_IsRefusedAndSingleDayAccepted
+
+      - id: ReviewCenter-AuditService-Filter-ActorText
+        title: >-
+          The AuditService class shall narrow the listing to the entries whose actor name contains the text of the
+          filter, without regard to case.
+        justification: |
+          An auditor knows a name, not the exact spelling of an actor text.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+
+      - id: ReviewCenter-AuditService-Filter-Action
+        title: >-
+          The AuditService class shall narrow the listing to the entries of the one exact action that the filter
+          names.
+        justification: |
+          An auditor looks for every change of one kind.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+
+      - id: ReviewCenter-AuditService-Filter-ActionGroup
+        title: >-
+          The AuditService class shall narrow the listing to the entries of the group of actions that the filter
+          names.
+        justification: |
+          An auditor looks for every change of one area, such as all review events.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+
+      - id: ReviewCenter-AuditService-Filter-DayRange
+        title: >-
+          The AuditService class shall narrow the listing to the range of UTC days of the filter, with both ends
+          included.
+        justification: |
+          An auditor thinks in days, and the last day of a range must count.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
           - AuditFilter_Range_StartOfFromDayAndStartOfDayAfterTo
-          - AuditActions_All_IsSortedUniqueAndWellFormed
-          - AuditActions_Prefixes_AreTheGroupsOfTheActions
-          - AuditActions_IsKnown_AcceptsOnlyListedValues
+
+      - id: ReviewCenter-AuditService-Filter-Paging
+        title: >-
+          The AuditService class shall page the filtered listing over the matching entries only.
+        justification: |
+          A link must lead to a page that holds matching entries.
+        tests:
+          - AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries
+
+      - id: ReviewCenter-AuditService-Filter-Trim
+        title: >-
+          The AuditService class shall trim the texts of the filter.
+        justification: |
+          A pasted name with blanks around it must still match.
+        tests:
+          - AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull
+
+      - id: ReviewCenter-AuditService-Filter-EmptyText
+        title: >-
+          The AuditService class shall turn an empty text of the filter into no condition.
+        justification: |
+          An empty field of the audit page must not hide every entry.
+        tests:
+          - AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull
+
+      - id: ReviewCenter-AuditService-Filter-None
+        title: >-
+          The AuditService class shall keep the filter without any condition as it is, with no range of instants.
+        justification: |
+          The unfiltered audit page must list the whole trail.
+        tests:
+          - AuditFilter_None_ValidatesToItself
+
+      - id: ReviewCenter-AuditService-Filter-TextTooLong
+        title: >-
+          The AuditService class shall refuse a text of the filter that is longer than the field it is compared with
+          with the invalid-filter rule.
+        justification: |
+          The filter is checked before the store is read, so a hostile query value cannot cost a scan.
+        tests:
+          - AuditFilter_Validated_TextTooLong_IsRefused
+          - AuditService_ListAsync_InvalidFilter_IsRefused
+
+      - id: ReviewCenter-AuditService-Filter-ReversedRange
+        title: >-
+          The AuditService class shall refuse a range of days that ends before it starts with the invalid-filter
+          rule.
+        justification: |
+          A reversed range can never match and is a mistake that the user must see.
+        tests:
+          - AuditFilter_Validated_ReversedRange_IsRefusedAndSingleDayAccepted
+          - AuditService_ListAsync_InvalidFilter_IsRefused
+
+      - id: ReviewCenter-AuditService-Filter-SingleDay
+        title: >-
+          The AuditService class shall accept a range of days that starts and ends on the same day.
+        justification: |
+          One day is the most common range.
+        tests:
+          - AuditFilter_Validated_ReversedRange_IsRefusedAndSingleDayAccepted
+
+      - id: ReviewCenter-AuditService-Filter-ActionList
+        title: >-
+          The AuditService class shall keep a list of the known actions that matches the actions the code records.
+        justification: |
+          The list of actions lets the page offer the choices, and the test that scans the sources keeps the list
+          from drifting away from what is really recorded.
+        tests:
           - AuditActions_All_MatchesTheActionsTheSourcesRecord
+
+      - id: ReviewCenter-AuditService-Filter-ActionListOrder
+        title: >-
+          The AuditService class shall list the known actions in ascending order without a repeat.
+        justification: |
+          The page offers the actions in one predictable order.
+        tests:
+          - AuditActions_All_IsSortedUniqueAndWellFormed
+
+      - id: ReviewCenter-AuditService-Filter-ActionListForm
+        title: >-
+          The AuditService class shall write every known action in the group.name form within the limit of an action.
+        justification: |
+          The group of an action is the text up to its first dot, so every code needs that form.
+        tests:
+          - AuditActions_All_IsSortedUniqueAndWellFormed
+
+      - id: ReviewCenter-AuditService-Filter-ActionGroups
+        title: >-
+          The AuditService class shall offer the groups of the known actions, each the prefix of at least one action.
+        justification: |
+          The page offers a group of actions as one choice.
+        tests:
+          - AuditActions_Prefixes_AreTheGroupsOfTheActions
+
+      - id: ReviewCenter-AuditService-Filter-ActionLookup
+        title: >-
+          The AuditService class shall tell a listed action or group from an unlisted or missing one.
+        justification: |
+          The filter of the page accepts only the choices that it offered.
+        tests:
+          - AuditActions_IsKnown_AcceptsOnlyListedValues
 
       - id: ReviewCenter-AuditService-Verify
         title: >-
-          The AuditService class shall verify the hash chain of the whole trail by reading it in ordered batches,
-          reporting an intact chain with its entry count and head hash, or the first broken entry.
+          The AuditService class shall verify the hash chain of the whole trail by reading it in ordered batches
+          that are smaller than the trail.
         justification: |
-          An operator must be able to check a trail of any size without loading it into memory, and a tampered entry
-          in any batch must be found.
+          An operator must be able to check a trail of any size without loading it into memory.
         tests:
           - AuditService_VerifyAsync_UntouchedTrail_IsIntactAndReadInBatches
+
+      - id: ReviewCenter-AuditService-Verify-Intact
+        title: >-
+          The AuditService class shall report an intact chain with its entry count and its head hash.
+        justification: |
+          The count and the head hash let an operator compare the trail with a copy that was kept elsewhere.
+        tests:
+          - AuditService_VerifyAsync_UntouchedTrail_IsIntactAndReadInBatches
+
+      - id: ReviewCenter-AuditService-Verify-Empty
+        title: >-
+          The AuditService class shall report an empty trail as intact with a count of zero and the genesis hash as
+          its head.
+        justification: |
+          A new installation has an empty trail, and that is not a broken chain.
+        tests:
           - AuditService_VerifyAsync_EmptyTrail_IsIntact
+
+      - id: ReviewCenter-AuditService-Verify-Broken
+        title: >-
+          The AuditService class shall report the first broken entry, with the count of the entries before it, when a
+          tampered entry lies in a later batch.
+        justification: |
+          A tampered entry in any batch must be found.
+        tests:
           - AuditService_VerifyAsync_TamperedEntryInLaterBatch_ReportsItsSequence
 
       - id: ReviewCenter-AuditService-Export
         title: >-
-          The AuditService class shall prepare and stream an export of the audit trail that honors the filter of the
-          listing, writes every matching entry once, in ascending sequence order, in keyset batches of 500 that are
-          never held together in memory, up to the newest sequence that existed when the export was prepared (so
-          that entries appended meanwhile, including its own audit entry, are not part of it), for a project only
-          the entries of that project, never an entry without a project, and shall stop at once when cancelled.
+          The AuditService class shall prepare and stream an export that writes every entry that matches the filter
+          of the listing once.
         justification: |
           An auditor or a regulator needs a copy of the trail that can be kept and checked elsewhere (21 CFR Part 11
-          section 11.10(b) and (e)). The trail only grows and may be large, so the export streams it in bounded
-          batches, and the fixed upper bound gives one consistent view while the chain keeps growing.
+          section 11.10(b) and (e)).
         tests:
           - AuditExport_ExportAsync_Filter_WritesMatchingEntriesAscending
-          - AuditExport_ExportAsync_Scope_ProjectNeverHoldsGlobalRows
-          - AuditExport_ExportAsync_EntriesAppendedAfterPrepare_AreNotIncluded
+          - AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500
+
+      - id: ReviewCenter-AuditService-Export-Ascending
+        title: >-
+          The AuditService class shall write the entries of an export in ascending sequence order.
+        justification: |
+          The chain can be re-checked only in the order in which it was written.
+        tests:
+          - AuditExport_ExportAsync_Filter_WritesMatchingEntriesAscending
+          - AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500
+
+      - id: ReviewCenter-AuditService-Export-Batches
+        title: >-
+          The AuditService class shall read the entries of an export in keyset batches of 500.
+        justification: |
+          The trail only grows and may be large, so the export streams it in bounded batches.
+        tests:
           - AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500
           - AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead
+
+      - id: ReviewCenter-AuditService-Export-Snapshot
+        title: >-
+          The AuditService class shall leave out of an export the entries that were appended after it was prepared.
+        justification: |
+          The fixed upper bound gives one consistent view while the chain keeps growing.
+        tests:
+          - AuditExport_ExportAsync_EntriesAppendedAfterPrepare_AreNotIncluded
+
+      - id: ReviewCenter-AuditService-Export-OwnEntry
+        title: >-
+          The AuditService class shall leave the audit entry of an export out of that export.
+        justification: |
+          The export is a copy of the trail as it was when the export was prepared.
+        tests:
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+          - AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject
+
+      - id: ReviewCenter-AuditService-Export-Project
+        title: >-
+          The AuditService class shall write only the entries of the project for a project export, and never an entry
+          without a project.
+        justification: |
+          A project administrator may read the trail of the project and nothing of any other project.
+        tests:
+          - AuditExport_ExportAsync_Scope_ProjectNeverHoldsGlobalRows
+
+      - id: ReviewCenter-AuditService-Export-Global
+        title: >-
+          The AuditService class shall write every entry, with or without a project, for an export without a project.
+        justification: |
+          An auditor of the whole installation needs the whole trail.
+        tests:
+          - AuditExport_ExportAsync_Scope_ProjectNeverHoldsGlobalRows
+
+      - id: ReviewCenter-AuditService-Export-Empty
+        title: >-
+          The AuditService class shall write a valid, empty export when the trail is empty.
+        justification: |
+          An export that finds nothing must still be a document that can be opened.
+        tests:
           - AuditExport_ExportAsync_EmptyTrail_IsValidAndAudited
+
+      - id: ReviewCenter-AuditService-Export-Cancelled
+        title: >-
+          The AuditService class shall stop reading and writing at once and throw the cancellation when the export is
+          cancelled.
+        justification: |
+          A download that the user abandoned must not keep reading the trail.
+        tests:
+          - AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry
+
+      - id: ReviewCenter-AuditService-Export-InvalidFilter
+        title: >-
+          The AuditService class shall refuse to prepare an export for an invalid filter with the invalid-filter
+          rule.
+        justification: |
+          An export of a filter that can never match is a mistake that the user must see before anything is read.
+        tests:
           - AuditExport_PrepareExportAsync_InvalidFilter_ThrowsDomainRule
+
+      - id: ReviewCenter-AuditService-Export-Arguments
+        title: >-
+          The AuditService class shall refuse a null filter, a null user, a null export, and a null target in the
+          export operations with an argument exception.
+        justification: |
+          A missing filter, user, export, or target handed to the service is a programming error that must fail at
+          once.
+        tests:
           - AuditExport_NullArguments_Throw
-          - AuditFilter_Describe_SetParts_AreListedInOrder
 
       - id: ReviewCenter-AuditService-ExportChainStatus
         title: >-
-          The AuditService class shall verify the whole chain once while preparing an export, after it has captured
-          the newest sequence and before the first byte is written, so that the status of the chain (intact, or
-          broken with the first broken sequence) is known to the caller in advance and covers every exported entry,
-          shall export a broken chain too and say so, and shall reveal, for a project export, neither the number
-          nor the head hash of the whole chain nor anything of the entries of other projects.
+          The AuditService class shall verify the whole chain while it prepares an export, before the first entry is
+          read.
         justification: |
-          An export of a tampered trail must say so, in a place the reader sees before reading the data, but the chain
-          is global, so a project export may name only whether the whole chain is sound and where it first breaks.
+          An export of a tampered trail must say so, in a place the reader sees before reading the data.
         tests:
           - AuditExport_PrepareExportAsync_IntactChain_ReportsIntact
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-Intact
+        title: >-
+          The AuditService class shall report an intact chain as intact in the prepared export, with the newest
+          sequence that existed then.
+        justification: |
+          The reader must know that the chain was sound up to the newest exported entry.
+        tests:
+          - AuditExport_PrepareExportAsync_IntactChain_ReportsIntact
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-Broken
+        title: >-
+          The AuditService class shall report a broken chain as broken with the first broken sequence in the
+          prepared export.
+        justification: |
+          The reader of the prepared export must know where the chain first fails, before reading any entry.
+        tests:
           - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
-          - AuditExport_ExportAsync_ProjectExport_RevealsNoCountsOfOtherProjects
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-WholeChain
+        title: >-
+          The AuditService class shall verify the whole chain, not only the entries of the filter, for a project
+          export.
+        justification: |
+          The chain is global, so the status of a project export covers every entry that was exported and more.
+        tests:
+          - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-BrokenExported
+        title: >-
+          The AuditService class shall export the entries of a broken chain too.
+        justification: |
+          An auditor needs the data of a tampered trail as evidence.
+        tests:
+          - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-FileName
+        title: >-
+          The AuditService class shall name the scope, the UTC time, and the chain status in the file name of an
+          export.
+        justification: |
+          The status of the chain is visible before the file is opened.
+        tests:
           - AuditExport_FileNameAndContentType_FollowScopeFormatAndStatus
+          - AuditExport_PrepareExportAsync_IntactChain_ReportsIntact
+          - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-ContentType
+        title: >-
+          The AuditService class shall give an export the extension and the content type of its format.
+        justification: |
+          The browser and the spreadsheet must open the file with the right program.
+        tests:
+          - AuditExport_FileNameAndContentType_FollowScopeFormatAndStatus
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-NoCounts
+        title: >-
+          The AuditService class shall reveal neither the number of the entries of the whole chain nor its head hash
+          in a project export.
+        justification: |
+          The chain is global, so a project export may name only whether the whole chain is sound and where it
+          first breaks.
+        tests:
+          - AuditExport_ExportAsync_ProjectExport_RevealsNoCountsOfOtherProjects
+
+      - id: ReviewCenter-AuditService-ExportChainStatus-NoOtherProjects
+        title: >-
+          The AuditService class shall reveal nothing of the entries of other projects in a project export.
+        justification: |
+          A project administrator must see nothing of any other project, even when the chain is broken there.
+        tests:
+          - AuditExport_ExportAsync_ProjectExport_RevealsNoCountsOfOtherProjects
 
       - id: ReviewCenter-AuditService-ExportAudited
         title: >-
           The AuditService class shall, after the export has ended and so outside its snapshot, record the export as
-          an audit entry of the action audit.exported for the exporting user, scoped to the project of the filter or
-          without a project, whose detail names the format, the number of entries written, whether the export was
-          complete or incomplete (cancelled or failed), and a bounded human-readable summary of the filter, and shall
-          record it also when the export is cancelled or fails, without letting a failure of that entry hide the
-          outcome of the export.
+          an audit entry of the action audit.exported.
         justification: |
           A copy of the whole trail is itself an event that an auditor must be able to find (21 CFR Part 11 section
-          11.10(e)). A cancelled download still handed out data, so it is recorded, marked incomplete.
+          11.10(e)).
         tests:
           - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
           - AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject
-          - AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry
-          - AuditExport_ExportAsync_TargetFails_RecordsIncompleteEntryAndRethrows
-          - AuditExport_ExportAsync_AuditAppendFails_ReportsErrorAndStillCompletes
-          - AuditExport_ExportedAction_IsInTheActionCatalog
+
+      - id: ReviewCenter-AuditService-ExportAudited-User
+        title: >-
+          The AuditService class shall record the audit entry of an export for the user who exported.
+        justification: |
+          The trail must show who took a copy.
+        tests:
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+
+      - id: ReviewCenter-AuditService-ExportAudited-Project
+        title: >-
+          The AuditService class shall scope the audit entry of an export to the project of the filter.
+        justification: |
+          The administrators of a project find the exports of their project in its history.
+        tests:
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+
+      - id: ReviewCenter-AuditService-ExportAudited-NoProject
+        title: >-
+          The AuditService class shall record the audit entry of an export without a project when the filter names
+          no project.
+        justification: |
+          An export of the whole trail belongs to no project.
+        tests:
+          - AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject
+
+      - id: ReviewCenter-AuditService-ExportAudited-Detail
+        title: >-
+          The AuditService class shall name the format, the number of entries written, and whether the export was
+          complete in the detail of the audit entry of an export.
+        justification: |
+          The fields of one entry tell an auditor what was handed out.
+        tests:
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+          - AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject
+          - AuditExport_ExportAsync_EmptyTrail_IsValidAndAudited
+
+      - id: ReviewCenter-AuditService-ExportAudited-FilterSummary
+        title: >-
+          The AuditService class shall put a human-readable summary of the filter, with its set parts in a fixed
+          order, into the detail of the audit entry of an export.
+        justification: |
+          An auditor must see which part of the trail was handed out.
+        tests:
+          - AuditFilter_Describe_SetParts_AreListedInOrder
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+
+      - id: ReviewCenter-AuditService-ExportAudited-SummaryBounded
+        title: >-
+          The AuditService class shall keep the detail of the audit entry of an export within the limit of a stored
+          detail for the largest possible filter.
+        justification: |
+          The long free texts of a filter come last, so a cut loses only them.
+        tests:
           - AuditExport_ExportAsync_MaximalFilter_DetailFitsAndKeepsCountAndDates
+
+      - id: ReviewCenter-AuditService-ExportAudited-SummaryKeepsCount
+        title: >-
+          The AuditService class shall keep the format, the count, the state, and the dates in the detail of the audit
+          entry of an export for the largest possible filter.
+        justification: |
+          An auditor reads the count and the dates first, so the cut of an oversized filter text must not reach them.
+        tests:
+          - AuditExport_ExportAsync_MaximalFilter_DetailFitsAndKeepsCountAndDates
+
+      - id: ReviewCenter-AuditService-ExportAudited-Cancelled
+        title: >-
+          The AuditService class shall record the audit entry of an export that is cancelled, marked incomplete.
+        justification: |
+          A cancelled download still handed out data, so it is recorded.
+        tests:
+          - AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry
+
+      - id: ReviewCenter-AuditService-ExportAudited-Failed
+        title: >-
+          The AuditService class shall record the audit entry of an export that fails, marked incomplete.
+        justification: |
+          A failed download may still have handed out data, so it is recorded.
+        tests:
+          - AuditExport_ExportAsync_TargetFails_RecordsIncompleteEntryAndRethrows
+
+      - id: ReviewCenter-AuditService-ExportAudited-FailureRethrown
+        title: >-
+          The AuditService class shall let the failure of an export reach the caller after it has recorded the audit
+          entry.
+        justification: |
+          The audit entry must not hide the outcome of the export.
+        tests:
+          - AuditExport_ExportAsync_TargetFails_RecordsIncompleteEntryAndRethrows
+
+      - id: ReviewCenter-AuditService-ExportAudited-AppendFailureReported
+        title: >-
+          The AuditService class shall report a failure to store the audit entry of an export to the error hook.
+        justification: |
+          The operator must learn that an export is missing from the trail.
+        tests:
+          - AuditExport_ExportAsync_AuditAppendFails_ReportsErrorAndStillCompletes
+
+      - id: ReviewCenter-AuditService-ExportAudited-AppendFailureCompletes
+        title: >-
+          The AuditService class shall complete an export normally when the audit entry of the export cannot be
+          stored.
+        justification: |
+          A failure of that entry must not hide the outcome of the export.
+        tests:
+          - AuditExport_ExportAsync_AuditAppendFails_ReportsErrorAndStillCompletes
+
+      - id: ReviewCenter-AuditService-ExportAudited-Catalog
+        title: >-
+          The AuditService class shall list the action audit.exported among the known actions.
+        justification: |
+          The filter of the audit page must offer the exports as a choice.
+        tests:
+          - AuditExport_ExportedAction_IsInTheActionCatalog
 
       - id: ReviewCenter-AuditService-ExportFormat
         title: >-
-          The AuditExportWriter class shall write an export as CSV, in UTF-8 with a byte order mark, with the columns
-          sequence, timestampUtc, actor, action, project, review, detail, previousHash, and hash, CRLF line ends, the
-          quoting of RFC 4180 for a comma, a quote, and a line break, and ISO 8601 UTC timestamps, or as JSON, as one
-          streamed object with the export (time and filter), the chain status, and the entries, escaped by a JSON
-          writer, in both cases a valid document when nothing matches, and shall, in CSV, prefix with an apostrophe any
-          text cell (actor, action, review, detail) that starts with =, +, -, @, a tab, or a carriage return, and
-          alter no hash, sequence, or timestamp.
+          The AuditExportWriter class shall write an export as CSV with the columns sequence, timestampUtc, actor,
+          action, project, review, detail, previousHash, and hash, in that order.
         justification: |
-          The file is opened in spreadsheets, where a cell that starts with a formula character is executed, and the
-          text of the trail comes from users. Neutralizing only the text cells keeps the hashes usable for the
-          re-check of the chain, and the JSON form is not interpreted by a spreadsheet.
+          The file is opened in spreadsheets and re-checked elsewhere, so the columns are fixed.
         tests:
           - AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf
           - AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvEncoding
+        title: >-
+          The AuditExportWriter class shall write a CSV export in UTF-8 with a byte order mark.
+        justification: |
+          A spreadsheet needs the mark to read non-ASCII names correctly.
+        tests:
+          - AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf
+          - AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvLineEnds
+        title: >-
+          The AuditExportWriter class shall end every line of a CSV export with CRLF.
+        justification: |
+          RFC 4180 defines CRLF as the line end of CSV.
+        tests:
+          - AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvQuoting
+        title: >-
+          The AuditExportWriter class shall quote a CSV cell that contains a comma, a quote, or a line break as
+          RFC 4180 describes.
+        justification: |
+          The detail of an entry is free text, and an unquoted comma would shift the columns.
+        tests:
           - AuditExportWriter_Quote_SpecialCharacters_QuotedPerRfc4180
           - AuditExportWriter_Csv_DetailWithCommaQuoteAndNewline_IsOneQuotedCell
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvTimestamp
+        title: >-
+          The AuditExportWriter class shall write the timestamp of a CSV row in ISO 8601 UTC.
+        justification: |
+          One time zone for every file makes the files comparable.
+        tests:
+          - AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvNoProject
+        title: >-
+          The AuditExportWriter class shall leave the project cell of a CSV row empty for an entry without a project.
+        justification: |
+          An entry without a project must not show a made-up project.
+        tests:
+          - AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvEmpty
+        title: >-
+          The AuditExportWriter class shall write only the header for a CSV export without entries.
+        justification: |
+          A spreadsheet that opens a CSV export without entries must still find the header of the columns.
+        tests:
+          - AuditExportWriter_Csv_NoEntries_IsHeaderOnly
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvNeutralized
+        title: >-
+          The AuditExportWriter class shall prefix with an apostrophe a CSV text cell that starts with =, +, -, @, a
+          tab, or a carriage return.
+        justification: |
+          The file is opened in spreadsheets, where a cell that starts with a formula character is executed, and the
+          text of the trail comes from users.
+        tests:
           - AuditExportWriter_Neutralize_LeadingFormulaCharacter_IsPrefixed
           - AuditExportWriter_Csv_TextCells_AreNeutralizedAndGeneratedCellsAreNot
-          - AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8
-          - AuditExportWriter_Csv_NoEntries_IsHeaderOnly
-          - AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty
+
+      - id: ReviewCenter-AuditService-ExportFormat-CsvGenerated
+        title: >-
+          The AuditExportWriter class shall alter no sequence, timestamp, or hash cell of a CSV export.
+        justification: |
+          Neutralizing only the text cells keeps the hashes usable for the re-check of the chain.
+        tests:
+          - AuditExportWriter_Csv_TextCells_AreNeutralizedAndGeneratedCellsAreNot
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonExport
+        title: >-
+          The AuditExportWriter class shall write the time and the filter of the export in a JSON export.
+        justification: |
+          The reader of the file must know when and for what it was made.
+        tests:
           - AuditExportWriter_Json_Envelope_HasExportChainAndEntries
-          - AuditExportWriter_Json_HostileText_IsEscapedAndRoundTrips
-          - AuditExportWriter_Json_NoEntries_IsValidDocument
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonChain
+        title: >-
+          The AuditExportWriter class shall write the status of the chain in a JSON export.
+        justification: |
+          The reader of the file must know whether the chain was sound.
+        tests:
+          - AuditExportWriter_Json_Envelope_HasExportChainAndEntries
           - AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonEntries
+        title: >-
+          The AuditExportWriter class shall write a JSON export as one valid JSON object with the parts export, chain,
+          and entries.
+        justification: |
+          One document that a JSON reader accepts is easier to keep and check than several.
+        tests:
+          - AuditExportWriter_Json_Envelope_HasExportChainAndEntries
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonEntryFields
+        title: >-
+          The AuditExportWriter class shall write each entry of a JSON export with its sequence, timestamp, actor,
+          action, project, review, detail, and hashes.
+        justification: |
+          The fields of one entry are checked together, because the chain is re-checked from them.
+        tests:
+          - AuditExportWriter_Json_Envelope_HasExportChainAndEntries
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonEscaped
+        title: >-
+          The AuditExportWriter class shall escape the text of a JSON export with a JSON writer.
+        justification: |
+          The text of the trail comes from users, so only a JSON writer can keep quotes and control characters from
+          breaking the document.
+        tests:
+          - AuditExportWriter_Json_HostileText_IsEscapedAndRoundTrips
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonFormulaUnchanged
+        title: >-
+          The AuditExportWriter class shall leave the formula characters at the start of a text in a JSON export
+          unchanged.
+        justification: |
+          The JSON form is not interpreted by a spreadsheet, so a prefix would only corrupt the text for the JSON
+          reader.
+        tests:
+          - AuditExportWriter_Json_FormulaCharacters_AreNotChanged
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonEmpty
+        title: >-
+          The AuditExportWriter class shall write a valid JSON document with an empty list of entries for an export
+          without entries.
+        justification: |
+          A JSON reader must accept the document of an export that finds nothing, so the list of entries stays and is
+          empty.
+        tests:
+          - AuditExportWriter_Json_NoEntries_IsValidDocument
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonBroken
+        title: >-
+          The AuditExportWriter class shall name the first broken sequence of a broken chain in a JSON export.
+        justification: |
+          The reader of the JSON document must find where the chain first fails in the chain part of the file.
+        tests:
+          - AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts
+
+      - id: ReviewCenter-AuditService-ExportFormat-JsonNoCounts
+        title: >-
+          The AuditExportWriter class shall write neither a count nor the head hash of the chain in a JSON export.
+        justification: |
+          The chain is global, so a count or the head hash would reveal the entries of other projects.
+        tests:
+          - AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts
+
+      - id: ReviewCenter-AuditService-ExportFormat-Flush
+        title: >-
+          The AuditExportWriter class shall pass the written batch on to the target at every flush.
+        justification: |
+          The export streams batch by batch, so every flush must hand the part that was written to the download.
+        tests:
           - AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime
-          - AuditExportWriter_NullArguments_Throw
+
+      - id: ReviewCenter-AuditService-ExportFormat-FlushEmptied
+        title: >-
+          The AuditExportWriter class shall empty its buffer at every flush.
+        justification: |
+          The buffer must not keep the part that was passed on, or the memory of a large export would grow with it.
+        tests:
+          - AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime
+
+      - id: ReviewCenter-AuditService-ExportFormat-Dispose
+        title: >-
+          The AuditExportWriter class shall release its buffers when it is disposed, so that it refuses a further
+          write.
+        justification: |
+          The writer holds buffers for the length of an export and must give them back.
+        tests:
           - AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable
+
+      - id: ReviewCenter-AuditService-ExportFormat-DisposeRepeatable
+        title: >-
+          The AuditExportWriter class shall accept a repeated disposal without a failure.
+        justification: |
+          A disposal that runs twice, for example from a using block and an error path, must not hide the real
+          outcome of the export.
+        tests:
+          - AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable
+
+      - id: ReviewCenter-AuditService-ExportFormat-Arguments
+        title: >-
+          The AuditExportWriter class shall refuse null arguments with an argument exception.
+        justification: |
+          A missing export, entry list, or target handed to the writer is a programming error that must fail at once.
+        tests:
+          - AuditExportWriter_NullArguments_Throw

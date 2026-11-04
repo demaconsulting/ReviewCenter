@@ -608,6 +608,26 @@ public class AuditServiceTests
     }
 
     /// <summary>
+    ///     Test that the first event of a key in a window is stored and reported as stored.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue()
+    {
+        // Arrange
+        var (service, store) = Create(clock: new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero)));
+        var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "unknown user, name 'x'");
+
+        // Act
+        var stored = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(stored);
+        var entry = Assert.Single(store.Entries);
+        Assert.Equal("auth.sign-in-failed", entry.Action);
+        Assert.Equal("unknown user, name 'x'", entry.Detail);
+    }
+
+    /// <summary>
     ///     Test that repeats of one key inside the window are counted and not stored.
     /// </summary>
     [Fact]

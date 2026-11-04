@@ -36,6 +36,25 @@ public class EvidenceSettingsServiceTests
     }
 
     /// <summary>
+    ///     Test that the defaults keep every content switch on, so that the evidence is complete.
+    /// </summary>
+    [Fact]
+    public void EvidenceSettings_Default_ContentSwitchesOn_IsComplete()
+    {
+        // Act
+        var defaults = EvidenceSettings.Default;
+
+        // Assert
+        Assert.True(defaults.IncludeThreads);
+        Assert.True(defaults.IncludeReviewerNames);
+        Assert.True(defaults.IncludeChecklistWording);
+        Assert.True(defaults.IncludeFiles);
+        Assert.True(defaults.IncludeGitContext);
+        Assert.False(defaults.IsReduced);
+        Assert.Empty(defaults.OmittedSections);
+    }
+
+    /// <summary>
     ///     Test that every content switch that is off is named as an omitted section, in a fixed order, and that the
     ///     anonymous toggles do not count as a reduction of the content.
     /// </summary>
@@ -62,6 +81,20 @@ public class EvidenceSettingsServiceTests
             ],
             settings.OmittedSections);
         Assert.False((EvidenceSettings.Default with { AnonymousAttestations = true }).IsReduced);
+    }
+
+    /// <summary>
+    ///     Test that switching only the anonymous toggles on is no reduction of the content and omits no section.
+    /// </summary>
+    [Fact]
+    public void EvidenceSettings_IsReduced_OnlyAnonymousSwitchesOn_IsNotReduced()
+    {
+        // Arrange
+        var settings = EvidenceSettings.Default with { AnonymousIndex = true, AnonymousAttestations = true };
+
+        // Act, Assert
+        Assert.False(settings.IsReduced);
+        Assert.Empty(settings.OmittedSections);
     }
 
     /// <summary>
@@ -148,6 +181,52 @@ public class EvidenceSettingsServiceTests
     }
 
     /// <summary>
+    ///     Test that a system administrator and a project administrator of the project each read its stored settings.
+    /// </summary>
+    /// <param name="who">The user name of the actor.</param>
+    [Theory]
+    [InlineData("root")]
+    [InlineData("pa")]
+    public async Task EvidenceSettingsService_GetAsync_SystemAndProjectAdministrator_ReturnsSettings(string who)
+    {
+        // Arrange: settings that differ from the defaults
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { AnonymousIndex = true, IncludeGitContext = false };
+        await world.Service.SetAsync(
+            new Actor("pb", "pb"), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Act
+        var settings = await world.Service.GetAsync(new Actor(who, who), world.Project, cancellationToken);
+
+        // Assert
+        Assert.Equal(updated, settings);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator and a project administrator of the project each change the settings.
+    /// </summary>
+    /// <param name="who">The user name of the actor.</param>
+    [Theory]
+    [InlineData("root")]
+    [InlineData("pa")]
+    public async Task EvidenceSettingsService_SetAsync_SystemAndProjectAdministrator_StoresChange(string who)
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { AnonymousAttestations = true };
+
+        // Act
+        var changed = await world.Service.SetAsync(
+            new Actor(who, who), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Assert
+        Assert.True(changed);
+        Assert.Equal(updated, await world.Service.GetEffectiveAsync(world.Project, cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a change is stored for its own project only and is recorded as one audit entry that names the
     ///     project, the actor and each changed key with its old and new value.
     /// </summary>
@@ -184,6 +263,7 @@ public class EvidenceSettingsServiceTests
     {
         // Arrange
         var world = await WorldAsync();
+        var ct = TestContext.Current.CancellationToken;
 
         // Act
         var changed = await world.Service.SetAsync(
@@ -191,10 +271,11 @@ public class EvidenceSettingsServiceTests
             world.Project,
             EvidenceSettings.Default,
             EvidenceSettings.Default,
-            TestContext.Current.CancellationToken);
+            ct);
 
         // Assert
         Assert.False(changed);
+        Assert.Equal(EvidenceSettings.Default, await world.Service.GetEffectiveAsync(world.Project, ct));
         Assert.DoesNotContain(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
     }
 
@@ -248,6 +329,110 @@ public class EvidenceSettingsServiceTests
                 EvidenceSettings.Default with { AnonymousIndex = true },
                 cancellationToken));
         Assert.Equal(DomainRule.ProjectNotFound, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a change that turns one switch off is recorded as exactly one audit entry for the project, with
+    ///     no review, that names the actor and lists the changed key with its old and new value.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { IncludeFiles = false };
+
+        // Act
+        await world.Service.SetAsync(
+            new Actor("root", "Rita Root"), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Assert: one entry of the action, and only one
+        var entry = Assert.Single(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
+        Assert.Equal("project.evidence-settings-changed", entry.Action);
+        Assert.Equal(world.Project, entry.ProjectId);
+        Assert.Null(entry.ReviewId);
+        Assert.Equal("Rita Root (root)", entry.ActorName);
+        Assert.Equal("IncludeFiles on->off", entry.Detail);
+    }
+
+    /// <summary>
+    ///     Test that a change that turns a switch on is recorded with the old value off and the new value on.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceSettingsService_SetAsync_SwitchTurnedOn_AuditsOffToOn()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { AnonymousIndex = true };
+
+        // Act
+        await world.Service.SetAsync(
+            new Actor("root", "root"), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Assert
+        var entry = Assert.Single(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
+        Assert.Equal("AnonymousIndex off->on", entry.Detail);
+    }
+
+    /// <summary>
+    ///     Test that the effective settings are read for a project without any actor, as stored.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceSettingsService_GetEffectiveAsync_NoActor_ReturnsTheStoredSettings()
+    {
+        // Arrange: a new project and a project whose settings were changed
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var updated = EvidenceSettings.Default with { AnonymousIndex = true, IncludeGitContext = false };
+        await world.Service.SetAsync(
+            new Actor("pa", "pa"), world.Project, EvidenceSettings.Default, updated, cancellationToken);
+
+        // Act
+        var changed = await world.Service.GetEffectiveAsync(world.Project, cancellationToken);
+        var untouched = await world.Service.GetEffectiveAsync(world.Other, cancellationToken);
+
+        // Assert
+        Assert.Equal(updated, changed);
+        Assert.Equal(EvidenceSettings.Default, untouched);
+    }
+
+    /// <summary>
+    ///     Test that an administrator whose right was revoked after a first successful call is refused at the next
+    ///     call, which stores and records nothing.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall()
+    {
+        // Arrange: the administrator reads and changes the settings once, then is removed from the project
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("pa", "pa");
+        var first = EvidenceSettings.Default with { AnonymousIndex = true };
+        Assert.Equal(EvidenceSettings.Default, await world.Service.GetAsync(actor, world.Project, cancellationToken));
+        Assert.True(
+            await world.Service.SetAsync(actor, world.Project, EvidenceSettings.Default, first, cancellationToken));
+        Assert.True(
+            await world.Store.RemoveMembershipAsync(
+                world.Project,
+                world.AdminId,
+                AuditDraft.By(Actor.CommandLine, "member.removed", "pa", world.Project),
+                false,
+                cancellationToken));
+
+        // Act
+        var read = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.GetAsync(actor, world.Project, cancellationToken));
+        var write = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.SetAsync(
+                actor, world.Project, first, first with { IncludeThreads = false }, cancellationToken));
+
+        // Assert: refused, nothing stored, and no second entry
+        Assert.Equal(DomainRule.ProjectNotFound, read.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, write.Rule);
+        Assert.Equal(first, await world.Service.GetEffectiveAsync(world.Project, cancellationToken));
+        Assert.Single(world.Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
     }
 
     /// <summary>
@@ -313,7 +498,7 @@ public class EvidenceSettingsServiceTests
         await store.AddMembershipAsync(ids["off"], project.Id, ProjectRole.User, cancellationToken);
         await store.AddMembershipAsync(ids["offadm"], project.Id, ProjectRole.ProjectAdmin, cancellationToken);
         await store.AddMembershipAsync(ids["padm"], other.Id, ProjectRole.ProjectAdmin, cancellationToken);
-        return new World(store, new EvidenceSettingsService(store, access), project.Id, other.Id);
+        return new World(store, new EvidenceSettingsService(store, access), project.Id, other.Id, ids["pa"]);
     }
 
     /// <summary>
@@ -323,5 +508,11 @@ public class EvidenceSettingsServiceTests
     /// <param name="Service">The service under test, over the real <see cref="ProjectAccess"/>.</param>
     /// <param name="Project">The project the tests work on.</param>
     /// <param name="Other">A second project.</param>
-    private sealed record World(FakeReviewStore Store, EvidenceSettingsService Service, int Project, int Other);
+    /// <param name="AdminId">The identity of the project administrator <c>pa</c> of the first project.</param>
+    private sealed record World(
+        FakeReviewStore Store,
+        EvidenceSettingsService Service,
+        int Project,
+        int Other,
+        int AdminId);
 }

@@ -151,6 +151,9 @@ public class AuditExportTests
         // Assert
         Assert.Equal(1200, export.SnapshotSequence);
         Assert.Equal(1200, rows);
+
+        // The entry that was appended while the second batch was read really exists, and is not in the export
+        Assert.Contains(store.Entries, e => e.Detail == "late");
         var bytes = target.ToArray();
         var sequences = Sequences(new UTF8Encoding(false).GetString(bytes, 3, bytes.Length - 3));
         Assert.Equal(Enumerable.Range(1, 1200).Select(i => (long)i), sequences);
@@ -274,7 +277,13 @@ public class AuditExportTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => service.ExportAsync(export, target, cancellation.Token));
 
-        // Assert: the first batch was written, the second was read but not passed on; the entry was appended although the token is cancelled
+        // Assert: the first batch was written, the second was read but not passed on, and no third batch was read;
+        // the entry was appended although the token is cancelled
+        Assert.Equal(2, store.MatchingReads);
+        var written = target.ToArray();
+        Assert.Equal(
+            Enumerable.Range(1, 500).Select(i => (long)i),
+            Sequences(new UTF8Encoding(false).GetString(written, 3, written.Length - 3)));
         var last = store.Entries[^1];
         Assert.Equal(1201, last.Sequence);
         Assert.Equal(AuditService.ExportedAction, last.Action);

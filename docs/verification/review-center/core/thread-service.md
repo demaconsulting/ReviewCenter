@@ -173,6 +173,10 @@ unchanged. This scenario is tested by
 its first comment. This scenario is tested by
 `ThreadService_ReplyAsync_InvalidText_ThrowsAndStoresNothing`.
 
+**ThreadService_ReplyAsync_TextLength_RejectsOneOverAndAcceptsTheLongest**: A reply of one character more than the
+limit is rejected with `CommentTextInvalid` and the thread keeps only its first comment; a reply of exactly the limit
+is stored in full. This scenario is tested by `ThreadService_ReplyAsync_TextLength_RejectsOneOverAndAcceptsTheLongest`.
+
 **ThreadService_ReplyAsync_UnknownThreadOrOtherReview_ThrowsThreadNotFound**: A reply to a thread that does not
 exist, and to a thread of another review, is rejected with `ThreadNotFound`. This scenario is tested by
 `ThreadService_ReplyAsync_UnknownThreadOrOtherReview_ThrowsThreadNotFound`.
@@ -185,8 +189,14 @@ reopened twice; the state follows each request, and the comments stay as they we
 exist is rejected with `ThreadNotFound`. This scenario is tested by
 `ThreadService_ResolveAsync_UnknownThread_ThrowsThreadNotFound`.
 
-**ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments**: Threads on two files with replies are
-listed; all are returned in creation order with their comments in posting order. This scenario is tested by
+**ThreadService_ResolveAsync_ReopenAsync_ThreadOfOtherReview_ThrowsThreadNotFound**: A resolved thread and an open
+thread of one review are reopened and resolved through a second review; both are rejected with `ThreadNotFound` and
+both threads keep their states. This scenario is tested by
+`ThreadService_ResolveAsync_ReopenAsync_ThreadOfOtherReview_ThrowsThreadNotFound`.
+
+**ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments**: Threads on two files, started in an order
+that differs from the order of the file names, with a reply to the first whose text sorts before its first comment,
+are listed; all are returned in creation order with their comments in posting order. This scenario is tested by
 `ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments`.
 
 **ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty**: A review without threads and a review that does
@@ -199,7 +209,8 @@ created as objects; the last activity is the latest comment time in each. This s
 
 **ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst**: Open and resolved threads, one with a
 late reply and two with equal times, are indexed for all, Open and Resolved; the result is filtered, ordered newest
-activity first with the higher identity first on a tie, and empty input gives an empty list. This scenario is
+activity first with the higher identity first on a tie, empty input gives an empty list, and the threads that were
+given keep their order and states. This scenario is
 tested by `ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst`.
 
 **ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction**: No threads, one open thread, three open and
@@ -241,9 +252,14 @@ checklist on, the author of the review starts a thread, replies, and resolves it
 concerns the checklist only. This scenario is tested by `ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected`.
 
 **ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement**: A thread that is included in the report is
-started on a review with a current signature; without an acknowledgement it is refused naming the slot and the signer
+started on a review with a current signature; without an acknowledgement it is refused naming slot 1 and the signer
 and nothing is stored, and with the acknowledgement it is stored and the signature is out of date. This scenario is
 tested by `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement`.
+
+**ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot**: A thread that is included in the
+report is started on a review in which slots 1 and 2 hold a current signature and slot 3 does not, without an
+acknowledgement; the refusal names exactly slots 1 and 2 with their signers, and nothing is stored. This scenario is
+tested by `ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot`.
 
 **ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor**: A thread on a file that is not in the
 review is started on a signed review; the refusal is `ThreadAnchorInvalid`, not the signature impact. This scenario is
@@ -266,6 +282,25 @@ scenario is tested by `ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNo
 **ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature**: A chat reply on a signed review is stored without an
 acknowledgement and the signature stays current. This scenario is tested by
 `ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature`.
+
+**ThreadService_StartThreadAsync_ChatAfterSignature_KeepsSignature**: Slots 1 and 2 are signed and a chat thread is
+started; the record digest is the same as before and slots 1 and 2 still hold a current signature while slot 3 holds
+none. This scenario is tested by `ThreadService_StartThreadAsync_ChatAfterSignature_KeepsSignature`.
+
+**ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement**: A chat reply is posted to a thread of a review
+with a current signature without any acknowledgement; the call returns the stored reply with its text, not included in
+the report, and the reply is the last comment of the thread. This scenario is tested by
+`ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement`.
+
+**ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_StoresThread**: A thread included in the report is
+started on a review with a current signature with the acknowledgement of the signed slot; the thread is stored as a
+Finding with its starting comment included. This scenario is tested by
+`ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_StoresThread`.
+
+**ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_MakesSignatureOutOfDate**: The same acknowledged
+thread is started; the record digest changes, slot 1 is out of date and slots 2 and 3, which never signed, stay not
+signed. This scenario is tested by
+`ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_MakesSignatureOutOfDate`.
 
 **ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement**: An included thread after a signature
 is refused with `SignaturesWouldBecomeOutOfDate` without the acknowledgement, and stored with it. This scenario is
@@ -299,6 +334,15 @@ note, needs no acknowledgement and leaves the signature current. This scenario i
 signature needs no acknowledgement, because the earlier resolution note stays in the record. This scenario is tested by
 `ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement`.
 
+**ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement**: A Finding is resolved with a note,
+then slot 1 signs; resolving it again, with a note and then without one, needs no acknowledgement, adds no comment and
+no audit entry, and the signature stays current. This scenario is tested by
+`ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement`.
+
+**ThreadService_ResolveAsync_ResolvedFindingAfterSignature_KeepsSignature**: A Finding is resolved with a note, then
+slot 1 signs; resolving it again leaves the record digest as it was and slot 1 still holds a current signature. This
+scenario is tested by `ThreadService_ResolveAsync_ResolvedFindingAfterSignature_KeepsSignature`.
+
 **ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest**: A thread is promoted and demoted with
 acknowledgements; the digest after the demotion equals the digest before the promotion. This scenario is tested by
 `ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest`.
@@ -316,9 +360,18 @@ comments keep their flags. This scenario is tested by `ThreadService_ReplyAsync_
 **ThreadService_ListAsync_Comments_CarryFlagAndKind**: The listed comments carry their kind (a comment or a
 resolution) and their flag. This scenario is tested by `ThreadService_ListAsync_Comments_CarryFlagAndKind`.
 
+**ThreadService_ListAsync_FindingAndQuestion_CarryTheirKind**: A thread started with its comment included and one
+started without it are listed in creation order with the kinds Finding and Question. This scenario is tested by
+`ThreadService_ListAsync_FindingAndQuestion_CarryTheirKind`.
+
 **ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing**: Resolving a Finding
 without a note is refused with `ResolutionNoteRequired` and nothing is stored. This scenario is tested by
 `ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing`.
+
+**ThreadService_ResolveAsync_FindingWithBlankNote_ThrowsResolutionNoteRequired**: Resolving a Finding with a note that
+is only white space is refused with `ResolutionNoteRequired`; the thread stays open with its one comment and no audit
+entry is added. This scenario is tested by
+`ThreadService_ResolveAsync_FindingWithBlankNote_ThrowsResolutionNoteRequired`.
 
 **ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment**: Resolving a Finding with a note stores
 the state and a Resolution comment that is included. This scenario is tested by
@@ -337,9 +390,17 @@ tested by `ThreadService_ResolveAsync_BlankNoteOnQuestion_IsNoNote`.
 **ThreadService_ResolveAsync_NoteTooLong_ThrowsCommentTextInvalid**: A note over the text limit is refused with
 `CommentTextInvalid`. This scenario is tested by `ThreadService_ResolveAsync_NoteTooLong_ThrowsCommentTextInvalid`.
 
+**ThreadService_ResolveAsync_NoteTooLong_LeavesThreadOpen**: A note one character over the limit is refused; the thread
+is still open with only its starting comment and no `thread.resolved` entry is in the audit trail. This scenario is
+tested by `ThreadService_ResolveAsync_NoteTooLong_LeavesThreadOpen`.
+
 **ThreadService_ResolveAsync_AlreadyResolved_IsNoOpWithoutNoteOrAudit**: Resolving a resolved thread, even with a
 note, stores nothing and records no audit entry. This scenario is tested by
 `ThreadService_ResolveAsync_AlreadyResolved_IsNoOpWithoutNoteOrAudit`.
+
+**ThreadService_ResolveAsync_AlreadyResolved_RecordsNothingInTheAuditTrail**: A thread is resolved once and then
+resolved again by another member; the audit trail does not grow and holds exactly one `thread.resolved` entry. This
+scenario is tested by `ThreadService_ResolveAsync_AlreadyResolved_RecordsNothingInTheAuditTrail`.
 
 **ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing**: A Question is promoted,
 or a Finding is demoted, after the service read the thread and before the store writes the resolution; the resolve is
@@ -402,12 +463,14 @@ refused with `ThreadNotFound`. This scenario is tested by
 **ThreadService_SetCommentIncludedAsync_SameValue_IsNoOp**: Setting the flag to its current value stores nothing and
 records no entry. This scenario is tested by `ThreadService_SetCommentIncludedAsync_SameValue_IsNoOp`.
 
-**ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore**: The Auditor cannot promote,
-demote, toggle, or resolve with a note; the refusals are the same as for the other thread actions. This scenario is
-tested by `ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore`.
+**ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore**: The Auditor cannot start a
+thread, reply, resolve, reopen, promote, demote, or toggle; each is refused with `ActorNotAllowed`, and no audit entry
+is added and no thread changes. This scenario is tested by
+`ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore`.
 
 **ThreadService_ReportMutations_OutsideUser_ThrowsProjectNotFound**: A user outside the project is refused with
-`ProjectNotFound` for each of these actions. This scenario is tested by
+`ProjectNotFound` for each of the seven thread actions (start, reply, resolve, reopen, promote, demote, and toggle); no
+audit entry is added and the thread keeps its comments and state. This scenario is tested by
 `ThreadService_ReportMutations_OutsideUser_ThrowsProjectNotFound`.
 
 **ThreadService_ReportActions_CommandLine_ThrowsProjectNotFound**: The command line has no user record, so a promote
@@ -473,6 +536,12 @@ in a concluded review, and on lines the file does not have, is refused with `Rev
 because the lock is checked before the file is looked up; nothing is stored or recorded. This scenario is tested by
 `ThreadService_StartThreadAsync_ConcludedReviewAndInvalidAnchor_ReportsReviewLocked`.
 
+**ThreadService_AllThreadActions_OutsiderOnConcludedReview_ThrowProjectNotFound**: A theory over every thread action
+(start, reply, resolve, reopen, promote, demote, and toggle) on a concluded review, requested by a user who is not a
+member of the project and acts through the real access rules; each is refused with `ProjectNotFound`, not
+`ReviewLocked`, and the review stays concluded. This scenario is tested by
+`ThreadService_AllThreadActions_OutsiderOnConcludedReview_ThrowProjectNotFound`.
+
 **ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned**: A review whose slots are all signed but with
 an open thread is not concluded, so the thread actions still work. This scenario is tested by
 `ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned`.
@@ -489,9 +558,17 @@ the thread, the comment, and whether it was included or taken out. This scenario
 the note and never its text. This scenario is tested by
 `ThreadService_ResolveAsync_WithNote_Audit_HasNoteHashButNotText`.
 
-**ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport**: The entries `thread.started` and
-`thread.replied` say `in report` when the comment is included. This scenario is tested by
+**ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport**: The entry `thread.started` says `in report` when
+the starting comment is included and does not when it is chat. This scenario is tested by
 `ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport`.
+
+**ThreadService_ReplyAsync_IncludeInReport_Audit_MarksInReport**: The entry `thread.replied` says `in report` when the
+reply is included and does not when the reply is chat. This scenario is tested by
+`ThreadService_ReplyAsync_IncludeInReport_Audit_MarksInReport`.
+
+**ThreadService_ReplyAsync_ChatReply_Audit_IsNotMarkedInReport**: A chat reply is posted to a thread whose starting
+comment is in the report; the single `thread.replied` entry names the thread and does not say `in report`. This
+scenario is tested by `ThreadService_ReplyAsync_ChatReply_Audit_IsNotMarkedInReport`.
 
 **ThreadService_StartThreadAsync_CheckAnchor_StoresCheckThreadWithEmptyFileAndNoLines**: A thread about a check is
 stored with the check, an empty file, no lines, and the head side. This scenario is tested by
@@ -502,7 +579,7 @@ checklist does not have is refused and nothing is stored. This scenario is teste
 `ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound`.
 
 **ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound**: A review without a checklist has
-no check to discuss and is refused. This scenario is tested by
+no check to discuss and is refused, and nothing is stored. This scenario is tested by
 `ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound`.
 
 **ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid**: An anchor that names both a file
@@ -513,9 +590,25 @@ and a check is refused. This scenario is tested by
 lines or the baseline side, and one that names no check, are refused. This scenario is tested by
 `ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid`.
 
+**ThreadService_StartThreadAsync_CheckAnchorWithBaselineSide_ThrowsThreadAnchorInvalid**: A check anchor that names the
+baseline side is refused with `ThreadAnchorInvalid` and nothing is stored. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorWithBaselineSide_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_StartThreadAsync_CheckAnchorWithoutCheckId_ThrowsThreadAnchorInvalid**: An anchor with an empty check
+identifier and no file is refused with `ThreadAnchorInvalid` and nothing is stored. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorWithoutCheckId_ThrowsThreadAnchorInvalid`.
+
 **ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work**: A check thread takes a reply, is resolved with
 a note when it is a Finding, and is reopened like any thread. This scenario is tested by
 `ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work`.
+
+**ThreadService_ResolveAsync_OnCheckThread_FindingNeedsNoteQuestionDoesNot**: A check thread that is a Question is
+resolved without a note, and a Finding is refused with `ResolutionNoteRequired` until a note is given. This scenario is
+tested by `ThreadService_ResolveAsync_OnCheckThread_FindingNeedsNoteQuestionDoesNot`.
+
+**ThreadService_ReopenAsync_OnCheckThread_ReopensResolvedThread**: A resolved check thread is Open again after a reopen
+and keeps its check and its comment. This scenario is tested by
+`ThreadService_ReopenAsync_OnCheckThread_ReopensResolvedThread`.
 
 **ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed**: An auditor and a plain
 contributor who holds no slot and does not lead the review are refused with `ActorNotAllowed`. This scenario is tested
@@ -533,6 +626,10 @@ thread. This scenario is tested by `ThreadService_StartThreadAsync_CheckAnchorWh
 starting comment is included makes a current signature out of date and needs the acknowledgement; a chat check thread
 does not. This scenario is tested by
 `ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement`.
+
+**ThreadService_StartThreadAsync_CheckAnchorChatThread_KeepsSignatureCurrent**: A check thread whose starting comment
+is not included in the report is started while a slot is signed, and that signature is still current afterwards. This
+scenario is tested by `ThreadService_StartThreadAsync_CheckAnchorChatThread_KeepsSignatureCurrent`.
 
 **ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck**: The entry `thread.started` names the thread,
 the check, and the hash of the text but not the text. This scenario is tested by
@@ -581,8 +678,14 @@ This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.
 **ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText**: A thread is started, replied to, resolved, and
 reopened; the entries `thread.started`, `thread.replied`, `thread.resolved`, and `thread.reopened` carry the thread
 and the anchor, and the comment text appears only as an eight-character digest prefix. This scenario is tested by
-`ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText`. A resolve of a thread that does not exist records
-nothing, which is tested by `ThreadService_ResolveAsync_MissingThread_RecordsNothing`. Both tests are defined in
+`ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText`. A reply, a resolve, and a reopen are each also
+verified alone, which is tested by `ThreadService_ReplyAsync_Audit_RecordsActorThreadReplyAndDigest`,
+`ThreadService_ResolveAsync_Audit_RecordsActorAndThread`, and `ThreadService_ReopenAsync_Audit_RecordsActorAndThread`.
+The comment text never appears in the entries of a start, a reply, a resolve, or a reopen, which is tested by
+`ThreadService_ThreadEvents_NeverContainTheCommentText`. A resolve of a thread that does not exist records
+nothing, which is tested by `ThreadService_ResolveAsync_MissingThread_RecordsNothing`. A reply to and a reopen of a
+thread that does not exist record nothing either, which is tested by
+`ThreadService_ReplyAsync_ReopenAsync_MissingThread_RecordsNothing`. All these tests are defined in
 `AuditEventTests.cs`. The new entries `thread.kind-changed` and `thread.comment-report-changed` and the note hash of
 `thread.resolved` are verified by the Audit scenarios of this unit above.
 

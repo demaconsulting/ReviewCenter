@@ -26,10 +26,11 @@ N/A - standard test environment.
   slot, and the role; a slot with a current signature and a slot of an approved review are not listed; an unlocked
   review is; a signature that no longer covers the record gives the state out of date; the work of a disabled user is
   still listed.
-- The open work is ordered by project, review, and slot, and costs one batch read of the snapshots for each project and
-  no single read.
-- A project administrator who is the only enabled one is reported; another enabled administrator, or a second
-  administrator who is disabled, changes the answer as the rule says; a disabled user is not reported.
+- The open work is ordered by project name and review identifier, and costs one batch read of the snapshots for each
+  project and no single read.
+- A project administrator who is the only enabled one is reported; another enabled administrator, a second
+  administrator who is disabled, a plain member, or a system administrator who is a plain member changes the answer as
+  the rule says; a disabled user is not reported.
 - A system administrator sees every project; a project administrator sees only the projects the asker administers; a
   member, a read-only member, a user outside every project, an unknown actor, the command line, and a disabled project
   administrator are refused with `ActorNotAllowed`; an unknown target user is `UserNotFound` for an administrator and
@@ -75,6 +76,14 @@ to Apollo; neither is the sole one. This scenario is tested by
 **UserImpactService_GetImpactAsync_DisabledSecondAdministrator_DoesNotCount**: The second administrator is disabled;
 `adm_a` is the sole one again, and the disabled one is not reported. This scenario is tested by
 `UserImpactService_GetImpactAsync_DisabledSecondAdministrator_DoesNotCount`.
+
+**UserImpactService_GetImpactAsync_PlainMemberOfTheProject_DoesNotCountAsAdministrator**: A plain member is added to
+Apollo, which `adm_a` administers alone; the project is still reported as a sole administrator project of `adm_a`.
+This scenario is tested by `UserImpactService_GetImpactAsync_PlainMemberOfTheProject_DoesNotCountAsAdministrator`.
+
+**UserImpactService_GetImpactAsync_SystemAdministratorMember_DoesNotCountAsAdministrator**: A system administrator
+joins Apollo as a plain member; the project is still reported as a sole administrator project of `adm_a`. This
+scenario is tested by `UserImpactService_GetImpactAsync_SystemAdministratorMember_DoesNotCountAsAdministrator`.
 
 **UserImpactService_GetImpactAsync_SystemAdministrator_SeesEveryProject**: `root` asks about `ann`, who waits in both
 projects, and about `adm_b`; the work of both projects and the sole administrator project Borealis are listed. This

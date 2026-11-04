@@ -221,6 +221,96 @@ public class AuditEventTests
     }
 
     /// <summary>
+    ///     Test that a reply records the actor, the thread, the reply and a short digest of the reply text.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReplyAsync_Audit_RecordsActorThreadReplyAndDigest()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt", 2, 3), TestActors.Ann, "Start", TestContext.Current.CancellationToken);
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        var reply = await fixture.Threads.ReplyAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, SecretComment, TestContext.Current.CancellationToken);
+
+        // Assert
+        var draft = Assert.Single(fixture.Reviews.Audits.Skip(before));
+        Assert.Equal("thread.replied", draft.Action);
+        Assert.Equal($"thread {thread.Id}, comment {reply.Id}, text sha256 {AuditText.ShortHash(SecretComment)}", draft.Detail);
+        Assert.Equal("Bob (bob)", draft.ActorName);
+        Assert.Equal((fixture.ProjectId, "rev-1"), (draft.ProjectId, draft.ReviewId));
+    }
+
+    /// <summary>
+    ///     Test that resolving a thread records the actor and the thread.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ResolveAsync_Audit_RecordsActorAndThread()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Start", TestContext.Current.CancellationToken);
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+
+        // Assert
+        var draft = Assert.Single(fixture.Reviews.Audits.Skip(before));
+        Assert.Equal("thread.resolved", draft.Action);
+        Assert.Equal($"thread {thread.Id}", draft.Detail);
+        Assert.Equal("Bob (bob)", draft.ActorName);
+        Assert.Equal((fixture.ProjectId, "rev-1"), (draft.ProjectId, draft.ReviewId));
+    }
+
+    /// <summary>
+    ///     Test that reopening a thread records the actor and the thread.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReopenAsync_Audit_RecordsActorAndThread()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Start", TestContext.Current.CancellationToken);
+        await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        await fixture.Threads.ReopenAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        var draft = Assert.Single(fixture.Reviews.Audits.Skip(before));
+        Assert.Equal("thread.reopened", draft.Action);
+        Assert.Equal($"thread {thread.Id}", draft.Detail);
+        Assert.Equal("Ann (ann)", draft.ActorName);
+        Assert.Equal((fixture.ProjectId, "rev-1"), (draft.ProjectId, draft.ReviewId));
+    }
+
+    /// <summary>
+    ///     Test that no thread event, whether start, reply, resolve or reopen, contains the text of a comment.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ThreadEvents_NeverContainTheCommentText()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt", 2, 3), TestActors.Ann, SecretComment, TestContext.Current.CancellationToken);
+        await fixture.Threads.ReplyAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, SecretComment, TestContext.Current.CancellationToken);
+        await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+        await fixture.Threads.ReopenAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        var drafts = fixture.Reviews.Audits.Skip(before).ToList();
+        Assert.Equal(["thread.started", "thread.replied", "thread.resolved", "thread.reopened"], drafts.Select(d => d.Action));
+        Assert.All(drafts, d => Assert.DoesNotContain("hunter2", d.Detail, StringComparison.Ordinal));
+        Assert.All(drafts, d => Assert.DoesNotContain("vault", d.Detail, StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that starting a thread about a check records the check, a short digest of the text and never the text.
     /// </summary>
     [Fact]
@@ -257,6 +347,26 @@ public class AuditEventTests
         // Act
         await Assert.ThrowsAsync<DomainRuleException>(
             () => fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", 99, TestActors.Ann, TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal(before, fixture.Reviews.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that replying to or reopening a thread that does not exist records nothing, as resolving does.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReplyAsync_ReopenAsync_MissingThread_RecordsNothing()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => fixture.Threads.ReplyAsync(fixture.ProjectId, "rev-1", 99, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => fixture.Threads.ReopenAsync(fixture.ProjectId, "rev-1", 99, TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert
         Assert.Equal(before, fixture.Reviews.Audits.Count);

@@ -231,6 +231,42 @@ public class UserImpactServiceTests
     }
 
     /// <summary>
+    ///     Test that a plain member of the project does not count as another administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_PlainMemberOfTheProject_DoesNotCountAsAdministrator()
+    {
+        // Arrange: a plain member joins the project of the only administrator
+        var setup = await ArrangeAsync();
+        await setup.AddUserAsync("member_x", setup.World.ProjectId, ProjectRole.User);
+
+        // Act
+        var impact = await setup.ImpactOfAsync("adm_a");
+
+        // Assert
+        Assert.Equal("Apollo", Assert.Single(impact.SoleAdminProjects).ProjectName);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who is a plain member of the project does not count as another
+    ///     administrator.
+    /// </summary>
+    [Fact]
+    public async Task UserImpactService_GetImpactAsync_SystemAdministratorMember_DoesNotCountAsAdministrator()
+    {
+        // Arrange: a system administrator joins the project as a plain member
+        var setup = await ArrangeAsync();
+        var sysadmin = await setup.World.Users.CreateAsync("sys_x", "sys_x", true, InboxTestWorld.Password, Ct);
+        await setup.World.Store.AddMembershipAsync(sysadmin.Id, setup.World.ProjectId, ProjectRole.User, Ct);
+
+        // Act
+        var impact = await setup.ImpactOfAsync("adm_a");
+
+        // Assert
+        Assert.Equal("Apollo", Assert.Single(impact.SoleAdminProjects).ProjectName);
+    }
+
+    /// <summary>
     ///     Test that a system administrator may ask about any user and sees the work and the sole administrator
     ///     projects of every project.
     /// </summary>

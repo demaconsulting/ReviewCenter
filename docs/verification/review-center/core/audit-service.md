@@ -62,6 +62,10 @@ N/A - standard test environment.
 tested by `AuditService_RecordAsync_Draft_StoresEntryThatVerifies`; the constructor and the failure of the strict
 operation by `AuditService_Constructor_NullStore_Throws` and `AuditService_RecordAsync_NullDraftOrStoreFailure_Throws`.
 
+**AuditService_RecordAsync_ParallelRecords_FormOneIntactChain**: Many drafts are recorded in parallel; the entries get
+consecutive sequences without a gap or a repeat, and `VerifyAsync` reports an intact chain. This scenario is tested by
+`AuditService_RecordAsync_ParallelRecords_FormOneIntactChain`.
+
 **AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue**: The best-effort operation stores the entry and returns
 `true`. This scenario is tested by `AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue`.
 
@@ -73,6 +77,10 @@ exception reaches the caller, and the hook receives the failure. This scenario i
 **AuditService_TryRecordAsync_Cancellation_Propagates**: A cancelled call is not swallowed, and a null draft is
 refused. This scenario is tested by `AuditService_TryRecordAsync_Cancellation_Propagates` and
 `AuditService_TryRecordAsync_NullDraft_Throws`.
+
+**AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue**: One event of a key is recorded; the
+call returns `true` and one entry with the action and the detail of the draft is stored. This scenario is tested by
+`AuditService_TryRecordCoalescedAsync_FirstEventOfKey_IsStoredAndReturnsTrue`.
 
 **AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst**: The same key is recorded three times
 within one minute; the first call returns `true`, the others `false`, and one entry is stored. This scenario is tested
@@ -260,3 +268,7 @@ arguments are refused. This scenario is tested by `AuditExportWriter_Json_Envelo
 `AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts`,
 `AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime`, `AuditExportWriter_NullArguments_Throw`, and
 `AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable` (the writer can be disposed twice and refuses writes after).
+
+**AuditExportWriter_Json_FormulaCharacters_AreNotChanged**: Texts that start with `=`, `+`, `-`, or `@` are written to
+the JSON document and read back exactly as they were, because JSON is not opened in a spreadsheet. This scenario is
+tested by `AuditExportWriter_Json_FormulaCharacters_AreNotChanged`.

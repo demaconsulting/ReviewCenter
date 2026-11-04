@@ -511,18 +511,23 @@ public class NotificationDispatcherDedupeTests
         await world.SeatAsync("r1", "ann");
         world.Enroll("ann", NotificationMode.Every);
         using var source = new CancellationTokenSource();
-        world.Sender.BeforeSend = _ => source.Cancel();
+        var rowsDuringSend = -1;
+        world.Sender.BeforeSend = _ =>
+        {
+            rowsDuringSend = world.Store.Log.Count;
+            source.Cancel();
+        };
         await world.PassAsync();
         world.Advance(NotificationDispatcherWorld.DefaultWindow);
 
         // Act
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => world.Dispatcher.RunPassAsync(source.Token));
 
-        // Assert
+        // Assert: the reservation existed during the cancelled send and was given back
+        Assert.Equal(1, rowsDuringSend);
         Assert.Empty(world.Store.Log);
         Assert.Empty(world.NotifiedOf("ann"));
     }
-
 
     /// <summary>
     ///     Test that an update the user looked at before the mail was due is dropped.

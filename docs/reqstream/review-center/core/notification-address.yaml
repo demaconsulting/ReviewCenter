@@ -134,7 +134,7 @@ sections:
         title: >-
           The NotificationAddress class shall refuse an address whose local part starts with a dot.
         justification: |
-          Such an address is malformed, and mail systems refuse it.
+          A local part that starts with a dot is malformed, and mail systems refuse it.
         tests:
           - NotificationAddress_TryNormalize_MalformedDots_Fails
 
@@ -142,7 +142,7 @@ sections:
         title: >-
           The NotificationAddress class shall refuse an address whose local part ends with a dot.
         justification: |
-          Such an address is malformed, and mail systems refuse it.
+          A local part that ends with a dot is malformed, and mail systems refuse it.
         tests:
           - NotificationAddress_TryNormalize_MalformedDots_Fails
 
@@ -166,7 +166,7 @@ sections:
         title: >-
           The NotificationAddress class shall refuse an address that has a domain label that starts with a hyphen.
         justification: |
-          Such a label is not a valid name in the domain name system.
+          A label that starts with a hyphen is not a valid name in the domain name system.
         tests:
           - NotificationAddress_TryNormalize_MalformedDots_Fails
 
@@ -174,7 +174,7 @@ sections:
         title: >-
           The NotificationAddress class shall refuse an address that has a domain label that ends with a hyphen.
         justification: |
-          Such a label is not a valid name in the domain name system.
+          A label that ends with a hyphen is not a valid name in the domain name system.
         tests:
           - NotificationAddress_TryNormalize_MalformedDots_Fails
 
@@ -224,7 +224,7 @@ sections:
         justification: |
           254 characters is the longest address that the mail standard allows, and a valid address must not be refused.
         tests:
-          - NotificationAddress_TryNormalize_LengthBoundary_AcceptsMaximumAndRefusesMore
+          - NotificationAddress_TryNormalize_AddressOf254_Succeeds
 
       - id: ReviewCenter-NotificationAddress-RefuseTooLong
         title: >-
@@ -240,7 +240,7 @@ sections:
         justification: |
           64 characters is the longest local part that the mail standard allows.
         tests:
-          - NotificationAddress_TryNormalize_LongLocalPart_Fails
+          - NotificationAddress_TryNormalize_LocalPartOf64_Succeeds
 
       - id: ReviewCenter-NotificationAddress-RefuseLongLocalPart
         title: >-

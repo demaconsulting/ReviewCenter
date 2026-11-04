@@ -9,69 +9,359 @@ sections:
     requirements:
       - id: ReviewCenter-AuditChain-Hash
         title: >-
-          The AuditChain unit shall compute the hash of an audit entry as the lowercase hexadecimal SHA-256 of a
-          canonical, length-prefixed encoding of the sequence, the time, the actor, the action, the optional project
-          and review, the detail, and the previous hash, so that the hash changes when any of them changes and no
-          text can move between two fields without changing it.
+          The AuditChain unit shall compute the hash of an audit entry as the SHA-256 of a canonical, length-prefixed
+          encoding of the sequence, the time, the actor, the action, the optional project and review, the detail,
+          and the previous hash.
         justification: |
-          The hash chain is only evidence if the hash covers every recorded value without ambiguity. A pinned
-          known-answer value protects the encoding against accidental change.
+          The hash chain is only evidence if the hash covers every recorded value in one fixed encoding. A pinned
+          known-answer value protects the encoding against accidental change, and the genesis hash is the previous
+          hash of the first entry.
         tests:
           - AuditChain_GenesisHash_IsSixtyFourZeros
           - AuditChain_ComputeHash_KnownEntry_MatchesPinnedValue
           - AuditChain_ComputeHash_KnownEntryWithoutOptionalFields_MatchesPinnedValue
+
+      - id: ReviewCenter-AuditChain-Hash-LowercaseHex
+        title: >-
+          The AuditChain unit shall write the hash of an audit entry as 64 lowercase hexadecimal characters.
+        justification: |
+          One spelling of the hash lets two hashes be compared as plain text.
+        tests:
           - AuditChain_ComputeHash_SameFields_IsStableLowercaseHexAndIgnoresStoredHash
+
+      - id: ReviewCenter-AuditChain-Hash-IgnoresStoredHash
+        title: >-
+          The AuditChain unit shall leave the hash that is stored in an audit entry out of the computation of its
+          hash.
+        justification: |
+          The stored hash is the result of the computation, so it cannot be one of its inputs.
+        tests:
+          - AuditChain_ComputeHash_SameFields_IsStableLowercaseHexAndIgnoresStoredHash
+
+      - id: ReviewCenter-AuditChain-Hash-UtcTime
+        title: >-
+          The AuditChain unit shall hash the time of an audit entry as a UTC instant, so that the same instant with
+          another offset gives the same hash.
+        justification: |
+          The same moment must not hash differently because a store or a machine reports it with another offset.
+        tests:
           - AuditChain_ComputeHash_SameInstantOtherOffset_SameHash
-          - AuditChain_ComputeHash_NullEntry_Throws
+
+      - id: ReviewCenter-AuditChain-Hash-EachField
+        title: >-
+          The AuditChain unit shall give an audit entry another hash when any one of its hashed fields changes.
+        justification: |
+          A change of any recorded value must be visible, or the trail could be edited without notice.
+        tests:
           - AuditChain_ComputeHash_AnyFieldChanged_ChangesHash
+
+      - id: ReviewCenter-AuditChain-Hash-AbsentReview
+        title: >-
+          The AuditChain unit shall hash an absent review differently from an empty review identifier.
+        justification: |
+          An entry that names no review is not the same record as an entry that names an empty one.
+        tests:
           - AuditChain_ComputeHash_NullReviewVersusEmptyReview_DiffersFromEachOther
+
+      - id: ReviewCenter-AuditChain-Hash-NoTextMoves
+        title: >-
+          The AuditChain unit shall give an audit entry another hash when text moves from one field to the next.
+        justification: |
+          Without the length prefix, "ab" followed by "c" would hash like "a" followed by "bc", and text could be
+          shifted between fields without a trace.
+        tests:
           - AuditChain_ComputeHash_TextMovedBetweenAdjacentFields_ChangesHash
           - AuditChain_ComputeHash_TextMovedFromDetailToReview_ChangesHash
+
+      - id: ReviewCenter-AuditChain-Hash-Unicode
+        title: >-
+          The AuditChain unit shall hash text that has characters outside the ASCII range, so that different text
+          gives a different hash.
+        justification: |
+          Names and details can hold any character, and an accent or an emoji must count.
+        tests:
           - AuditChain_ComputeHash_UnicodeText_IsHashed
+
+      - id: ReviewCenter-AuditChain-Hash-NullEntry
+        title: >-
+          The AuditChain unit shall refuse a null audit entry or a null sequence of entries with an argument null
+          exception.
+        justification: |
+          A missing entry is a programming error that must fail at once and not as a hash of nothing.
+        tests:
+          - AuditChain_ComputeHash_NullEntry_Throws
 
       - id: ReviewCenter-AuditChain-Verify
         title: >-
-          The AuditChain unit shall verify a sequence of audit entries one by one, without holding it in memory,
-          and shall report the sequence of the first entry that is edited, missing, inserted, duplicated, out of
-          order, or linked to the wrong predecessor, together with the hash of the last entry that verified.
+          The AuditChain unit shall report a sequence of audit entries as intact when every entry has the next
+          sequence, names the hash of its predecessor, and carries its own correct hash.
         justification: |
-          Verification must detect edits, deletions, insertions, and reordering in the middle of the history, and
-          it must work on a trail of any size.
+          A valid history must pass, or the auditor could not tell a trail that is whole from one that was changed.
+        tests:
+          - AuditChain_Verify_ValidChain_IsIntactWithLastHashAsHead
+
+      - id: ReviewCenter-AuditChain-Verify-Head
+        title: >-
+          The AuditChain unit shall report the hash of the last entry of an intact sequence of audit entries as its
+          head.
+        justification: |
+          The head hash names the state of the trail at the time of the check, so a later check can show what was
+          added since.
+        tests:
+          - AuditChain_Verify_ValidChain_ReportsLastEntryHashAsHead
+
+      - id: ReviewCenter-AuditChain-Verify-Empty
+        title: >-
+          The AuditChain unit shall report an empty sequence of audit entries as intact, with the genesis hash as
+          the head.
+        justification: |
+          A trail without entries has nothing that is wrong.
         tests:
           - AuditChain_Verify_EmptyChain_IsIntactWithGenesisHead
-          - AuditChain_Verify_ValidChain_IsIntactWithLastHashAsHead
-          - AuditChain_Verify_EditedEntry_ReportsThatEntry
-          - AuditChain_Verify_EditedEntryWithRecomputedHash_BreaksAtNextEntry
-          - AuditChain_Verify_DeletedEntry_ReportsTheMissingSequence
-          - AuditChain_Verify_DeletedFirstEntry_ReportsSequenceOne
-          - AuditChain_Verify_ReorderedEntries_ReportsFirstOutOfOrderSequence
-          - AuditChain_Verify_InsertedEntry_IsDetected
-          - AuditChain_Verify_DuplicatedEntry_IsDetected
-          - AuditChain_Verify_WrongPreviousHash_ReportsThatEntry
-          - AuditChain_Verify_FirstEntryWithOtherSequence_ReportsSequenceOne
-          - AuditChain_Verify_TwoBadEntries_ReportsTheFirst
+
+      - id: ReviewCenter-AuditChain-Verify-OneByOne
+        title: >-
+          The AuditChain unit shall verify a sequence of audit entries in a single pass, taking one entry at a time
+          from the sequence.
+        justification: |
+          Verification must work on a trail of any size, so it must not need the whole sequence in memory.
+        tests:
+          - AuditChain_Verify_Sequence_IsEnumeratedOnceOneEntryAtATime
           - AuditChain_Verify_BadEntry_StopsReadingTheSequence
+
+      - id: ReviewCenter-AuditChain-Verify-Edited
+        title: >-
+          The AuditChain unit shall report the sequence of the first audit entry whose content or stored hash was
+          edited.
+        justification: |
+          An edit of a recorded value must be found, and the auditor must be told where.
+        tests:
+          - AuditChain_Verify_EditedEntry_ReportsThatEntry
+
+      - id: ReviewCenter-AuditChain-Verify-EditedRehashed
+        title: >-
+          The AuditChain unit shall report the sequence of the entry after an edited entry when the edit also
+          recomputed the hash of the edited entry.
+        justification: |
+          A forger who recomputes the hash of the edited entry is still caught, because the next entry names the old
+          hash.
+        tests:
+          - AuditChain_Verify_EditedEntryWithRecomputedHash_BreaksAtNextEntry
+
+      - id: ReviewCenter-AuditChain-Verify-Missing
+        title: >-
+          The AuditChain unit shall report the sequence of the entry that is missing from the middle of a sequence.
+        justification: |
+          A deleted entry leaves a gap in the history, and the gap must be found.
+        tests:
+          - AuditChain_Verify_DeletedEntry_ReportsTheMissingSequence
+
+      - id: ReviewCenter-AuditChain-Verify-MissingFirst
+        title: >-
+          The AuditChain unit shall report sequence 1 when the first entry of the trail is missing.
+        justification: |
+          A deleted start of the history must be found as well as a deleted middle.
+        tests:
+          - AuditChain_Verify_DeletedFirstEntry_ReportsSequenceOne
+
+      - id: ReviewCenter-AuditChain-Verify-FirstOtherSequence
+        title: >-
+          The AuditChain unit shall report sequence 1 when the first entry of the sequence has another sequence.
+        justification: |
+          A trail that does not start at 1 has lost its beginning.
+        tests:
+          - AuditChain_Verify_FirstEntryWithOtherSequence_ReportsSequenceOne
+
+      - id: ReviewCenter-AuditChain-Verify-Inserted
+        title: >-
+          The AuditChain unit shall report the sequence that follows an inserted entry.
+        justification: |
+          An inserted entry moves every later entry out of sequence, and the first one that is out of sequence names
+          the place of the forgery.
+        tests:
+          - AuditChain_Verify_InsertedEntry_IsDetected
+
+      - id: ReviewCenter-AuditChain-Verify-Duplicated
+        title: >-
+          The AuditChain unit shall report the sequence that follows the first copy of an entry that occurs twice in
+          a row.
+        justification: |
+          A repeated entry is a copy that was added to the history.
+        tests:
+          - AuditChain_Verify_DuplicatedEntry_IsDetected
+
+      - id: ReviewCenter-AuditChain-Verify-OutOfOrder
+        title: >-
+          The AuditChain unit shall report the sequence of the first entry that is out of order.
+        justification: |
+          Reordered entries change the history even when each entry is valid alone.
+        tests:
+          - AuditChain_Verify_ReorderedEntries_ReportsFirstOutOfOrderSequence
+
+      - id: ReviewCenter-AuditChain-Verify-WrongPredecessor
+        title: >-
+          The AuditChain unit shall report the sequence of an entry that names a wrong hash as its predecessor, even
+          when its own hash is right.
+        justification: |
+          The link to the predecessor is what makes the entries a chain.
+        tests:
+          - AuditChain_Verify_WrongPreviousHash_ReportsThatEntry
+
+      - id: ReviewCenter-AuditChain-Verify-FirstOfTwo
+        title: >-
+          The AuditChain unit shall report only the first of two bad entries.
+        justification: |
+          The first break is where the trust in the trail ends, and a later one adds nothing.
+        tests:
+          - AuditChain_Verify_TwoBadEntries_ReportsTheFirst
+
+      - id: ReviewCenter-AuditChain-Verify-StopsReading
+        title: >-
+          The AuditChain unit shall stop reading a sequence of audit entries at the first bad entry.
+        justification: |
+          Reading on would cost time on a trail that has already failed.
+        tests:
+          - AuditChain_Verify_BadEntry_StopsReadingTheSequence
+
+      - id: ReviewCenter-AuditChain-Verify-HeadOfLastGood
+        title: >-
+          The AuditChain unit shall report the hash of the last entry that verified as the head of a sequence that
+          failed.
+        justification: |
+          The auditor learns up to which entry the trail can still be trusted.
+        tests:
+          - AuditChainVerifier_Add_AfterFailure_StaysFailedWithLastGoodHead
+
+      - id: ReviewCenter-AuditChain-Verify-StaysFailed
+        title: >-
+          The AuditChain unit shall keep the first failure of a sequence when more entries are added after it.
+        justification: |
+          A later entry that happens to look right must not hide the break.
+        tests:
           - AuditChainVerifier_Add_AfterFailure_StaysFailedWithLastGoodHead
 
       - id: ReviewCenter-AuditChain-Text
         title: >-
-          The AuditChain unit shall clean every text that enters the trail (trimming it, replacing control
-          characters and line breaks, replacing lone surrogates, and cutting it with an ellipsis at a length limit
-          without splitting a surrogate pair), shall identify a text that must not be stored by the short SHA-256
-          hash of its trimmed text, and shall name the actor of an audit draft as the display name and user name of
-          a user or as the command line.
+          The AuditChain unit shall replace each control character and line break of a text that enters the trail
+          with a space.
         justification: |
-          The trail is shown on pages and read in logs, so its text must be one safe line of bounded length, and a
-          comment or a justification must be identifiable without being copied into a history that cannot be edited.
+          The trail is shown on pages and read in logs, so its text must be one safe line.
+        tests:
+          - AuditText_Clean_ControlCharactersAndLineBreaks_BecomeSpaces
+
+      - id: ReviewCenter-AuditChain-Text-Plain
+        title: >-
+          The AuditChain unit shall keep a text that needs no cleaning as it is.
+        justification: |
+          Cleaning must not change what an auditor reads in ordinary text.
         tests:
           - AuditText_Clean_PlainText_IsUnchanged
+
+      - id: ReviewCenter-AuditChain-Text-Trim
+        title: >-
+          The AuditChain unit shall remove the white space around a text that enters the trail.
+        justification: |
+          White space at the ends carries no meaning and would make equal texts differ.
+        tests:
           - AuditText_Clean_NullAndPadded_AreEmptyAndTrimmed
-          - AuditText_Clean_ControlCharactersAndLineBreaks_BecomeSpaces
+
+      - id: ReviewCenter-AuditChain-Text-Null
+        title: >-
+          The AuditChain unit shall treat a missing text as an empty text.
+        justification: |
+          A value that was not given must read as nothing and must not fail the record of an event.
+        tests:
+          - AuditText_Clean_NullAndPadded_AreEmptyAndTrimmed
+
+      - id: ReviewCenter-AuditChain-Text-LoneSurrogate
+        title: >-
+          The AuditChain unit shall replace a lone surrogate in a text with the replacement character.
+        justification: |
+          A lone surrogate is not valid text and cannot be stored or hashed in UTF-8 without loss.
+        tests:
           - AuditText_Clean_Surrogates_PairKeptLoneReplaced
+
+      - id: ReviewCenter-AuditChain-Text-SurrogatePair
+        title: >-
+          The AuditChain unit shall keep a valid surrogate pair in a text.
+        justification: |
+          A character outside the basic plane, such as an emoji, is valid text and must not be damaged.
+        tests:
+          - AuditText_Clean_Surrogates_PairKeptLoneReplaced
+
+      - id: ReviewCenter-AuditChain-Text-LimitCut
+        title: >-
+          The AuditChain unit shall cut a text that is longer than its length limit to exactly the limit, ending with
+          an ellipsis.
+        justification: |
+          The text of the trail must be of bounded length, and the ellipsis shows that something was left out.
+        tests:
           - AuditText_Clean_LongText_IsCutWithEllipsisWithinLimit
+
+      - id: ReviewCenter-AuditChain-Text-LimitKept
+        title: >-
+          The AuditChain unit shall keep a text that is as long as its length limit without a cut.
+        justification: |
+          A text that fits must not lose its end to an ellipsis.
+        tests:
+          - AuditText_Clean_LongText_IsCutWithEllipsisWithinLimit
+
+      - id: ReviewCenter-AuditChain-Text-NoPairSplit
+        title: >-
+          The AuditChain unit shall not split a surrogate pair when it cuts a text at the length limit.
+        justification: |
+          Half of a pair is a lone surrogate, and the cut text would no longer be valid.
+        tests:
           - AuditText_Clean_CutInsideSurrogatePair_DoesNotSplitThePair
+
+      - id: ReviewCenter-AuditChain-Text-LimitBelowFour
+        title: >-
+          The AuditChain unit shall refuse a length limit below four with an argument out of range exception.
+        justification: |
+          A limit below four cannot hold the ellipsis and one character of the text.
+        tests:
           - AuditText_Clean_LimitBelowFour_Throws
+
+      - id: ReviewCenter-AuditChain-Text-ShortHash
+        title: >-
+          The AuditChain unit shall identify a text that must not be stored by the first eight lowercase hexadecimal
+          characters of the SHA-256 hash of its trimmed text.
+        justification: |
+          A comment or a justification must be identifiable without being copied into a history that cannot be
+          edited.
+        tests:
           - AuditText_ShortHash_Text_IsPrefixOfSha256OfTrimmedText
+
+      - id: ReviewCenter-AuditChain-Text-ShortHashNull
+        title: >-
+          The AuditChain unit shall give a missing text the short hash of an empty text.
+        justification: |
+          A value that was not given must be identified in the same way as an empty one.
+        tests:
           - AuditText_ShortHash_NullAndDifferentText_BehavesAsEmptyAndDiffers
+
+      - id: ReviewCenter-AuditChain-Text-ShortHashDiffers
+        title: >-
+          The AuditChain unit shall give different texts different short hashes.
+        justification: |
+          The short hash is only an identification if two different texts can be told apart by it.
+        tests:
+          - AuditText_ShortHash_NullAndDifferentText_BehavesAsEmptyAndDiffers
+
+      - id: ReviewCenter-AuditChain-Text-ActorSignedIn
+        title: >-
+          The AuditChain unit shall name the actor of an audit draft by a signed-in user as the display name and the
+          user name of the user.
+        justification: |
+          The trail must say who acted, and the user name tells apart two users with the same display name.
+        tests:
           - AuditDraft_By_SignedInActor_NamesDisplayNameAndUserName
+
+      - id: ReviewCenter-AuditChain-Text-ActorCommandLine
+        title: >-
+          The AuditChain unit shall name the actor of an audit draft by the command line as the command line.
+        justification: |
+          A change made on the command line has no user, and the trail must still say that it was not a person at a
+          page.
+        tests:
           - AuditDraft_By_CommandLineActor_NamesOnlyTheDisplayName

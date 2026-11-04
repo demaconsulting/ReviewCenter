@@ -13,7 +13,7 @@ sections:
         title: >-
           The NotificationMessage class shall keep the subject it was built with.
         justification: |
-          The sender must send exactly what the caller composed.
+          A changed subject would reach the recipient as text that the caller never composed.
         tests:
           - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
 
@@ -21,7 +21,7 @@ sections:
         title: >-
           The NotificationMessage class shall keep the plain text body it was built with.
         justification: |
-          The sender must send exactly what the caller composed.
+          Mail readers that show plain text must receive the exact wording that the caller composed.
         tests:
           - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
 
@@ -29,7 +29,7 @@ sections:
         title: >-
           The NotificationMessage class shall keep the HTML body it was built with.
         justification: |
-          The sender must send exactly what the caller composed.
+          Mail readers that show HTML must receive the exact markup that the caller composed.
         tests:
           - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
 
@@ -88,7 +88,15 @@ sections:
         justification: |
           A mail without a subject looks like spam and is easily lost.
         tests:
-          - NotificationMessage_Constructor_SubjectLength_RefusesEmptyAndTooLong
+          - NotificationMessage_Constructor_EmptyOrBlankSubject_Throws
+
+      - id: ReviewCenter-NotificationMessage-RefuseBlankSubject
+        title: >-
+          The NotificationMessage class shall refuse a subject that has only white space.
+        justification: |
+          After the white space is ignored, nothing is left, so the mail has no subject.
+        tests:
+          - NotificationMessage_Constructor_BlankSubject_Throws
 
       - id: ReviewCenter-NotificationMessage-RefuseLongSubject
         title: >-
@@ -102,15 +110,18 @@ sections:
         title: >-
           The NotificationMessage class shall refuse a body that has only white space.
         justification: |
-          A message without content is a caller error, and it is better found when the message is built.
+          A body of blanks shows nothing to the reader, and the caller that built it has made an error that is
+          better found when the message is built.
         tests:
+          - NotificationMessage_Constructor_BlankBody_Throws
           - NotificationMessage_Constructor_InvalidBody_Throws
 
       - id: ReviewCenter-NotificationMessage-RefuseEmptyBody
         title: >-
           The NotificationMessage class shall refuse an empty body.
         justification: |
-          A message without content is a caller error, and it is better found when the message is built.
+          A body that was never filled in usually means that the caller skipped a step, and the message must not go
+          out as a blank mail.
         tests:
           - NotificationMessage_Constructor_EmptyBody_Throws
 
@@ -120,7 +131,7 @@ sections:
         justification: |
           A limit on the size keeps one message from being a way to send very large mails.
         tests:
-          - NotificationMessage_Constructor_InvalidBody_Throws
+          - NotificationMessage_Constructor_TooLongBody_Throws
 
       - id: ReviewCenter-NotificationMessage-RefuseNulInBody
         title: >-
@@ -128,7 +139,7 @@ sections:
         justification: |
           A NUL character can cut the body off in mail software.
         tests:
-          - NotificationMessage_Constructor_InvalidBody_Throws
+          - NotificationMessage_Constructor_NulInBody_Throws
 
       - id: ReviewCenter-NotificationMessage-AcceptBodyLineBreaks
         title: >-

@@ -28,7 +28,8 @@ N/A - standard test environment.
 - The changes between two settings name each changed key with its old and new value in the order of the properties.
 - A system administrator and a project administrator of the project read and change the settings; a plain member gets
   `ActorNotAllowed`; a user outside the project, an administrator of another project, a disabled member, a disabled
-  administrator, and no actor at all get `ProjectNotFound`; a refusal changes nothing and records nothing.
+  administrator, and no actor at all get `ProjectNotFound`; a refusal changes nothing and records nothing; the right is
+  checked again at every call.
 - A change is stored for its own project only and is recorded as one entry `project.evidence-settings-changed` that
   carries the project and no review, names the actor, and lists each changed key as `Key off->on` or `Key on->off`.
 - Saving settings that equal the expected ones changes nothing, records nothing, and reports that nothing changed.
@@ -43,10 +44,18 @@ N/A - standard test environment.
 and the five content switches are on, no section is omitted, the settings are not reduced, and they differ from
 themselves in nothing. This scenario is tested by `EvidenceSettings_Default_IsPrivateAndComplete`.
 
+**EvidenceSettings_Default_ContentSwitchesOn_IsComplete**: The default settings are read; the five content switches
+are on, the settings are not reduced, and no section is omitted. This scenario is tested by
+`EvidenceSettings_Default_ContentSwitchesOn_IsComplete`.
+
 **EvidenceSettings_OmittedSections_NameEachSwitchThatIsOff**: Settings with the anonymous index on and every content
 switch off are asked for their omitted sections; the five section names come back in the fixed order, the settings are
 reduced, and settings that differ from the defaults only in an anonymous switch are not. This scenario is tested by
 `EvidenceSettings_OmittedSections_NameEachSwitchThatIsOff`.
+
+**EvidenceSettings_IsReduced_OnlyAnonymousSwitchesOn_IsNotReduced**: Settings with both anonymous switches on and every
+content switch on are not reduced and omit no section. This scenario is tested by
+`EvidenceSettings_IsReduced_OnlyAnonymousSwitchesOn_IsNotReduced`.
 
 **EvidenceSettings_ChangesFrom_NamesChangedKeysWithOldAndNewValue**: Settings that turn the anonymous index on and the
 reviewer names off are compared with the defaults; the two changes come back with their keys and old and new values,
@@ -65,6 +74,16 @@ the member gets `ActorNotAllowed`, and the others get `ProjectNotFound`. After a
 still the defaults and no entry `project.evidence-settings-changed` exists. This scenario is tested by
 `EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused`.
 
+**EvidenceSettingsService_GetAsync_SystemAndProjectAdministrator_ReturnsSettings**: A theory over the system
+administrator and the project administrator. Another administrator has turned the anonymous index on and the git
+context off; the actor reads the settings of `Own` and gets exactly those. This scenario is tested by
+`EvidenceSettingsService_GetAsync_SystemAndProjectAdministrator_ReturnsSettings`.
+
+**EvidenceSettingsService_SetAsync_SystemAndProjectAdministrator_StoresChange**: A theory over the system
+administrator and the project administrator. The actor turns the anonymous attestations on; the call reports `true` and
+the effective settings of `Own` are the new ones. This scenario is tested by
+`EvidenceSettingsService_SetAsync_SystemAndProjectAdministrator_StoresChange`.
+
 **EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited**: A project administrator turns the anonymous
 attestations on and the threads off. The call reports `true`; the effective settings of `Own` are the new ones and
 those of `Other` are still the defaults; exactly one entry `project.evidence-settings-changed` exists, with the project
@@ -72,8 +91,26 @@ of `Own`, no review, the name of the actor with the user name, and the detail
 `AnonymousAttestations off->on; IncludeThreads on->off`. This scenario is tested by
 `EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited`.
 
+**EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey**: A system administrator turns the
+file list off. Exactly one entry `project.evidence-settings-changed` exists, with the project, no review, the name of
+the actor with the user name, and the detail `IncludeFiles on->off`. This scenario is tested by
+`EvidenceSettingsService_SetAsync_OneSwitchOff_RecordsOneEntryWithTheChangedKey`.
+
+**EvidenceSettingsService_SetAsync_SwitchTurnedOn_AuditsOffToOn**: A system administrator turns the anonymous index
+on. Exactly one entry `project.evidence-settings-changed` exists, and its detail is `AnonymousIndex off->on`. This
+scenario is tested by `EvidenceSettingsService_SetAsync_SwitchTurnedOn_AuditsOffToOn`.
+
+**EvidenceSettingsService_GetEffectiveAsync_NoActor_ReturnsTheStoredSettings**: After a project administrator changed
+the settings of `Own`, they are read without an actor and are the new ones, and those of `Other` are the defaults. This
+scenario is tested by `EvidenceSettingsService_GetEffectiveAsync_NoActor_ReturnsTheStoredSettings`.
+
+**EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall**: A project administrator reads
+and changes the settings once and is then removed from the project. The next read and the next change raise
+`ProjectNotFound`, the stored settings are those of the first change, and only one entry exists. This scenario is
+tested by `EvidenceSettingsService_GetAndSet_AdministratorRightRevoked_IsRefusedAtTheNextCall`.
+
 **EvidenceSettingsService_SetAsync_NoChange_RecordsNothing**: Settings equal to the expected ones are saved; the call
-reports `false` and no entry exists. This scenario is tested by
+reports `false`, the stored settings are still the defaults, and no entry exists. This scenario is tested by
 `EvidenceSettingsService_SetAsync_NoChange_RecordsNothing`.
 
 **EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged**: One administrator changes the
