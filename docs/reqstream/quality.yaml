@@ -720,15 +720,25 @@ sections:
           - ReviewCenter-OTS-Git-Access-ResolveRevision
 
       - id: Quality-SourceAccess-RevisionRefusal
-        title: The repository shall rely on the installed git program to refuse a revision that is unknown or unsafe.
+        title: The repository shall rely on the installed git program to refuse a revision that is unknown.
         tags: [quality]
         justification: |
-          A name that git does not know, or one that git would read as an option, must not select a commit, so the
-          service depends on the refusal by git. This grouping requirement links that OTS requirement to the quality
-          root so it participates in orphan detection without being falsely reported as disconnected from tool
-          functionality.
+          A name that git does not know must not select a commit, so the service depends on the refusal by git. This
+          grouping requirement links that OTS requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
+
+      - id: Quality-SourceAccess-RevisionUnsafe
+        title: >-
+          The repository shall rely on the installed git program to refuse a revision that could be read as an option.
+        tags: [quality]
+        justification: |
+          A name that git would read as an option must not select a commit or change the call, so the service depends
+          on the refusal by git. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe
 
       - id: Quality-SourceAccess-ListFiles
         title: The repository shall rely on the installed git program to list the files of a commit.

@@ -71,16 +71,24 @@ sections:
 
       - id: ReviewCenter-ContentSources-Mirror-CloneError
         title: >-
-          When the location of a repository cannot be cloned, the ContentSources subsystem shall report an access
+          The ContentSources subsystem shall report a location of a repository that cannot be cloned as an access
           failure (rule GitAccessFailed) that names the repository.
         justification: |
-          An operator must be told which repository has a wrong location, and a failed first clone must not leave a
-          half-made mirror that a later open would take for a good one.
+          An operator must be told which repository has a wrong location.
         children:
           - ReviewCenter-GitSource-Mirror-CloneError
-          - ReviewCenter-GitSource-Mirror-FailedClone
         tests:
           - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
+
+      - id: ReviewCenter-ContentSources-Mirror-FailedClone
+        title: >-
+          The ContentSources subsystem shall leave no mirror folder behind when the first clone of a repository fails.
+        justification: |
+          A half-made mirror would be taken for a good one by a later open.
+        children:
+          - ReviewCenter-GitSource-Mirror-FailedClone
+        tests:
+          - GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp
 
       - id: ReviewCenter-ContentSources-Mirror-NoToken
         title: >-
@@ -237,15 +245,24 @@ sections:
           back with the same key ring, also after a restart.
         justification: |
           A token is a secret that grants access to source code. It must not be readable in a copy of the database,
-          while the server must still be able to use it after it was started again. Each purpose of the key ring has a
-          key of its own.
+          while the server must still be able to use it after it was started again.
         children:
           - ReviewCenter-CredentialProtector-Encrypt
           - ReviewCenter-CredentialProtector-Encrypt-Decrypt
           - ReviewCenter-CredentialProtector-Persistence
-          - ReviewCenter-CredentialProtector-Isolation
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials-Isolation
+        title: >-
+          The ContentSources subsystem shall encrypt a token with a purpose of its own, so that a protector of another
+          purpose on the same key ring cannot read it.
+        justification: |
+          Each use of the key ring must be sealed from the others.
+        children:
+          - ReviewCenter-CredentialProtector-Isolation
+        tests:
+          - CredentialProtector_Purpose_IsolatesTokensFromOtherUses
 
       - id: ReviewCenter-ContentSources-Credentials-Unreadable
         title: >-
@@ -323,40 +340,83 @@ sections:
 
       - id: ReviewCenter-ContentSources-Errors
         title: >-
-          The ContentSources subsystem shall report a git program that is not installed or is older than version 2.31,
-          and a cache folder that cannot be used, as git unavailable (rule GitUnavailable).
+          The ContentSources subsystem shall report a git program that is not installed as git unavailable (rule
+          GitUnavailable).
         justification: |
-          Operators must be able to tell what to install or fix. The message names the setting and not the path, and a
-          cache folder that cannot be used must not leave the lock on the repository held, so that the next open does
-          not wait.
+          Operators must be able to tell what to install.
         children:
           - ReviewCenter-GitRunner-Errors
+
+      - id: ReviewCenter-ContentSources-Errors-OldGit
+        title: >-
+          The ContentSources subsystem shall report an installed git that is older than version 2.31 as git unavailable
+          (rule GitUnavailable).
+        justification: |
+          An old git lacks options that the reads depend on.
+        children:
           - ReviewCenter-GitRunner-Errors-OldGit
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolder
+        title: >-
+          The ContentSources subsystem shall report a cache folder that cannot be used, or a malformed or too long cache
+          path, as git unavailable (rule GitUnavailable).
+        justification: |
+          A cache that cannot be written makes every read fail.
+        children:
           - ReviewCenter-GitRunner-Errors-CacheFolder
           - ReviewCenter-GitRunner-Errors-CacheMalformed
-          - ReviewCenter-GitRunner-Errors-CacheMessage
           - ReviewCenter-GitSource-CacheFolder
           - ReviewCenter-GitSource-CacheFolder-Malformed
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolderMessage
+        title: >-
+          The ContentSources subsystem shall name the Git:CachePath setting, and neither the path nor the exception of
+          the file system, in the error for a cache folder that cannot be used.
+        justification: |
+          The operator must know which setting to fix without a path in the log.
+        children:
+          - ReviewCenter-GitRunner-Errors-CacheMessage
           - ReviewCenter-GitSource-CacheFolder-Message
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolderLock
+        title: >-
+          The ContentSources subsystem shall release the lock on the repository when the cache folder cannot be used, so
+          that the next open does not wait.
+        justification: |
+          A held lock would turn one fault into a hang.
+        children:
           - ReviewCenter-GitSource-CacheFolder-Lock
-        tests:
-          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
       - id: ReviewCenter-ContentSources-Errors-Failure
         title: >-
           The ContentSources subsystem shall report a failed git call as an access failure (rule GitAccessFailed) whose
           message names the repository.
         justification: |
-          Users must be able to tell a wrong location or a refused token from other failures and to act on the message,
-          which shows the first line of the error, the exit code, and a short text.
+          Users must be able to tell a wrong location or a refused token from other failures and to act on the message.
         children:
           - ReviewCenter-GitRunner-Errors-Failure
+        tests:
+          - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
+
+      - id: ReviewCenter-ContentSources-Errors-FailureText
+        title: >-
+          The ContentSources subsystem shall give only the first line of the error text of git, or its exit code when it
+          printed none, and keep a long text short, in the message of a failed call.
+        justification: |
+          A message must be readable.
+        children:
           - ReviewCenter-GitRunner-Errors-FirstLine
           - ReviewCenter-GitRunner-Errors-ExitCode
           - ReviewCenter-GitRunner-Errors-Length
+
+      - id: ReviewCenter-ContentSources-Errors-FailureDenied
+        title: >-
+          The ContentSources subsystem shall report a refusal of the credentials by the server as denied access to the
+          repository.
+        justification: |
+          A refused token must be told from a wrong location.
+        children:
           - ReviewCenter-GitRunner-Errors-Denied
-        tests:
-          - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
 
       - id: ReviewCenter-ContentSources-Errors-Secrets
         title: >-

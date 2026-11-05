@@ -61,10 +61,18 @@ sections:
             tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
           - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
-            title: git shall refuse a revision that is unknown or unsafe.
+            title: git shall refuse a revision that is unknown.
             justification: |
-              A revision that does not exist, or that git could read as an option, must never select content. A
-              passing test that runs the real program confirms that an unknown and an unsafe revision are refused.
+              A revision that does not exist must never select content. A passing test that runs the real program
+              confirms that an unknown revision is refused.
+            tags: [ots]
+            tests:
+              - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+          - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe
+            title: git shall refuse a revision that could be read as an option.
+            justification: |
+              A name that git could read as an option must never select content or change the call. A passing test
+              that runs the real program confirms that a revision that starts like an option is refused.
             tags: [ots]
             tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused

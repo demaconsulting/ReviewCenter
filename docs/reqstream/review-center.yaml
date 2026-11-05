@@ -910,7 +910,12 @@ sections:
           - ReviewCenter-Cli-AuditVerify-Misuse
           - ReviewCenter-Hosting-AuditVerify
           - ReviewCenter-Hosting-AuditVerify-Failed
+          - ReviewCenter-Hosting-AuditVerify-Failed-MissingDatabase
+          - ReviewCenter-Hosting-AuditVerify-Failed-FileUri
+          - ReviewCenter-Hosting-AuditVerify-Failed-Unreadable
           - ReviewCenter-Hosting-AuditVerify-Services
+          - ReviewCenter-Hosting-AuditVerify-ServicesWarning
+          - ReviewCenter-Hosting-AuditVerify-ServicesCallerUnaffected
           - ReviewCenter-Hosting-Arguments
           - ReviewCenter-Web-AuditPage
           - ReviewCenter-Web-AuditPage-HeaderLink
@@ -979,6 +984,8 @@ sections:
           - ReviewCenter-Hosting-AttestationServices
           - ReviewCenter-Hosting-AttestationServices-SelfSignedFolder
           - ReviewCenter-Hosting-AttestationServices-UnprotectedKey
+          - ReviewCenter-Hosting-AttestationServices-UnprotectedStarts
+          - ReviewCenter-Hosting-AttestationServices-UnprotectedWarned
           - ReviewCenter-Hosting-AttestationServices-ProtectedKeyUnreadable
           - ReviewCenter-Hosting-AttestationKeyFailure
           - ReviewCenter-Web-Attestation
@@ -1171,6 +1178,7 @@ sections:
           - ReviewCenter-Messaging-OffSettings
           - ReviewCenter-Hosting-NotificationSettings
           - ReviewCenter-Hosting-NotificationSettings-Valid
+          - ReviewCenter-Hosting-NotificationSettings-InlinePassword
           - ReviewCenter-Hosting-NotificationTables
           - ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
           - ReviewCenter-Web-NotificationCard
@@ -1280,6 +1288,8 @@ sections:
           - ReviewCenter-Messaging-SmtpDelivery-Envelope
           - ReviewCenter-Messaging-SmtpDelivery-Content
           - ReviewCenter-Messaging-SmtpDelivery-SpecialCharacters
+          - ReviewCenter-Messaging-SmtpDelivery-SubjectHeader
+          - ReviewCenter-Messaging-SmtpDelivery-SubjectCharacters
           - ReviewCenter-Messaging-SmtpDelivery-Authentication
           - ReviewCenter-Messaging-SmtpTls
         tests:
@@ -1343,8 +1353,10 @@ sections:
         children:
           - ReviewCenter-Messaging-SendFailure
           - ReviewCenter-Messaging-SendFailure-NothingDelivered
+          - ReviewCenter-Messaging-SendFailure-NoFile
           - ReviewCenter-Messaging-Cancellation
           - ReviewCenter-Messaging-Cancellation-NothingSent
+          - ReviewCenter-Messaging-Cancellation-NoFile
           - ReviewCenter-Messaging-NullMessage
         tests:
           - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
@@ -2157,7 +2169,11 @@ sections:
         children:
           - ReviewCenter-Identity-Authorization
           - ReviewCenter-Hosting-Authentication
+          - ReviewCenter-Hosting-Authentication-Revalidation
+          - ReviewCenter-Hosting-Authentication-ThrottleRefused
+          - ReviewCenter-Hosting-Authentication-ThrottleAccepted
           - ReviewCenter-Hosting-Authentication-Pages
+          - ReviewCenter-Hosting-Authentication-LoginPage
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
@@ -2372,10 +2388,22 @@ sections:
           - ReviewCenter-Cli-UserAdd-WrongAction
           - ReviewCenter-Cli-UserAdd-NoPasswordOption
           - ReviewCenter-Hosting-UserAdd
+          - ReviewCenter-Hosting-UserAdd-SystemAdmin
+          - ReviewCenter-Hosting-UserAdd-PasswordFromEnvironment
+          - ReviewCenter-Hosting-UserAdd-Report
+          - ReviewCenter-Hosting-UserAdd-NoKeyRing
           - ReviewCenter-Hosting-UserAdd-StandardInput
           - ReviewCenter-Hosting-UserAdd-Prompt
+          - ReviewCenter-Hosting-UserAdd-Prompt-Backspace
           - ReviewCenter-Hosting-UserAdd-NoPasswordPrinted
           - ReviewCenter-Hosting-UserAdd-Rejected
+          - ReviewCenter-Hosting-UserAdd-Rejected-InvalidName
+          - ReviewCenter-Hosting-UserAdd-Rejected-InvalidNameNothingCreated
+          - ReviewCenter-Hosting-UserAdd-Rejected-PasswordTooShort
+          - ReviewCenter-Hosting-UserAdd-Rejected-PasswordTooShortNothingCreated
+          - ReviewCenter-Hosting-UserAdd-Rejected-PasswordMismatch
+          - ReviewCenter-Hosting-UserAdd-Rejected-NoPassword
+          - ReviewCenter-Hosting-UserAdd-Rejected-NoPasswordNoDatabase
           - ReviewCenter-Hosting-Arguments
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
@@ -2437,6 +2465,7 @@ sections:
           - ReviewCenter-ContentSources-GitAccess-OutputLimit
           - ReviewCenter-ContentSources-Mirror
           - ReviewCenter-ContentSources-Mirror-CloneError
+          - ReviewCenter-ContentSources-Mirror-FailedClone
           - ReviewCenter-ContentSources-Mirror-NoToken
           - ReviewCenter-ContentSources-Mirror-Serialization
           - ReviewCenter-ContentSources-Revisions
@@ -2452,12 +2481,20 @@ sections:
           - ReviewCenter-ContentSources-ArgumentErrors
           - ReviewCenter-ContentSources-Content-Bytes
           - ReviewCenter-ContentSources-Errors
+          - ReviewCenter-ContentSources-Errors-OldGit
+          - ReviewCenter-ContentSources-Errors-CacheFolder
+          - ReviewCenter-ContentSources-Errors-CacheFolderMessage
+          - ReviewCenter-ContentSources-Errors-CacheFolderLock
           - ReviewCenter-ContentSources-Errors-Failure
+          - ReviewCenter-ContentSources-Errors-FailureText
+          - ReviewCenter-ContentSources-Errors-FailureDenied
           - ReviewCenter-ContentSources-Errors-Secrets
           - ReviewCenter-ContentSources-DisabledRepository
           - ReviewCenter-ContentSources-DisabledRepository-NotOffered
           - ReviewCenter-Core-FileSelection
           - ReviewCenter-Hosting-GitSettings
+          - ReviewCenter-Hosting-GitSettings-Default
+          - ReviewCenter-Hosting-GitSettings-RangeRefused
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
           - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading
@@ -2476,6 +2513,7 @@ sections:
           protection of the keys is part of the promise.
         children:
           - ReviewCenter-ContentSources-Credentials
+          - ReviewCenter-ContentSources-Credentials-Isolation
           - ReviewCenter-ContentSources-Credentials-Unreadable
           - ReviewCenter-ContentSources-Credentials-GitEnvironment
           - ReviewCenter-ContentSources-Credentials-Redaction
@@ -2505,9 +2543,22 @@ sections:
         children:
           - ReviewCenter-Hosting-KeyRingProtection
           - ReviewCenter-Hosting-KeyRingProtection-PermissionsOnly
+          - ReviewCenter-Hosting-KeyRingProtection-PermissionsOnlyWindows
+          - ReviewCenter-Hosting-KeyRingProtection-PermissionsOnlyWarning
           - ReviewCenter-Hosting-KeyRingProtection-Choice
+          - ReviewCenter-Hosting-KeyRingProtection-ChoiceExplicit
+          - ReviewCenter-Hosting-KeyRingProtection-ChoiceSettings
+          - ReviewCenter-Hosting-KeyRingProtection-AllowNewKeyRing
           - ReviewCenter-Hosting-KeyRingProtection-Refused
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedCertificate
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedCertificateSecret
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedRing
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedRingNoKey
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedRingContent
+          - ReviewCenter-Hosting-KeyRingProtection-RefusedPlaintext
           - ReviewCenter-Hosting-KeyRingProtection-Accepted
+          - ReviewCenter-Hosting-KeyRingProtection-AcceptedNewRing
+          - ReviewCenter-Hosting-KeyRingProtection-AcceptedOlderKey
           - ReviewCenter-Hosting-KeyRingProtection-Probe
           - ReviewCenter-Utilities-SecretSource
           - ReviewCenter-Utilities-SecretSource-SizeLimit
@@ -2543,6 +2594,7 @@ sections:
           - ReviewCenter-Hosting-KeyRingLost-AllowNewKeyRing
           - ReviewCenter-Hosting-KeyRingLost-UnreadableDatabase
           - ReviewCenter-Hosting-KeyRingLost-StartsWithKeys
+          - ReviewCenter-Hosting-KeyRingLost-StartsUnreadableDatabase
           - ReviewCenter-Hosting-KeyRingLost-NothingLost
           - ReviewCenter-ValidationChecks-ConfiguredKeys
           - ReviewCenter-ValidationChecks-ConfiguredKeys-NothingConfiguredSkipped
@@ -2597,6 +2649,9 @@ sections:
           - ReviewCenter-Hosting-KeysReprotect
           - ReviewCenter-Hosting-KeysReprotect-Secrets
           - ReviewCenter-Hosting-KeysReprotect-Refused
+          - ReviewCenter-Hosting-KeysReprotect-RefusedEmptyRing
+          - ReviewCenter-Hosting-KeysReprotect-RefusedSettings
+          - ReviewCenter-Hosting-KeysReprotect-RefusedMissingDatabase
           - ReviewCenter-Hosting-KeysReprotect-Failure
           - ReviewCenter-Hosting-KeysReprotect-Report
           - ReviewCenter-Hosting-Arguments
@@ -2856,6 +2911,7 @@ sections:
           - ReviewCenter-Hosting-Database-Restart
           - ReviewCenter-Hosting-DatabaseFailure
           - ReviewCenter-Hosting-DatabaseFailure-ExitCode
+          - ReviewCenter-Hosting-DatabaseFailure-LocationExitCode
           - ReviewCenter-Storage-Persistence
           - ReviewCenter-Storage-Persistence-Reviews
           - ReviewCenter-Storage-Persistence-FileContent

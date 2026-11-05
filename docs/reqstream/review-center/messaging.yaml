@@ -359,16 +359,36 @@ sections:
       - id: ReviewCenter-Messaging-SmtpDelivery-SpecialCharacters
         title: >-
           When the SMTP transport is used, the Messaging subsystem shall deliver a sender name with special characters
-          and a subject with characters outside ASCII or the text of a header line unchanged and inside its own header.
+          unchanged and inside the sender header.
         justification: |
-          Names and subjects come from users, so they must neither be garbled nor be able to inject a header line.
+          Names come from users, so they must neither be garbled nor be able to inject a header line.
         children:
           - ReviewCenter-SmtpNotificationSender-SenderNameIsolated
-          - ReviewCenter-SmtpNotificationSender-SubjectIsolated
-          - ReviewCenter-SmtpNotificationSender-SubjectCharacters
           - ReviewCenter-OTS-MailKit-MimeSenderName
-          - ReviewCenter-OTS-MailKit-MimeSubjectEncoding
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-Messaging-SmtpDelivery-SubjectHeader
+        title: >-
+          When the SMTP transport is used, the Messaging subsystem shall keep a subject that contains the text of a
+          header line inside the subject header.
+        justification: |
+          A subject that can start a header line could inject a header.
+        children:
+          - ReviewCenter-SmtpNotificationSender-SubjectIsolated
           - ReviewCenter-OTS-MailKit-MimeSubjectHeader
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-Messaging-SmtpDelivery-SubjectCharacters
+        title: >-
+          When the SMTP transport is used, the Messaging subsystem shall deliver a subject with characters outside
+          ASCII unchanged.
+        justification: |
+          A subject must not be garbled.
+        children:
+          - ReviewCenter-SmtpNotificationSender-SubjectCharacters
+          - ReviewCenter-OTS-MailKit-MimeSubjectEncoding
         tests:
           - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
 
@@ -428,15 +448,23 @@ sections:
 
       - id: ReviewCenter-Messaging-SendFailure-NothingDelivered
         title: >-
-          When the delivery of a message fails, the Messaging subsystem shall deliver no message to the SMTP server and
-          leave no file in the folder.
+          When the delivery of a message fails, the Messaging subsystem shall deliver no message to the SMTP server.
         justification: |
-          A failed send must leave no half result that could be mistaken for a mail.
+          A failed send must not leave a half result at the server that could be mistaken for a mail.
         children:
           - ReviewCenter-SmtpNotificationSender-NothingDeliveredOnFailure
-          - ReviewCenter-FileNotificationSender-FailedNoFile
         tests:
           - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+      - id: ReviewCenter-Messaging-SendFailure-NoFile
+        title: >-
+          When the delivery of a message fails, the Messaging subsystem shall leave no file in the folder of the file
+          transport.
+        justification: |
+          A failed send must leave no file that could be mistaken for a mail.
+        children:
+          - ReviewCenter-FileNotificationSender-FailedNoFile
+        tests:
           - FileNotificationSender_Send_Failure_LeavesNoMessageOrTemporaryFile
 
       - id: ReviewCenter-Messaging-SendErrorNoPassword
@@ -493,14 +521,23 @@ sections:
 
       - id: ReviewCenter-Messaging-Cancellation-NothingSent
         title: >-
-          When the cancellation token is canceled, the Messaging subsystem shall deliver no message and write no file.
+          When the cancellation token is canceled, the Messaging subsystem shall deliver no message to the SMTP server.
+        justification: |
+          A canceled send must not reach the server in a way that the caller does not expect.
+        children:
+          - ReviewCenter-SmtpNotificationSender-CanceledNothingSent
+        tests:
+          - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
+
+      - id: ReviewCenter-Messaging-Cancellation-NoFile
+        title: >-
+          When the cancellation token is canceled, the Messaging subsystem shall write no file in the folder of the file
+          transport.
         justification: |
           A canceled send must have no effect that the caller does not expect.
         children:
-          - ReviewCenter-SmtpNotificationSender-CanceledNothingSent
           - ReviewCenter-FileNotificationSender-CanceledNoFile
         tests:
-          - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
           - FileNotificationSender_Send_Cancelled_LeavesNoFile
 
       - id: ReviewCenter-Messaging-NullMessage

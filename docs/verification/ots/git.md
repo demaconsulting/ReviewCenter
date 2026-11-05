@@ -15,8 +15,8 @@ of these functions work correctly.
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all fourteen
-requirements are satisfied.
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all
+fifteen requirements are satisfied.
 
 ### Test Scenarios
 
@@ -54,10 +54,11 @@ appears only in the environment of the process.
 **Scenario**: A branch, a tag, and a full commit identity of a mirrored repository are resolved, and an unknown and an
 unsafe revision are resolved too.
 
-**Expected**: The first three give the commit identity, and the others are refused.
+**Expected**: The first three give the commit identity, and the others are refused: the unknown revision with its own
+rule, and the revisions that could be read as an option with their own.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`,
-`ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`.
+`ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`, `ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe`.
 
 #### GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 
