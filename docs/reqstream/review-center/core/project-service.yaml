@@ -904,7 +904,8 @@ sections:
 
       - id: ReviewCenter-ProjectService-ReviewRuleSwitches-ExistingProject
         title: >-
-          The ProjectService class shall keep the two further review rules on for a project that exists and whose
+          The ProjectService class shall keep the two further review rules, authors answering the checklist of their
+          own review and the person who reopened a review signing it again, on for a project that exists and whose
           rules were never changed, also when another setting of the project is changed.
         justification: |
           A project that nobody set up must follow the rules as a new project does, and a change of another setting

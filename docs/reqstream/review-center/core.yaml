@@ -3809,7 +3809,8 @@ sections:
 
       - id: ReviewCenter-Core-ReviewRuleSwitches-DefaultExisting
         title: >-
-          The Core subsystem shall keep the two further review rules on, and enforce them, for a project that exists
+          The Core subsystem shall keep the two further review rules, authors answering the checklist of their own
+          review and the person who reopened a review signing it again, on and enforce them for a project that exists
           and whose rules were never changed.
         justification: |
           A project that nobody set up must not be without the protection of the rules. The database of an earlier
@@ -9825,8 +9826,8 @@ sections:
 
       - id: ReviewCenter-Core-TotpSecondFactor-AdminResetPasswordChange
         title: >-
-          The Core subsystem shall refuse the reset when the system administrator still has to change a temporary
-          password, and keep the second factor of the user.
+          The Core subsystem shall refuse to reset the second factor of a user when the system administrator who asks
+          still has to change a temporary password, and keep the second factor of the user.
         justification: |
           An administrator whose password is a temporary one is not yet the only holder of the account, so the right
           to take the protection of another user away must wait until the password is changed.

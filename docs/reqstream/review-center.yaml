@@ -5896,7 +5896,7 @@ sections:
 
       - id: ReviewCenter-System-TotpSecondFactor-OtherSignIns-ApiToken
         title: >-
-          The tool shall leave the API tokens as they were, without a second factor.
+          The tool shall accept a personal access token for an API request without asking for a second factor.
         tags: [system]
         justification: |
           A token is the proof of a program, and a second factor on top would stop every program that cannot type a
@@ -7898,7 +7898,8 @@ sections:
 
       - id: ReviewCenter-System-GitContent-ObjectIds
         title: >-
-          The tool shall pass to the git program only an object identifier that has the form of one.
+          The tool shall pass to the git program only a commit or blob identifier that is a lowercase hexadecimal
+          object identifier.
         tags: [system]
         justification: |
           A text of a user that acts as an option of the command line of the git program must not be able to change
@@ -7908,7 +7909,7 @@ sections:
 
       - id: ReviewCenter-System-GitContent-ArgumentErrors
         title: >-
-          The tool shall refuse a missing input of the credential protection and of the reading of a ReviewMark
+          The tool shall refuse a missing input to the credential protection and to the reading of a ReviewMark
           configuration file with an argument error.
         tags: [system]
         justification: |

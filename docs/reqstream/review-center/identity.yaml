@@ -947,7 +947,8 @@ sections:
 
       - id: ReviewCenter-Identity-TotpSecondFactor-OtherSignIns-ApiToken
         title: >-
-          The Identity subsystem shall leave the sign-in with an API token as it was, without a second factor.
+          The Identity subsystem shall accept a personal access token for an API request without asking for a second
+          factor.
         justification: |
           An API token is the proof of a program, and a second code would stop programs that cannot type one.
         children:

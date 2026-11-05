@@ -598,8 +598,8 @@ sections:
 
       - id: ReviewCenter-TotpService-AdminReset-MustChangePassword
         title: >-
-          The TotpService class shall refuse the reset when the system administrator still has to change a temporary
-          password.
+          The TotpService class shall refuse to reset the second factor of a user when the system administrator who
+          asks still has to change a temporary password.
         justification: |
           An account whose password is a temporary one is not yet in the hands of its owner, so it must not remove the
           protection of another account.
