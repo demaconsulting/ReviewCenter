@@ -455,9 +455,11 @@ while notifications are set up, which is tested by `AccountPage_Render_Notificat
 `ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates`.
 
 **Inbox**: A signed-in user who requests the inbox route is served the inbox page, which waits for its live
-connection and carries the interactive marker, which is tested by
-`WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is the evidence of the requirement
-`ReviewCenter-Web-Inbox-Interactive`. A visitor who is not signed in is sent to the login page by the inbox
+connection and still carries the not-yet-interactive marker (`data-interactive="false"`), which is tested by
+`WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage`; this is part of the evidence of the requirement
+`ReviewCenter-Web-Inbox`, the page itself. The marker that turns true after the render is tested in the unit tests of
+`InboxPage` (`ReviewCenter-Web-Inbox-Interactive`). A visitor who is not signed in is sent to the login page by the
+inbox
 route and sees nothing of the inbox, which is tested by
 `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`, the evidence of the requirement
 `ReviewCenter-Web-Inbox-SignedInOnly`. The groups, the markers, and Mark all as read

@@ -100,9 +100,10 @@ login page that returns to `/inbox` is. This scenario is tested by
 
 **WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage**: A signed-in user requests `/inbox` through the real
 pipeline; the response is the inbox page, still marked `data-interactive="false"` because no live connection exists
-yet, and it carries the marker of an interactive component. This scenario is tested by
-`WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage` in `WebSubsystemTests.cs`, the evidence of the subsystem
-requirement `ReviewCenter-Web-Inbox-Interactive`.
+yet; the test shows that the page is served with this not-yet-interactive marker, not the marker after the render.
+This scenario is tested by
+`WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage` in `WebSubsystemTests.cs`, part of the evidence of the
+subsystem requirement `ReviewCenter-Web-Inbox`.
 
 **WebSubsystem_InboxPage_Unauthenticated_IsChallenged**: A visitor who is not signed in requests `/inbox` through the
 real pipeline and is redirected to the login page, which returns to the inbox, and nothing of the inbox is in the body.

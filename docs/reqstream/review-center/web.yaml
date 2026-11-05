@@ -1970,11 +1970,18 @@ sections:
 
       - id: ReviewCenter-Web-Checklist-AnswerJustify
         title: >-
-          The Web subsystem shall ask for a justification, marked as required, when the reviewer answers Fail or N/A.
+          The Web subsystem shall ask for a justification, marked as required, when the reviewer answers Fail.
         justification: |
-          A Fail or an N/A that is not explained cannot be judged by the others, so it is not stored without a reason.
+          A Fail that is not explained cannot be judged by the others, so the reviewer is asked for the reason.
         children:
           - ReviewCenter-ChecklistPage-Answer-Fail
+
+      - id: ReviewCenter-Web-Checklist-AnswerJustify-NotApplicable
+        title: >-
+          The Web subsystem shall ask for a justification, marked as required, when the reviewer answers N/A.
+        justification: |
+          Skipping a check must be an explained decision, so the reviewer is asked for the reason of an N/A.
+        children:
           - ReviewCenter-ChecklistPage-Answer-NotApplicable
 
       - id: ReviewCenter-Web-Checklist-AnswerJustify-Required
@@ -1987,11 +1994,18 @@ sections:
 
       - id: ReviewCenter-Web-Checklist-AnswerJustify-Save
         title: >-
-          The Web subsystem shall store a Fail or an N/A together with its justification when the reviewer saves it.
+          The Web subsystem shall store a Fail together with its justification when the reviewer saves it.
         justification: |
           The justification is part of the answer and must be kept with it.
         children:
           - ReviewCenter-ChecklistPage-Answer-Save
+
+      - id: ReviewCenter-Web-Checklist-AnswerJustify-SaveNotApplicable
+        title: >-
+          The Web subsystem shall store an N/A together with its justification when the reviewer saves it.
+        justification: |
+          The reason of a skipped check is part of the answer and must be kept with it.
+        children:
           - ReviewCenter-ChecklistPage-Answer-SaveNotApplicable
 
       - id: ReviewCenter-Web-Checklist-AnswerBy
@@ -5102,8 +5116,7 @@ sections:
 
       - id: ReviewCenter-Web-AccessTokens
         title: >-
-          The Web subsystem shall let a signed-in user create a personal access token on the account page and see its
-          value once.
+          The Web subsystem shall let a signed-in user create a personal access token on the account page.
         justification: |
           A token is made by its owner, so the page where the user already manages the account is where it belongs.
         children:
@@ -5931,15 +5944,11 @@ sections:
           Rejected).
         justification: |
           The project page is where a lead starts. The lead must see at a glance how far each review has come. The
-          behavior needs a live connection, so it is verified by the component tests of the unit.
-        children:
-          - ReviewCenter-ProjectPage-Approval
-          - ReviewCenter-ProjectPage-Approval-Setup
-          - ReviewCenter-ProjectPage-Approval-Rejected
-          - ReviewCenter-ProjectPage-Approval-InReview
-          - ReviewCenter-ProjectPage-Approval-Current
+          behavior needs a live connection, so it is verified by the component tests of the unit that render the page.
+          The unit requirements for the stage rules are owned by `Web-Signatures-ProjectStatus`.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
 
       - id: ReviewCenter-Web-Progress-Signatures
         title: >-
@@ -7289,6 +7298,7 @@ sections:
           - ReviewCenter-InboxPage-Sections-DetailLine
         tests:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-DueMark
         title: >-
@@ -7315,8 +7325,6 @@ sections:
           The marker tells that the page is ready to be used.
         children:
           - ReviewCenter-InboxPage-Interactive
-        tests:
-          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-Summary
         title: >-

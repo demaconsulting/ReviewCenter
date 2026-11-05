@@ -1872,8 +1872,10 @@ sections:
           - ReviewCenter-Web-Checklist-AnswerPass
           - ReviewCenter-Web-Checklist-AnswerPassNoJustification
           - ReviewCenter-Web-Checklist-AnswerJustify
+          - ReviewCenter-Web-Checklist-AnswerJustify-NotApplicable
           - ReviewCenter-Web-Checklist-AnswerJustify-Required
           - ReviewCenter-Web-Checklist-AnswerJustify-Save
+          - ReviewCenter-Web-Checklist-AnswerJustify-SaveNotApplicable
           - ReviewCenter-Web-Checklist-AnswerBy
           - ReviewCenter-Web-Checklist-AnswerByShown
           - ReviewCenter-Web-Checklist-AnswerByNoNameField
