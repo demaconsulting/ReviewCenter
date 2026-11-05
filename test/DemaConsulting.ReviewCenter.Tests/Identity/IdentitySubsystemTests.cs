@@ -22,6 +22,7 @@ using System.Net;
 using System.Security.Claims;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -63,6 +64,48 @@ public class IdentitySubsystemTests
         var stored = await users.GetAsync("ann", TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.DoesNotContain(TestBrowser.Password, stored.PasswordHash, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the author of a comment comes from the signed-in user: the actor the Identity subsystem provides
+    ///     for the user is the one the thread service stores as the author, and a name that the comment text claims
+    ///     is not taken as the author.
+    /// </summary>
+    [Fact]
+    public async Task IdentitySubsystem_Actor_SignedInUser_IsRecordedAsTheAuthorOfAComment()
+    {
+        // Arrange: the real pipeline with an administrator and a review, and the provider of a new scope
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        var users = app.Services.GetRequiredService<UserService>();
+        await users.CreateAsync("ann", "Ann Example", UserRole.Admin, TestBrowser.Password, TestContext.Current.CancellationToken);
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        using var scope = app.Services.CreateScope();
+        var provider = Assert.IsType<RevalidatingAuthenticationStateProvider>(
+            scope.ServiceProvider.GetRequiredService<AuthenticationStateProvider>());
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "ann"),
+                new Claim(SignIn.DisplayNameClaimType, "Ann Example"),
+                new Claim(ClaimTypes.Role, nameof(UserRole.Admin))
+            ],
+            "Test");
+        provider.SetAuthenticationState(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity))));
+
+        // Act: write a comment as the actor of the signed-in user, with a text that names somebody else
+        var actor = await provider.GetActorAsync();
+        var threads = app.Services.GetRequiredService<ThreadService>();
+        await threads.StartThreadAsync(
+            project.Id, "rev-1", new ThreadAnchor("a.txt"), actor, "Author: bob", TestContext.Current.CancellationToken);
+        var stored = Assert.Single(await threads.ListAsync(project.Id, "rev-1", TestContext.Current.CancellationToken));
+
+        // Assert: the stored author is the signed-in user
+        var comment = Assert.Single(stored.Comments);
+        Assert.Equal("ann", comment.AuthorUsername);
+        Assert.Equal("Ann Example", comment.Author);
+        Assert.Equal("Author: bob", comment.Text);
     }
 
     /// <summary>

@@ -185,6 +185,28 @@ public class ProjectServiceTests
     }
 
     /// <summary>
+    ///     Test that a project that exists keeps both further rules on when another setting of the project is changed.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn()
+    {
+        // Arrange: a project that exists in the store, with its rules never set
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+
+        // Act: another setting of the project is changed, and the project is read again
+        await service.SetReviewRuleAsync(TestActors.Ann, project.Id, ReviewRule.IndependentReviewers, true, false, cancellationToken);
+        var stored = (await store.GetProjectAsync(project.Id, cancellationToken))!;
+
+        // Assert: the other setting changed, and both further rules are still on
+        Assert.False(ReadRule(stored, ReviewRule.IndependentReviewers));
+        Assert.True(ReadRule(stored, ReviewRule.NonAuthorChecklistAnswers));
+        Assert.True(ReadRule(stored, ReviewRule.NonReopenerSigning));
+    }
+
+    /// <summary>
     ///     Test that an administrator switches a further rule and that each change, and only a change, is audited
     ///     with the fixed action and the property name.
     /// </summary>

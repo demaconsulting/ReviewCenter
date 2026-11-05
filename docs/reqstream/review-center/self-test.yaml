@@ -140,6 +140,8 @@ sections:
           - ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
           - ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
           - ReviewCenter-Utilities-TempFiles-InvalidPolicy
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_RealProcessRun_LeavesNoTemporaryFiles
 
       - id: ReviewCenter-SelfTest-Hermetic-NoConfiguration
         title: >-
@@ -154,6 +156,7 @@ sections:
           - ReviewCenter-ServerHost-IsolatedSettings-Environment
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+          - SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ReadsNoDeploymentConfiguration
 
       - id: ReviewCenter-SelfTest-Hermetic-NoDatabase
         title: >-
@@ -170,6 +173,7 @@ sections:
           - ReviewCenter-ServerHost-IsolatedSettings-AmbientData
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+          - SelfTestSubsystem_ValidationWorkflow_RealProcessRun_TouchesNoConfiguredDatabaseOrKeyRing
 
       - id: ReviewCenter-SelfTest-Hermetic-NoPort
         title: >-
@@ -182,6 +186,8 @@ sections:
           - ReviewCenter-ServerHost-IsolatedSettings
           - ReviewCenter-ServerHost-IsolatedSettings-Routes
           - ReviewCenter-ServerHost-IsolatedSettings-DefaultHostAmbient
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ListensOnEphemeralLoopbackPort
 
       - id: ReviewCenter-SelfTest-ConfiguredNotifications
         title: >-

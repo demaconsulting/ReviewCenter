@@ -2091,6 +2091,7 @@ sections:
           somebody else.
         children:
           - ReviewCenter-Identity-Actor
+          - ReviewCenter-Identity-Actor-CommentAuthor
 
       - id: ReviewCenter-System-Author-NobodyRefused
         title: >-
@@ -3476,10 +3477,13 @@ sections:
         tags: [system]
         justification: |
           The rules are on by default for every project, so that no project is left without the protection by
-          accident.
+          accident. A database that was made before the rules were stored must be created again, so a project that
+          exists means a project of the current database whose rules nobody changed.
         children:
           - ReviewCenter-Core-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-Core-ReviewRuleSwitches-DefaultExisting
           - ReviewCenter-Storage-ReviewRuleSwitches-Default
+          - ReviewCenter-Web-ReviewRuleSwitches-DefaultOn
 
       - id: ReviewCenter-System-ReviewRuleSwitches-DefaultNotice
         title: >-
@@ -3487,10 +3491,10 @@ sections:
           every project of the tool, also to the projects that existed before.
         tags: [system]
         justification: |
-          A lead who sees a switch must know what the value means for the project that has never been changed.
+          A lead who sees a switch must know what the value means for the project that has never been changed. That
+          the rules really are on for such a project is verified by the default requirements, not by this one.
         children:
           - ReviewCenter-Web-ReviewRuleSwitches-DefaultNotice
-          - ReviewCenter-Web-ReviewRuleSwitches-DefaultOn
 
       - id: ReviewCenter-System-ReviewRuleSwitches-AdminOnly
         title: >-
@@ -5018,6 +5022,8 @@ sections:
         children:
           - ReviewCenter-Evidence-Index
           - ReviewCenter-Evidence-Index-Fields
+          - ReviewCenter-Evidence-Index-Fields-Result
+          - ReviewCenter-Evidence-Index-Fields-Address
           - ReviewCenter-Evidence-Index-Order
           - ReviewCenter-Evidence-Index-Schema
           - ReviewCenter-Evidence-Index-Fingerprint
@@ -5460,6 +5466,8 @@ sections:
           of a phone that changes every thirty seconds is the cheapest second proof.
         children:
           - ReviewCenter-Core-TotpSecondFactor
+          - ReviewCenter-Core-TotpSecondFactor-SetupSecretStrength
+          - ReviewCenter-Core-TotpSecondFactor-SetupIssuer
           - ReviewCenter-Core-TotpSecondFactor-SetupPending
           - ReviewCenter-Core-TotpSecondFactor-SetupReplace
           - ReviewCenter-Core-TotpSecondFactor-SetupConfirm
@@ -5699,6 +5707,7 @@ sections:
           - ReviewCenter-Identity-TotpSecondFactor-WrongCodes
           - ReviewCenter-Core-TotpSecondFactor-Lockout
           - ReviewCenter-Core-TotpSecondFactor-LockoutLocked
+          - ReviewCenter-Core-TotpSecondFactor-LockoutSetupLocked
           - ReviewCenter-Core-TotpSecondFactor-LockoutOperations
           - ReviewCenter-Core-TotpSecondFactor-LockoutShared
           - ReviewCenter-Core-TotpSecondFactor-SharedLockout
@@ -5764,12 +5773,14 @@ sections:
       - id: ReviewCenter-System-TotpSecondFactor-AdminResetRefused
         title: >-
           The tool shall refuse the reset of a second factor when the caller is not an enabled system administrator,
-          acts through an API token, or names a user who has none, and keep the second factor.
+          has still to change a temporary password, acts through an API token, or names a user who has none, and keep
+          the second factor.
         tags: [system]
         justification: |
           The reset is the weakest point of the second factor, so only an administrator who is signed in may use it.
         children:
           - ReviewCenter-Core-TotpSecondFactor-AdminResetRefused
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetPasswordChange
           - ReviewCenter-Core-TotpSecondFactor-AdminResetTarget
 
       - id: ReviewCenter-System-TotpSecondFactor-Visibility
@@ -5853,12 +5864,23 @@ sections:
 
       - id: ReviewCenter-System-TotpSecondFactor-OtherSignIns
         title: >-
-          The tool shall leave the sign-in with a provider and the API tokens as they were, without a second factor.
+          The tool shall leave the sign-in with a provider as it was, without a second factor.
         tags: [system]
         justification: |
-          The provider and the token have proofs of their own, and a second factor on top would only lock them out.
+          The provider has a proof of its own, and a second factor on top would only lock out a person whom the
+          provider has already checked.
         children:
           - ReviewCenter-Identity-TotpSecondFactor-OtherSignIns
+
+      - id: ReviewCenter-System-TotpSecondFactor-OtherSignIns-ApiToken
+        title: >-
+          The tool shall leave the API tokens as they were, without a second factor.
+        tags: [system]
+        justification: |
+          A token is the proof of a program, and a second factor on top would stop every program that cannot type a
+          code.
+        children:
+          - ReviewCenter-Identity-TotpSecondFactor-OtherSignIns-ApiToken
 
       - id: ReviewCenter-System-NotificationsOffByDefault
         title: >-
@@ -7819,22 +7841,49 @@ sections:
       - id: ReviewCenter-System-GitContent
         title: >-
           The tool shall read the source code of a registered repository through the git program installed on the
-          server, without a shell.
+          server.
         tags: [system]
         justification: |
           Formal reviews compare file sets with earlier revisions. Using the installed git keeps the behavior the
-          same as the developers see, and running it without a shell keeps a hostile repository from harming the
-          server.
+          same as the developers see.
         children:
-          - ReviewCenter-ContentSources-GitAccess
-          - ReviewCenter-ContentSources-GitAccess-Timeout
-          - ReviewCenter-ContentSources-GitAccess-OutputLimit
           - ReviewCenter-ContentSources-Content-Bytes
-          - ReviewCenter-ContentSources-ArgumentErrors
-          - ReviewCenter-ContentSources-ArgumentErrors-ReviewSetContent
-          - ReviewCenter-ContentSources-ArgumentErrors-ObjectIds
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-System-GitContent-NoShell
+        title: >-
+          The tool shall start the git program without a shell.
+        tags: [system]
+        justification: |
+          A hostile repository must not be able to run code or harm the server through a shell that the git program
+          would otherwise be started in.
+        children:
+          - ReviewCenter-ContentSources-GitAccess
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-System-GitContent-ObjectIds
+        title: >-
+          The tool shall pass to the git program only an object identifier that has the form of one.
+        tags: [system]
+        justification: |
+          A text of a user that acts as an option of the command line of the git program must not be able to change
+          what the program does.
+        children:
+          - ReviewCenter-ContentSources-ArgumentErrors-ObjectIds
+
+      - id: ReviewCenter-System-GitContent-ArgumentErrors
+        title: >-
+          The tool shall refuse a missing input of the credential protection and of the reading of a ReviewMark
+          configuration file with an argument error.
+        tags: [system]
+        justification: |
+          A call without its inputs is a programming error that has to fail early, not become an unclear failure
+          later.
+        children:
+          - ReviewCenter-ContentSources-ArgumentErrors
+          - ReviewCenter-ContentSources-ArgumentErrors-ReviewSetContent
 
       - id: ReviewCenter-System-GitContent-Mirror
         title: >-
@@ -7902,6 +7951,8 @@ sections:
         justification: |
           A hostile or huge repository must not be able to exhaust the memory or the time of the server.
         children:
+          - ReviewCenter-ContentSources-GitAccess-Timeout
+          - ReviewCenter-ContentSources-GitAccess-OutputLimit
           - ReviewCenter-ContentSources-Content
           - ReviewCenter-ContentSources-Content-Limit
           - ReviewCenter-ContentSources-Content-Size
@@ -9523,16 +9574,29 @@ sections:
 
       - id: ReviewCenter-System-Persistence
         title: >-
-          The tool shall keep all its records in the database named by the Database settings.
+          The tool shall keep all its records in a database.
         tags: [system]
         justification: |
-          Review records must outlive the server process, and the operator must be able to choose where the data
-          lives so that it can be backed up and protected like any other record (21 CFR Part 11 section 11.10(c),
-          protection of records to enable their accurate and ready retrieval).
+          Review records must outlive the server process, or a restart would lose the evidence of a review (21 CFR
+          Part 11 section 11.10(c), protection of records to enable their accurate and ready retrieval).
+        children:
+          - ReviewCenter-Hosting-Database-Services
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-System-Persistence-Settings
+        title: >-
+          The tool shall keep its records in the database named by the Database settings.
+        tags: [system]
+        justification: |
+          The operator must be able to choose where the data lives so that it can be backed up and protected like any
+          other record.
         children:
           - ReviewCenter-Hosting-Database
-          - ReviewCenter-Hosting-Database-Services
           - ReviewCenter-Storage-Configuration
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile
 
       - id: ReviewCenter-System-Persistence-Create
         title: >-
@@ -9563,14 +9627,23 @@ sections:
 
       - id: ReviewCenter-System-Persistence-Integrity
         title: >-
-          The tool shall refuse to store a second review with the same identifier in a project, and a review for a
-          project that does not exist, and leave the stored data unchanged.
+          The tool shall refuse to store a second review with the same identifier in a project, and leave the stored
+          data unchanged.
         tags: [system]
         justification: |
           A refused write must not damage the records that are already kept, or the history of a review could be
           overwritten.
         children:
           - ReviewCenter-Storage-Integrity
+
+      - id: ReviewCenter-System-Persistence-Integrity-UnknownProject
+        title: >-
+          The tool shall refuse to store a review for a project that does not exist, and leave the stored data
+          unchanged.
+        tags: [system]
+        justification: |
+          A review without a project could never be reached again and would leave an orphan record in the database.
+        children:
           - ReviewCenter-Storage-Integrity-UnknownProject
 
       - id: ReviewCenter-System-Persistence-Failure

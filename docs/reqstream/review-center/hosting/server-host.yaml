@@ -75,7 +75,7 @@ sections:
           The pages reach the data only through the registered services, so the composition root must connect them to
           the configured database.
         tests:
-          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+          - ServerHost_CreateApplication_DatabaseConfigured_ProjectServiceStoresProjects
 
       - id: ReviewCenter-ServerHost-Database-Persistence
         title: >-
@@ -288,7 +288,7 @@ sections:
         justification: |
           An ambient Development environment would change the behavior of the host under test.
         tests:
-          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+          - ServerHost_CreateApplication_IsolatedSettings_RunsInProductionEnvironment
 
       - id: ReviewCenter-ServerHost-IsolatedSettings-AmbientData
         title: >-
@@ -298,7 +298,7 @@ sections:
           Ambient settings must neither be used nor written, or the check would change the data of the machine it
           runs on.
         tests:
-          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+          - ServerHost_CreateApplication_IsolatedSettings_LeavesAmbientDataPlacesUntouched
 
       - id: ReviewCenter-ServerHost-IsolatedSettings-Routes
         title: >-
@@ -334,7 +334,7 @@ sections:
         justification: |
           The operator must learn from the log when the trail could not be written.
         tests:
-          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
+          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarning
 
       - id: ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
         title: >-
@@ -342,7 +342,7 @@ sections:
         justification: |
           The user whose action triggered the entry must not be disturbed by a failure of the trail.
         tests:
-          - ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse
+          - ServerHost_AddServices_AuditTrailUnwritable_ReturnsFalseWithoutThrowing
 
       - id: ReviewCenter-ServerHost-ProjectAccess
         title: >-
@@ -359,7 +359,7 @@ sections:
         justification: |
           The repository registry is one set of data, so the whole process must use one service for it.
         tests:
-          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+          - ServerHost_AddServices_Configured_RegistersRepositoryServiceAsSingleton
 
       - id: ReviewCenter-ServerHost-RepositoryServices-GitSource
         title: >-
@@ -367,7 +367,7 @@ sections:
         justification: |
           The registry reads the content of a repository through the git content source.
         tests:
-          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+          - ServerHost_AddServices_Configured_RegistersGitSource
 
       - id: ReviewCenter-ServerHost-RepositoryServices-GitCacheDefault
         title: >-
@@ -385,7 +385,7 @@ sections:
         justification: |
           A new installation works without configuration, and the data and the keys are kept and backed up together.
         tests:
-          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+          - ServerHost_AddServices_Configured_PlacesTheKeyRingBesideTheDatabase
           - ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder
 
       - id: ReviewCenter-ServerHost-RepositoryServices-KeysFolderConfigured
@@ -394,7 +394,7 @@ sections:
         justification: |
           The operator decides where the keys live, for example on a volume that is backed up separately.
         tests:
-          - ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder
+          - ServerHost_ResolveKeysPath_Configured_ChoosesTheConfiguredFolder
 
       - id: ReviewCenter-ServerHost-RepositoryServices-TokenProtection
         title: >-
@@ -404,7 +404,7 @@ sections:
           Repository tokens are stored encrypted, so the protector must turn a token into text that does not contain
           it and back.
         tests:
-          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+          - ServerHost_AddServices_Configured_CredentialProtectorRoundTripsAToken
 
       - id: ReviewCenter-ServerHost-PlannerServices
         title: >-
@@ -420,7 +420,7 @@ sections:
         justification: |
           The planner reads the review-sets of a repository through the parser.
         tests:
-          - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
+          - ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton
 
       - id: ReviewCenter-ServerHost-KeyRing
         title: >-
@@ -459,7 +459,7 @@ sections:
           secret in clear text would give a copy of the folder, for example in a backup, access to every stored token
           and every second-factor secret.
         tests:
-          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+          - ServerHost_CreateApplication_CertificateKeyRing_KeyFilesAreEncrypted
 
       - id: ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
         title: >-
@@ -477,7 +477,7 @@ sections:
         justification: |
           A log that holds the password defeats the protection of the key files.
         tests:
-          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+          - ServerHost_CreateApplication_CertificateKeyRing_DoesNotLogThePassword
 
       - id: ReviewCenter-ServerHost-KeyProtection-InvalidSettings
         title: >-
@@ -506,7 +506,7 @@ sections:
         justification: |
           The operator must learn which setting is wrong and which file is meant, before the server starts.
         tests:
-          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+          - ServerHost_CreateApplication_MissingCertificate_ThrowsClearError
 
       - id: ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
         title: >-
@@ -516,7 +516,7 @@ sections:
           A wrong password and a file without a private key look the same to the operator, so the message names both
           possible causes.
         tests:
-          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+          - ServerHost_CreateApplication_WrongPasswordCertificate_ThrowsClearErrorWithoutPassword
 
       - id: ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
         title: >-
@@ -526,7 +526,7 @@ sections:
           The error names the certificate file and is read by the administrator who fixes it, so it must not repeat the
           password that opened the certificate or the one that failed.
         tests:
-          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+          - ServerHost_CreateApplication_WrongPasswordCertificate_ThrowsClearErrorWithoutPassword
 
       - id: ReviewCenter-ServerHost-KeyProtection-WrongCertificate
         title: >-
@@ -565,7 +565,7 @@ sections:
           Without encryption the access rights of the folder are all that protect the keys, so they must admit the
           account of the server only.
         tests:
-          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheFolder
 
       - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
         title: >-
@@ -575,7 +575,7 @@ sections:
           Without encryption the access rights of the files are what protect each key, so a file that others can read
           would give the key away.
         tests:
-          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheKeyFiles
 
       - id: ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
         title: >-
@@ -606,7 +606,7 @@ sections:
           The refusal must come before the probe round trip, because the probe is what creates the new key, and a
           new key would hide the loss at the next start.
         tests:
-          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+          - ServerHost_CreateApplication_LostRing_CreatesNoKey
 
       - id: ReviewCenter-ServerHost-LostKeyRing-NoSecretShown
         title: >-
@@ -615,7 +615,7 @@ sections:
         justification: |
           A start-up error reaches logs and terminals, and a secret that is written there is leaked.
         tests:
-          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+          - ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret
 
       - id: ReviewCenter-ServerHost-LostKeyRing-AllowNewKeyRing
         title: >-
@@ -772,7 +772,7 @@ sections:
         justification: |
           A new key at every start would break the check of the attestations that were signed earlier.
         tests:
-          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_NoAttestationSettings_SelfSignedKeyPersistsAcrossRestart
 
       - id: ReviewCenter-ServerHost-AttestationServices-SelfSignedConfigured
         title: >-
@@ -790,7 +790,7 @@ sections:
         justification: |
           One setting decides for every key of the server whether it must be encrypted.
         tests:
-          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedWithRequireEncryptedKeys
 
       - id: ReviewCenter-ServerHost-AttestationServices-UnprotectedStarts
         title: >-
@@ -799,7 +799,7 @@ sections:
         justification: |
           An unprotected key is allowed unless the operator demands encrypted keys.
         tests:
-          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_StartsWithoutRequireEncryptedKeys
 
       - id: ReviewCenter-ServerHost-AttestationServices-UnprotectedWarned
         title: >-
@@ -808,7 +808,7 @@ sections:
         justification: |
           An unprotected key is allowed, but the operator must be able to see that it is unprotected.
         tests:
-          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_WarnsWithoutRequireEncryptedKeys
 
       - id: ReviewCenter-ServerHost-AttestationKeyProtection
         title: >-
@@ -901,7 +901,7 @@ sections:
         justification: |
           The API checks every request against the tokens, so the whole process must use one token service.
         tests:
-          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+          - ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton
 
       - id: ReviewCenter-ServerHost-ApiRegistration-Routes
         title: >-
@@ -917,7 +917,7 @@ sections:
         justification: |
           The API must be closed to a caller who has no token.
         tests:
-          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+          - ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized
 
       - id: ReviewCenter-ServerHost-ApiRegistration-OpenApi
         title: >-
@@ -925,7 +925,7 @@ sections:
         justification: |
           A client needs the description of the API before it has a token.
         tests:
-          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+          - ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken
 
       - id: ReviewCenter-ServerHost-ApiRegistration-UnknownAddress
         title: >-
@@ -934,7 +934,7 @@ sections:
         justification: |
           A script that mistypes an address must not receive the HTML of the not-found page.
         tests:
-          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+          - ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404
 
       - id: ReviewCenter-ServerHost-OidcSettings
         title: >-
@@ -983,7 +983,7 @@ sections:
           A server that does not use sign-in with a provider must start as it did before, whatever the unused OpenID
           Connect settings say.
         tests:
-          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+          - ServerHost_CreateApplication_OidcOff_BuildsTheApplication
 
       - id: ReviewCenter-ServerHost-OidcSettings-ValidBuilds
         title: >-
@@ -1089,7 +1089,7 @@ sections:
         justification: |
           A server that does not use the feature must start as it did before, whatever the unused settings say.
         tests:
-          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+          - ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings
 
       - id: ReviewCenter-ServerHost-NotificationValidBuilds
         title: >-
@@ -1098,7 +1098,7 @@ sections:
         justification: |
           Valid settings must not stop the start.
         tests:
-          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+          - ServerHost_CreateApplication_NotificationsOnAndValid_BuildsTheApplication
 
       - id: ReviewCenter-ServerHost-NotificationInlinePasswordWarning
         title: >-
@@ -1116,7 +1116,7 @@ sections:
         justification: |
           The warning goes to the log, and a log that holds the password defeats the purpose of the warning.
         tests:
-          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+          - ServerHost_CreateApplication_NotificationsInlinePassword_WarningHidesThePassword
 
       - id: ReviewCenter-ServerHost-NotificationTablesMissingStopsStart
         title: >-
@@ -1135,7 +1135,7 @@ sections:
         justification: |
           A database that was created before the feature must keep working for an administrator who does not use it.
         tests:
-          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn
+          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff
 
       - id: ReviewCenter-ServerHost-NotificationWorkerFile
         title: >-

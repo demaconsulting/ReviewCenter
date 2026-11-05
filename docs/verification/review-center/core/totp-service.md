@@ -19,7 +19,8 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- Starting an enrollment needs the current password and returns the secret and an `otpauth` address, but stores only
+- Starting an enrollment needs the current password and returns a 160-bit secret and an `otpauth` address that names
+  the issuer `ReviewCenter`, but stores only
   a pending enrollment that is not active; starting again replaces the pending secret.
 - The accounts that can not use the feature (API token actors, external accounts, accounts that must change the
   password, and every account when the feature is switched off) are refused with `TotpNotAvailable`, and an active
@@ -31,7 +32,8 @@ N/A - standard test environment. The tests need no database, no files, and no ne
   and only once even when many requests present it at the same time.
 - A wrong, reused, malformed, or missing code gives the same failed result, which carries no user.
 - A recovery code works once, in any usual spelling, only for its own user, and its use is audited without the code.
-- Wrong codes and wrong passwords share one failure counter, five failures lock the account, and only a complete
+- Wrong codes and wrong passwords share one failure counter, five failures lock the account, a locked account refuses
+  even the right code at the confirmation of a setup, and only a complete
   sign-in clears the counter.
 - A pending sign-in works once, only from the client address it was issued to, and while it lives; an attempt from
   another address does not spend it.
@@ -39,7 +41,8 @@ N/A - standard test environment. The tests need no database, no files, and no ne
   recovery codes.
 - Removing the second factor, and regenerating recovery codes, need the password and a code; a recovery code is
   accepted for removal but not for regeneration; both are audited, and removal ends pending sign-ins.
-- Only an enabled system administrator who is not an API token actor can reset the second factor of another user;
+- Only an enabled system administrator who is not an API token actor and has no temporary password can reset the
+  second factor of another user;
   the reset is audited with the administrator and the target and ends pending sign-ins.
 - Neither a secret, a code, nor a recovery code reaches an audit entry or an error message.
 - Changing the own password with a second factor on needs the current password and a fresh code or an unused
@@ -57,6 +60,14 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 the right password. The result holds a Base32 secret and an `otpauth` address with the secret and the issuer, the
 status is available but not enrolled, and the password alone still signs in. This scenario is tested by
 `TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsSecretAndUriButIsNotActive`.
+
+**TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsA160BitSecret**: A user starts an enrollment with the right
+password. The Base32 secret decodes to 20 bytes, which are 160 bits. This scenario is tested by
+`TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsA160BitSecret`.
+
+**TotpService_BeginEnrollmentAsync_ValidPassword_UriNamesTheIssuerReviewCenter**: A user starts an enrollment with the
+right password. The `otpauth` address holds the parameter `issuer=ReviewCenter`. This scenario is tested by
+`TotpService_BeginEnrollmentAsync_ValidPassword_UriNamesTheIssuerReviewCenter`.
 
 **TotpService_BeginEnrollmentAsync_Twice_ReplacesThePendingSecret**: Two enrollments are started in a row. The secrets
 differ and a code of the first secret no longer confirms. This scenario is tested by
@@ -181,6 +192,11 @@ another user and is refused. This scenario is tested by
 the right code is refused while locked and works after the lockout; five failures and the lockout are audited. This
 scenario is tested by `TotpService_CompleteSignInAsync_FiveWrongCodes_LocksTheAccount`.
 
+**TotpService_ConfirmEnrollmentAsync_LockedOutAccountRightCode_ThrowsAndStaysPending**: A setup is started and five
+wrong codes lock the account. The right code is then refused with `TotpCodeIncorrect` and the message of a wrong code,
+and the enrollment is still pending. This scenario is tested by
+`TotpService_ConfirmEnrollmentAsync_LockedOutAccountRightCode_ThrowsAndStaysPending`.
+
 **TotpService_CompleteSignInAsync_PasswordAndCodeFailures_ShareOneCounter**: Three wrong passwords and two wrong codes
 lock the account on the second code. This scenario is tested by
 `TotpService_CompleteSignInAsync_PasswordAndCodeFailures_ShareOneCounter`.
@@ -269,6 +285,10 @@ token is refused with `ActorNotAllowed` and the second factor of the user stays.
 **TotpService_ResetAsync_DisabledAdministrator_ThrowsActorNotAllowed**: A disabled system administrator is refused with
 `ActorNotAllowed` and the second factor of the user stays. This scenario is tested by
 `TotpService_ResetAsync_DisabledAdministrator_ThrowsActorNotAllowed`.
+
+**TotpService_ResetAsync_AdministratorMustChangePassword_ThrowsActorNotAllowed**: A system administrator whose password
+is a temporary one is refused with `ActorNotAllowed`, the second factor of the user stays, and no reset is recorded.
+This scenario is tested by `TotpService_ResetAsync_AdministratorMustChangePassword_ThrowsActorNotAllowed`.
 
 **TotpService_ResetAsync_UnknownUser_ThrowsUserNotFound**: Resetting a user who does not exist raises `UserNotFound`.
 This scenario is tested by `TotpService_ResetAsync_UnknownUser_ThrowsUserNotFound`.

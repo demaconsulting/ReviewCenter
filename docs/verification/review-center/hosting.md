@@ -97,6 +97,11 @@ scenario is tested by `HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedi
 protector, the default folders beside the database, the persistence of the key ring so that a token stays readable after
 a restart, and the clear error for a key ring folder that cannot be written are verified by the unit tests of
 `ServerHost`: `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`,
+`ServerHost_AddServices_Configured_RegistersRepositoryServiceAsSingleton`,
+`ServerHost_AddServices_Configured_RegistersGitSource`,
+`ServerHost_AddServices_Configured_CredentialProtectorRoundTripsAToken`,
+`ServerHost_AddServices_Configured_PlacesTheKeyRingBesideTheDatabase`,
+`ServerHost_ResolveKeysPath_Configured_ChoosesTheConfiguredFolder`,
 `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`,
 `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`, and
 `ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`. The protection of the key ring at rest and its
@@ -104,11 +109,13 @@ start-up refusals are verified by the unit tests of `KeyRingProtection` and by
 `ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`,
 `ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`, and
 `ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`. The refusal of a lost key
-ring and its escape hatch are verified by `ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey` and
+ring and its escape hatch are verified by `ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey`,
+`ServerHost_CreateApplication_LostRing_CreatesNoKey`, `ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret`, and
 `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`, and the scan that feeds them by the unit
 tests of `SecretScan`. The registration of the
 review planner and of the parser of the review-set file is verified by
-`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
+`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser` and
+`ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton`.
 
 **Attestation services and the start-up check**: Starting the real pipeline with no attestation setting creates the
 self-signed key in an `attestation-selfsigned` folder beside the Data Protection keys and keeps the same key across a
@@ -128,7 +135,11 @@ which skips when the store is unavailable.
 
 **API registration**: The routes of the API under `/api` are mapped, the personal access token service is registered once,
 the OpenAPI document is served without a token, and an unknown address under `/api` is a JSON 404 instead of a page. This
-is verified by the unit test of `ServerHost`, `ServerHost_CreateApplication_ApiRoutes_AreMapped`; the behavior of the
+is verified by the unit tests of `ServerHost`, `ServerHost_CreateApplication_ApiRoutes_AreMapped`,
+`ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton`,
+`ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized`,
+`ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken`, and
+`ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404`; the behavior of the
 routes is verified in the `Api` subsystem.
 
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
@@ -147,9 +158,11 @@ refuse with exit code 1 and no change, which is tested by `KeysCommand_Run_Unrea
 throws an `InvalidOperationException` that names the setting and does not contain the client secret, which is tested
 by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`. With the provider off, or on with
 valid settings, the application is built, which is tested by
-`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`; both are unit tests of `ServerHost`. With the
-provider off, its endpoints answer 404, which is tested by `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown`
-(see the `OidcSignIn` verification).
+`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`, with the provider off by
+`ServerHost_CreateApplication_OidcOff_BuildsTheApplication`, and with an http loopback authority by
+`ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication`; all are unit tests of `ServerHost`. With
+the provider off, its endpoints answer 404, which is tested by
+`OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown` (see the `OidcSignIn` verification).
 
 **Second factor settings**: Starting the real pipeline with an invalid setting of the second factor throws an
 `InvalidOperationException` that names the setting, which is tested by
@@ -164,7 +177,11 @@ it is built and logs a warning that names the password file setting and does not
 by `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`. A database that already has
 a table but no notification tables stops the start while notifications are on and does not while they are off, which is
 tested by `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`; all three
-are unit tests of `ServerHost`.
+are unit tests of `ServerHost`. Each of these outcomes also has a test of its own:
+`ServerHost_CreateApplication_NotificationsOnAndValid_BuildsTheApplication`,
+`ServerHost_CreateApplication_NotificationsInlinePassword_WarningHidesThePassword`,
+`ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings`, and
+`ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff`.
 
 **Notification worker**: The running web host with notifications enabled has the worker and the worker is running, which
 is tested by `HostingSubsystem_NotificationWorker_OnlyEnabledWebHost`, and the same host with notifications off has

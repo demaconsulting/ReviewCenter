@@ -43,8 +43,9 @@ Acceptance Criteria).
   about the self-signed key; the download is in the audit trail.
 - A review that is not complete is not offered on the page, and the download is refused with 409.
 - A review concluded as rejected is offered the download like an approved one and gets a signed attestation marked as
-  a rejection, with its findings, conclusion and ballots appendix; the evidence index never lists it, and a request
-  without credentials is answered `NotFound`; these are verified in the unit tests of `AttestationService` and
+  a rejection on its first page, which is verified by `EvidenceSubsystem_RejectedReview_MarksRejectionOnFirstPage`.
+  Its findings, conclusion and ballots appendix, the rule that the evidence index never lists it, and the answer
+  `NotFound` to a request without credentials are verified in the unit tests of `AttestationService` and
   `EvidenceIndexService`.
 - The attestation download and the evidence index answer a user who is not a member of the project exactly like a
   project that does not exist (404), and a member and a system administrator are served. A request without credentials
@@ -53,9 +54,14 @@ Acceptance Criteria).
   replace the names when those are off, every PDF has a Content scope section, and the signature of the reduced PDF
   verifies.
 - A review that is approved, and therefore locked, still gets its attestation PDF and its evidence index. A PDF of a
-  review that was reopened carries a "Reopen history" section (the administrator is named only when the reviewer names
-  are on), and a PDF of a review that was never reopened has none; these are verified in the unit tests of
-  `AttestationService`.
+  review that was reopened after an approval and approved again carries a "Reopen history" section, which is verified
+  by `EvidenceSubsystem_ReopenedAndApprovedAgain_StatesReopenHistory`. That the administrator is named only when the
+  reviewer names are on, and that a PDF of a review that was never reopened has no such section, are verified in the
+  unit tests of `AttestationService`.
+- The PDF of a completed review states the review, its fingerprint and files, the checklist with who answered, the
+  findings that were included, the conclusion, the ballots appendix, the reviewer sign-offs, the head of the audit
+  trail, and the key that signed it; it leaves out the reviewer names, the checklist wording, and the findings when the
+  evidence settings say so. These are verified by the subsystem tests named in the scenarios below.
 - The evidence index that the application serves equals a committed file, has the shape that ReviewMark reads, and
   carries
   a fingerprint that equals the one that the algorithm of ReviewMark computes from the same files.
@@ -77,11 +83,65 @@ button,
 and a request for the download answers 409. This scenario is tested by
 `EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused`.
 
+**EvidenceSubsystem_CompletedReview_StatesReviewFingerprintAndFiles**: The document of the approved review is
+downloaded. It has the Review section with the project, the review identifier and the content fingerprint, which equals
+the fingerprint that the code of the tests computes from the content of the one file, and the Files section with the
+file. This scenario is tested by `EvidenceSubsystem_CompletedReview_StatesReviewFingerprintAndFiles`.
+
+**EvidenceSubsystem_CompletedReview_StatesChecklistWithWhoAnswered**: The document of the approved review has the
+Checklist section with the first check of the default checklist answered `Pass`, and a line that says who answered
+it and when, in UTC. This scenario is tested by `EvidenceSubsystem_CompletedReview_StatesChecklistWithWhoAnswered`.
+
+**EvidenceSubsystem_CompletedReview_StatesConclusionApproved**: The document of the approved review has the Conclusion
+section with the outcome `Approved` and does not carry the title of a rejection. This scenario is tested by
+`EvidenceSubsystem_CompletedReview_StatesConclusionApproved`.
+
+**EvidenceSubsystem_CompletedReview_StatesBallotsAppendixWithFingerprint**: The document of the approved review has the
+Ballots appendix section with the ballot of slot 1, the time it was submitted, and the ballot fingerprint of 64
+hexadecimal characters with the name of its algorithm. This scenario is tested by
+`EvidenceSubsystem_CompletedReview_StatesBallotsAppendixWithFingerprint`.
+
+**EvidenceSubsystem_CompletedReview_StatesReviewerSignOffs**: The document of the approved review has the Reviewer
+sign-offs section with the primary reviewer, who signed, when, the meaning of the signature and the record digest. This
+scenario is tested by `EvidenceSubsystem_CompletedReview_StatesReviewerSignOffs`.
+
+**EvidenceSubsystem_CompletedReview_StatesAuditTrailHead**: The document of the approved review has the Audit trail
+section, and the value after the row `Chain head hash` is 64 hexadecimal characters. This scenario is tested by
+`EvidenceSubsystem_CompletedReview_StatesAuditTrailHead`.
+
+**EvidenceSubsystem_CompletedReview_StatesTheSigningKey**: The document of the approved review has the Digital
+signature section with the subject and the algorithm of the key, and the thumbprint that it states equals the
+thumbprint of the certificate in the signature of the same file. This scenario is tested by
+`EvidenceSubsystem_CompletedReview_StatesTheSigningKey`.
+
+**EvidenceSubsystem_RejectedReview_MarksRejectionOnFirstPage**: The only reviewer answers every check `Fail` and writes
+a conclusion text, and the review is signed. In the downloaded document the title `Review attestation - REJECTED` is
+followed directly by the banner of the rejection, the Review section follows the banner, and the conclusion is
+`Rejected`. This scenario is tested by `EvidenceSubsystem_RejectedReview_MarksRejectionOnFirstPage`.
+
+**EvidenceSubsystem_ReopenedAndApprovedAgain_StatesReopenHistory**: An administrator other than the signer reopens the
+approved review with a reason, and the reviewer signs again. The downloaded document has the Reopen history section
+with the administrator, the reason, and the digest of the approval that was replaced. This scenario is tested by
+`EvidenceSubsystem_ReopenedAndApprovedAgain_StatesReopenHistory`.
+
+**EvidenceSubsystem_SettingsLeaveOut_NamesWordingAndFindings_AreLeftOutOfTheDocument**: A review has an included,
+resolved finding and is signed, and the project switches off the reviewer names, the checklist wording, and the
+discussion threads. The downloaded document names none of the people, has no wording of the first check but still its
+identifier and outcome, does not have the text of the finding and says that the findings are not included, and
+names the three parts in the line that says what was left out. This scenario is tested by
+`EvidenceSubsystem_SettingsLeaveOut_NamesWordingAndFindings_AreLeftOutOfTheDocument`.
+
+**EvidenceSubsystem_IncludedFinding_IsStatedInFindingsSection**: A review has a finding that was included in the report
+and resolved, and is signed. The downloaded document has the section `Findings and comments in this report` with the
+line that names the author of the finding, the text of the finding, and the status `Resolved`. This scenario is tested
+by `EvidenceSubsystem_IncludedFinding_IsStatedInFindingsSection`.
+
 **ReviewMarkContract_GoldenIndex_MatchesCommittedFile**: A project with reviews in several states is built with a fixed
 clock,
 and the evidence index is requested. The text equals `TestData/evidence-index.golden.json`, so a change of the shape,
 the
-order, or the fingerprint algorithm is a visible change of a committed file. This scenario is tested by
+order, the fingerprint algorithm, the result, or the address of an entry is a visible change of a committed file.
+This scenario is tested by
 `ReviewMarkContract_GoldenIndex_MatchesCommittedFile`.
 
 **ReviewMarkContract_Index_HasTheSchemaReviewMarkReads**,

@@ -88,9 +88,17 @@ N/A - standard test environment.
 
 **ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment**: The process environment is poisoned
 (listen address, Kestrel endpoint, environment name, database settings and sentinel paths) and an isolated host is
-started; it listens on one loopback address that is not the poisoned port, reports the `Production` environment,
-creates its database only in the temporary folder, and touches nothing in the sentinel folder. This scenario is
-tested by `ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment`.
+started; it listens on one loopback address that is not the poisoned port. This scenario is tested by
+`ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment`.
+
+**ServerHost_CreateApplication_IsolatedSettings_RunsInProductionEnvironment**: The same poisoned environment names
+the Development environment and an isolated host is started; the host reports the `Production` environment. This
+scenario is tested by `ServerHost_CreateApplication_IsolatedSettings_RunsInProductionEnvironment`.
+
+**ServerHost_CreateApplication_IsolatedSettings_LeavesAmbientDataPlacesUntouched**: The same poisoned environment
+names a database, a key ring folder and a git cache folder in a sentinel folder and an isolated host is started; the
+database exists only in the temporary folder of the host, and nothing is created in the sentinel folder. This scenario
+is tested by `ServerHost_CreateApplication_IsolatedSettings_LeavesAmbientDataPlacesUntouched`.
 
 **ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins**: The same poisoned environment and a normal host;
 the host listens on the poisoned port. This proves that the poison above is effective, so the isolated test cannot pass
@@ -103,7 +111,8 @@ scenario is tested by `ServerHost_CreateApplication_IsolatedSettings_Constrained
 
 **ServerHost_CreateApplication_HealthRoute_Returns200Healthy**: The real pipeline is started on
 an in-memory server and the health route is requested; the response is 200 with the plain-text
-body `Healthy`. This scenario is tested by
+body `Healthy`. The 200 status serves the health route requirement; because the request carries no credentials, the
+same 200 also serves the requirement that the health route needs no sign-in. This scenario is tested by
 `ServerHost_CreateApplication_HealthRoute_Returns200Healthy`.
 
 **ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry**: The pipeline is started
@@ -124,9 +133,12 @@ called with a null context; an `ArgumentNullException` is thrown. This scenario 
 `ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException`.
 
 **ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices**: The pipeline is started
-with the database connection string pointing at a new file; a project is created through the registered
-`ProjectService`. The file exists afterwards and the project is stored in it. This scenario is tested by
-`ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices`.
+with the database connection string pointing at a new file; the file and its folder exist afterwards. This scenario is
+tested by `ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices`.
+
+**ServerHost_CreateApplication_DatabaseConfigured_ProjectServiceStoresProjects**: The pipeline is started with the
+database connection string pointing at a new file; a project is created through the registered `ProjectService` and
+read back. This scenario is tested by `ServerHost_CreateApplication_DatabaseConfigured_ProjectServiceStoresProjects`.
 
 **ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData**: A project is created through one application
 instance, which is then disposed; a second instance on the same database file lists the project. This scenario is
@@ -183,12 +195,26 @@ an empty, http, malformed, or query-carrying authority, an empty or space-contai
 `openid`, a display name of 51 characters, a user name claim with a space, an age of 5 or 901 seconds, an empty or
 white-space client secret, or a control character in the client secret. An `InvalidOperationException` that says
 "Invalid OpenID Connect sign-in settings" and
-names the setting is thrown, and its message never holds the secret. This scenario is tested by
+names the setting is thrown, and its message never holds the secret. The exception type, the message and the setting
+name serve the requirement that the start stops with an error that names the setting; the check of the message for
+the secret serves the requirement that the error never shows the client secret. This scenario is tested by
 `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
 
-**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: The pipeline is built with the provider off and a
-garbage authority (not read), with an https authority, and with an http loopback authority and the largest age of 900
-seconds; all three are built. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+**ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret**: A theory over a client secret
+file that does not exist and a client secret file that exists and is set together with an inline secret; the start of
+the application stops with a message that names `Identity:Oidc:ClientSecretFile`. In both cases the message does not
+hold the secret, which serves the requirement that the error never shows the client secret; the case of the missing
+file also serves the requirement that a missing client secret file stops the start with an error that names the
+setting. This scenario is tested by
+`ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret`.
+
+**ServerHost_CreateApplication_OidcOff_BuildsTheApplication**: The pipeline is built with sign-in with a provider off
+and a garbage authority (not read); the application is built. This scenario is tested by
+`ServerHost_CreateApplication_OidcOff_BuildsTheApplication`.
+
+**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: The pipeline is built with sign-in on, an
+https authority and the largest age of 900 seconds; the application is built. This scenario is tested by
+`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
 
 **ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication**: With sign-in on and an http authority
 on `localhost`, the pipeline is built. This scenario is tested by
@@ -218,26 +244,61 @@ the `SigningService` is taken from the application services twice; both calls re
 no approval for a review that does not exist. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersSigningService`.
 
-**ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders**: The real pipeline is started on an
+**ServerHost_AddServices_Configured_RegistersRepositoryServiceAsSingleton**: The real pipeline is started on an
 in-memory server with a new database; the `RepositoryService` is taken from the application services twice and is the
-same instance, the git source and the token protector are registered, the git cache path is a `git-cache` folder beside
-the database, a key file exists in a `keys` folder beside the database, and a protected value does not contain the
-token and is unprotected to it. This scenario is tested by
+same instance. This scenario is tested by `ServerHost_AddServices_Configured_RegistersRepositoryServiceAsSingleton`.
+
+**ServerHost_AddServices_Configured_RegistersGitSource**: The real pipeline is started on an in-memory server with a
+new database; the git content source is taken from the application services and is registered. This scenario is tested
+by `ServerHost_AddServices_Configured_RegistersGitSource`.
+
+**ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders**: The real pipeline is started on an
+in-memory server with a new database and without `Git:CachePath`; the git cache path is a `git-cache` folder beside
+the database. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`.
 
-**ServerHost_CreateApplication_ApiRoutes_AreMapped**: The real pipeline is started on an in-memory server; the
-`PersonalAccessTokenService` is taken from the application services twice and is the same instance. A request for
-`/api/projects` without a token is answered 401, the OpenAPI document at `/api/openapi.json` is answered 200 without a
-token, and an unknown address `/api/nothing` is answered 404 with the media type `application/problem+json`, not with a
-page. This scenario is tested by `ServerHost_CreateApplication_ApiRoutes_AreMapped`.
+**ServerHost_AddServices_Configured_PlacesTheKeyRingBesideTheDatabase**: The real pipeline is started on an in-memory
+server with a new database and without `DataProtection:KeysPath`; a key file exists in a `keys` folder beside the
+database. This scenario is tested by `ServerHost_AddServices_Configured_PlacesTheKeyRingBesideTheDatabase`.
+
+**ServerHost_AddServices_Configured_CredentialProtectorRoundTripsAToken**: The real pipeline is started on an
+in-memory server with a new database; the credential protector protects a token, the protected value does not contain
+the token, and it is unprotected to the token again. This scenario is tested by
+`ServerHost_AddServices_Configured_CredentialProtectorRoundTripsAToken`.
+
+**ServerHost_CreateApplication_ApiRoutes_AreMapped**: The real pipeline is started on an in-memory server and the
+protected address `/api/projects` is requested without a token; the answer is not 404 and is not an HTML page, so the
+API routes are mapped under `/api`. This scenario is tested by `ServerHost_CreateApplication_ApiRoutes_AreMapped`.
+
+**ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton**: The real pipeline is started on an
+in-memory server; the `PersonalAccessTokenService` is taken from the application services twice and is the same
+instance. This scenario is tested by `ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton`.
+
+**ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized**: The real pipeline is started on an in-memory
+server and `/api/projects` is requested without a token; the answer is 401. This scenario is tested by
+`ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized`.
+
+**ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken**: The real pipeline is started on an in-memory
+server and `/api/openapi.json` is requested without a token; the answer is 200. This scenario is tested by
+`ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken`.
+
+**ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404**: The real pipeline is started on an in-memory
+server and the unknown address `/api/nothing` is requested; the answer is 404 with the media type
+`application/problem+json`, not a page. This scenario is tested by
+`ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404`.
 
 **ServerHost_Restart_KeyRingPersisted_TokenStaysReadable**: A token is encrypted with the protector of one application
 instance, which is then disposed; a second instance on the same database decrypts it. This scenario is tested by
 `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`.
 
 **ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser**: The real pipeline is started on an in-memory
-server and the `ReviewPlanner` and the `IReviewSetParser` are taken from the application services twice each; every
-call returns the same instance. This scenario is tested by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
+server and the `ReviewPlanner` is taken from the application services twice; both calls return the same instance. The
+name of the test is kept from the time when it also checked the parser. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
+
+**ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton**: The real pipeline is started on an
+in-memory server and the `IReviewSetParser` is taken from the application services twice; both calls return the same
+instance. This scenario is tested by `ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton`.
 
 **ServerHost_AddServices_Configured_RegistersInboxService**: The real pipeline is started on an in-memory server and the
 `InboxService` and the `IInboxStore` are taken from the application services twice each; every call returns the same
@@ -248,24 +309,43 @@ instance, and the service answers zero for a user who is not known. This scenari
 `DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and the
 path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.
 
-**ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder**: A configured key ring folder is used as given; a
-missing or blank setting gives a `keys` folder beside the database. This scenario is tested by
-`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
+**ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder**: A missing or blank `DataProtection:KeysPath`
+gives a `keys` folder beside the database. The name of the test is kept from the time when it also checked a
+configured folder. This scenario is tested by `ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
+
+**ServerHost_ResolveKeysPath_Configured_ChoosesTheConfiguredFolder**: A configured key ring folder is used as given.
+This scenario is tested by `ServerHost_ResolveKeysPath_Configured_ChoosesTheConfiguredFolder`.
 
 **ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable**: An application is built with
 `DataProtection:Protection` Auto and a certificate in a temporary folder; a value is protected, the application is
-disposed, and a second application over the same key ring unprotects it. The key file holds an encrypted secret. This
-scenario is tested by `ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`.
+disposed, and a second application over the same key ring unprotects it. This scenario is tested by
+`ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`.
+
+**ServerHost_CreateApplication_CertificateKeyRing_KeyFilesAreEncrypted**: An application is built with
+`DataProtection:Protection` Auto and a certificate in a temporary folder, and a value is protected; the key file in
+the key ring folder holds an encrypted secret and no master key in clear text. This scenario is tested by
+`ServerHost_CreateApplication_CertificateKeyRing_KeyFilesAreEncrypted`.
+
+**ServerHost_CreateApplication_CertificateKeyRing_DoesNotLogThePassword**: An application is built twice with
+`DataProtection:Protection` Auto and a certificate with a password; the two start-up entries of the key ring
+protection are logged at information level, and no captured log entry contains the password. This scenario is tested
+by `ServerHost_CreateApplication_CertificateKeyRing_DoesNotLogThePassword`.
 
 **ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError**: An unknown protection, an unknown DPAPI
 scope, and a certificate protection without a certificate each stop the build with an `InvalidOperationException` that
 starts "Invalid key ring settings:" and names the setting. This scenario is tested by
 `ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`.
 
-**ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword**: A missing
-certificate file and a wrong password each stop the build with a message that names
-`DataProtection:CertificatePath` and does not contain the password. This scenario is tested by
-`ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword`.
+**ServerHost_CreateApplication_MissingCertificate_ThrowsClearError**: A certificate file that does not exist stops the
+build with a message that names `DataProtection:CertificatePath` and the path. This scenario is tested by
+`ServerHost_CreateApplication_MissingCertificate_ThrowsClearError`.
+
+**ServerHost_CreateApplication_WrongPasswordCertificate_ThrowsClearErrorWithoutPassword**: A certificate file that
+exists is opened with a password that is not its password; the build stops with a message that says the password is
+wrong or the file is not a certificate with a private key, and that contains neither the configured password nor the
+password of the certificate. The first check serves the requirement for the wrong password; the two checks for the
+passwords serve the requirement that the error never shows a password. This scenario is tested by
+`ServerHost_CreateApplication_WrongPasswordCertificate_ThrowsClearErrorWithoutPassword`.
 
 **ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey**: A ring that one
 certificate protects is opened with another; the build fails with a message that names
@@ -287,9 +367,17 @@ mention of `AllowNewKeyRing`. This scenario is tested by
 
 **ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey**: A database holds a repository token and a
 second-factor secret that a ring protected, and the key folder is empty or has been removed (a theory with both
-cases). The build fails with the message "Key ring '...' is empty but the database holds 2 protected secrets" that names
-`DataProtection:AllowNewKeyRing`, and no key file exists afterwards. This scenario is tested by
-`ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey`.
+cases). The build fails with the message "Key ring '...' is empty but the database holds 2 protected secrets" that
+names `DataProtection:AllowNewKeyRing`. The name of the test is kept from the time when it also checked that no key
+file was created. This scenario is tested by `ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey`.
+
+**ServerHost_CreateApplication_LostRing_CreatesNoKey**: The same lost ring is started in both cases of the theory;
+the build fails and no key file exists afterwards. This scenario is tested by
+`ServerHost_CreateApplication_LostRing_CreatesNoKey`.
+
+**ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret**: The same lost ring is started in both cases of the
+theory; the message of the error does not contain the stored token. This scenario is tested by
+`ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret`.
 
 **ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning**: The same lost ring is started with
 `DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of
@@ -326,19 +414,31 @@ scenario is tested by `KeyRingSettings_AllowNewKeyRing_DefaultsToFalse`.
 The registration scenario of the command-line verbs is `ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile`, above:
 only `AddServices` runs, so neither a scan nor the use of the ring takes place and no key file is created.
 
-**ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError** and
-**ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles**: On Linux and macOS only (skipped on
-Windows), explicit DPAPI is refused with a message that names `DataProtection:Protection`, and the key folder gets mode
-0700 and the key files mode 0600. These scenarios are tested by the tests of the same names.
+**ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError**: On Linux and macOS only (skipped on Windows), explicit
+DPAPI is refused with a message that names `DataProtection:Protection`. This scenario is tested by
+`ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError`.
+
+**ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheFolder**: On Linux and macOS only (skipped on
+Windows), the key ring is protected by permissions only and the server is started; the key folder has mode 0700. This
+scenario is tested by `ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheFolder`.
+
+**ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheKeyFiles**: On Linux and macOS only (skipped on
+Windows), the key ring is protected by permissions only, the key folder starts with loose permissions, and the
+server is started, which writes the key file; the key file has mode 0600. This scenario is tested by
+`ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheKeyFiles`.
 
 The choice of `PermissionsOnly` by the settings of the isolated hosts of the self-validation is verified with the
 validation checks unit and is not a scenario of this unit.
 
 **ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys**: The pipeline
-is started twice on the same database folder with no attestation setting. The key file exists in the
-`attestation-selfsigned` folder inside the `keys` folder, and the key (its thumbprint) is the same after the restart.
-This scenario is tested by
+is started on a database folder with no attestation setting. The key file exists in the `attestation-selfsigned`
+folder inside the `keys` folder. This scenario is tested by
 `ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`.
+
+**ServerHost_CreateApplication_NoAttestationSettings_SelfSignedKeyPersistsAcrossRestart**: The pipeline is started
+twice on the same database folder with no attestation setting; the key (its thumbprint) is the same after the
+restart. This scenario is tested by
+`ServerHost_CreateApplication_NoAttestationSettings_SelfSignedKeyPersistsAcrossRestart`.
 
 **ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile**: The server is started once, which creates
 the protected attestation key, then the key ring folder is deleted and the server is started again. The start fails with
@@ -363,11 +463,21 @@ protected PFX that ends in 30 days and its password. The application is created,
 names the File provider, a warning that the certificate expires is logged and shown in the status, and the password is
 not in any log entry. This scenario is tested by `ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry`.
 
-**ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys**: The key ring is
-protected by a certificate and the attestation key is a PFX without a password. With `DataProtection:RequireEncryptedKeys`
-the start fails, naming that setting and saying that the key is not protected by a password. Without it, the server
-starts and logs the warning. This scenario is tested by
-`ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys`.
+**ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedWithRequireEncryptedKeys**: The key ring is
+protected by a certificate and the attestation key is a PFX without a password. With
+`DataProtection:RequireEncryptedKeys` the start fails, naming that setting and saying that the key is not protected by
+a password. This scenario is tested by
+`ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedWithRequireEncryptedKeys`.
+
+**ServerHost_CreateApplication_UnprotectedFileAttestationKey_StartsWithoutRequireEncryptedKeys**: The same key ring
+and attestation key are used without `DataProtection:RequireEncryptedKeys`; the server starts and the attestation key
+provider reports that it is available. This scenario is tested by
+`ServerHost_CreateApplication_UnprotectedFileAttestationKey_StartsWithoutRequireEncryptedKeys`.
+
+**ServerHost_CreateApplication_UnprotectedFileAttestationKey_WarnsWithoutRequireEncryptedKeys**: The same key ring
+and attestation key are used without `DataProtection:RequireEncryptedKeys`; the start logs a warning that the key is
+not protected by a password. This scenario is tested by
+`ServerHost_CreateApplication_UnprotectedFileAttestationKey_WarnsWithoutRequireEncryptedKeys`.
 
 **ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError**: The provider setting names a provider that
 does not exist; an `InvalidOperationException` "The attestation signing key is not usable" that names
@@ -412,18 +522,33 @@ to an unknown zone. An `InvalidOperationException` with the text "Invalid notifi
 `Notifications:` and the setting is thrown, and its message does not contain the password. This scenario is tested by
 `ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret`.
 
+**ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings**: One application is built with
+notifications off and an invalid `FromAddress`, over a new database; it is built. This scenario is tested by
+`ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings`.
+
+**ServerHost_CreateApplication_NotificationsOnAndValid_BuildsTheApplication**: One application is built with valid
+enabled SMTP settings over a new database; it is built. This scenario is tested by
+`ServerHost_CreateApplication_NotificationsOnAndValid_BuildsTheApplication`.
+
 **ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword**: One application is built
-with notifications off and an invalid `FromAddress`, and one with valid enabled SMTP settings and an inline password,
-both over a new database and a capturing log provider. Both are built, and exactly one warning that starts with
-"Notification settings" is logged, for the second; it names `Notifications:Smtp:PasswordFile` and does not contain the
-password. This scenario is tested by
+with valid enabled SMTP settings and an inline password, over a new database and a capturing log provider. Exactly one
+warning that starts with "Notification settings" is logged, and it names `Notifications:Smtp:PasswordFile`. The name of
+the test is kept from the time when it also checked the two cases above. This scenario is tested by
 `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`.
 
-**ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn**: A database file that
-holds one unrelated table, so that the server does not create the model, is used with valid enabled settings; an
-`InvalidOperationException` whose message contains "no notification tables" is thrown. With the same database and
-notifications off the application is built. This scenario is tested by
+**ServerHost_CreateApplication_NotificationsInlinePassword_WarningHidesThePassword**: The same application is built
+with an inline password; the one warning about the notification settings does not contain the password. This scenario
+is tested by `ServerHost_CreateApplication_NotificationsInlinePassword_WarningHidesThePassword`.
+
+**ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn**: A database file
+that holds one unrelated table, so that the server does not create the model, is used with valid enabled settings; an
+`InvalidOperationException` whose message contains "no notification tables" is thrown. The name of the test is kept
+from the time when it also checked the case below. This scenario is tested by
 `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`.
+
+**ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff**: The same database
+file is used with notifications off; the application is built. This scenario is tested by
+`ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff`.
 
 **ServerHost_AddServices_Configured_RegistersProjectAccessAsSingleton**: The real pipeline is started on an in-memory
 server and `IProjectAccess` is taken from the application services twice; both calls return the same instance. This
@@ -434,11 +559,14 @@ server; the `AuditAppender`, the `IAuditStore`, and the `AuditService` are each 
 twice, and each pair is the same instance. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersAuditServicesAsSingletons`.
 
-**ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse**: The audit store is replaced by one whose
-append always fails, and `TryRecordAsync` of the audit service is called; it throws nothing and returns false, and a
-warning that says "An
-audit entry could not be recorded" is logged by the `ServerHost` category. This scenario is tested by
-`ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse`.
+**ServerHost_AddServices_AuditTrailUnwritable_LogsWarning**: The audit store is replaced by one whose append always
+fails, and `TryRecordAsync` of the audit service is called; a warning that says "An audit entry could not be recorded"
+is logged by the `ServerHost` category. This scenario is tested by
+`ServerHost_AddServices_AuditTrailUnwritable_LogsWarning`.
+
+**ServerHost_AddServices_AuditTrailUnwritable_ReturnsFalseWithoutThrowing**: The audit store is replaced by one whose
+append always fails, and `TryRecordAsync` of the audit service is called; it throws nothing and returns false. This
+scenario is tested by `ServerHost_AddServices_AuditTrailUnwritable_ReturnsFalseWithoutThrowing`.
 
 **ServerHost_AddServices_ServicesOnly_CreatesNoKeyFile**: Only `AddServices` is called, as the command-line verbs do,
 with a key folder that does not exist; the `UserService` and the `AuditService` are resolved and used. Neither the key
@@ -485,3 +613,46 @@ and has stopped when the host has stopped, which is tested by `ServerHost_RunAsy
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real
 pipeline; there is no separate test of the registration.
+
+**Scenarios whose assertions serve several requirements**: The following scenarios have one Act whose failure or
+result is seen from several sides, so one test links to each requirement that it asserts. The assertion that serves
+each requirement is:
+
+- `ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry`: the one start-up entry of information level
+  serves the start-up log entry requirement, and the named URL value of that entry serves the requirement for the
+  listen URL.
+- `ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`: the exception that names the setting serves
+  the requirement for invalid key ring settings, and the absence of a key file afterwards serves the requirement that
+  a failed check creates no key.
+- `ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`: the message that names
+  the two settings serves the wrong certificate requirement, and the absence of a second key file serves the
+  requirement that a failed check creates no key.
+- `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`: the exception serves the requirement that
+  names `DataProtection:KeysPath`, and the folder in its message serves the requirement that names the folder.
+- `ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret`: the exception serves the
+  requirement that an invalid setting stops the start, the setting in its message serves the requirement that names the
+  setting, and the check that the SMTP password is absent from the message serves the requirement that hides it.
+- `ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile`: the exception serves the requirement
+  that the start fails, the file name and the advice to delete it serve the requirement that names the file, and the
+  file that is still there serves the requirement that the key file is kept; the variant with
+  `DataProtection:AllowNewKeyRing` shows the same error and the file in place for the requirement about that setting.
+- `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`: the successful build serves the
+  requirement that the start goes on with a new key, and the warning with the setting and the count serves the warning
+  requirement.
+- `ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing`: the successful build and the one key serve the
+  requirement for a fresh installation, and the log without an error entry serves the requirement that no error is
+  logged.
+- `ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint`: the quiet start serves the requirement
+  that the start is without complaint, and the key folder that still holds exactly one key file serves the requirement
+  that no second key is created.
+- `ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey`: the message that names
+  the folder and `Database:ConnectionString` serves the requirement for the refusal, the absence of the database
+  location, of the exception text and of an inner exception serves the sanitizing requirement, and the empty key folder
+  afterwards serves the requirement that no key file is created.
+- `ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning`: the successful build serves the
+  requirement that the start goes on, and the warning that the database could not be read serves the warning
+  requirement.
+- `ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts`: the successful build serves the requirement
+  that the start goes on, and the error with the counts and the remedy serves the requirement for the error entry.
+- `ServerHost_CreateApplication_HealthRoute_Returns200Healthy`: see above; the 200 status serves both the health route
+  requirement and the requirement that the route needs no sign-in, because the request carries no credentials.

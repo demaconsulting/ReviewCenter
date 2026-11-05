@@ -66,6 +66,42 @@ public partial class TotpServiceTests
     }
 
     /// <summary>
+    ///     Test that the secret that the setup returns is 160 bits (20 bytes) long.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsA160BitSecret()
+    {
+        // Arrange: a user without a second factor
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+
+        // Act: start the enrollment
+        var enrollment = await world.Totp.BeginEnrollmentAsync(
+            TestActors.Ann, TotpTestWorld.Password, TestContext.Current.CancellationToken);
+
+        // Assert: the base32 text of the secret decodes to 20 bytes, which are 160 bits
+        Assert.Equal(160, TotpOracle.FromBase32(enrollment.SecretBase32).Length * 8);
+    }
+
+    /// <summary>
+    ///     Test that the authenticator address that the setup returns names ReviewCenter as the issuer.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_BeginEnrollmentAsync_ValidPassword_UriNamesTheIssuerReviewCenter()
+    {
+        // Arrange: a user without a second factor
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+
+        // Act: start the enrollment
+        var enrollment = await world.Totp.BeginEnrollmentAsync(
+            TestActors.Ann, TotpTestWorld.Password, TestContext.Current.CancellationToken);
+
+        // Assert: the issuer parameter of the address is ReviewCenter
+        Assert.Contains("issuer=ReviewCenter", enrollment.OtpauthUri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that two enrollments get different secrets.
     /// </summary>
     [Fact]
@@ -869,6 +905,39 @@ public partial class TotpServiceTests
     }
 
     /// <summary>
+    ///     Test that the confirmation of a setup refuses even a right code while the account is locked out, with the
+    ///     message of a wrong code, and leaves the setup pending.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ConfirmEnrollmentAsync_LockedOutAccountRightCode_ThrowsAndStaysPending()
+    {
+        // Arrange: a started enrollment and five wrong codes, which lock the account
+        var world = new TotpTestWorld();
+        var user = await world.AddUserAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var enrollment = await world.Totp.BeginEnrollmentAsync(TestActors.Ann, TotpTestWorld.Password, cancellationToken);
+        var secret = TotpOracle.FromBase32(enrollment.SecretBase32);
+        var right = world.CodeNow(secret);
+        var wrong = right == "000000" ? "000001" : "000000";
+        DomainRuleException? wrongCode = null;
+        for (var i = 0; i < 5; i++)
+        {
+            wrongCode = await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Totp.ConfirmEnrollmentAsync(TestActors.Ann, wrong, cancellationToken));
+        }
+
+        // Act: confirm with the right code while the account is locked out
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ConfirmEnrollmentAsync(TestActors.Ann, right, cancellationToken));
+
+        // Assert: refused like a wrong code, and the setup is still pending
+        Assert.True(await world.UserService.IsLockedOutAsync("ann", cancellationToken));
+        Assert.Equal(DomainRule.TotpCodeIncorrect, exception.Rule);
+        Assert.Equal(wrongCode!.Message, exception.Message);
+        Assert.False((await world.Store.GetAsync(user.Id, cancellationToken))!.IsActive);
+    }
+
+    /// <summary>
     ///     Test that wrong passwords and wrong codes share one counter.
     /// </summary>
     [Fact]
@@ -1380,6 +1449,41 @@ public partial class TotpServiceTests
         await world.UserService.SetEnabledAsync("root", false, Actor.CommandLine, cancellationToken);
 
         // Act: the disabled administrator tries to reset ann's second factor
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ResetAsync(new Actor("root", "root"), "ann", cancellationToken));
+
+        // Assert: refused, the second factor is still there, and no reset is recorded
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.True(await world.Totp.IsEnrolledAsync("ann", cancellationToken));
+        Assert.DoesNotContain(world.Store.Audits, a => a.Action == TotpService.ResetAction);
+    }
+
+    /// <summary>
+    ///     Test that an administrator who must still change a temporary password can not reset a second factor.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ResetAsync_AdministratorMustChangePassword_ThrowsActorNotAllowed()
+    {
+        // Arrange: an enrolled user and an administrator whose password is a temporary one
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.Users.AddAsync(
+            new User
+            {
+                Username = "root",
+                DisplayName = "Root",
+                Enabled = true,
+                IsSystemAdmin = true,
+                PasswordHash = "hash:" + TotpTestWorld.Password,
+                MustChangePassword = true,
+                Created = world.Clock.GetUtcNow()
+            },
+            _ => AuditDraft.By(Actor.CommandLine, "user.created", "test"),
+            cancellationToken);
+
+        // Act: the administrator tries to reset ann's second factor
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => world.Totp.ResetAsync(new Actor("root", "root"), "ann", cancellationToken));
 

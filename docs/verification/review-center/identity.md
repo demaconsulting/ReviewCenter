@@ -29,6 +29,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   reports a user as valid while enabled and as no longer valid after the user is disabled.
 - The role claim `SystemAdmin` belongs only to a system administrator, and a session ends when the system
   administrator state of its user changes.
+- The actor that the subsystem provides for the signed-in user is stored as the author of a comment, whatever name the
+  text of the comment carries.
 - With a fake OpenID Connect provider, a first sign-in creates a plain account (no project, no administrator right, no
   password) and a session, sign-out is local only, and a fresh sign-in of the same person at the provider allows
   exactly one signature without a password.
@@ -43,6 +45,12 @@ real pipeline. A request for `/projects` is redirected; the user signs in throug
 the return URL and is redirected to it; the page shows the display name of the user in the header; the user signs
 out, and `/projects` is redirected to the login page again. The stored password hash does not contain the password.
 This scenario is tested by `IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd`.
+
+**IdentitySubsystem_Actor_SignedInUser_IsRecordedAsTheAuthorOfAComment**: On the real pipeline a project and a review
+exist, and the authentication state provider of a new scope is given a signed-in state of the user `ann`. The actor that
+`GetActorAsync` returns is given to the thread service with a comment text that reads `Author: bob`. The stored comment
+has the user name and display name of `ann` as its author, and the text is kept as written. This scenario is tested by
+`IdentitySubsystem_Actor_SignedInUser_IsRecordedAsTheAuthorOfAComment`.
 
 **IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid**: On the real pipeline a user is
 created through `UserService`, and the authentication state provider is resolved from a new service scope, as a circuit

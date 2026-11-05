@@ -123,6 +123,11 @@ answer 404 and the login page shows no button. This scenario is tested by
 the display name beside the local form, the generic message, and the local return address. This scenario is tested by
 `OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm`.
 
+**OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge**: With the second factor on in the settings of the
+tool, a person signs in through the fake provider; the person is sent to the local return address with one session
+cookie and no cookie of a pending second step. This scenario is tested by
+`OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge`.
+
 **OidcSignIn_Logout_IsLocalOnly**: Signing out ends the session and the provider sees no request. This scenario is
 tested by `OidcSignIn_Logout_IsLocalOnly`.
 

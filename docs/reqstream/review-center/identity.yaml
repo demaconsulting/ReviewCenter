@@ -326,6 +326,17 @@ sections:
           - ReviewCenter-SignIn-Actor
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - IdentitySubsystem_Actor_SignedInUser_IsRecordedAsTheAuthorOfAComment
+
+      - id: ReviewCenter-Identity-Actor-CommentAuthor
+        title: >-
+          The Identity subsystem shall provide the actor of the signed-in user to the thread service as the author of
+          a comment, whatever name the text of the comment carries.
+        justification: |
+          The author of a comment must be the person who is signed in. A name typed into the comment text is only
+          text and must never become the recorded author.
+        tests:
+          - IdentitySubsystem_Actor_SignedInUser_IsRecordedAsTheAuthorOfAComment
 
       - id: ReviewCenter-Identity-Actor-NobodyRefused
         title: >-
@@ -734,6 +745,7 @@ sections:
           A correct provider setting must not stop the server from starting.
         tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+          - ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication
 
       - id: ReviewCenter-Identity-OidcStartupSettings-Off
         title: >-
@@ -743,6 +755,7 @@ sections:
           A server that does not use a provider must not need any provider setting.
         tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+          - ServerHost_CreateApplication_OidcOff_BuildsTheApplication
 
       - id: ReviewCenter-Identity-OidcStartupValidation
         title: >-
@@ -926,10 +939,17 @@ sections:
 
       - id: ReviewCenter-Identity-TotpSecondFactor-OtherSignIns
         title: >-
-          The Identity subsystem shall leave the sign-in with a provider and with an API token as it was, without a
-          second factor.
+          The Identity subsystem shall leave the sign-in with a provider as it was, without a second factor.
         justification: |
-          A provider and an API token have their own checks, and a second code would stop programs that cannot type
-          one.
+          A provider has its own checks of the person, and a second code of this tool would only lock out a person
+          whom the provider has already checked.
+        children:
+          - ReviewCenter-OidcSignIn-Login-NoSecondFactor
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-OtherSignIns-ApiToken
+        title: >-
+          The Identity subsystem shall leave the sign-in with an API token as it was, without a second factor.
+        justification: |
+          An API token is the proof of a program, and a second code would stop programs that cannot type one.
         children:
           - ReviewCenter-TotpSignIn-Disabled-PersonalAccessTokenUnaffected

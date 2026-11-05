@@ -1727,6 +1727,56 @@ public class CoreSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a project member who holds an unsigned reviewer slot on an unapproved review is refused the
+    ///     auditor role, that the refusal names the review, and that the role and the audit trail stay as they were.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser()
+    {
+        // Arrange: bob holds an unsigned slot of the review rev-1, which is not approved
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        await realm.Signing.AddSlotAsync(realm.Root, realm.ProjectId, "rev-1", realm.Ids["bob"], null, cancellationToken);
+        var auditsBefore = realm.Store.Audits.Count;
+
+        // Act: an administrator makes bob an auditor
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Projects.SetMemberRoleAsync(
+            realm.Root, realm.ProjectId, "bob", ProjectRole.Auditor, cancellationToken));
+
+        // Assert: refused with the rule that names the review, bob is still a user, and nothing was recorded
+        Assert.Equal(DomainRule.MemberHasOpenReviewWork, refused.Rule);
+        Assert.Contains("rev-1", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            ProjectRole.User,
+            (await realm.Store.GetMembershipAsync(realm.Ids["bob"], realm.ProjectId, cancellationToken))!.Role);
+        Assert.Equal(auditsBefore, realm.Store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that a project that exists and whose rules nobody changed keeps both further rules on in the store
+    ///     and that the services enforce them, so that the author of a review is refused the answer.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ReviewRuleSwitches_ExistingProject_KeepsBothRulesOnAndEnforced()
+    {
+        // Arrange: a project that exists, with the review rev-1 that ann created, and no rule ever changed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var firstItem = DefaultChecklist.Current.Sections[0].Items[0].Id;
+
+        // Act: read the project again from the store and let the author answer a check
+        var project = (await realm.Store.GetProjectAsync(realm.ProjectId, cancellationToken))!;
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Checklists.SetAnswerAsync(
+            realm.ProjectId, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken));
+
+        // Assert: both rules are on, no rule change was recorded, and the author is refused
+        Assert.True(project.RequireNonAuthorChecklistAnswers);
+        Assert.True(project.RequireNonReopenerSigning);
+        Assert.DoesNotContain(realm.Store.Audits, a => a.Action == ProjectService.ReviewRuleChangedAction);
+        Assert.Equal(DomainRule.AuthorCannotAnswer, refused.Rule);
+    }
+
+    /// <summary>
     ///     Test that the author of a review created through an API token is the user of the token, so that user
     ///     cannot be a reviewer of it while independence is required.
     /// </summary>

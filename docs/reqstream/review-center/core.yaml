@@ -393,6 +393,8 @@ sections:
           - ReviewCenter-ProjectService-AuditorRole-OpenWork
           - ReviewCenter-ProjectService-AuditorRole-OutOfDate
           - ReviewCenter-ProjectService-AuditorRole-ReviewNames
+        tests:
+          - CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser
 
       - id: ReviewCenter-Core-ProjectAccess-SlotsAndSigning
         title: >-
@@ -3804,6 +3806,19 @@ sections:
           The default is on, so that a project is only without a rule when somebody chose that.
         children:
           - ReviewCenter-ProjectService-ReviewRuleSwitches-NewProject
+
+      - id: ReviewCenter-Core-ReviewRuleSwitches-DefaultExisting
+        title: >-
+          The Core subsystem shall keep the two further review rules on, and enforce them, for a project that exists
+          and whose rules were never changed.
+        justification: |
+          A project that nobody set up must not be without the protection of the rules. The database of an earlier
+          version has no column for the rules and must be created again, so the claim is about the projects of the
+          current database.
+        children:
+          - ReviewCenter-ProjectService-ReviewRuleSwitches-ExistingProject
+        tests:
+          - CoreSubsystem_ReviewRuleSwitches_ExistingProject_KeepsBothRulesOnAndEnforced
 
       - id: ReviewCenter-Core-ReviewRuleSwitches-Refused
         title: >-
@@ -9345,6 +9360,22 @@ sections:
         children:
           - ReviewCenter-TotpService-Enrollment
 
+      - id: ReviewCenter-Core-TotpSecondFactor-SetupSecretStrength
+        title: >-
+          The Core subsystem shall make the secret of a new setup of a second factor 160 bits long.
+        justification: |
+          A secret that is too short could be found by trying, and the second factor would protect nothing.
+        children:
+          - ReviewCenter-TotpService-Enrollment-SecretBits
+
+      - id: ReviewCenter-Core-TotpSecondFactor-SetupIssuer
+        title: >-
+          The Core subsystem shall name ReviewCenter as the issuer in the authenticator address of a new secret.
+        justification: |
+          A person who has several entries in the app must be able to see which one belongs to this tool.
+        children:
+          - ReviewCenter-TotpService-Enrollment-Issuer
+
       - id: ReviewCenter-Core-TotpSecondFactor-SetupPending
         title: >-
           The Core subsystem shall keep a started setup of a second factor pending, so that the password alone still
@@ -9792,6 +9823,16 @@ sections:
           - ReviewCenter-TotpService-AdminReset-ApiToken
           - ReviewCenter-TotpService-AdminReset-DisabledAdmin
 
+      - id: ReviewCenter-Core-TotpSecondFactor-AdminResetPasswordChange
+        title: >-
+          The Core subsystem shall refuse the reset when the system administrator still has to change a temporary
+          password, and keep the second factor of the user.
+        justification: |
+          An administrator whose password is a temporary one is not yet the only holder of the account, so the right
+          to take the protection of another user away must wait until the password is changed.
+        children:
+          - ReviewCenter-TotpService-AdminReset-MustChangePassword
+
       - id: ReviewCenter-Core-TotpSecondFactor-AdminResetTarget
         title: >-
           The Core subsystem shall refuse the reset of a user who does not exist and of a user who has no second
@@ -9835,6 +9876,15 @@ sections:
           A lockout that a lucky guess could end would not stop guessing.
         children:
           - ReviewCenter-TotpService-Lockout-Locked
+
+      - id: ReviewCenter-Core-TotpSecondFactor-LockoutSetupLocked
+        title: >-
+          The Core subsystem shall refuse even a right code at the confirmation of a setup while the account is locked
+          out.
+        justification: |
+          A lockout that a lucky guess at the setup could get around would not stop guessing.
+        children:
+          - ReviewCenter-TotpService-Lockout-SetupLocked
 
       - id: ReviewCenter-Core-TotpSecondFactor-LockoutOperations
         title: >-
