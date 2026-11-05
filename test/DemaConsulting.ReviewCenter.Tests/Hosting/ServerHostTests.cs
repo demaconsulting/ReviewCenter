@@ -136,8 +136,8 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that a database configured through the <c>Database</c> section is created and usable:
-    ///     the file and its folder appear, and the domain services work against it.
+    ///     Test that a database configured through the <c>Database</c> section is created when the application is
+    ///     built: the file and its folder appear.
     /// </summary>
     [Fact]
     public async Task ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices()
@@ -149,18 +149,37 @@ public class ServerHostTests
 
         try
         {
-            // Act: start the pipeline against that database and create a project through the registered service
+            // Act: start the pipeline against that database
             await using var app = await TestWebApp.StartAsync(logs, $"Data Source={file};Pooling=False", ["serve", "--silent"]);
-            var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
 
-            // Assert: the database file exists and the project was stored in it
+            // Assert: the database file exists
             Assert.True(File.Exists(file));
-            Assert.True(project.Id > 0);
         }
         finally
         {
             Directory.Delete(folder, recursive: true);
         }
+    }
+
+    /// <summary>
+    ///     Test that the project service of the host works against the configured database: a project that is
+    ///     created through it is stored and read back.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_DatabaseConfigured_ProjectServiceStoresProjects()
+    {
+        // Arrange: start the pipeline against a throwaway database
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, TestDatabase.NewConnectionString(), ["serve", "--silent"]);
+
+        // Act: create a project through the registered service and read it back
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var found = await app.Services.GetRequiredService<ProjectService>()
+            .GetAsync(TestActors.Ann, project.Id, TestContext.Current.CancellationToken);
+
+        // Assert: the project was stored in the database
+        Assert.True(project.Id > 0);
+        Assert.Equal("Apollo", found?.Name);
     }
 
     /// <summary>
@@ -459,49 +478,66 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that the provider settings are not checked while sign-in with a provider is off, and that valid
-    ///     settings (https, and http for a loopback host) build the application.
+    ///     Test that the provider settings are not checked while sign-in with a provider is off: a garbage
+    ///     authority does not stop the build.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_OidcOff_BuildsTheApplication()
+    {
+        // Arrange: sign-in with a provider is off, and the unused authority is garbage
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = OidcHostOptions(new Dictionary<string, string?>
+        {
+            ["Identity:Oidc:Authority"] = "garbage"
+        });
+
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
+    }
+
+    /// <summary>
+    ///     Test that valid provider settings with an https authority build the application.
     /// </summary>
     [Fact]
     public void ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication()
     {
-        // Arrange
+        // Arrange: valid enabled settings with an https authority
         using var context = Context.Create(["serve", "--silent"]);
-        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
-        {
-            MapStaticAssets = false,
-            ConfigureBuilder = builder =>
-            {
-                builder.WebHost.UseTestServer();
-                extra["Database:ConnectionString"] = TestDatabase.NewConnectionString();
-                builder.Configuration.AddInMemoryCollection(extra);
-            }
-        };
-
-        // Act / Assert: all three build
-        using var off = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
-        {
-            ["Identity:Oidc:Authority"] = "garbage"
-        }));
-        using var secure = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        var options = OidcHostOptions(new Dictionary<string, string?>
         {
             ["Identity:Oidc:Enabled"] = "true",
             ["Identity:Oidc:Authority"] = "https://idp.example.com/realm",
             ["Identity:Oidc:ClientId"] = "reviewcenter",
-            ["Identity:Oidc:ClientSecret"] = "top-secret-value"
-        }));
-        using var loopback = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
-        {
-            ["Identity:Oidc:Enabled"] = "true",
-            ["Identity:Oidc:Authority"] = "http://localhost:8080/realm",
-            ["Identity:Oidc:ClientId"] = "reviewcenter",
             ["Identity:Oidc:ClientSecret"] = "top-secret-value",
             ["Identity:Oidc:ReauthMaxAgeSeconds"] = "900"
-        }));
-        Assert.NotNull(off);
-        Assert.NotNull(secure);
-        Assert.NotNull(loopback);
+        });
+
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
     }
+
+    /// <summary>
+    ///     Gets host options for the OpenID Connect tests: an in-memory server, a throwaway database and the
+    ///     given settings.
+    /// </summary>
+    /// <param name="settings">The OpenID Connect settings to add.</param>
+    /// <returns>The host options.</returns>
+    private static ServerHostOptions OidcHostOptions(Dictionary<string, string?> settings) => new()
+    {
+        MapStaticAssets = false,
+        ConfigureBuilder = builder =>
+        {
+            builder.WebHost.UseTestServer();
+            settings["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+            builder.Configuration.AddInMemoryCollection(settings);
+        }
+    };
 
     /// <summary>
     ///     Test that valid settings with http on a loopback host build the application.
@@ -576,83 +612,174 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that the notification settings are not checked while notifications are off, and that valid settings
-    ///     build the application and log a warning for an inline password.
+    ///     Test that the notification settings are not checked while notifications are off: a garbage sender address
+    ///     does not stop the build.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings()
+    {
+        // Arrange: notifications are not enabled, and an unused setting is garbage
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = NotificationHostOptions(
+            new Dictionary<string, string?> { ["Notifications:FromAddress"] = "garbage" },
+            new CapturingLoggerProvider());
+
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
+    }
+
+    /// <summary>
+    ///     Test that valid notification settings build the application while notifications are on.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_NotificationsOnAndValid_BuildsTheApplication()
+    {
+        // Arrange: valid enabled SMTP settings
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = NotificationHostOptions(ValidNotificationSettings(), new CapturingLoggerProvider());
+
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, options);
+
+        // Assert: the application was built
+        Assert.NotNull(application);
+    }
+
+    /// <summary>
+    ///     Test that an inline SMTP password makes the start log a warning that names the password file setting.
     /// </summary>
     [Fact]
     public void ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword()
     {
-        // Arrange
+        // Arrange: valid enabled SMTP settings with an inline password
         using var context = Context.Create(["serve", "--silent"]);
         var logs = new CapturingLoggerProvider();
-        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
-        {
-            MapStaticAssets = false,
-            ConfigureBuilder = builder =>
-            {
-                builder.WebHost.UseTestServer();
-                builder.Logging.AddProvider(logs);
-                extra["Database:ConnectionString"] = TestDatabase.NewConnectionString();
-                builder.Configuration.AddInMemoryCollection(extra);
-            }
-        };
 
-        // Act: off with garbage, and on with valid settings
-        using var off = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
-        {
-            ["Notifications:FromAddress"] = "garbage"
-        }));
-        using var on = ServerHost.CreateApplication(context, Options(ValidNotificationSettings()));
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, NotificationHostOptions(ValidNotificationSettings(), logs));
 
-        // Assert: both build, and only the second warns, without the password
-        Assert.NotNull(off);
-        Assert.NotNull(on);
-        var warning = Assert.Single(
-            logs.Entries,
-            entry => entry.Level == LogLevel.Warning && entry.Message.Contains("Notification settings", StringComparison.Ordinal));
+        // Assert: exactly one warning about the notification settings, which names the file setting to use instead
+        var warning = Assert.Single(logs.Entries, IsNotificationWarning);
         Assert.Contains("Notifications:Smtp:PasswordFile", warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the warning about an inline SMTP password does not contain the password.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_NotificationsInlinePassword_WarningHidesThePassword()
+    {
+        // Arrange: valid enabled SMTP settings with an inline password
+        using var context = Context.Create(["serve", "--silent"]);
+        var logs = new CapturingLoggerProvider();
+
+        // Act: create the application
+        using var application = ServerHost.CreateApplication(context, NotificationHostOptions(ValidNotificationSettings(), logs));
+
+        // Assert: the warning does not show the password
+        var warning = Assert.Single(logs.Entries, IsNotificationWarning);
         Assert.DoesNotContain("top-secret", warning.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     Test that a database created before the feature stops the start while notifications are on, and does not
-    ///     while they are off.
+    ///     Gets host options for the notification tests: an in-memory server, a throwaway database, the given
+    ///     settings and the given logger provider.
+    /// </summary>
+    /// <param name="settings">The notification settings to add.</param>
+    /// <param name="logs">The logger provider that captures the log entries.</param>
+    /// <returns>The host options.</returns>
+    private static ServerHostOptions NotificationHostOptions(Dictionary<string, string?> settings, CapturingLoggerProvider logs) => new()
+    {
+        MapStaticAssets = false,
+        ConfigureBuilder = builder =>
+        {
+            builder.WebHost.UseTestServer();
+            builder.Logging.AddProvider(logs);
+            settings["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+            builder.Configuration.AddInMemoryCollection(settings);
+        }
+    };
+
+    /// <summary>
+    ///     Gets whether a log entry is the warning about the notification settings.
+    /// </summary>
+    /// <param name="entry">The log entry.</param>
+    /// <returns>True when the entry is that warning.</returns>
+    private static bool IsNotificationWarning(CapturedLogEntry entry) =>
+        entry.Level == LogLevel.Warning && entry.Message.Contains("Notification settings", StringComparison.Ordinal);
+
+    /// <summary>
+    ///     Test that a database created before the feature stops the start while notifications are on.
     /// </summary>
     [Fact]
     public void ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn()
     {
         // Arrange: a database file that already has a table, so the server does not create the model
         using var folder = new TemporaryDirectory();
-        var connectionString = $"Data Source={folder.GetFilePath("old.db")};Pooling=False";
-        using (var connection = new SqliteConnection(connectionString))
-        {
-            connection.Open();
-            using var command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE Old (Id INTEGER)";
-            command.ExecuteNonQuery();
-        }
-
+        var connectionString = CreateOldDatabase(folder);
         using var context = Context.Create(["serve", "--silent"]);
-        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
-        {
-            MapStaticAssets = false,
-            ConfigureBuilder = builder =>
-            {
-                builder.WebHost.UseTestServer();
-                extra["Database:ConnectionString"] = connectionString;
-                builder.Configuration.AddInMemoryCollection(extra);
-            }
-        };
 
         // Act: notifications on
         var exception = Assert.Throws<InvalidOperationException>(
-            () => ServerHost.CreateApplication(context, Options(ValidNotificationSettings())));
+            () => ServerHost.CreateApplication(context, OldDatabaseOptions(connectionString, ValidNotificationSettings())));
 
-        // Assert: the message tells to recreate the database; with notifications off the start works
+        // Assert: the message tells to recreate the database
         Assert.Contains("no notification tables", exception.Message, StringComparison.Ordinal);
-        using var off = ServerHost.CreateApplication(context, Options([]));
-        Assert.NotNull(off);
     }
+
+    /// <summary>
+    ///     Test that a database created before the feature does not stop the start while notifications are off.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff()
+    {
+        // Arrange: a database file that already has a table, so the server does not create the model
+        using var folder = new TemporaryDirectory();
+        var connectionString = CreateOldDatabase(folder);
+        using var context = Context.Create(["serve", "--silent"]);
+
+        // Act: notifications off
+        using var application = ServerHost.CreateApplication(context, OldDatabaseOptions(connectionString, []));
+
+        // Assert: the application was built
+        Assert.NotNull(application);
+    }
+
+    /// <summary>
+    ///     Creates a database file with one unrelated table, which is how a database from before the feature looks.
+    /// </summary>
+    /// <param name="folder">The folder that holds the file.</param>
+    /// <returns>The connection string of the database.</returns>
+    private static string CreateOldDatabase(TemporaryDirectory folder)
+    {
+        var connectionString = $"Data Source={folder.GetFilePath("old.db")};Pooling=False";
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "CREATE TABLE Old (Id INTEGER)";
+        command.ExecuteNonQuery();
+        return connectionString;
+    }
+
+    /// <summary>
+    ///     Gets host options that point the server at an existing database.
+    /// </summary>
+    /// <param name="connectionString">The connection string of the database.</param>
+    /// <param name="settings">The notification settings to add.</param>
+    /// <returns>The host options.</returns>
+    private static ServerHostOptions OldDatabaseOptions(string connectionString, Dictionary<string, string?> settings) => new()
+    {
+        MapStaticAssets = false,
+        ConfigureBuilder = builder =>
+        {
+            builder.WebHost.UseTestServer();
+            settings["Database:ConnectionString"] = connectionString;
+            builder.Configuration.AddInMemoryCollection(settings);
+        }
+    };
 
     /// <summary>
     ///     Gets valid enabled SMTP notification settings with an inline password.
@@ -861,7 +988,7 @@ public class ServerHostTests
 
     /// <summary>
     ///     Test that without any attestation setting the server creates its self-signed key beside the data
-    ///     protection keys, and keeps it across a restart.
+    ///     protection keys.
     /// </summary>
     [Fact]
     public async Task ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys()
@@ -870,6 +997,31 @@ public class ServerHostTests
         var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
         var connectionString = $"Data Source={Path.Combine(folder, "rc.db")};Pooling=False";
         var expected = Path.Combine(folder, "keys", "attestation-selfsigned", SelfSignedKeyProvider.FileName);
+        var logs = new CapturingLoggerProvider();
+
+        try
+        {
+            // Act: start once on that folder
+            await using var app = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+
+            // Assert: the key file is where it should be
+            Assert.True(File.Exists(expected));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the self-signed key is the same after a restart on the same folder.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_NoAttestationSettings_SelfSignedKeyPersistsAcrossRestart()
+    {
+        // Arrange: a database in a folder of its own, so that the key folder is known
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        var connectionString = $"Data Source={Path.Combine(folder, "rc.db")};Pooling=False";
         var logs = new CapturingLoggerProvider();
 
         try
@@ -884,8 +1036,7 @@ public class ServerHostTests
             await using var again = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
             var second = again.Services.GetRequiredService<IAttestationKeyProvider>().GetSigningKey().Info.Thumbprint;
 
-            // Assert: the key file is where it should be, and the key is the same after the restart
-            Assert.True(File.Exists(expected));
+            // Assert: the key is the same after the restart
             Assert.Equal(first, second);
         }
         finally
@@ -1102,14 +1253,53 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that an audit entry that cannot be stored is reported with a logged warning and does not throw.
+    ///     Test that an audit entry that cannot be stored makes the host log a warning about the entry.
     /// </summary>
     [Fact]
-    public async Task ServerHost_AddServices_AuditTrailUnwritable_LogsWarningAndReturnsFalse()
+    public async Task ServerHost_AddServices_AuditTrailUnwritable_LogsWarning()
     {
         // Arrange: an application whose audit store refuses every appended entry
         var logs = new CapturingLoggerProvider();
-        await using var app = await TestWebApp.StartAsync(
+        await using var app = await StartWithFailingAuditStoreAsync(logs);
+
+        // Act: record an entry through the registered audit service
+        await app.Services.GetRequiredService<AuditService>()
+            .TryRecordAsync(AuditDraft.By(new Actor("ann", "Ann"), "test.action", "detail"), TestContext.Current.CancellationToken);
+
+        // Assert: the host logged a warning about the entry
+        Assert.Contains(
+            logs.Entries,
+            e => e.Category == typeof(ServerHost).FullName
+                 && e.Level == LogLevel.Warning
+                 && e.Message.Contains("An audit entry could not be recorded", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that an audit entry that cannot be stored does not fail the caller: nothing is thrown and the result is
+    ///     false.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_AuditTrailUnwritable_ReturnsFalseWithoutThrowing()
+    {
+        // Arrange: an application whose audit store refuses every appended entry
+        await using var app = await StartWithFailingAuditStoreAsync(new CapturingLoggerProvider());
+
+        // Act: record an entry through the registered audit service
+        var recorded = await app.Services.GetRequiredService<AuditService>()
+            .TryRecordAsync(AuditDraft.By(new Actor("ann", "Ann"), "test.action", "detail"), TestContext.Current.CancellationToken);
+
+        // Assert: nothing was thrown, and the result is false
+        Assert.False(recorded);
+    }
+
+    /// <summary>
+    ///     Starts an application whose audit store refuses every appended entry.
+    /// </summary>
+    /// <param name="logs">Receives the log entries.</param>
+    /// <returns>The started application; the caller disposes it.</returns>
+    private static Task<WebApplication> StartWithFailingAuditStoreAsync(CapturingLoggerProvider logs)
+    {
+        return TestWebApp.StartAsync(
             logs,
             null,
             ["serve", "--silent"],
@@ -1124,18 +1314,6 @@ public class ServerHostTests
                     return proxy;
                 });
             });
-
-        // Act: record an entry through the registered audit service
-        var recorded = await app.Services.GetRequiredService<AuditService>()
-            .TryRecordAsync(AuditDraft.By(new Actor("ann", "Ann"), "test.action", "detail"), TestContext.Current.CancellationToken);
-
-        // Assert: nothing was thrown, the result is false, and the host logged a warning about the entry
-        Assert.False(recorded);
-        Assert.Contains(
-            logs.Entries,
-            e => e.Category == typeof(ServerHost).FullName
-                 && e.Level == LogLevel.Warning
-                 && e.Message.Contains("An audit entry could not be recorded", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -1172,36 +1350,106 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that the host registers the repository registry and the git source, with the key ring and the git
-    ///     cache folder placed beside the database by default.
+    ///     Test that the host registers the repository service as one shared instance.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersRepositoryServiceAsSingleton()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var (started, _) = await StartWithDefaultFoldersAsync();
+        await using var app = started;
+
+        // Act: resolve the service twice
+        var service = app.Services.GetRequiredService<RepositoryService>();
+
+        // Assert: one shared instance
+        Assert.Same(service, app.Services.GetRequiredService<RepositoryService>());
+    }
+
+    /// <summary>
+    ///     Test that the host registers the git content source for the repository service.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersGitSource()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var (started, _) = await StartWithDefaultFoldersAsync();
+        await using var app = started;
+
+        // Act: resolve the git content source
+        var provider = app.Services.GetRequiredService<IGitRepositoryProvider>();
+
+        // Assert: it is registered
+        Assert.NotNull(provider);
+    }
+
+    /// <summary>
+    ///     Test that without <c>Git:CachePath</c> the git cache folder is <c>git-cache</c> beside the database.
     /// </summary>
     [Fact]
     public async Task ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders()
     {
         // Arrange: start the real pipeline on a throwaway database
-        var connectionString = TestDatabase.NewConnectionString();
-        var logs = new CapturingLoggerProvider();
-        await using var app = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
-        var database = new DatabaseOptions { ConnectionString = connectionString };
-        var folder = DatabaseSetup.ResolveDataDirectory(database);
+        var (started, folder) = await StartWithDefaultFoldersAsync();
+        await using var app = started;
 
-        // Act: resolve the services and protect a value
-        var service = app.Services.GetRequiredService<RepositoryService>();
-        var provider = app.Services.GetRequiredService<IGitRepositoryProvider>();
+        // Act: read the git options that the host registered
+        var cachePath = app.Services.GetRequiredService<GitOptions>().CachePath;
+
+        // Assert: the cache folder is beside the database
+        Assert.Equal(Path.Combine(folder, "git-cache"), cachePath);
+    }
+
+    /// <summary>
+    ///     Test that without <c>DataProtection:KeysPath</c> the key ring is persisted in a <c>keys</c> folder beside
+    ///     the database.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_PlacesTheKeyRingBesideTheDatabase()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var (started, folder) = await StartWithDefaultFoldersAsync();
+        await using var app = started;
+
+        // Act: protect a value, which makes the key ring write its key
+        app.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-Host");
+
+        // Assert: the key files are in the keys folder beside the database
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(folder, "keys"), "key-*.xml"));
+    }
+
+    /// <summary>
+    ///     Test that the credential protector of the host encrypts a repository token and decrypts it again.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_CredentialProtectorRoundTripsAToken()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var (started, _) = await StartWithDefaultFoldersAsync();
+        await using var app = started;
         var protector = app.Services.GetRequiredService<ICredentialProtector>();
+
+        // Act: protect a token and unprotect the result
         var cipher = protector.Protect("tkn-Host");
 
-        // Assert: registered as singletons, folders beside the database, the key ring persisted and the token encrypted
-        Assert.Same(service, app.Services.GetRequiredService<RepositoryService>());
-        Assert.NotNull(provider);
-        Assert.Equal(Path.Combine(folder, "git-cache"), app.Services.GetRequiredService<GitOptions>().CachePath);
-        Assert.NotEmpty(Directory.GetFiles(Path.Combine(folder, "keys"), "key-*.xml"));
+        // Assert: the encrypted text does not contain the token, and decrypts back to it
         Assert.DoesNotContain("tkn-Host", cipher, StringComparison.Ordinal);
         Assert.Equal("tkn-Host", protector.Unprotect(cipher));
     }
 
     /// <summary>
-    ///     Test that the host registers the review planner and the parser of the review-set file as singletons.
+    ///     Starts the real pipeline on a throwaway database, with no setting for the git cache or the key ring.
+    /// </summary>
+    /// <returns>The application and the folder that holds the database.</returns>
+    private static async Task<(WebApplication App, string Folder)> StartWithDefaultFoldersAsync()
+    {
+        var connectionString = TestDatabase.NewConnectionString();
+        var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
+        return (app, DatabaseSetup.ResolveDataDirectory(new DatabaseOptions { ConnectionString = connectionString }));
+    }
+
+    /// <summary>
+    ///     Test that the host registers the review planner as one shared instance.
     /// </summary>
     [Fact]
     public async Task ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser()
@@ -1210,18 +1458,50 @@ public class ServerHostTests
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, TestDatabase.NewConnectionString(), ["serve", "--silent"]);
 
-        // Act: resolve the services
+        // Act: resolve the planner
         var planner = app.Services.GetRequiredService<ReviewPlanner>();
+
+        // Assert: it exists and is a singleton
+        Assert.Same(planner, app.Services.GetRequiredService<ReviewPlanner>());
+    }
+
+    /// <summary>
+    ///     Test that the host registers the parser of the review-set file as one shared instance.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, TestDatabase.NewConnectionString(), ["serve", "--silent"]);
+
+        // Act: resolve the parser
         var parser = app.Services.GetRequiredService<IReviewSetParser>();
 
-        // Assert: both exist and are singletons
-        Assert.Same(planner, app.Services.GetRequiredService<ReviewPlanner>());
+        // Assert: it exists and is a singleton
         Assert.Same(parser, app.Services.GetRequiredService<IReviewSetParser>());
     }
 
     /// <summary>
-    ///     Test that the host registers the token service and maps the API: the routes, the OpenAPI document and the
-    ///     JSON 404 for other addresses under the API prefix, which does not fall through to the web pages.
+    ///     Test that the host registers the personal access token service as one shared instance.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve the token service
+        var service = app.Services.GetRequiredService<PersonalAccessTokenService>();
+
+        // Assert: one shared instance
+        Assert.Same(service, app.Services.GetRequiredService<PersonalAccessTokenService>());
+    }
+
+    /// <summary>
+    ///     Test that the API routes are mapped under <c>/api</c>: a protected route is found, and answers the caller
+    ///     instead of falling through to a web page.
     /// </summary>
     [Fact]
     public async Task ServerHost_CreateApplication_ApiRoutes_AreMapped()
@@ -1231,18 +1511,68 @@ public class ServerHostTests
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var client = app.GetTestClient();
 
-        // Act: resolve the token service and request a protected route, the document and an unknown route
-        var service = app.Services.GetRequiredService<PersonalAccessTokenService>();
-        var protectedRoute = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
-        var document = await client.GetAsync("/api/openapi.json", TestContext.Current.CancellationToken);
-        var unknown = await client.GetAsync("/api/nothing", TestContext.Current.CancellationToken);
+        // Act: request a route of the API without a token
+        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
 
-        // Assert: a singleton service, 401 for the route, 200 for the document and a JSON 404 for the rest
-        Assert.Same(service, app.Services.GetRequiredService<PersonalAccessTokenService>());
-        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, protectedRoute.StatusCode);
-        Assert.Equal(System.Net.HttpStatusCode.OK, document.StatusCode);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, unknown.StatusCode);
-        Assert.Equal("application/problem+json", unknown.Content.Headers.ContentType?.MediaType);
+        // Assert: the route exists (any answer but 404) and its content is not a web page
+        Assert.NotEqual(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.NotEqual("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>
+    ///     Test that a request without a token to a protected API route is answered with status 401.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request a protected route without a token
+        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: 401
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the OpenAPI document is served at <c>/api/openapi.json</c> without a token.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the document without a token
+        var response = await client.GetAsync("/api/openapi.json", TestContext.Current.CancellationToken);
+
+        // Assert: 200
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that an address under <c>/api</c> that does not exist is answered with a JSON 404 and does not fall
+    ///     through to the web pages.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request an address that does not exist
+        var response = await client.GetAsync("/api/nothing", TestContext.Current.CancellationToken);
+
+        // Assert: 404 with a JSON problem document
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     /// <summary>
@@ -1309,24 +1639,40 @@ public class ServerHostTests
     }
 
     /// <summary>
-    ///     Test that the key ring folder is the configured one, or <c>keys</c> beside the database.
+    ///     Test that the key ring folder is <c>keys</c> beside the database when no folder is configured or the
+    ///     configured one is blank.
     /// </summary>
     [Fact]
     public void ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder()
+    {
+        // Arrange: a database
+        var folder = Path.Combine(Path.GetTempPath(), "rc-keys-test");
+        var database = new DatabaseOptions { ConnectionString = Path.Combine(folder, "x.db") };
+
+        // Act: resolve with no configured folder and with a blank one
+        var fallback = ServerHost.ResolveKeysPath(new KeyRingSettings(), database);
+        var blank = ServerHost.ResolveKeysPath(new KeyRingSettings { KeysPath = "  " }, database);
+
+        // Assert: keys beside the database in both cases
+        Assert.Equal(Path.Combine(folder, "keys"), fallback);
+        Assert.Equal(Path.Combine(folder, "keys"), blank);
+    }
+
+    /// <summary>
+    ///     Test that the key ring folder is the configured one when <c>DataProtection:KeysPath</c> is set.
+    /// </summary>
+    [Fact]
+    public void ServerHost_ResolveKeysPath_Configured_ChoosesTheConfiguredFolder()
     {
         // Arrange: a database and a configured folder
         var folder = Path.Combine(Path.GetTempPath(), "rc-keys-test");
         var database = new DatabaseOptions { ConnectionString = Path.Combine(folder, "x.db") };
 
-        // Act: resolve with and without a configured folder
+        // Act: resolve with a configured folder
         var configured = ServerHost.ResolveKeysPath(new KeyRingSettings { KeysPath = Path.Combine(folder, "custom") }, database);
-        var fallback = ServerHost.ResolveKeysPath(new KeyRingSettings(), database);
-        var blank = ServerHost.ResolveKeysPath(new KeyRingSettings { KeysPath = "  " }, database);
 
-        // Assert: configured wins; otherwise keys beside the database
+        // Assert: the configured folder wins
         Assert.Equal(Path.Combine(folder, "custom"), configured);
-        Assert.Equal(Path.Combine(folder, "keys"), fallback);
-        Assert.Equal(Path.Combine(folder, "keys"), blank);
     }
 
     /// <summary>
@@ -1404,6 +1750,43 @@ public class ServerHostTests
         var location = response.Headers.Location?.ToString();
         Assert.Contains("/login?ReturnUrl=", location, StringComparison.Ordinal);
         Assert.Contains(Uri.EscapeDataString("/projects"), location, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a visitor who is signed in is served a page that needs a signed-in user.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_SignedInUser_ProtectedPageIsServed()
+    {
+        // Arrange: the real pipeline and a visitor who has signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+
+        // Act: request a protected page
+        var response = await browser.Client.GetAsync("/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the page is served, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
+    /// <summary>
+    ///     Test that the health route is answered to a visitor who is not signed in, without a redirect to the
+    ///     login page.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin()
+    {
+        // Arrange: the real pipeline and a visitor who is not signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request the health route
+        var response = await browser.Client.GetAsync(ServerHost.HealthPath, TestContext.Current.CancellationToken);
+
+        // Assert: answered directly, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
     }
 
     /// <summary>
@@ -1680,11 +2063,15 @@ public class ServerHostIsolationTests
     }
 
     /// <summary>
-    ///     Test that the isolated host listens only on the address of the context and takes nothing from a poisoned
-    ///     environment: the listen address, the environment name and the database settings.
+    ///     Starts the isolated host in a poisoned process environment, lets the caller inspect it, and stops it.
     /// </summary>
-    [Fact]
-    public async Task ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment()
+    /// <param name="inspect">
+    ///     The assertions, given the started host, the poisoned port, the temporary folder of the host and the
+    ///     sentinel folder that must stay empty.
+    /// </param>
+    /// <returns>A task that completes when the host has been stopped.</returns>
+    private static async Task RunPoisonedIsolatedHostAsync(
+        Action<WebApplication, int, TemporaryDirectory, TemporaryDirectory> inspect)
     {
         // Arrange: a poisoned process environment and a sentinel folder that must stay untouched
         using var folder = new TemporaryDirectory();
@@ -1698,20 +2085,60 @@ public class ServerHostIsolationTests
         try
         {
             await app.StartAsync(TestContext.Current.CancellationToken);
-            var address = HostStartCheck.ExpectOneLoopbackAddress(app.Urls);
-
-            // Assert: one loopback address that is not the poisoned one, a production environment and a database
-            // in the temporary folder only
-            Assert.NotEqual(poisonedPort, address.Port);
-            Assert.Equal("Production", app.Environment.EnvironmentName);
-            Assert.True(File.Exists(Path.Combine(folder.DirectoryPath, "selftest.db")));
-            Assert.Empty(Directory.GetFileSystemEntries(sentinel.DirectoryPath));
+            inspect(app, poisonedPort, folder, sentinel);
             await app.StopAsync(TestContext.Current.CancellationToken);
         }
         finally
         {
             await app.DisposeAsync();
         }
+    }
+
+    /// <summary>
+    ///     Test that the isolated host listens only on the address of the context and not on the ambient listen
+    ///     address of a poisoned environment.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment()
+    {
+        // Arrange, Act: start the isolated host in a poisoned environment and check where it listens
+        await RunPoisonedIsolatedHostAsync((app, poisonedPort, _, _) =>
+        {
+            // Assert: one loopback address that is not the poisoned one
+            var address = HostStartCheck.ExpectOneLoopbackAddress(app.Urls);
+            Assert.NotEqual(poisonedPort, address.Port);
+        });
+    }
+
+    /// <summary>
+    ///     Test that the isolated host runs in the Production environment although the ambient environment variables
+    ///     say Development.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_IsolatedSettings_RunsInProductionEnvironment()
+    {
+        // Arrange, Act: start the isolated host in a poisoned environment
+        await RunPoisonedIsolatedHostAsync((app, _, _, _) =>
+        {
+            // Assert: the environment is Production
+            Assert.Equal("Production", app.Environment.EnvironmentName);
+        });
+    }
+
+    /// <summary>
+    ///     Test that the isolated host keeps its database in its temporary folder and leaves the places that the
+    ///     ambient settings name (database, key ring and git cache) untouched.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_IsolatedSettings_LeavesAmbientDataPlacesUntouched()
+    {
+        // Arrange, Act: start the isolated host in a poisoned environment whose paths point into a sentinel folder
+        await RunPoisonedIsolatedHostAsync((_, _, folder, sentinel) =>
+        {
+            // Assert: the database is in the temporary folder, and nothing was written to the sentinel folder
+            Assert.True(File.Exists(Path.Combine(folder.DirectoryPath, "selftest.db")));
+            Assert.Empty(Directory.GetFileSystemEntries(sentinel.DirectoryPath));
+        });
     }
 
     /// <summary>
@@ -1889,15 +2316,71 @@ public class ServerHostKeyRingTests
 
     /// <summary>
     ///     Test that a token encrypted before a restart is readable after it when the key ring is protected with a
-    ///     certificate, that the key file is encrypted, and that the protection is logged.
+    ///     certificate.
     /// </summary>
     [Fact]
     public async Task ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable()
     {
-        // Arrange: a certificate, and a host that encrypts a token with a ring protected by it
+        // Arrange: a certificate, and a log to capture
         using var folder = new TemporaryDirectory();
-        var certificate = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
         var logs = new CapturingLoggerProvider();
+
+        // Act: encrypt a token, restart over the same ring and read the token
+        var plain = await ProtectAndRestartOverCertificateRingAsync(folder, logs);
+
+        // Assert: readable
+        Assert.Equal("tkn-HostCertificate", plain);
+    }
+
+    /// <summary>
+    ///     Test that the key files of a key ring that is protected with a certificate are encrypted at rest.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_CertificateKeyRing_KeyFilesAreEncrypted()
+    {
+        // Arrange: a certificate, and a log to capture
+        using var folder = new TemporaryDirectory();
+        var logs = new CapturingLoggerProvider();
+
+        // Act: start with a ring protected by the certificate, which writes the key file
+        await ProtectAndRestartOverCertificateRingAsync(folder, logs);
+
+        // Assert: the key file holds an encrypted secret and no master key in clear text
+        var text = await File.ReadAllTextAsync(Assert.Single(KeyFiles(folder)), TestContext.Current.CancellationToken);
+        Assert.Contains("<encryptedSecret", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<masterKey", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that protecting the key ring with a certificate logs the protection but never the password.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_CertificateKeyRing_DoesNotLogThePassword()
+    {
+        // Arrange: a certificate, and a log to capture
+        using var folder = new TemporaryDirectory();
+        var logs = new CapturingLoggerProvider();
+
+        // Act: start twice with a ring protected by the certificate
+        await ProtectAndRestartOverCertificateRingAsync(folder, logs);
+
+        // Assert: the protection was logged at information level, and no entry holds the password
+        var entries = logs.Entries.Where(entry => entry.Category == typeof(KeyRingProtection).FullName).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, entry => Assert.Equal(LogLevel.Information, entry.Level));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(Password, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Encrypts a token with a key ring that is protected with a certificate, restarts over the same ring while
+    ///     requiring encrypted keys, and reads the token again.
+    /// </summary>
+    /// <param name="folder">The temporary folder of the hosts.</param>
+    /// <param name="logs">Receives the log entries of both hosts.</param>
+    /// <returns>The token as the second host reads it.</returns>
+    private static async Task<string> ProtectAndRestartOverCertificateRingAsync(TemporaryDirectory folder, CapturingLoggerProvider logs)
+    {
+        var certificate = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
         string cipher;
         await using (var first = Create(Settings(
             folder,
@@ -1908,24 +2391,13 @@ public class ServerHostKeyRingTests
             cipher = first.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-HostCertificate");
         }
 
-        // Act: start a second host with the same certificate, now requiring encrypted keys
         await using var second = Create(Settings(
             folder,
             ("DataProtection:CertificatePath", certificate),
             ("DataProtection:CertificatePassword", Password),
             ("DataProtection:Protection", "Auto"),
             ("DataProtection:RequireEncryptedKeys", "true")), logs);
-        var plain = second.Services.GetRequiredService<ICredentialProtector>().Unprotect(cipher);
-
-        // Assert: readable, encrypted at rest, and logged without the password
-        Assert.Equal("tkn-HostCertificate", plain);
-        var text = await File.ReadAllTextAsync(Assert.Single(KeyFiles(folder)), TestContext.Current.CancellationToken);
-        Assert.Contains("<encryptedSecret", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("<masterKey", text, StringComparison.Ordinal);
-        var entries = logs.Entries.Where(entry => entry.Category == typeof(KeyRingProtection).FullName).ToList();
-        Assert.Equal(2, entries.Count);
-        Assert.All(entries, entry => Assert.Equal(LogLevel.Information, entry.Level));
-        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(Password, StringComparison.Ordinal));
+        return second.Services.GetRequiredService<ICredentialProtector>().Unprotect(cipher);
     }
 
     /// <summary>
@@ -1961,17 +2433,74 @@ public class ServerHostKeyRingTests
 
     /// <summary>
     ///     Test that an attestation key file without a password is refused when the settings of the key ring require
-    ///     encrypted keys, and that the same file is only a warning without the requirement.
+    ///     encrypted keys.
     /// </summary>
     [Fact]
-    public async Task ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys()
+    public void ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedWithRequireEncryptedKeys()
     {
         // Arrange: a ring protected with a certificate, and an attestation PFX without a password
         using var folder = new TemporaryDirectory();
+        var common = UnprotectedAttestationKeySettings(folder);
+
+        // Act: create the application with the requirement
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, [.. common, ("DataProtection:RequireEncryptedKeys", "true")]),
+            new CapturingLoggerProvider()));
+
+        // Assert: refused, naming the setting and saying that the key is not protected by a password
+        Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("is not protected by a password", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an attestation key file without a password does not stop the start when the key ring settings
+    ///     do not require encrypted keys.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_UnprotectedFileAttestationKey_StartsWithoutRequireEncryptedKeys()
+    {
+        // Arrange: a ring protected with a certificate, and an attestation PFX without a password
+        using var folder = new TemporaryDirectory();
+        var common = UnprotectedAttestationKeySettings(folder);
+
+        // Act: create the application without the requirement
+        await using var app = Create(Settings(folder, common), new CapturingLoggerProvider());
+
+        // Assert: the application started with a usable attestation key
+        Assert.True(app.Services.GetRequiredService<IAttestationKeyProvider>().Describe().IsAvailable);
+    }
+
+    /// <summary>
+    ///     Test that an attestation key file without a password makes the start log a warning that the key is not
+    ///     protected by a password.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_UnprotectedFileAttestationKey_WarnsWithoutRequireEncryptedKeys()
+    {
+        // Arrange: a ring protected with a certificate, and an attestation PFX without a password
+        using var folder = new TemporaryDirectory();
+        var common = UnprotectedAttestationKeySettings(folder);
+        var logs = new CapturingLoggerProvider();
+
+        // Act: create the application without the requirement
+        await using var app = Create(Settings(folder, common), logs);
+
+        // Assert: the start logged the warning
+        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Warning
+            && entry.Message.Contains("is not protected by a password", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Gets the settings of a ring that is protected with a certificate and a File attestation key without a
+    ///     password.
+    /// </summary>
+    /// <param name="folder">The temporary folder that receives the certificate files.</param>
+    /// <returns>The settings.</returns>
+    private static (string, string?)[] UnprotectedAttestationKeySettings(TemporaryDirectory folder)
+    {
         var ring = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
         var attestation = KeyRingTestCertificates.WritePfx(folder, "attest", null);
-        var logs = new CapturingLoggerProvider();
-        (string, string?)[] common =
+        return
         [
             ("DataProtection:CertificatePath", ring),
             ("DataProtection:CertificatePassword", Password),
@@ -1979,17 +2508,6 @@ public class ServerHostKeyRingTests
             ("Attestation:Provider", "File"),
             ("Attestation:CertificatePath", attestation)
         ];
-
-        // Act: with the requirement, and without it
-        var exception = Assert.Throws<InvalidOperationException>(() => Create(
-            Settings(folder, [.. common, ("DataProtection:RequireEncryptedKeys", "true")]), logs));
-        await using var app = Create(Settings(folder, common), logs);
-
-        // Assert: refused naming the settings in the first case; started with a warning in the second
-        Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("is not protected by a password", exception.Message, StringComparison.Ordinal);
-        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Warning
-            && entry.Message.Contains("is not protected by a password", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -2018,30 +2536,45 @@ public class ServerHostKeyRingTests
     }
 
     /// <summary>
-    ///     Test that a certificate file that is missing, or that has another password, stops the start with an error
-    ///     that names the setting and never shows the password.
+    ///     Test that a certificate file that is missing stops the start with an error that names the setting and the
+    ///     path.
     /// </summary>
     [Fact]
-    public void ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword()
+    public void ServerHost_CreateApplication_MissingCertificate_ThrowsClearError()
     {
-        // Arrange: a missing file, and a file with another password
+        // Arrange: a path of a certificate file that does not exist
         using var folder = new TemporaryDirectory();
         var missing = folder.GetFilePath("missing.pfx");
-        var present = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
 
-        // Act
-        var missingException = Assert.Throws<InvalidOperationException>(() => Create(
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
             Settings(folder, ("DataProtection:Protection", "Auto"), ("DataProtection:CertificatePath", missing), ("DataProtection:CertificatePassword", Password)),
             new CapturingLoggerProvider()));
-        var wrongException = Assert.Throws<InvalidOperationException>(() => Create(
+
+        // Assert: the message names the setting and the path
+        Assert.Contains($"DataProtection:CertificatePath '{missing}' could not be loaded", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a certificate file that cannot be opened with the configured password stops the start with an
+    ///     error that names both possible causes and never shows the password.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_WrongPasswordCertificate_ThrowsClearErrorWithoutPassword()
+    {
+        // Arrange: a certificate file and a password that is not its password
+        using var folder = new TemporaryDirectory();
+        var present = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
             Settings(folder, ("DataProtection:CertificatePath", present), ("DataProtection:CertificatePassword", "other-password"), ("DataProtection:Protection", "Certificate")),
             new CapturingLoggerProvider()));
 
-        // Assert
-        Assert.Contains($"DataProtection:CertificatePath '{missing}' could not be loaded", missingException.Message, StringComparison.Ordinal);
-        Assert.Contains("wrong password or not a certificate with a private key", wrongException.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(Password, wrongException.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("other-password", wrongException.Message, StringComparison.Ordinal);
+        // Assert: the message names both causes (CertificateWrongPassword) and shows neither password (CertificateNoSecret)
+        Assert.Contains("wrong password or not a certificate with a private key", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Password, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("other-password", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -2178,7 +2711,7 @@ public class ServerHostKeyRingTests
 
     /// <summary>
     ///     Test that a database with protected secrets and a key folder without keys stops the start with the
-    ///     documented message and creates no key.
+    ///     documented message.
     /// </summary>
     /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to leave it empty.</param>
     [Theory]
@@ -2186,8 +2719,60 @@ public class ServerHostKeyRingTests
     [InlineData(true)]
     public async Task ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey(bool removeFolder)
     {
-        // Arrange: a database with two secrets protected by a ring that is then lost
+        // Arrange, Act: lose the ring of a database with two secrets and start again
         using var folder = new TemporaryDirectory();
+        var exception = await StartWithLostRingAsync(folder, removeFolder);
+
+        // Assert: the message of the guard
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        Assert.Equal(
+            $"Key ring '{keys}' is empty but the database holds 2 protected secrets. Restore the keys folder that belongs " +
+            "to this database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.",
+            exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the start that is refused because the key ring is lost creates no key file.
+    /// </summary>
+    /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to leave it empty.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ServerHost_CreateApplication_LostRing_CreatesNoKey(bool removeFolder)
+    {
+        // Arrange, Act: lose the ring of a database with two secrets and start again
+        using var folder = new TemporaryDirectory();
+        await StartWithLostRingAsync(folder, removeFolder);
+
+        // Assert: no key was created by the refused start
+        Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that the error that stops the start because the key ring is lost does not show a stored secret.
+    /// </summary>
+    /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to leave it empty.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret(bool removeFolder)
+    {
+        // Arrange, Act: lose the ring of a database with two secrets and start again
+        using var folder = new TemporaryDirectory();
+        var exception = await StartWithLostRingAsync(folder, removeFolder);
+
+        // Assert: the message does not hold the stored token
+        Assert.DoesNotContain("tkn-lost-ring", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Creates a database with two secrets that a key ring protects, loses the ring, and starts again.
+    /// </summary>
+    /// <param name="folder">The temporary folder of the host.</param>
+    /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to leave it empty.</param>
+    /// <returns>The error that stops the start.</returns>
+    private static async Task<InvalidOperationException> StartWithLostRingAsync(TemporaryDirectory folder, bool removeFolder)
+    {
         var settings = Settings(folder);
         var keys = Path.Combine(folder.DirectoryPath, "keys");
         await using (var first = Create(settings, new CapturingLoggerProvider()))
@@ -2205,16 +2790,7 @@ public class ServerHostKeyRingTests
             Directory.Delete(keys, recursive: true);
         }
 
-        // Act
-        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
-
-        // Assert: the message of the guard, no secret, and no key was created by the refused start
-        Assert.Equal(
-            $"Key ring '{keys}' is empty but the database holds 2 protected secrets. Restore the keys folder that belongs " +
-            "to this database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.",
-            exception.Message);
-        Assert.DoesNotContain("tkn-lost-ring", exception.Message, StringComparison.Ordinal);
-        Assert.Empty(KeyFiles(folder));
+        return Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
     }
 
     /// <summary>
@@ -2496,27 +3072,58 @@ public class ServerHostKeyRingTests
     }
 
     /// <summary>
-    ///     Test that on Unix the key folder is private to the owner and the key files are readable and writable by the
-    ///     owner only.
+    ///     Test that on Unix the key folder is private to the owner (mode 0700) when the key ring is protected by
+    ///     permissions only.
     /// </summary>
     [Fact]
     [UnsupportedOSPlatform("windows")]
-    public async Task ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles()
+    public async Task ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheFolder()
     {
         // Arrange: a key folder that exists with loose permissions
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
         using var folder = new TemporaryDirectory();
-        var keys = Path.Combine(folder.DirectoryPath, "keys");
-        Directory.CreateDirectory(keys);
-        File.SetUnixFileMode(keys, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+        var keys = CreateKeyFolderWithLoosePermissions(folder);
 
-        // Act
+        // Act: create the application
         await using var app = Create(Settings(folder), new CapturingLoggerProvider());
 
-        // Assert: 0700 for the folder and 0600 for every key file
+        // Assert: 0700 for the folder
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(keys));
+    }
+
+    /// <summary>
+    ///     Test that on Unix every key file is readable and writable by the owner only (mode 0600) when the key ring
+    ///     is protected by permissions only.
+    /// </summary>
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsTheKeyFiles()
+    {
+        // Arrange: a key folder that exists with loose permissions
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
+        using var folder = new TemporaryDirectory();
+        CreateKeyFolderWithLoosePermissions(folder);
+
+        // Act: create the application, which writes the key file
+        await using var app = Create(Settings(folder), new CapturingLoggerProvider());
+
+        // Assert: 0600 for every key file
         var files = KeyFiles(folder);
         Assert.NotEmpty(files);
         Assert.All(files, file => Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file)));
+    }
+
+    /// <summary>
+    ///     Creates the key folder of the settings with permissions that other accounts may use.
+    /// </summary>
+    /// <param name="folder">The temporary folder.</param>
+    /// <returns>The path of the key folder.</returns>
+    [UnsupportedOSPlatform("windows")]
+    private static string CreateKeyFolderWithLoosePermissions(TemporaryDirectory folder)
+    {
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        Directory.CreateDirectory(keys);
+        File.SetUnixFileMode(keys, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+        return keys;
     }
 }

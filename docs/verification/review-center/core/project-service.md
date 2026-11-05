@@ -323,6 +323,12 @@ entry. This scenario is tested by `ProjectService_SetRequireIndependentReviewers
 on, in the returned project and in the stored one. This scenario is tested by
 `ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn`.
 
+**ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn**: A project exists in the store with
+its rules never set. Another setting of the project (the independence rule) is switched off and the project is read
+again; both further rules are still on. A database made before the rules were stored has no column for them and must be
+created again, so the scenario is about the projects of the current database. This scenario is tested by
+`ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn`.
+
 **ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail**: For each of the two further rules,
 an
 administrator switches the rule off, repeats the same change (which returns `false` and records nothing), and switches it

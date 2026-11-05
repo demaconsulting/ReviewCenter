@@ -100,6 +100,16 @@ sections:
         tests:
           - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
 
+      - id: ReviewCenter-OidcSignIn-Login-NoSecondFactor
+        title: >-
+          The OidcSignIn unit shall sign a person in through the provider without asking for a second factor, also
+          while the second factor is on for the tool.
+        justification: |
+          The provider has already checked the person with proofs of its own, and a second code of this tool on top
+          would lock out the person at the provider without any gain in assurance.
+        tests:
+          - OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge
+
       - id: ReviewCenter-OidcSignIn-Settings
         title: >-
           The OidcSignIn unit shall accept the provider settings (address, client identifier, client secret, scopes,

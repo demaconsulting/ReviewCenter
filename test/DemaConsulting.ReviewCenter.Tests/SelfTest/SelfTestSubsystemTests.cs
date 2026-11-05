@@ -37,6 +37,14 @@ public partial class SelfTestSubsystemTests
     /// <returns>The pattern.</returns>
     [GeneratedRegex("outcome=\"Passed\"")]
     private static partial Regex PassedOutcome();
+
+    /// <summary>
+    ///     Matches the line of the host check that reports the loopback port it listened on.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex(@"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:(\d+);")]
+    private static partial Regex HostListeningLine();
+
     /// <summary>
     ///     Test that self-test subsystem can run the real validation workflow without result files.
     /// </summary>
@@ -103,6 +111,84 @@ public partial class SelfTestSubsystemTests
         Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Trx);
         Assert.DoesNotContain("ReviewCenter_ConfiguredNotifications", run.Log);
         Assert.DoesNotContain("ReviewCenter_ConfiguredNotifications", run.Trx);
+    }
+
+    /// <summary>
+    ///     Test that the real validation process leaves nothing behind in its temporary folder.
+    /// </summary>
+    [Fact]
+    public void SelfTestSubsystem_ValidationWorkflow_RealProcessRun_LeavesNoTemporaryFiles()
+    {
+        // Arrange: the shared real process run, whose TEMP was a private empty folder (see RealValidationRun)
+
+        // Act: read the outcome of that run
+        var run = RealValidationRun.Process;
+
+        // Assert: the run succeeded and every file that its checks created in the temporary folder was removed
+        Assert.Equal(0, run.ExitCode);
+        Assert.Empty(run.PrivateTempEntries);
+    }
+
+    /// <summary>
+    ///     Test that the real validation process listens on one loopback port and not on the configured one.
+    /// </summary>
+    [Fact]
+    public void SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ListensOnEphemeralLoopbackPort()
+    {
+        // Arrange: the shared real process run, whose environment configured all-interface listen addresses on one
+        // port (see RealValidationRun)
+
+        // Act: read the outcome of that run and the port that the host check reports
+        var run = RealValidationRun.Process;
+        var match = HostListeningLine().Match(run.Output);
+
+        // Assert: the host check reports a loopback port that is assigned by the system and not the configured one
+        Assert.Equal(0, run.ExitCode);
+        Assert.True(match.Success, "The host check should report a loopback address:" + Environment.NewLine + run.Output);
+        var port = int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.InRange(port, 1, 65535);
+        Assert.NotEqual(run.PoisonedPort, port);
+    }
+
+    /// <summary>
+    ///     Test that the real validation process reads no configuration of the deployment.
+    /// </summary>
+    [Fact]
+    public void SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ReadsNoDeploymentConfiguration()
+    {
+        // Arrange: the shared real process run, made with invalid appsettings.json files in the program folder and the
+        // working folder and an environment that names a different environment, provider and settings
+
+        // Act: read the outcome of that run
+        var run = RealValidationRun.Process;
+
+        // Assert: every default check passed, which cannot happen when any of that configuration was read, and the
+        // opt-in check of the configuration did not run
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("Total Tests: 10", run.Output);
+        Assert.Contains("Passed: 10", run.Output);
+        Assert.Contains("Failed: 0", run.Output);
+        Assert.DoesNotContain("ReviewCenter_Configured", run.Output);
+    }
+
+    /// <summary>
+    ///     Test that the real validation process touches no configured database or key ring.
+    /// </summary>
+    [Fact]
+    public void SelfTestSubsystem_ValidationWorkflow_RealProcessRun_TouchesNoConfiguredDatabaseOrKeyRing()
+    {
+        // Arrange: the shared real process run, whose environment configured a database, a key ring and a certificate
+        // in a sentinel folder (see RealValidationRun)
+
+        // Act: read the outcome of that run
+        var run = RealValidationRun.Process;
+
+        // Assert: the run succeeded without checking the configured database and keys, and nothing was created in the
+        // sentinel folder
+        Assert.Equal(0, run.ExitCode);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredDatabase", run.Output);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Output);
+        Assert.Empty(run.SentinelEntries);
     }
 
     /// <summary>

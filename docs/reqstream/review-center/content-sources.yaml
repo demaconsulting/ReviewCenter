@@ -381,7 +381,8 @@ sections:
           The ContentSources subsystem shall report a cache folder that cannot be used, or a malformed or too long cache
           path, as git unavailable (rule GitUnavailable).
         justification: |
-          A cache that cannot be written makes every read fail.
+          A cache that cannot be written makes every read fail. The check also reports other I/O failures while the
+          mirror is opened as the cache folder, because the message does not reveal the path of the server.
         children:
           - ReviewCenter-GitRunner-Errors-CacheFolder
           - ReviewCenter-GitRunner-Errors-CacheMalformed

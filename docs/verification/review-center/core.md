@@ -279,6 +279,17 @@ and the review is signed by that person, and reopening the review by that person
 `ReopenWouldStrandSlot` and leaves the review approved; once the second rule is switched off the person reopens the
 review and signs it again. This scenario is tested by `CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff`.
 
+**CoreSubsystem_ReviewRuleSwitches_ExistingProject_KeepsBothRulesOnAndEnforced**: In a project that exists, whose rules
+nobody changed, the stored project is read again: both further rules are on, no `project.review-rule-changed` entry
+exists, and the author of the review is refused an answer with `AuthorCannotAnswer`. A database made before the rules
+were stored has no column for them and must be created again, so the scenario is about the projects of the current
+database. This scenario is tested by `CoreSubsystem_ReviewRuleSwitches_ExistingProject_KeepsBothRulesOnAndEnforced`.
+
+**CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser**: A member holds an unsigned slot of a review
+that is not approved. A system administrator makes the member an auditor and is refused with
+`MemberHasOpenReviewWork`; the message names the review, the member is still a user, and no audit entry is added. This
+scenario is tested by `CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser`.
+
 **CoreSubsystem_ApiTokenReview_AuthorIsTokenUser**: A review created by an actor that came through a token has the
 owner of the token as its author, so that the owner is refused as reviewer of a slot while a different member is
 accepted. This scenario is tested by `CoreSubsystem_ApiTokenReview_AuthorIsTokenUser`.

@@ -52,6 +52,7 @@ sections:
           - ReviewCenter-AttestationService-Report-NotConcluded
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - EvidenceSubsystem_CompletedReview_StatesReviewFingerprintAndFiles
 
       - id: ReviewCenter-Evidence-Document-Deterministic
         title: >-
@@ -79,6 +80,7 @@ sections:
           - ReviewCenter-AttestationService-Document-AnswerTime
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - EvidenceSubsystem_CompletedReview_StatesChecklistWithWhoAnswered
 
       - id: ReviewCenter-Evidence-Document-Findings
         title: >-
@@ -102,6 +104,7 @@ sections:
           - ReviewCenter-AttestationService-Report-Discussion
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - EvidenceSubsystem_IncludedFinding_IsStatedInFindingsSection
 
       - id: ReviewCenter-Evidence-Document-NoExcludedComments
         title: >-
@@ -126,6 +129,7 @@ sections:
           - ReviewCenter-AttestationService-Report-Conclusion
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - EvidenceSubsystem_CompletedReview_StatesConclusionApproved
 
       - id: ReviewCenter-Evidence-Document-RejectionMarked
         title: >-
@@ -138,6 +142,8 @@ sections:
           - ReviewCenter-AttestationRenderer-Conclusion-RejectedBanner
           - ReviewCenter-AttestationRenderer-Conclusion-BannerPlacement
           - ReviewCenter-AttestationRenderer-Conclusion-NoBanner
+        tests:
+          - EvidenceSubsystem_RejectedReview_MarksRejectionOnFirstPage
 
       - id: ReviewCenter-Evidence-Document-BallotsAppendix
         title: >-
@@ -154,6 +160,8 @@ sections:
           - ReviewCenter-AttestationService-Report-Appendix
           - ReviewCenter-AttestationService-Report-SlotOrder
           - ReviewCenter-AttestationService-Report-BallotFingerprint
+        tests:
+          - EvidenceSubsystem_CompletedReview_StatesBallotsAppendixWithFingerprint
 
       - id: ReviewCenter-Evidence-Document-SignOffs
         title: >-
@@ -169,6 +177,8 @@ sections:
           - ReviewCenter-AttestationRenderer-SignOffs-ToolVersionProperty
           - ReviewCenter-AttestationRenderer-SignOffs-Names
           - ReviewCenter-AttestationService-Document-SignOffs
+        tests:
+          - EvidenceSubsystem_CompletedReview_StatesReviewerSignOffs
 
       - id: ReviewCenter-Evidence-Document-AuditHead
         title: >-
@@ -178,6 +188,8 @@ sections:
         children:
           - ReviewCenter-AttestationRenderer-SignOffs-AuditHead
           - ReviewCenter-AttestationService-Document-AuditHead
+        tests:
+          - EvidenceSubsystem_CompletedReview_StatesAuditTrailHead
 
       - id: ReviewCenter-Evidence-Document-KeyStatement
         title: >-
@@ -186,6 +198,8 @@ sections:
           A reader must see which key to check the signature against.
         children:
           - ReviewCenter-AttestationService-Document-Key
+        tests:
+          - EvidenceSubsystem_CompletedReview_StatesTheSigningKey
 
       - id: ReviewCenter-Evidence-Document-LeftOut
         title: >-
@@ -199,6 +213,8 @@ sections:
           - ReviewCenter-AttestationService-Report-ThreadsOff
           - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOff
           - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOffIdentifiers
+        tests:
+          - EvidenceSubsystem_SettingsLeaveOut_NamesWordingAndFindings_AreLeftOutOfTheDocument
 
       - id: ReviewCenter-Evidence-Document-ReopenHistory
         title: >-
@@ -211,6 +227,8 @@ sections:
           - ReviewCenter-AttestationService-ReopenHistory-NeverReopened
           - ReviewCenter-AttestationService-ReopenHistory-NoNames
           - ReviewCenter-AttestationService-ReopenHistory-Locked
+        tests:
+          - EvidenceSubsystem_ReopenedAndApprovedAgain_StatesReopenHistory
 
       - id: ReviewCenter-Evidence-Signature
         title: >-
@@ -590,9 +608,35 @@ sections:
       - id: ReviewCenter-Evidence-Index-Fields
         title: >-
           The Evidence subsystem shall give each entry of the evidence index the review-set id, the fingerprint of the
-          files, the date of the latest signature, the result pass and the address of the attestation.
+          files, and the date of the latest signature.
         justification: |
-          These are the fields that ReviewMark needs to decide whether a review-set has a current review.
+          These are the fields that ReviewMark uses to match an entry with a review-set and to pick the newest of
+          several entries of the same review-set.
+        children:
+          - ReviewCenter-EvidenceIndex-Identity
+          - ReviewCenter-EvidenceIndex-Fields-Fingerprint
+          - ReviewCenter-EvidenceIndex-Fields
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+          - ReviewMarkContract_Index_HasTheSchemaReviewMarkReads
+
+      - id: ReviewCenter-Evidence-Index-Fields-Result
+        title: >-
+          The Evidence subsystem shall give each entry of the evidence index the result pass.
+        justification: |
+          The index lists only approved reviews, and ReviewMark reads the result of an entry to tell a current review
+          from a failed one.
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+          - ReviewMarkContract_Index_HasTheSchemaReviewMarkReads
+
+      - id: ReviewCenter-Evidence-Index-Fields-Address
+        title: >-
+          The Evidence subsystem shall give each entry of the evidence index the address of the attestation of its
+          review.
+        justification: |
+          ReviewMark follows the address of an entry to the attestation that is the evidence of the review, so the
+          address must lead to the attestation of that review and no other.
         tests:
           - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
 

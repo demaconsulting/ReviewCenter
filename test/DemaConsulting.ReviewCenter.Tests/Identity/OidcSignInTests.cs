@@ -103,6 +103,30 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
     }
 
     /// <summary>
+    ///     Test that a person who signs in through the provider is signed in without a second factor challenge, also
+    ///     while the second factor is switched on for the tool.
+    /// </summary>
+    [Fact]
+    public async Task OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge()
+    {
+        // Arrange: the application with the second factor switched on and the provider
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        Assert.True(app.Services.GetRequiredService<IOptions<TotpOptions>>().Value.Enabled);
+
+        // Act: sign in through the provider
+        var landing = await OidcTestApp.SignInAsync(browser, _idp, "/projects");
+
+        // Assert: sent on to the page, one session cookie, and no cookie of a pending second step
+        Assert.Equal(HttpStatusCode.Redirect, landing.StatusCode);
+        Assert.Equal("/projects", landing.Headers.Location?.OriginalString);
+        Assert.Single(OidcTestApp.SessionCookies(browser));
+        Assert.DoesNotContain(
+            browser.SetCookieHeaders,
+            header => header.StartsWith(TotpSignIn.CookieName + "=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that the sign-in and the creation of the account are recorded in the audit trail with the host of the
     ///     issuer only.
     /// </summary>

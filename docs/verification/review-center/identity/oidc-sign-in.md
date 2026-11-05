@@ -123,6 +123,11 @@ answer 404 and the login page shows no button. This scenario is tested by
 the display name beside the local form, the generic message, and the local return address. This scenario is tested by
 `OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm`.
 
+**OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge**: With the second factor on in the settings of the
+tool, a person signs in through the fake provider; the person is sent to the local return address with one session
+cookie and no cookie of a pending second step. This scenario is tested by
+`OidcSignIn_SecondFactorOn_ProviderSignIn_SignsInWithoutChallenge`.
+
 **OidcSignIn_Logout_IsLocalOnly**: Signing out ends the session and the provider sees no request. This scenario is
 tested by `OidcSignIn_Logout_IsLocalOnly`.
 
@@ -205,8 +210,10 @@ stops the application from being created with a message that names the setting a
 secret. The test is in the `ServerHost` tests and is linked from the settings validation requirement of this unit. This
 scenario is tested by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
 
-**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in off, or with valid settings, the
-application is created. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in on and valid settings (an https
+authority and the largest age), the application is created. The name of the test is kept from the time when it also
+covered sign-in off, which is now tested by `ServerHost_CreateApplication_OidcOff_BuildsTheApplication`. This scenario is
+tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
 
 **OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause**: After a refused confirmation the review page names the
 cause when the provider sent no usable `auth_time` (absent, or present but negative): the text says the provider did not

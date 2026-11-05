@@ -32,6 +32,24 @@ sections:
         tests:
           - TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsSecretAndUriButIsNotActive
 
+      - id: ReviewCenter-TotpService-Enrollment-SecretBits
+        title: >-
+          The TotpService class shall return a secret of 160 bits when the setup of a second factor is started.
+        justification: |
+          The secret is shared with the app of the person, and the one-time password standard (RFC 4226) recommends 160
+          bits so that it cannot be guessed.
+        tests:
+          - TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsA160BitSecret
+
+      - id: ReviewCenter-TotpService-Enrollment-Issuer
+        title: >-
+          The TotpService class shall name ReviewCenter as the issuer in the authenticator address of a new secret.
+        justification: |
+          The authenticator app lists the account under the name of the issuer, so the person can tell the entry from
+          the entries of other services.
+        tests:
+          - TotpService_BeginEnrollmentAsync_ValidPassword_UriNamesTheIssuerReviewCenter
+
       - id: ReviewCenter-TotpService-Enrollment-Replace
         title: >-
           The TotpService class shall replace the pending secret with a new one when the setup is started again, so that
@@ -578,6 +596,16 @@ sections:
         tests:
           - TotpService_ResetAsync_DisabledAdministrator_ThrowsActorNotAllowed
 
+      - id: ReviewCenter-TotpService-AdminReset-MustChangePassword
+        title: >-
+          The TotpService class shall refuse to reset the second factor of a user when the system administrator who
+          asks still has to change a temporary password.
+        justification: |
+          An account whose password is a temporary one is not yet in the hands of its owner, so it must not remove the
+          protection of another account.
+        tests:
+          - TotpService_ResetAsync_AdministratorMustChangePassword_ThrowsActorNotAllowed
+
       - id: ReviewCenter-TotpService-AdminReset-UnknownUser
         title: >-
           The TotpService class shall refuse the reset of a user who does not exist.
@@ -638,6 +666,16 @@ sections:
           The setup is a guessing surface too.
         tests:
           - TotpService_ConfirmEnrollmentAsync_WrongCode_ThrowsAndStaysPending
+
+      - id: ReviewCenter-TotpService-Lockout-SetupLocked
+        title: >-
+          The TotpService class shall refuse even a right code at the confirmation of a setup while the account is
+          locked out.
+        justification: |
+          A lockout must bind the setup too, or a guesser could finish a setup with a lucky guess while the account is
+          locked.
+        tests:
+          - TotpService_ConfirmEnrollmentAsync_LockedOutAccountRightCode_ThrowsAndStaysPending
 
       - id: ReviewCenter-TotpService-Lockout-Removal
         title: >-

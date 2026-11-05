@@ -668,6 +668,8 @@ sections:
           The export is for people who are signed in, so a request without a session is sent to sign in.
         children:
           - ReviewCenter-ApiEndpoints-AuditExport-SignedOut
+        tests:
+          - AuditExportEndpoints_SignedOut_RedirectsToLogin
 
       - id: ReviewCenter-Api-AuditExport-NotInApi
         title: >-

@@ -45,6 +45,29 @@ environment configures a database file that does not exist, does not create that
 neither the log nor the TRX mention the configured-database check. This scenario is tested by
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.
 
+**SelfTestSubsystem_ValidationWorkflow_RealProcessRun_LeavesNoTemporaryFiles**: The real
+`--validate` process runs with a private empty `TEMP` folder; it exits with code 0 and the
+folder is empty afterwards. This scenario is tested by
+`SelfTestSubsystem_ValidationWorkflow_RealProcessRun_LeavesNoTemporaryFiles`.
+
+**SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ListensOnEphemeralLoopbackPort**: The real
+process runs with all-interface listen addresses on one port in its environment; it exits with
+code 0, the host check reports a loopback address `127.0.0.1` with a port from 1 to 65535, and
+that port is not the configured one. This scenario is tested by
+`SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ListensOnEphemeralLoopbackPort`.
+
+**SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ReadsNoDeploymentConfiguration**: The real
+process runs with invalid `appsettings.json` files and an environment that names another
+environment and provider; it exits with code 0, ten of ten checks pass, none fails and no
+`ReviewCenter_Configured` check appears in the output. This scenario is tested by
+`SelfTestSubsystem_ValidationWorkflow_RealProcessRun_ReadsNoDeploymentConfiguration`.
+
+**SelfTestSubsystem_ValidationWorkflow_RealProcessRun_TouchesNoConfiguredDatabaseOrKeyRing**: The
+real process runs with a database, key ring and certificate configured in a sentinel folder; it
+exits with code 0, the output holds no configured-database or configured-keys check, and the
+sentinel folder is still empty. This scenario is tested by
+`SelfTestSubsystem_ValidationWorkflow_RealProcessRun_TouchesNoConfiguredDatabaseOrKeyRing`.
+
 **SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound**: The real run completes in
 well under the 60 s limit of a single check. This scenario is tested by
 `SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound`.

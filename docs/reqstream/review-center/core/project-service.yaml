@@ -636,8 +636,8 @@ sections:
         title: >-
           The ProjectService class shall give a created account a temporary password of sixteen characters.
         justification: |
-          A password chosen by the system cannot be weak, and sixteen characters are more than the minimum that
-          a person must choose themselves.
+          A password chosen by the system cannot be weak, and sixteen characters are more than the minimum of twelve
+          characters that a person must use when they choose their own password.
         tests:
           - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
 
@@ -901,6 +901,19 @@ sections:
           A new project must start strict, so that a rule is relaxed on purpose and never by omission.
         tests:
           - ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches-ExistingProject
+        title: >-
+          The ProjectService class shall keep the two further review rules, authors answering the checklist of their
+          own review and the person who reopened a review signing it again, on for a project that exists and whose
+          rules were never changed, also when another setting of the project is changed.
+        justification: |
+          A project that nobody set up must follow the rules as a new project does, and a change of another setting
+          must not switch a rule off by the way. A database that was made before the two rules were stored has no
+          column for them and must be created again, so this requirement is about the projects of the current
+          database.
+        tests:
+          - ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn
 
       - id: ReviewCenter-ProjectService-ReviewRuleSwitches-PlainMember
         title: >-

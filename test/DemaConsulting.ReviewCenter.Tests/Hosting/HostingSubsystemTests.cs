@@ -201,6 +201,44 @@ public class HostingSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a visitor who is signed in is served a page that needs a signed-in user.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Pages_SignedInUser_ProtectedPageIsServed()
+    {
+        // Arrange: a started host and a visitor who has signed in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+
+        // Act: request a protected page
+        var projects = await browser.Client.GetAsync("/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the page is served, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, projects.StatusCode);
+        Assert.Null(projects.Headers.Location);
+    }
+
+    /// <summary>
+    ///     Test that the health URL answers a visitor who is not signed in, without a redirect to the login page.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_HealthEndpoint_NotSignedIn_IsNotRedirectedToLogin()
+    {
+        // Arrange: a started host and a client that has no sign-in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: probe health without signing in
+        var health = await client.GetAsync(ServerHost.HealthPath, TestContext.Current.CancellationToken);
+
+        // Assert: answered directly, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, health.StatusCode);
+        Assert.Null(health.Headers.Location);
+    }
+
+    /// <summary>
     ///     Test that the login page is served to a visitor who is not signed in.
     /// </summary>
     [Fact]
