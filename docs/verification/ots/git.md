@@ -51,14 +51,23 @@ appears only in the environment of the process.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
-**Scenario**: A branch, a tag, and a full commit identity of a mirrored repository are resolved, and an unknown and an
-unsafe revision are resolved too.
+**Scenario**: A branch, a tag, and a full commit identity of a mirrored repository are resolved, and an unknown
+revision is resolved too.
 
-**Expected**: The first three give the commit identity, and the others are refused: the unknown revision with its own
-rule, and the revisions that could be read as an option with their own.
+**Expected**: The first three give the commit identity, and the unknown revision is refused.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`,
-`ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`, `ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe`.
+`ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`.
+
+#### GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt
+
+**Scenario**: The runner starts the installed git program directly, so that the check of the service does not run
+first, to resolve a commit identity and two revisions that start like an option, each after the end-of-options marker.
+
+**Expected**: The commit identity resolves, and the two revisions that start like an option end with a nonzero exit
+code and no output.
+
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe`.
 
 #### GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 

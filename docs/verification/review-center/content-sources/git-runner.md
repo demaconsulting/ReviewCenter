@@ -116,6 +116,11 @@ names `Git:CachePath` but not the path, and no inner exception is chained. This 
 returns its
 exit code and error text. This scenario is tested by `GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode`.
 
+**GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt**: Run directly, without the check of the service, git
+refuses a revision that starts like an option when it follows the end-of-options marker, with a nonzero exit code and
+no output, while a valid revision resolves with the same call. This scenario is tested by
+`GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt`.
+
 **GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed**: Output beyond the limit stops the call with
 `GitAccessFailed`. This scenario is tested by `GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed`.
 
