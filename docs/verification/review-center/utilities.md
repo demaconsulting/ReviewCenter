@@ -139,6 +139,10 @@ scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDi
 secret file is disposed; the same `SecretSource.Resolve` call is refused with a message that names the file setting.
 This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting`.
 
+**UtilitiesSubsystem_SecretSourceWorkflow_FileOfExactlyTheLimit_ResolvesSecret**: A secret file of exactly 8192 bytes is
+written inside a `TemporaryDirectory`; `SecretSource.Resolve` returns the whole contents and throws nothing. This
+scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileOfExactlyTheLimit_ResolvesSecret`.
+
 **UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting**: In a `TemporaryDirectory`, a file
 that is missing, a directory, an empty file, a file of 8193 bytes, and a file that is not UTF-8 (the last two start
 with a recognizable text) are each given as the secret file; every one of the five calls throws

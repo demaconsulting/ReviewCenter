@@ -15,8 +15,8 @@ of these functions work correctly.
 git has no self-validation mode and is verified by the project's own tests, which run the real program against real
 repositories created in a private temporary folder and against a local server that refuses credentials; no substitute
 is used, because the behavior of the real program is what is verified. Each scenario names a specific test method that
-depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all fourteen
-requirements are satisfied.
+depends on the program under verification. A passing pipeline run for all scenarios constitutes evidence that all
+fifteen requirements are satisfied.
 
 ### Test Scenarios
 
@@ -51,13 +51,23 @@ appears only in the environment of the process.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
-**Scenario**: A branch, a tag, and a full commit identity of a mirrored repository are resolved, and an unknown and an
-unsafe revision are resolved too.
+**Scenario**: A branch, a tag, and a full commit identity of a mirrored repository are resolved, and an unknown
+revision is resolved too.
 
-**Expected**: The first three give the commit identity, and the others are refused.
+**Expected**: The first three give the commit identity, and the unknown revision is refused.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision`,
 `ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal`.
+
+#### GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt
+
+**Scenario**: The runner starts the installed git program directly, so that the check of the service does not run
+first, to resolve a commit identity and two revisions that start like an option, each after the end-of-options marker.
+
+**Expected**: The commit identity resolves, and the two revisions that start like an option end with a nonzero exit
+code and no output.
+
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe`.
 
 #### GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
 

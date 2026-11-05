@@ -169,12 +169,22 @@ sections:
       - id: ReviewCenter-Utilities-TempFiles-LockedFile
         title: >-
           The Utilities subsystem shall not throw when a temporary directory is disposed while a file in it stays held
-          open, and shall leave the directory to the operating system.
+          open.
         justification: |
-          A cleanup failure must not turn a finished piece of work into a failure, and a folder that is still locked
-          is cleaned up later by the operating system's own temporary-file cleanup.
+          A cleanup failure must not turn a finished piece of work into a failure of the run that did the work.
         children:
           - ReviewCenter-TemporaryDirectory-Dispose-NoThrow
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing
+
+      - id: ReviewCenter-Utilities-TempFiles-LockedFile-Remains
+        title: >-
+          The Utilities subsystem shall leave a temporary directory that holds a file that stays open to the operating
+          system to remove when the directory is disposed.
+        justification: |
+          A folder that is still locked cannot be removed by the run; leaving it in place lets the operating system's
+          own temporary-file cleanup remove it later instead of the run forcing the removal.
+        children:
           - ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
         tests:
           - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing
@@ -227,9 +237,20 @@ sections:
         children:
           - ReviewCenter-SecretSource-File
           - ReviewCenter-SecretSource-File-Trimmed
-          - ReviewCenter-SecretSource-File-SizeLimit
         tests:
           - UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret
+
+      - id: ReviewCenter-Utilities-SecretSource-SizeLimit
+        title: >-
+          The Utilities subsystem shall resolve a secret that is given as the path of a file of exactly 8192 bytes to
+          the contents of the file.
+        justification: |
+          The size limit keeps a wrong file, such as a binary or a log, from being used as a secret, and a file that
+          is exactly at the limit is still a valid secret; a limit that is off by one would refuse a valid deployment.
+        children:
+          - ReviewCenter-SecretSource-File-SizeLimit
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_FileOfExactlyTheLimit_ResolvesSecret
 
       - id: ReviewCenter-Utilities-SecretSource-Inline
         title: >-

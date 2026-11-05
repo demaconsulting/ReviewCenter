@@ -61,13 +61,25 @@ sections:
             tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
           - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
-            title: git shall refuse a revision that is unknown or unsafe.
+            title: git shall refuse a revision that is unknown.
             justification: |
-              A revision that does not exist, or that git could read as an option, must never select content. A
-              passing test that runs the real program confirms that an unknown and an unsafe revision are refused.
+              A revision that does not exist must never select content. A passing test that runs the real program
+              confirms that an unknown revision is refused.
             tags: [ots]
             tests:
               - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+          - id: ReviewCenter-OTS-Git-Access-ResolveRevision-Unsafe
+            title: >-
+              git shall refuse a revision that could be read as an option when the revision follows the end-of-options
+              marker.
+            justification: |
+              A name that git could read as an option must never select content or change the call, and the service
+              passes every revision after the end-of-options marker. A passing test that runs the real program
+              directly, without the check of the service, confirms that git refuses a revision that starts like an
+              option with a nonzero exit code and no output, and resolves a valid revision with the same call.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt
           - id: ReviewCenter-OTS-Git-Access-ListFiles
             title: git shall list the files of a commit.
             justification: |

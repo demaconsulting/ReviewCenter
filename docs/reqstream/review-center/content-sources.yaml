@@ -14,13 +14,11 @@ sections:
     requirements:
       - id: ReviewCenter-ContentSources-GitAccess
         title: >-
-          The ContentSources subsystem shall read a registered repository through the installed git program, run
-          without a shell, in a curated environment, with a time limit on every call that stops git and everything
-          it started, and with a limit on the output it accepts.
+          The ContentSources subsystem shall read a registered repository by starting the installed git program as a
+          separate program without a shell and with a curated environment.
         justification: |
-          Locations and revisions come from users and repositories are controlled by other people. Running git in a
-          controlled way, with bounds on time and size, keeps a hostile or broken repository from running code,
-          hanging a request, or exhausting the memory of the server.
+          The tool needs no git library, and a hostile or broken repository must not be able to run code through a
+          shell, a user configuration, a hook, or a credential helper of the server.
         children:
           - ReviewCenter-GitRunner-NoShell
           - ReviewCenter-GitRunner-NoShell-Environment
@@ -31,47 +29,119 @@ sections:
           - ReviewCenter-GitRunner-NoShell-Protocols
           - ReviewCenter-GitRunner-NoShell-Hooks
           - ReviewCenter-GitRunner-NoShell-Result
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-GitAccess-Timeout
+        title: >-
+          The ContentSources subsystem shall put a time limit on every git call that stops git and everything it
+          started.
+        justification: |
+          A server that never answers must not hang a request of the tool, and no process may stay behind when the
+          time is over.
+        children:
           - ReviewCenter-GitRunner-Timeout
           - ReviewCenter-GitRunner-Timeout-Ends
           - ReviewCenter-GitRunner-Timeout-StopsGit
           - ReviewCenter-GitRunner-Timeout-StopsChildren
+
+      - id: ReviewCenter-ContentSources-GitAccess-OutputLimit
+        title: >-
+          The ContentSources subsystem shall limit the output that it accepts from a git call.
+        justification: |
+          A repository or a server that sends endless text must not exhaust the memory of the server.
+        children:
           - ReviewCenter-GitRunner-OutputLimit
-        tests:
-          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+          - ReviewCenter-GitRunner-Redaction-ErrorLimit
 
       - id: ReviewCenter-ContentSources-Mirror
         title: >-
           The ContentSources subsystem shall keep one local bare mirror per registered repository that is current each
-          time the repository is opened, and shall let only one session at a time use the mirror of a repository.
+          time the repository is opened.
         justification: |
           Reading from a local mirror is fast and works the same for every kind of location, and following the
-          remote means a review always sees the current state. One session at a time keeps a fetch from changing the
-          mirror under a reader.
+          remote means a review always sees the current state.
         children:
           - ReviewCenter-GitSource-Mirror
           - ReviewCenter-GitSource-Mirror-Refresh
           - ReviewCenter-GitSource-Mirror-Prune
           - ReviewCenter-GitSource-Mirror-LocationChange
-          - ReviewCenter-GitSource-Mirror-FailedClone
-          - ReviewCenter-GitSource-Mirror-CloneError
-          - ReviewCenter-GitSource-Mirror-NoToken
-          - ReviewCenter-GitSource-Serialization
-          - ReviewCenter-GitSource-Serialization-Parallel
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Mirror-CloneError
+        title: >-
+          The ContentSources subsystem shall report a location of a repository that cannot be cloned as an access
+          failure (rule GitAccessFailed) that names the repository.
+        justification: |
+          An operator must be told which repository has a wrong location.
+        children:
+          - ReviewCenter-GitSource-Mirror-CloneError
+        tests:
+          - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
+
+      - id: ReviewCenter-ContentSources-Mirror-FailedClone
+        title: >-
+          The ContentSources subsystem shall leave no mirror folder behind when the first clone of a repository fails.
+        justification: |
+          A half-made mirror would be taken for a good one by a later open.
+        children:
+          - ReviewCenter-GitSource-Mirror-FailedClone
+        tests:
+          - GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp
+          - ContentSourcesSubsystem_UnreachableRepository_LeavesNoMirrorFolder
+
+      - id: ReviewCenter-ContentSources-Mirror-NoToken
+        title: >-
+          The ContentSources subsystem shall never store the access token of a repository in its mirror.
+        justification: |
+          The cache folder is read by operators and backed up, so it must stay free of secrets.
+        children:
+          - ReviewCenter-GitSource-Mirror-NoToken
+
+      - id: ReviewCenter-ContentSources-Mirror-Serialization
+        title: >-
+          The ContentSources subsystem shall let only one session at a time use the mirror of a repository while
+          sessions on different repositories run at the same time.
+        justification: |
+          One session at a time keeps a fetch from changing the mirror under a reader, and other repositories must not
+          wait for it.
+        children:
+          - ReviewCenter-GitSource-Serialization
+          - ReviewCenter-GitSource-Serialization-Parallel
 
       - id: ReviewCenter-ContentSources-Revisions
         title: >-
           The ContentSources subsystem shall resolve a branch, a tag, or a commit identifier of a repository to a
-          commit, and refuse a revision that does not exist.
+          commit.
         justification: |
-          A review is made of exact commits, and the user must be told when the name they gave matches nothing.
+          A review is made of exact commits, so the name that a user gives must lead to one.
         children:
           - ReviewCenter-GitSource-Revision
-          - ReviewCenter-GitSource-Revision-Unknown
-          - ReviewCenter-GitSource-Revision-Unsafe
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Revisions-Unknown
+        title: >-
+          The ContentSources subsystem shall refuse a revision that does not exist in the repository with the rule
+          RevisionNotFound.
+        justification: |
+          The user must be told when the name they gave matches nothing.
+        children:
+          - ReviewCenter-GitSource-Revision-Unknown
+        tests:
+          - ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound
+
+      - id: ReviewCenter-ContentSources-Revisions-Unsafe
+        title: >-
+          The ContentSources subsystem shall refuse a revision that could be read as a git option with the rule
+          RevisionInvalid.
+        justification: |
+          A name that starts like an option could make git do something else than resolve a revision.
+        children:
+          - ReviewCenter-GitSource-Revision-Unsafe
+        tests:
+          - ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid
 
       - id: ReviewCenter-ContentSources-Revisions-Branch
         title: >-
@@ -84,11 +154,11 @@ sections:
 
       - id: ReviewCenter-ContentSources-Changes
         title: >-
-          The ContentSources subsystem shall list the files that changed between a baseline and a head commit, or all
-          files of the head commit when there is no baseline, report a rename as a deletion and an addition, and
-          leave out symbolic links and submodules.
+          The ContentSources subsystem shall list the files that were added, modified, or deleted between a baseline
+          commit and a head commit, or all files of the head commit as added when there is no baseline commit.
         justification: |
-          A review covers what changed, or the whole head. Only plain files can be reviewed byte for byte.
+          A review covers what changed since the last reviewed state, or the whole head when nothing was reviewed
+          before. A rename is shown as a deletion and an addition, and a change of the mode only is no change.
         children:
           - ReviewCenter-GitSource-Changes
           - ReviewCenter-GitSource-Changes-Rename
@@ -97,10 +167,19 @@ sections:
           - ReviewCenter-GitSource-Changes-Order
           - ReviewCenter-GitSource-Changes-Blobs
           - ReviewCenter-GitSource-Changes-Blobs-MissingSide
-          - ReviewCenter-GitSource-SpecialEntries
-          - ReviewCenter-GitSource-SpecialEntries-Reported
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+
+      - id: ReviewCenter-ContentSources-Changes-SpecialEntries
+        title: >-
+          The ContentSources subsystem shall leave symbolic links and submodule entries out of every listing of files
+          and report each entry that it left out.
+        justification: |
+          Only plain files can be reviewed byte for byte, and nothing may disappear from a review without a trace.
+        children:
+          - ReviewCenter-GitSource-SpecialEntries
+          - ReviewCenter-GitSource-SpecialEntries-Reported
 
       - id: ReviewCenter-ContentSources-Changes-Between
         title: >-
@@ -114,18 +193,61 @@ sections:
 
       - id: ReviewCenter-ContentSources-Content
         title: >-
-          The ContentSources subsystem shall read the content of a file of a commit as exactly the bytes the
-          repository stores, and shall refuse a file larger than the limit of the caller.
+          The ContentSources subsystem shall read the content of a file of a commit as exactly the bytes the repository
+          stores, without any conversion of line endings or other filtering.
         justification: |
-          The fingerprint of a review is calculated over the bytes, so they must not be converted, and the size limit
-          protects the server.
+          The fingerprint of a review is calculated over the bytes, so they must not be converted.
         children:
           - ReviewCenter-GitSource-Content
-          - ReviewCenter-GitSource-Content-Limit
-          - ReviewCenter-GitSource-Content-ObjectIds
-          - ReviewCenter-GitSource-Content-Size
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Content-Limit
+        title: >-
+          The ContentSources subsystem shall refuse a file larger than the limit of the caller with an access failure
+          (rule GitAccessFailed).
+        justification: |
+          The size limit of the caller protects the memory of the server from a very large file.
+        children:
+          - ReviewCenter-GitSource-Content-Limit
+
+      - id: ReviewCenter-ContentSources-Content-Size
+        title: >-
+          The ContentSources subsystem shall report the size of a file in bytes.
+        justification: |
+          A caller can check the size of a file against its limit before it reads the content.
+        children:
+          - ReviewCenter-GitSource-Content-Size
+
+      - id: ReviewCenter-ContentSources-ArgumentErrors
+        title: >-
+          The ContentSources subsystem shall refuse a missing data protection provider, a missing token to encrypt,
+          or a missing text to decrypt with an argument error.
+        justification: |
+          A call of the credential protection without its inputs is a programming error that fails early instead of
+          becoming an unclear failure later.
+        children:
+          - ReviewCenter-CredentialProtector-Encrypt-Arguments
+
+      - id: ReviewCenter-ContentSources-ArgumentErrors-ReviewSetContent
+        title: >-
+          The ContentSources subsystem shall refuse missing content of a ReviewMark configuration file with an
+          argument error.
+        justification: |
+          Reading review-sets from content that is not there is a programming error that fails early instead of
+          becoming an unclear failure later.
+        children:
+          - ReviewCenter-ReviewSetParser-Errors-Content
+
+      - id: ReviewCenter-ContentSources-ArgumentErrors-ObjectIds
+        title: >-
+          The ContentSources subsystem shall refuse a commit or blob identifier that is not a lowercase hexadecimal
+          object identifier with an argument error.
+        justification: |
+          Refusing anything that is not an identifier keeps no text of a user from acting as an option of the git
+          command line.
+        children:
+          - ReviewCenter-GitSource-Content-ObjectIds
 
       - id: ReviewCenter-ContentSources-Content-Bytes
         title: >-
@@ -139,39 +261,74 @@ sections:
 
       - id: ReviewCenter-ContentSources-Credentials
         title: >-
-          The ContentSources subsystem shall keep the access token of a repository encrypted, readable again after a
-          restart with the same key ring, report credentials that cannot be read instead of using a wrong value, give
-          the token to git only through the environment of the child process, and remove every form of the token from
-          the messages and the log.
+          The ContentSources subsystem shall keep the access token of a repository encrypted in a form that can be read
+          back with the same key ring, also after a restart.
         justification: |
-          A token is a secret that grants access to source code. It must not be readable in a copy of the database, in
-          the process list, in the cache folder, or in any message, while the server must still be able to use it.
+          A token is a secret that grants access to source code. It must not be readable in a copy of the database,
+          while the server must still be able to use it after it was started again.
         children:
           - ReviewCenter-CredentialProtector-Encrypt
           - ReviewCenter-CredentialProtector-Encrypt-Decrypt
-          - ReviewCenter-CredentialProtector-Encrypt-Arguments
           - ReviewCenter-CredentialProtector-Persistence
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials-Isolation
+        title: >-
+          The ContentSources subsystem shall encrypt a token with a purpose of its own, so that a protector of another
+          purpose on the same key ring cannot read it.
+        justification: |
+          Each use of the key ring must be sealed from the others.
+        children:
+          - ReviewCenter-CredentialProtector-Isolation
+        tests:
+          - CredentialProtector_Purpose_IsolatesTokensFromOtherUses
+
+      - id: ReviewCenter-ContentSources-Credentials-Unreadable
+        title: >-
+          The ContentSources subsystem shall report credentials that cannot be read instead of using a wrong value.
+        justification: |
+          A wrong value would make git log in with a bad token and could lock the account of the service user.
+        children:
           - ReviewCenter-CredentialProtector-Unreadable
           - ReviewCenter-CredentialProtector-Unreadable-NotEncrypted
           - ReviewCenter-CredentialProtector-Unreadable-Message
-          - ReviewCenter-CredentialProtector-Isolation
           - ReviewCenter-CredentialProtector-Isolation-Foreign
+
+      - id: ReviewCenter-ContentSources-Credentials-GitEnvironment
+        title: >-
+          The ContentSources subsystem shall give the access token to git only through the environment of the child
+          process.
+        justification: |
+          The arguments of a process are visible to every user of the machine, and its environment is not.
+        children:
           - ReviewCenter-GitRunner-TokenEnvironment
           - ReviewCenter-GitRunner-TokenEnvironment-Arguments
           - ReviewCenter-GitRunner-TokenEnvironment-Header
           - ReviewCenter-GitRunner-TokenEnvironment-Anonymous
+
+      - id: ReviewCenter-ContentSources-Credentials-Redaction
+        title: >-
+          The ContentSources subsystem shall remove every form of the access token from the error text of a git call.
+        justification: |
+          A secret must not reach a message or the log, however git prints it: alone, with the user name, escaped for a
+          URL, in the encoded header, as user information of a URL, or cut at the end of a buffer.
+        children:
           - ReviewCenter-GitRunner-Redaction
           - ReviewCenter-GitRunner-Redaction-EncodedHeader
           - ReviewCenter-GitRunner-Redaction-UrlCredentials
-          - ReviewCenter-GitRunner-Redaction-Location
           - ReviewCenter-GitRunner-Redaction-Cut
           - ReviewCenter-GitRunner-Redaction-BufferStart
-          - ReviewCenter-GitRunner-Redaction-ErrorLimit
+
+      - id: ReviewCenter-ContentSources-Credentials-RedactionUnchanged
+        title: >-
+          The ContentSources subsystem shall leave error text of a git call that holds nothing to remove unchanged.
+        justification: |
+          The removal of secrets must not damage the messages that an operator needs to find the cause of a failure.
+        children:
           - ReviewCenter-GitRunner-Redaction-Unchanged
           - ReviewCenter-GitRunner-Redaction-NoLocation
           - ReviewCenter-GitRunner-Redaction-MissingText
-        tests:
-          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 
       - id: ReviewCenter-ContentSources-Credentials-Encrypted
         title: >-
@@ -203,44 +360,106 @@ sections:
 
       - id: ReviewCenter-ContentSources-Errors
         title: >-
-          The ContentSources subsystem shall report a clear, secret-free error that names the cause and the repository
-          (never its location) when git is not
-          installed or too old, when a revision does not exist, when access is refused or the location cannot be
-          read, and when a call runs out of time, or when the cache folder cannot be written.
+          The ContentSources subsystem shall report a git program that is not installed as git unavailable (rule
+          GitUnavailable).
         justification: |
-          Operators and users must be able to tell a missing program from a wrong location, a refused token, or a
-          slow server, and must be able to act on the message.
+          Operators must be able to tell what to install.
         children:
           - ReviewCenter-GitRunner-Errors
+
+      - id: ReviewCenter-ContentSources-Errors-OldGit
+        title: >-
+          The ContentSources subsystem shall report an installed git that is older than version 2.31 as git unavailable
+          (rule GitUnavailable).
+        justification: |
+          An old git lacks options that the reads depend on.
+        children:
           - ReviewCenter-GitRunner-Errors-OldGit
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolder
+        title: >-
+          The ContentSources subsystem shall report a cache folder that cannot be used, or a malformed or too long cache
+          path, as git unavailable (rule GitUnavailable).
+        justification: |
+          A cache that cannot be written makes every read fail.
+        children:
+          - ReviewCenter-GitRunner-Errors-CacheFolder
+          - ReviewCenter-GitRunner-Errors-CacheMalformed
+          - ReviewCenter-GitSource-CacheFolder
+          - ReviewCenter-GitSource-CacheFolder-Malformed
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolderMessage
+        title: >-
+          The ContentSources subsystem shall name the Git:CachePath setting, and neither the path nor the exception of
+          the file system, in the error for a cache folder that cannot be used.
+        justification: |
+          The operator must know which setting to fix without a path in the log.
+        children:
+          - ReviewCenter-GitRunner-Errors-CacheMessage
+          - ReviewCenter-GitSource-CacheFolder-Message
+
+      - id: ReviewCenter-ContentSources-Errors-CacheFolderLock
+        title: >-
+          The ContentSources subsystem shall release the lock on the repository when the cache folder cannot be used, so
+          that the next open does not wait.
+        justification: |
+          A held lock would turn one fault into a hang.
+        children:
+          - ReviewCenter-GitSource-CacheFolder-Lock
+
+      - id: ReviewCenter-ContentSources-Errors-Failure
+        title: >-
+          The ContentSources subsystem shall report a failed git call as an access failure (rule GitAccessFailed) whose
+          message names the repository.
+        justification: |
+          Users must be able to tell a wrong location or a refused token from other failures and to act on the message.
+        children:
           - ReviewCenter-GitRunner-Errors-Failure
+        tests:
+          - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
+
+      - id: ReviewCenter-ContentSources-Errors-FailureText
+        title: >-
+          The ContentSources subsystem shall give only the first line of the error text of git, or its exit code when it
+          printed none, and keep a long text short, in the message of a failed call.
+        justification: |
+          A message must be readable.
+        children:
           - ReviewCenter-GitRunner-Errors-FirstLine
           - ReviewCenter-GitRunner-Errors-ExitCode
           - ReviewCenter-GitRunner-Errors-Length
+
+      - id: ReviewCenter-ContentSources-Errors-FailureDenied
+        title: >-
+          The ContentSources subsystem shall report a refusal of the credentials by the server as denied access to the
+          repository.
+        justification: |
+          A refused token must be told from a wrong location.
+        children:
           - ReviewCenter-GitRunner-Errors-Denied
+
+      - id: ReviewCenter-ContentSources-Errors-Secrets
+        title: >-
+          The ContentSources subsystem shall keep every secret and the location of a repository out of the message of a
+          failed git call.
+        justification: |
+          Locations and tokens can hold secrets, and a message reaches pages and logs.
+        children:
           - ReviewCenter-GitRunner-Errors-Secrets
           - ReviewCenter-GitRunner-Errors-LocalPath
           - ReviewCenter-GitRunner-Errors-WebAddress
-          - ReviewCenter-GitRunner-Errors-CacheFolder
-          - ReviewCenter-GitRunner-Errors-CacheMalformed
-          - ReviewCenter-GitRunner-Errors-CacheMessage
-          - ReviewCenter-GitSource-CacheFolder
-          - ReviewCenter-GitSource-CacheFolder-Malformed
-          - ReviewCenter-GitSource-CacheFolder-Message
-          - ReviewCenter-GitSource-CacheFolder-Lock
+          - ReviewCenter-GitRunner-Redaction-Location
         tests:
-          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+          - ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository
 
       - id: ReviewCenter-ContentSources-ReviewSets
         title: >-
-          The ContentSources subsystem shall read the review-sets (identifier, title, and paths) that a repository
-          defines in its ReviewMark configuration file, within fixed limits, shall refuse a file that is not usable
-          with a plain message, and shall tell whether a commit is in the history of another commit.
+          The ContentSources subsystem shall read the review-sets of a ReviewMark configuration file as the entries of
+          its reviews key, in file order, each with its identifier, title, and ordered paths.
         justification: |
           A repository already says in its configuration file which sets of files are reviewed together, so the
-          planner can offer one review for each set. The file is written by other people, so it is read within limits
-          and its errors are explained, and the history check lets the planner reuse the head of an earlier review as
-          the baseline of a new one only when that is sound.
+          planner can offer one review for each set. The file may use the usual styles of YAML, a byte order mark, and
+          other line endings, and it may hold other keys that are of no concern here.
         children:
           - ReviewCenter-ReviewSetParser-Read
           - ReviewCenter-ReviewSetParser-Read-UnknownKeys
@@ -252,38 +471,66 @@ sections:
           - ReviewCenter-ReviewSetParser-Read-ByteOrderMark
           - ReviewCenter-ReviewSetParser-Read-WindowsLineEnds
           - ReviewCenter-ReviewSetParser-Read-EmptyPaths
+        tests:
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+
+      - id: ReviewCenter-ContentSources-ReviewSets-Limits
+        title: >-
+          The ContentSources subsystem shall refuse a ReviewMark configuration file whose size, number of review-sets,
+          or review-set values are beyond the fixed limits.
+        justification: |
+          The file is written by other people, so the work that it can cause must be bounded.
+        children:
           - ReviewCenter-ReviewSetParser-Limits
-          - ReviewCenter-ReviewSetParser-Limits-Alias
           - ReviewCenter-ReviewSetParser-Limits-SetCount
           - ReviewCenter-ReviewSetParser-Limits-IdLength
           - ReviewCenter-ReviewSetParser-Limits-TitleLength
-          - ReviewCenter-ReviewSetParser-Limits-IdControl
-          - ReviewCenter-ReviewSetParser-Limits-TitleControl
           - ReviewCenter-ReviewSetParser-Limits-PathCount
           - ReviewCenter-ReviewSetParser-Limits-PathValue
           - ReviewCenter-ReviewSetParser-Limits-PathValue-Length
           - ReviewCenter-ReviewSetParser-Limits-PathValue-Control
+          - ReviewCenter-ReviewSetParser-Limits-IdControl
+          - ReviewCenter-ReviewSetParser-Limits-TitleControl
+
+      - id: ReviewCenter-ContentSources-ReviewSets-AtLimit
+        title: >-
+          The ContentSources subsystem shall accept a ReviewMark configuration file whose size, number of review-sets,
+          and review-set values are exactly at the fixed limits.
+        justification: |
+          The limits are inclusive, so a file that uses the whole allowance must still be read.
+        children:
           - ReviewCenter-ReviewSetParser-Limits-AtLimit
           - ReviewCenter-ReviewSetParser-Limits-AtLimit-SetCount
           - ReviewCenter-ReviewSetParser-Limits-AtLimit-IdLength
           - ReviewCenter-ReviewSetParser-Limits-AtLimit-TitleLength
           - ReviewCenter-ReviewSetParser-Limits-AtLimit-PathCount
           - ReviewCenter-ReviewSetParser-Limits-AtLimit-PathLength
+
+      - id: ReviewCenter-ContentSources-ReviewSets-Unusable
+        title: >-
+          The ContentSources subsystem shall refuse a ReviewMark configuration file that is not usable with the rule
+          ReviewSetConfigInvalid and a plain message.
+        justification: |
+          The planner must not build a plan from a broken file, and the user must be told what is wrong: the message
+          names the position and shows nothing of the YAML library.
+        children:
           - ReviewCenter-ReviewSetParser-Errors
           - ReviewCenter-ReviewSetParser-Errors-NotYaml
           - ReviewCenter-ReviewSetParser-Errors-MissingId
           - ReviewCenter-ReviewSetParser-Errors-MissingTitle
           - ReviewCenter-ReviewSetParser-Errors-DuplicateId
           - ReviewCenter-ReviewSetParser-Errors-PlainMessage
-          - ReviewCenter-ReviewSetParser-Errors-Content
-          - ReviewCenter-GitSource-Ancestry
-          - ReviewCenter-GitSource-Ancestry-NotAncestor
-          - ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
-          - ReviewCenter-GitSource-Ancestry-Itself
+          - ReviewCenter-ReviewSetParser-Limits-Alias
+
+      - id: ReviewCenter-ContentSources-ReviewSets-UnknownCommit
+        title: >-
+          The ContentSources subsystem shall report a commit that the repository does not have, in an ancestry
+          question, as an access failure (rule GitAccessFailed).
+        justification: |
+          The planner must get a clear failure and not a wrong answer, and the failure must show no path of the server.
+        children:
           - ReviewCenter-GitSource-Ancestry-UnknownCommit
           - ReviewCenter-GitSource-Ancestry-NoPaths
-        tests:
-          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
 
       - id: ReviewCenter-ContentSources-ReviewSets-Read
         title: >-
@@ -301,8 +548,11 @@ sections:
         justification: |
           The head of an earlier review may serve as the baseline of a new one only when it is in the history of the
           new head.
+        children:
+          - ReviewCenter-GitSource-Ancestry
+          - ReviewCenter-GitSource-Ancestry-Itself
         tests:
-          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+          - ContentSourcesSubsystem_Ancestry_EarlierCommitIsInTheHistoryOfALaterCommit
 
       - id: ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
         title: >-
@@ -310,8 +560,11 @@ sections:
         justification: |
           A baseline from another line of history would give a wrong list of changes, so the negative answer has to be
           right as well.
+        children:
+          - ReviewCenter-GitSource-Ancestry-NotAncestor
+          - ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
         tests:
-          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+          - ContentSourcesSubsystem_Ancestry_LaterCommitIsNotInTheHistoryOfAnEarlierCommit
 
       - id: ReviewCenter-ContentSources-DisabledRepository
         title: >-
@@ -329,4 +582,4 @@ sections:
           A repository that an administrator has disabled must not appear among the choices for a review, so that
           nobody picks it by mistake.
         tests:
-          - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading
+          - ContentSourcesSubsystem_DisabledRepository_IsNotOfferedForSelection

@@ -571,6 +571,41 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that git itself refuses a revision that could be read as an option when the revision follows the
+    ///     end-of-options marker, with the same call shape as the source and without the check of the product that runs
+    ///     before it.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_OptionShapedRevision_GitRefusesIt()
+    {
+        // Arrange: a repository with one commit and a runner over the installed git
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        GitTestSupport.Init(root.Path);
+        GitTestSupport.Write(root.Path, "a.txt", "first\n");
+        var commit = GitTestSupport.Commit(root.Path, "first");
+        var gitDir = Path.Combine(root.Path, ".git");
+        var runner = new GitRunner(Options(root.Path));
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: resolve a valid revision and two option-shaped ones, directly through git
+        var valid = await runner.RunAsync(
+            ["--git-dir", gitDir, "rev-parse", "--verify", "--end-of-options", commit + "^{commit}"], null, 4096, cancellationToken);
+        var shortOption = await runner.RunAsync(
+            ["--git-dir", gitDir, "rev-parse", "--verify", "--end-of-options", "-x^{commit}"], null, 4096, cancellationToken);
+        var longOption = await runner.RunAsync(
+            ["--git-dir", gitDir, "rev-parse", "--verify", "--end-of-options", "--upload-pack=touch x^{commit}"], null, 4096, cancellationToken);
+
+        // Assert: the valid revision resolves, and git refuses the others with a failure and no output
+        Assert.Equal(0, valid.ExitCode);
+        Assert.Equal(commit, Encoding.UTF8.GetString(valid.Output).Trim());
+        Assert.NotEqual(0, shortOption.ExitCode);
+        Assert.Empty(shortOption.Output);
+        Assert.NotEqual(0, longOption.ExitCode);
+        Assert.Empty(longOption.Output);
+    }
+
+    /// <summary>
     ///     Test that output beyond the cap stops the call with an error instead of filling memory.
     /// </summary>
     [Fact]

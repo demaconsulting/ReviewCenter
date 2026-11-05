@@ -189,10 +189,13 @@ public class PuppetEndToEndTests
             Assert.StartsWith("true", (await Run("eval", "matchMedia('(prefers-color-scheme: dark)').matches")).Output, StringComparison.Ordinal);
             Assert.Equal(0, (await Run("console")).Code);
 
-            // Act and assert: stop succeeds and removes the control file; a second stop finds nothing running
+            // Act and assert: stop succeeds and removes the control file; a second stop finds nothing running, exits
+            // with code 2 and points at the start command
             Assert.Equal(0, (await Run("stop")).Code);
             Assert.False(File.Exists(controlFile));
-            Assert.Equal(2, (await Run("stop")).Code);
+            var secondStop = await Run("stop");
+            Assert.Equal(2, secondStop.Code);
+            Assert.Contains("puppet start", secondStop.Error, StringComparison.Ordinal);
         }
         finally
         {

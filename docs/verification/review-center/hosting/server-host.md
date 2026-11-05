@@ -208,6 +208,11 @@ and the configured value is in effect. These scenarios are tested by the tests o
 a user is created through the `UserService` taken from the application services; the user is stored with a database
 identity. This scenario is tested by `ServerHost_AddServices_Configured_RegistersUserService`.
 
+**ServerHost_AddServices_Configured_RegistersReviewService**: The real pipeline is started on an in-memory server and a
+project is stored through the `ProjectService`; the `ReviewService` taken from the application services lists the
+reviews of that project from the database and the list is empty. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersReviewService`.
+
 **ServerHost_AddServices_Configured_RegistersSigningService**: The real pipeline is started on an in-memory server and
 the `SigningService` is taken from the application services twice; both calls return the same instance, and it reports
 no approval for a review that does not exist. This scenario is tested by

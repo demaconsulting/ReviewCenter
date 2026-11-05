@@ -13,12 +13,11 @@ sections:
       - id: ReviewCenter-Hosting-Health
         title: >-
           The Hosting subsystem shall answer requests for the /health URL with HTTP status 200
-          and the text Healthy while the server is running, without sign-in, alongside the user interface routes.
+          and the text Healthy while the server is running, without sign-in.
         justification: |
           Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
-          simple, unauthenticated way to find out whether the service is up. The health route
-          must coexist with the user interface routes on the same server so that one probe
-          reflects the state of the whole web service.
+          simple, unauthenticated way to find out whether the service is up. The route
+          must answer without sign-in because a probe has no account.
         children:
           - ReviewCenter-ServerHost-Health
           - ReviewCenter-ServerHost-Health-NoSignIn
@@ -43,15 +42,23 @@ sections:
         justification: |
           Operators need to confirm that the service started and where it is listening, and
           log aggregation tools need named properties rather than pre-formatted text so that
-          entries can be searched and correlated. Framework request logging flowing to the
-          same sinks gives a single audit trail for the running service.
+          entries can be searched and correlated.
         children:
           - ReviewCenter-ServerHost-Logging
           - ReviewCenter-ServerHost-Logging-UrlValue
-          - ReviewCenter-ServerHost-SilentMode
-          - ReviewCenter-ServerHost-SilentMode-ConsoleDefault
         tests:
           - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
+
+      - id: ReviewCenter-Hosting-Logging-Silent
+        title: >-
+          The Hosting subsystem shall write the log entries of the server to the console only when the silent
+          option is not set.
+        justification: |
+          A script or a service manager that captures the output of the server needs a way to keep the console quiet,
+          while an operator who starts the server by hand expects to see its log entries without a switch.
+        children:
+          - ReviewCenter-ServerHost-SilentMode
+          - ReviewCenter-ServerHost-SilentMode-ConsoleDefault
 
       - id: ReviewCenter-Hosting-Logging-FrameworkEntries
         title: >-
@@ -61,26 +68,35 @@ sections:
           One audit trail for the running service needs the framework request entries next to the entries of the
           server, in the same place.
         tests:
-          - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
+          - HostingSubsystem_Startup_LoggingConfigured_FrameworkEntriesReachTheSameSinks
 
       - id: ReviewCenter-Hosting-Database
         title: >-
-          The Hosting subsystem shall create the configured database when the server starts and make the project,
-          review, user, and signing services available to the pages through it, so that stored data is served
-          again after the server is restarted.
+          The Hosting subsystem shall create the configured database when the server starts.
         justification: |
           The pages are only useful if what users create is kept. Opening the database at start-up, rather than
-          on first use, makes a configuration problem visible immediately, and a restart must not lose data.
+          on first use, makes a configuration problem visible immediately.
         children:
           - ReviewCenter-ServerHost-Database
-          - ReviewCenter-ServerHost-Database-ProjectService
-          - ReviewCenter-ServerHost-Database-Persistence
-          - ReviewCenter-ServerHost-Database-UserService
-          - ReviewCenter-ServerHost-Database-SigningService
-          - ReviewCenter-ServerHost-Database-InboxService
-          - ReviewCenter-ServerHost-InputValidation
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+          - HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile
+
+      - id: ReviewCenter-Hosting-Database-Services
+        title: >-
+          The Hosting subsystem shall make the project, review, user, signing, and inbox services available to the
+          pages through the configured database.
+        justification: |
+          The pages read and change their data only through these services, so the server has to connect each of them
+          to the database that it created.
+        children:
+          - ReviewCenter-ServerHost-Database-ProjectService
+          - ReviewCenter-ServerHost-Database-UserService
+          - ReviewCenter-ServerHost-Database-ReviewService
+          - ReviewCenter-ServerHost-Database-SigningService
+          - ReviewCenter-ServerHost-Database-InboxService
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_DomainServicesResolve
 
       - id: ReviewCenter-Hosting-Database-Restart
         title: >-
@@ -88,81 +104,165 @@ sections:
           database.
         justification: |
           What users create must survive a restart of the server, or the pages would be of no use.
+        children:
+          - ReviewCenter-ServerHost-Database-Persistence
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
 
       - id: ReviewCenter-Hosting-Authentication
         title: >-
-          The Hosting subsystem shall set up cookie sign-in for the pages with a configurable session length and
-          a configurable interval, with a minimum of 5 seconds, at which open pages re-check their user,
-          requiring a signed-in user for every page except the home page and the login page, while the /health
-          URL stays open to everyone.
+          The Hosting subsystem shall refuse to start, with an error that names Auth:SessionHours, when the session
+          length of the cookie sign-in is not a positive number.
         justification: |
-          Review data must only be reached by identified users, but probes and the login page must work without
-          signing in. Closing every other page by default means a new page cannot be left open by mistake, and a
-          wrong interval must stop the server at start-up instead of loading the database or leaving open
-          pages unchecked.
+          A session length that is zero or negative would end every sign-in at once, so the server must stop at
+          start-up instead of locking users out.
         children:
           - ReviewCenter-ServerHost-Authentication
+        tests:
+          - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-Authentication-Revalidation
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names Auth:RevalidationSeconds, when the
+          interval at which open pages re-check their user is below 5 seconds.
+        justification: |
+          A page that re-checks its user too often would load the server, so the interval has a floor of its own.
+        children:
           - ReviewCenter-ServerHost-Authentication-RevalidationInterval
+        tests:
+          - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-Authentication-ThrottleRefused
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names the Identity:Throttle setting, when a
+          sign-in throttle limit is not positive, the window is outside 1 to 86400 seconds, or the per-address limit
+          is below the per-name limit.
+        justification: |
+          A throttle that is wrong would either lock everybody out or protect nobody.
+        children:
           - ReviewCenter-ServerHost-Authentication-ThrottleLimits
           - ReviewCenter-ServerHost-Authentication-ThrottleLimits-Window
           - ReviewCenter-ServerHost-Authentication-ThrottleLimits-AddressBelowName
+
+      - id: ReviewCenter-Hosting-Authentication-ThrottleAccepted
+        title: >-
+          The Hosting subsystem shall start with the default sign-in throttle settings and with valid explicit
+          settings.
+        justification: |
+          A valid or default throttle must never stop a start.
+        children:
           - ReviewCenter-ServerHost-Authentication-ThrottleAccepted
           - ReviewCenter-ServerHost-Authentication-ThrottleAccepted-Explicit
+
+      - id: ReviewCenter-Hosting-Authentication-Pages
+        title: >-
+          The Hosting subsystem shall redirect a visitor who is not signed in from a page that needs a signed-in
+          user, such as the projects page, to the login page.
+        justification: |
+          Review data must only be reached by identified users. Closing every page by default, except the few that
+          are named as open, means a new page cannot be left open by mistake.
+        children:
           - ReviewCenter-ServerHost-Authentication-ProtectedPages
+        tests:
+          - HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin
+
+      - id: ReviewCenter-Hosting-Authentication-LoginPage
+        title: >-
+          The Hosting subsystem shall serve the login page to a visitor who is not signed in.
+        justification: |
+          A visitor must be able to reach the page where the sign-in happens.
+        children:
           - ReviewCenter-ServerHost-Authentication-PublicPages
         tests:
-          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
-          - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
-          - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
+          - HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed
 
       - id: ReviewCenter-Hosting-GitSettings
         title: >-
-          The Hosting subsystem shall refuse to start, with an error that names Git:TimeoutSeconds, when the time
-          limit of a git call is not between 1 and 3600 seconds.
+          The Hosting subsystem shall accept Git:TimeoutSeconds at its limits of 1 and 3600 seconds and use the value
+          as the time limit of a git call.
         justification: |
-          An operator who mistypes the limit must learn it at start-up, not when the first repository call hangs
-          or is cut short.
+          The limits of the range are values an operator may choose, so they must start the server and take effect
+          as the time after which a git call is stopped.
+        children:
+          - ReviewCenter-ServerHost-GitSettings-Limits
+        tests:
+          - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
+
+      - id: ReviewCenter-Hosting-GitSettings-Default
+        title: >-
+          The Hosting subsystem shall use 120 seconds as the time limit of a git call when Git:TimeoutSeconds is not
+          set.
+        justification: |
+          A server without the setting must still stop a git call that hangs.
+        children:
+          - ReviewCenter-ServerHost-GitSettings-Default
+
+      - id: ReviewCenter-Hosting-GitSettings-RangeRefused
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names Git:TimeoutSeconds, when it is not
+          between 1 and 3600 seconds.
+        justification: |
+          A limit of zero or of days would make git calls fail at once or never end.
         children:
           - ReviewCenter-ServerHost-GitSettings
-          - ReviewCenter-ServerHost-GitSettings-Limits
-          - ReviewCenter-ServerHost-GitSettings-Default
         tests:
           - ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError
-          - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
 
       - id: ReviewCenter-Hosting-UserAdd
         title: >-
-          The Hosting subsystem shall create a user in the configured database when the user add verb is run,
-          reading the password from the environment, from redirected standard input, or from a prompt, and
-          shall report the outcome without ever printing the password.
+          The Hosting subsystem shall create a user with the given user name and display name in the configured
+          database when the user add verb is run, and return exit code 0.
         justification: |
           The first system administrator must exist before anybody can sign in, and creating it from the command
           line needs no web page that would itself need a system administrator.
         children:
           - ReviewCenter-UserCommand-Create
-          - ReviewCenter-UserCommand-Create-SystemAdmin
-          - ReviewCenter-UserCommand-Create-OrdinaryUser
-          - ReviewCenter-UserCommand-Create-Report
-          - ReviewCenter-UserCommand-Create-NoPasswordPrinted
-          - ReviewCenter-UserCommand-Create-NoKeyRing
-          - ReviewCenter-UserCommand-Create-Arguments
-          - ReviewCenter-UserCommand-Password
-          - ReviewCenter-UserCommand-Password-Prompt
-          - ReviewCenter-UserCommand-Password-Mismatch
-          - ReviewCenter-UserCommand-Password-Backspace
-          - ReviewCenter-UserCommand-Password-NoPassword
-          - ReviewCenter-UserCommand-Password-NoDatabase
-          - ReviewCenter-UserCommand-Errors
-          - ReviewCenter-UserCommand-Errors-PasswordTooShort
-          - ReviewCenter-UserCommand-Errors-PasswordNotPrinted
-          - ReviewCenter-UserCommand-Errors-NothingCreated
-          - ReviewCenter-UserCommand-Errors-InvalidUserName
-          - ReviewCenter-UserCommand-Errors-InvalidUserName-NoUser
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
-          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+
+      - id: ReviewCenter-Hosting-UserAdd-SystemAdmin
+        title: >-
+          The Hosting subsystem shall create the user as a system administrator only when the --system-admin switch
+          is given.
+        justification: |
+          An account with every right must never come from a missing switch.
+        children:
+          - ReviewCenter-UserCommand-Create-SystemAdmin
+          - ReviewCenter-UserCommand-Create-OrdinaryUser
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+          - ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser
+
+      - id: ReviewCenter-Hosting-UserAdd-PasswordFromEnvironment
+        title: >-
+          The Hosting subsystem shall take the password of the new user from the REVIEWCENTER_PASSWORD environment
+          variable when it is set to a non-empty value.
+        justification: |
+          The environment keeps the password out of the command line and the shell history.
+        children:
+          - ReviewCenter-UserCommand-Password
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Hosting-UserAdd-Report
+        title: >-
+          The Hosting subsystem shall report the name of the created user, and whether the user is a system
+          administrator, on the output.
+        justification: |
+          The operator needs to see what was created.
+        children:
+          - ReviewCenter-UserCommand-Create-Report
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Hosting-UserAdd-NoKeyRing
+        title: >-
+          The Hosting subsystem shall create no Data Protection key file and no key folder when the user add verb
+          creates a user.
+        justification: |
+          A command-line verb must not leave the key ring of a server behind.
+        children:
+          - ReviewCenter-UserCommand-Create-NoKeyRing
 
       - id: ReviewCenter-Hosting-UserAdd-StandardInput
         title: >-
@@ -173,6 +273,112 @@ sections:
           line would show in the process list, so redirected standard input is the way to hand it over.
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromStandardInput_CreatesUser
+
+      - id: ReviewCenter-Hosting-UserAdd-Prompt
+        title: >-
+          The Hosting subsystem shall ask for the password and then for the repeated password at a prompt when neither
+          the environment variable nor standard input supplies one.
+        justification: |
+          An operator who creates the first system administrator by hand has no script to hand the password over, and
+          asking twice keeps a mistyped password from locking the account.
+        children:
+          - ReviewCenter-UserCommand-Password-Prompt
+
+      - id: ReviewCenter-Hosting-UserAdd-Prompt-Backspace
+        title: >-
+          The Hosting subsystem shall remove the last typed character when the Backspace key is pressed while the
+          password is typed at the prompt.
+        justification: |
+          A typing slip at a hidden prompt must be correctable.
+        children:
+          - ReviewCenter-UserCommand-Password-Backspace
+
+      - id: ReviewCenter-Hosting-UserAdd-NoPasswordPrinted
+        title: >-
+          The Hosting subsystem shall never write the password of the new user, whether it was accepted or rejected,
+          to the output of the user add verb.
+        justification: |
+          The output of the verb is kept in terminals, script logs, and job histories, so a password that appears
+          there is exposed to everybody who can read them.
+        children:
+          - ReviewCenter-UserCommand-Create-NoPasswordPrinted
+          - ReviewCenter-UserCommand-Errors-PasswordNotPrinted
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected
+        title: >-
+          The Hosting subsystem shall report an error and return exit code 1 when the user name is already taken,
+          whatever the letter case.
+        justification: |
+          A script must be able to tell from the exit code that no user was created, and an operator must learn that
+          the name is in use, without a second account that only differs in the letter case.
+        children:
+          - ReviewCenter-UserCommand-Errors
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-InvalidName
+        title: >-
+          The Hosting subsystem shall report an error and return exit code 1 when the user name breaks the user name
+          rules.
+        justification: |
+          A name that the page cannot show or sign in with must not be created.
+        children:
+          - ReviewCenter-UserCommand-Errors-InvalidUserName
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-InvalidNameNothingCreated
+        title: >-
+          The Hosting subsystem shall create no user when the user name breaks the user name rules.
+        justification: |
+          A refused name must leave the user store as it was.
+        children:
+          - ReviewCenter-UserCommand-Errors-InvalidUserName-NoUser
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-PasswordTooShort
+        title: >-
+          The Hosting subsystem shall report an error and return exit code 1 when the password is shorter than the
+          minimum length.
+        justification: |
+          A weak password must be refused before it is stored.
+        children:
+          - ReviewCenter-UserCommand-Errors-PasswordTooShort
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-PasswordTooShortNothingCreated
+        title: >-
+          The Hosting subsystem shall create no user when it rejects the password.
+        justification: |
+          A refused password must leave the user store as it was.
+        children:
+          - ReviewCenter-UserCommand-Errors-NothingCreated
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-PasswordMismatch
+        title: >-
+          The Hosting subsystem shall refuse the password with the error "The passwords do not match." when the two
+          prompt entries differ.
+        justification: |
+          A mistyped password at the prompt would lock the new user out.
+        children:
+          - ReviewCenter-UserCommand-Password-Mismatch
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-NoPassword
+        title: >-
+          The Hosting subsystem shall report the error "No password was provided." and return exit code 1 when no
+          password source supplies a password.
+        justification: |
+          The verb must not hang or create a user without a password.
+        children:
+          - ReviewCenter-UserCommand-Password-NoPassword
+        tests:
+          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+
+      - id: ReviewCenter-Hosting-UserAdd-Rejected-NoPasswordNoDatabase
+        title: >-
+          The Hosting subsystem shall create no database file when no password is provided.
+        justification: |
+          A refused call must not leave a database behind.
+        children:
+          - ReviewCenter-UserCommand-Password-NoDatabase
 
       - id: ReviewCenter-Hosting-ProjectAccess
         title: >-
@@ -190,96 +396,219 @@ sections:
 
       - id: ReviewCenter-Hosting-DatabaseFailure
         title: >-
-          The Hosting subsystem shall report a database setting that cannot be used as an error and exit code 1,
-          without starting to serve requests.
+          The Hosting subsystem shall report a database setting that cannot be used as an error that names the
+          problem.
         justification: |
-          A service that starts with a database it cannot use would fail on the first request. Stopping
-          immediately with a clear message lets the operator fix the setting.
+          Stopping with a clear message lets the operator fix the setting instead of searching for the cause of a
+          failure later.
         children:
           - ReviewCenter-ServerHost-DatabaseFailure
-          - ReviewCenter-ServerHost-DatabaseFailure-ExitCode
-          - ReviewCenter-ServerHost-DatabaseFailure-LocationExitCode
           - ReviewCenter-ServerHost-DatabaseFailure-ErrorReported
         tests:
-          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider
 
       - id: ReviewCenter-Hosting-DatabaseFailure-ExitCode
         title: >-
           The Hosting subsystem shall return exit code 1 when the database provider that is configured is not
           supported.
         justification: |
-          Scripts and service managers decide on the exit code whether the server started, so a database setting that
-          cannot be used must show as a failure there.
+          Scripts and service managers decide on the exit code whether the server started, so a database provider
+          that is not supported must show as a failure there.
+        children:
+          - ReviewCenter-ServerHost-DatabaseFailure-ExitCode
         tests:
           - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
+
+      - id: ReviewCenter-Hosting-DatabaseFailure-LocationExitCode
+        title: >-
+          The Hosting subsystem shall return exit code 1 when the database location that is configured cannot be
+          used.
+        justification: |
+          A location that cannot be used must end the run as clearly as a provider that is not supported.
+        children:
+          - ReviewCenter-ServerHost-DatabaseFailure-LocationExitCode
 
       - id: ReviewCenter-Hosting-AuditVerify
         title: >-
           The Hosting subsystem shall verify the hash chain of the audit trail in the configured database when the
-          audit verify verb is run, reporting the number of entries with exit code 0 for an intact chain and the
-          first broken entry, a database file that does not exist, or the failure to read the database with exit
-          code 1, and shall give the server and
-          the command-line verbs the same audit services.
+          audit verify verb is run, and report the number of entries with exit code 0 for an intact chain.
         justification: |
           Scripts and scheduled jobs must be able to check the trail without the web interface and to alert on the
           exit code.
         children:
           - ReviewCenter-AuditCommand-Verify
           - ReviewCenter-AuditCommand-Verify-EmptyTrail
-          - ReviewCenter-AuditCommand-Verify-EditedEntry
-          - ReviewCenter-AuditCommand-Verify-DeletedEntry
           - ReviewCenter-AuditCommand-Verify-Unchanged
           - ReviewCenter-AuditCommand-Verify-NoKeyRing
-          - ReviewCenter-AuditCommand-Errors
-          - ReviewCenter-AuditCommand-Errors-NothingCreated
-          - ReviewCenter-AuditCommand-Errors-FileUri
-          - ReviewCenter-AuditCommand-Errors-FileUriNothingCreated
-          - ReviewCenter-AuditCommand-Errors-Unreadable
-          - ReviewCenter-AuditCommand-Errors-Arguments
-          - ReviewCenter-ServerHost-AuditServices
-          - ReviewCenter-ServerHost-AuditServices-FailureWarning
-          - ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+
+      - id: ReviewCenter-Hosting-AuditVerify-Failed
+        title: >-
+          The Hosting subsystem shall report the first broken entry by its sequence number and return exit code 1 when
+          the audit verify verb finds an entry of the trail edited or deleted.
+        justification: |
+          A tampered trail is the finding that a scheduled check exists to raise, so it must show in the exit code and
+          name the first entry that no longer fits.
+        children:
+          - ReviewCenter-AuditCommand-Verify-EditedEntry
+          - ReviewCenter-AuditCommand-Verify-DeletedEntry
+        tests:
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
+
+      - id: ReviewCenter-Hosting-AuditVerify-Failed-MissingDatabase
+        title: >-
+          The Hosting subsystem shall report that the database file does not exist and return exit code 1 when the
+          configured database file is missing, creating neither the file nor its folder.
+        justification: |
+          A check of a database that is not there must not create it.
+        children:
+          - ReviewCenter-AuditCommand-Errors
+          - ReviewCenter-AuditCommand-Errors-NothingCreated
+
+      - id: ReviewCenter-Hosting-AuditVerify-Failed-FileUri
+        title: >-
+          The Hosting subsystem shall report an error and return exit code 1, without reporting an intact trail, when
+          a file: URI asks for the creation of a database file that does not exist.
+        justification: |
+          A creating URI must not make an empty trail look intact.
+        children:
+          - ReviewCenter-AuditCommand-Errors-FileUri
+          - ReviewCenter-AuditCommand-Errors-FileUriNothingCreated
+
+      - id: ReviewCenter-Hosting-AuditVerify-Failed-Unreadable
+        title: >-
+          The Hosting subsystem shall report an error and return exit code 1 when the database file cannot be read as
+          a database.
+        justification: |
+          A damaged file is not an intact trail.
+        children:
+          - ReviewCenter-AuditCommand-Errors-Unreadable
+
+      - id: ReviewCenter-Hosting-AuditVerify-Services
+        title: >-
+          The Hosting subsystem shall give the server and the command-line verbs one shared instance of the audit
+          appender, the audit store and the audit service.
+        justification: |
+          The entries that the server writes and the entries that a verb checks must come from one set of services.
+        children:
+          - ReviewCenter-ServerHost-AuditServices
+
+      - id: ReviewCenter-Hosting-AuditVerify-ServicesWarning
+        title: >-
+          The Hosting subsystem shall write a warning to the log when an audit entry cannot be stored.
+        justification: |
+          A lost audit entry must be visible to the operator.
+        children:
+          - ReviewCenter-ServerHost-AuditServices-FailureWarning
+
+      - id: ReviewCenter-Hosting-AuditVerify-ServicesCallerUnaffected
+        title: >-
+          The Hosting subsystem shall not fail the caller when an audit entry cannot be stored.
+        justification: |
+          An audit fault must not stop the action that was audited.
+        children:
+          - ReviewCenter-ServerHost-AuditServices-FailureWarning-CallerUnaffected
 
       - id: ReviewCenter-Hosting-KeysReprotect
         title: >-
-          The Hosting subsystem shall rotate the Data Protection key when the keys reprotect verb is run, in the
-          same configuration environment as the server: refuse with exit code 1 and without any change when the
-          stored secrets cannot all be read, and otherwise create a new key, protect every stored repository token and
-          second-factor secret again with it, and report the counts and the keys that are still referenced.
+          The Hosting subsystem shall create exactly one new Data Protection key, protected as the server protects its
+          key ring, when the keys reprotect verb is run in the same configuration environment as the server.
         justification: |
-          Old key material can be retired only when nothing stored needs it, and the operator needs one safe command
-          to get there.
+          Old key material can be retired only when a new key exists, and the operator needs one safe command to get
+          there. Running in the environment of the server makes the new key protected and stored as the server expects.
         children:
           - ReviewCenter-KeysCommand-Reprotect
+          - ReviewCenter-KeysCommand-Reprotect-SecondRun
           - ReviewCenter-KeysCommand-Reprotect-KeyProtection
+          - ReviewCenter-KeysCommand-Reprotect-KeyFolder
+
+      - id: ReviewCenter-Hosting-KeysReprotect-Secrets
+        title: >-
+          The Hosting subsystem shall protect every stored repository token and second-factor secret again with the
+          new key and keep every secret readable.
+        justification: |
+          A new key retires the old one only when nothing that is stored still needs the old one, and a secret that
+          cannot be read afterwards would lock a repository or a user out.
+        children:
           - ReviewCenter-KeysCommand-Reprotect-Tokens
           - ReviewCenter-KeysCommand-Reprotect-SecondFactor
           - ReviewCenter-KeysCommand-Reprotect-Readable
-          - ReviewCenter-KeysCommand-Reprotect-SecondRun
           - ReviewCenter-KeysCommand-Reprotect-NoSecrets
-          - ReviewCenter-KeysCommand-Reprotect-KeyFolder
-          - ReviewCenter-KeysCommand-Reprotect-TableUnchanged
-          - ReviewCenter-KeysCommand-Reprotect-Failure
-          - ReviewCenter-KeysCommand-Reprotect-FailureNewKey
-          - ReviewCenter-KeysCommand-Reprotect-CompletedTables
-          - ReviewCenter-KeysCommand-Reprotect-FailureUnchangedTable
-          - ReviewCenter-KeysCommand-Reprotect-FailureRunAgain
-          - ReviewCenter-KeysCommand-Reprotect-FailureNoSecret
+        tests:
+          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
+
+      - id: ReviewCenter-Hosting-KeysReprotect-Refused
+        title: >-
+          The Hosting subsystem shall refuse with exit code 1, saying that nothing was changed, when a stored secret
+          cannot be read with the current key ring.
+        justification: |
+          Re-protecting with a ring that cannot read the secrets would destroy them, so the command must stop before
+          anything is written and say which secrets it could not read.
+        children:
           - ReviewCenter-KeysCommand-RefusesUnreadable
           - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableCount
           - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableIds
           - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoChange
           - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoSecret
+        tests:
+          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
+
+      - id: ReviewCenter-Hosting-KeysReprotect-RefusedEmptyRing
+        title: >-
+          The Hosting subsystem shall refuse with exit code 1, saying that the key ring is empty, and create no key
+          file, when secrets are stored but the key ring holds no key.
+        justification: |
+          A new key over secrets of an empty ring would hide the loss.
+        children:
           - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRing
           - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRingNoKey
+
+      - id: ReviewCenter-Hosting-KeysReprotect-RefusedSettings
+        title: >-
+          The Hosting subsystem shall refuse with exit code 1, naming DataProtection:RequireEncryptedKeys, and change
+          nothing, when the setting requires encrypted keys that the configured protection cannot provide.
+        justification: |
+          A key that breaks the required protection must not be created.
+        children:
           - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsProblem
           - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsNoChange
+
+      - id: ReviewCenter-Hosting-KeysReprotect-RefusedMissingDatabase
+        title: >-
+          The Hosting subsystem shall refuse with exit code 1, saying that the database file does not exist, and
+          create no database, key folder or key file, when the configured database file is missing.
+        justification: |
+          The verb must not make up a database.
+        children:
           - ReviewCenter-KeysCommand-RefusesUnreadable-MissingDatabase
           - ReviewCenter-KeysCommand-RefusesUnreadable-MissingDatabaseNothingCreated
-          - ReviewCenter-KeysCommand-RefusesUnreadable-Arguments
+
+      - id: ReviewCenter-Hosting-KeysReprotect-Failure
+        title: >-
+          The Hosting subsystem shall report an error that says that re-protecting stopped, with exit code 1, when
+          writing a table fails after the new key was created.
+        justification: |
+          A failure in the middle of a run leaves some tables protected with the new key and some with the old one,
+          so the operator must be told exactly where the run stopped and what to do next.
+        children:
+          - ReviewCenter-KeysCommand-Reprotect-Failure
+          - ReviewCenter-KeysCommand-Reprotect-FailureNewKey
+          - ReviewCenter-KeysCommand-Reprotect-TableUnchanged
+          - ReviewCenter-KeysCommand-Reprotect-CompletedTables
+          - ReviewCenter-KeysCommand-Reprotect-FailureUnchangedTable
+          - ReviewCenter-KeysCommand-Reprotect-FailureRunAgain
+          - ReviewCenter-KeysCommand-Reprotect-FailureNoSecret
+
+      - id: ReviewCenter-Hosting-KeysReprotect-Report
+        title: >-
+          The Hosting subsystem shall report the identifier of the new key, how many repository tokens and
+          second-factor secrets it re-protected, which keys the stored secrets still reference, and the next steps,
+          without any secret value.
+        justification: |
+          The operator retires the old keys only after seeing from the report that nothing references them, and a
+          report that contained a secret would leak it into terminals and job logs.
+        children:
           - ReviewCenter-KeysCommand-Report
           - ReviewCenter-KeysCommand-Report-Counts
           - ReviewCenter-KeysCommand-Report-Counts-SecondFactor
@@ -291,26 +620,44 @@ sections:
           - ReviewCenter-KeysCommand-Report-NoSecret
         tests:
           - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
-          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
 
       - id: ReviewCenter-Hosting-RepositoryServices
         title: >-
           The Hosting subsystem shall make the repository registry, the credential protector, and the git content
-          source available to the pages, keeping the key ring and the git cache in folders that default to folders
-          beside the database file, so that a token entered before a restart is still readable after it.
+          source available to the pages.
         justification: |
           The pages can only register and use repositories when the server connects the registry to the database, the
-          key ring, and git. Defaults beside the database mean a new installation works without configuration.
+          credential protector, and git.
         children:
           - ReviewCenter-ServerHost-RepositoryServices
           - ReviewCenter-ServerHost-RepositoryServices-GitSource
+          - ReviewCenter-ServerHost-RepositoryServices-TokenProtection
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
+      - id: ReviewCenter-Hosting-RepositoryServices-Folders
+        title: >-
+          The Hosting subsystem shall keep the git cache and the key ring in folders beside the database file unless
+          DataProtection:KeysPath names the folder of the key ring.
+        justification: |
+          Defaults beside the database mean a new installation works without configuration, and a configured key
+          folder lets the operator keep the key ring apart from the data that it protects.
+        children:
           - ReviewCenter-ServerHost-RepositoryServices-GitCacheDefault
           - ReviewCenter-ServerHost-RepositoryServices-KeysFolderDefault
           - ReviewCenter-ServerHost-RepositoryServices-KeysFolderConfigured
-          - ReviewCenter-ServerHost-RepositoryServices-TokenProtection
-          - ReviewCenter-ServerHost-KeyRing
         tests:
           - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+
+      - id: ReviewCenter-Hosting-RepositoryServices-TokenRestart
+        title: >-
+          The Hosting subsystem shall keep a token that was entered before a restart readable after the restart.
+        justification: |
+          A token that could not be read again after a restart would have to be entered anew, and a repository that
+          the server cannot reach would stop working without a visible cause.
+        children:
+          - ReviewCenter-ServerHost-KeyRing
+        tests:
           - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
 
       - id: ReviewCenter-Hosting-PlannerServices
@@ -341,28 +688,16 @@ sections:
 
       - id: ReviewCenter-Hosting-KeyRingProtection
         title: >-
-          The Hosting subsystem shall protect the key ring at rest with Windows DPAPI, a certificate that the operator
-          supplies, or, where neither is available, the permissions of its folder with a warning at every start,
-          shall refuse to start with a message that names the setting at fault when the protection settings are
-          invalid, when the certificate does not open the existing ring, or when DataProtection:RequireEncryptedKeys
-          is true and the ring is not encrypted, and shall register the same protection of the key files wherever the
-          services are registered, while only the server start checks and probes the key ring.
+          The Hosting subsystem shall protect the key ring at rest by encrypting its key files with Windows DPAPI or
+          with the certificate that the operator supplies.
         justification: |
-          The key ring is the root of trust of every stored token and secret, so its protection must be strong by
-          default where the platform allows it, honest where it does not, and must never be replaced silently by a
-          new ring that makes the stored data unreadable.
+          The key ring is the root of trust of every stored token and secret, so its protection must be strong where
+          the platform or the operator allows it.
         children:
-          - ReviewCenter-KeyRingProtection-Auto
-          - ReviewCenter-KeyRingProtection-Auto-Windows
-          - ReviewCenter-KeyRingProtection-Auto-Unix
-          - ReviewCenter-KeyRingProtection-Auto-Default
-          - ReviewCenter-KeyRingProtection-Auto-Explicit
-          - ReviewCenter-KeyRingProtection-Auto-Explicit-Spaces
           - ReviewCenter-KeyRingProtection-Dpapi
           - ReviewCenter-KeyRingProtection-Dpapi-CurrentUser
           - ReviewCenter-KeyRingProtection-Dpapi-LocalMachine
           - ReviewCenter-KeyRingProtection-Dpapi-Restart
-          - ReviewCenter-KeyRingProtection-Dpapi-OtherSystem
           - ReviewCenter-KeyRingProtection-Dpapi-Log
           - ReviewCenter-KeyRingProtection-Dpapi-FolderRules
           - ReviewCenter-KeyRingProtection-Certificate
@@ -373,87 +708,246 @@ sections:
           - ReviewCenter-KeyRingProtection-Certificate-Formats-PemEncryptedKey
           - ReviewCenter-KeyRingProtection-Certificate-Password
           - ReviewCenter-KeyRingProtection-Certificate-PasswordFile
-          - ReviewCenter-KeyRingProtection-Certificate-NoPath
-          - ReviewCenter-KeyRingProtection-Certificate-Missing
-          - ReviewCenter-KeyRingProtection-Certificate-WrongPassword
-          - ReviewCenter-KeyRingProtection-Certificate-NoPrivateKey
-          - ReviewCenter-KeyRingProtection-Certificate-Rsa
-          - ReviewCenter-KeyRingProtection-Certificate-Platform
-          - ReviewCenter-KeyRingProtection-Certificate-BothPasswords
-          - ReviewCenter-KeyRingProtection-Certificate-PasswordHidden
           - ReviewCenter-KeyRingProtection-Certificate-Log
-          - ReviewCenter-KeyRingProtection-PermissionsOnly
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles-StillReadable
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-UnixFolder
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder-NoInheritance
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsInherit
-          - ReviewCenter-KeyRingProtection-PermissionsOnly-Warning
-          - ReviewCenter-KeyRingProtection-Require
-          - ReviewCenter-KeyRingProtection-Require-Auto
-          - ReviewCenter-KeyRingProtection-Require-PlaintextRing
-          - ReviewCenter-KeyRingProtection-Require-EncryptedRing
           - ReviewCenter-KeyRingProtection-PreviousCertificates
           - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword
           - ReviewCenter-KeyRingProtection-PreviousCertificates-SharedPassword-NoPassword
+          - ReviewCenter-ServerHost-KeyProtection
+          - ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
+          - ReviewCenter-ServerHost-KeyProtection-NoPasswordLogged
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-PermissionsOnly
+        title: >-
+          The Hosting subsystem shall restrict the key files and the key folder to the server account by owner-only
+          modes on Linux and macOS when the permissions of the key folder are the protection of the key ring.
+        justification: |
+          Where neither DPAPI nor a certificate is available the folder permissions are the only protection, so on
+          Linux and macOS they must be as narrow as the owner-only modes allow.
+        children:
+          - ReviewCenter-KeyRingProtection-PermissionsOnly
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-NewKeyFiles-StillReadable
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-UnixFolder
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-PermissionsOnlyWindows
+        title: >-
+          The Hosting subsystem shall restrict the key folder to access rules that admit only the account of the
+          server and the system on Windows when the permissions of the key folder are the protection of the key ring.
+        justification: |
+          The access rules of Windows are not the modes of Linux, so the protection is checked on its own there.
+        children:
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFiles-StillStored
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsFolder-NoInheritance
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-WindowsInherit
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-PermissionsOnlyWarning
+        title: >-
+          The Hosting subsystem shall warn at every start that the key ring is not encrypted at rest when only the
+          permissions of the key folder protect it.
+        justification: |
+          A restriction is not an encryption, so the operator must be told what remains open.
+        children:
+          - ReviewCenter-KeyRingProtection-PermissionsOnly-Warning
+          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-Choice
+        title: >-
+          The Hosting subsystem shall choose the certificate when a certificate path is set and otherwise DPAPI on
+          Windows and folder permissions elsewhere, when DataProtection:Protection is Auto or is not set.
+        justification: |
+          An operator must be able to predict which protection a server uses from its settings, and a new installation
+          must pick the best protection that its platform offers without any configuration.
+        children:
+          - ReviewCenter-KeyRingProtection-Auto
+          - ReviewCenter-KeyRingProtection-Auto-Windows
+          - ReviewCenter-KeyRingProtection-Auto-Unix
+          - ReviewCenter-KeyRingProtection-Auto-Default
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-ChoiceExplicit
+        title: >-
+          The Hosting subsystem shall use the protection that DataProtection:Protection names, in any letter case and
+          with spaces around the value, as named.
+        justification: |
+          An operator who names a protection expects that protection and no other.
+        children:
+          - ReviewCenter-KeyRingProtection-Auto-Explicit
+          - ReviewCenter-KeyRingProtection-Auto-Explicit-Spaces
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-ChoiceSettings
+        title: >-
+          The Hosting subsystem shall read the settings of the key ring protection from the DataProtection
+          configuration section without regard to the letter case of the names.
+        justification: |
+          The names of settings come from files that are written by hand.
+        children:
+          - ReviewCenter-KeyRingProtection-Validation-Binding
+          - ReviewCenter-KeyRingProtection-Validation-Binding-PreviousList
+          - ReviewCenter-KeyRingProtection-Validation-Binding-RequireEncrypted
+          - ReviewCenter-KeyRingProtection-Validation-Binding-LetterCase
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-AllowNewKeyRing
+        title: >-
+          The Hosting subsystem shall provide the DataProtection:AllowNewKeyRing setting with the value false when it
+          is not set.
+        justification: |
+          A key ring must never be replaced by a new one unless the operator allows it.
+        children:
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-Refused
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names the setting at fault, when the key
+          ring protection settings are invalid.
+        justification: |
+          A key ring that is protected differently from what the operator asked for would leave the ring open, so the
+          server must stop and say which setting to fix.
+        children:
+          - ReviewCenter-ServerHost-KeyProtection-InvalidSettings
+          - ReviewCenter-KeyRingProtection-Validation
+          - ReviewCenter-KeyRingProtection-Validation-Scope
+          - ReviewCenter-KeyRingProtection-Validation-Report
+          - ReviewCenter-KeyRingProtection-Validation-BadType
+          - ReviewCenter-KeyRingProtection-Certificate-NoPath
+          - ReviewCenter-KeyRingProtection-Require
+          - ReviewCenter-KeyRingProtection-Require-Auto
+          - ReviewCenter-KeyRingProtection-Dpapi-OtherSystem
+          - ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
+        tests:
+          - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedCertificate
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names DataProtection:CertificatePath, when
+          the certificate cannot be loaded.
+        justification: |
+          A key ring that cannot be opened is no protection, so the server stops and names the file.
+        children:
+          - ReviewCenter-KeyRingProtection-Certificate-Missing
+          - ReviewCenter-KeyRingProtection-Certificate-Platform
+          - ReviewCenter-KeyRingProtection-Certificate-WrongPassword
+          - ReviewCenter-KeyRingProtection-Certificate-NoPrivateKey
+          - ReviewCenter-KeyRingProtection-Certificate-Rsa
+          - ReviewCenter-KeyRingProtection-Certificate-BothPasswords
           - ReviewCenter-KeyRingProtection-PreviousCertificates-Entry
+          - ReviewCenter-ServerHost-KeyProtection-CertificateUnreadable
+          - ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedCertificateSecret
+        title: >-
+          The Hosting subsystem shall keep the certificate password out of the error that stops the start when the
+          certificate cannot be loaded.
+        justification: |
+          A password in an error would reach the log of the server.
+        children:
+          - ReviewCenter-KeyRingProtection-Certificate-PasswordHidden
+          - ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedRing
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names the setting at fault, when the
+          existing key ring cannot be opened with the certificate or holds no readable key.
+        justification: |
+          A ring that is read with the wrong key would be replaced silently and make every stored secret unreadable.
+        children:
           - ReviewCenter-KeyRingProtection-WrongKeyGuard
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoCertificate
-          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoKeyCreated
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-UnreadableKeys
+          - ReviewCenter-ServerHost-KeyProtection-WrongCertificate
+        tests:
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedRingNoKey
+        title: >-
+          The Hosting subsystem shall create no key and change nothing in the key folder when the key ring is
+          refused.
+        justification: |
+          A refusal that leaves a second key behind would defeat the guard.
+        children:
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoKeyCreated
+          - ReviewCenter-ServerHost-KeyProtection-NoKeyOnFailure
+        tests:
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedRingContent
+        title: >-
+          The Hosting subsystem shall keep the content of an unreadable key file out of the message that refuses the
+          key ring.
+        justification: |
+          A key file is a secret and its content must not reach a log.
+        children:
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-ContentHidden
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-RefusedPlaintext
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names DataProtection:RequireEncryptedKeys
+          and the key file, when that setting is true and the ring holds a key file that is not encrypted.
+        justification: |
+          An operator who requires encryption must not run on a plain key file.
+        children:
+          - ReviewCenter-KeyRingProtection-Require-PlaintextRing
+          - ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-Accepted
+        title: >-
+          The Hosting subsystem shall accept a key ring whose key files are all encrypted when
+          DataProtection:RequireEncryptedKeys is true.
+        justification: |
+          A refusal that also stopped a ring that already is encrypted would make the server unusable for no reason.
+        children:
+          - ReviewCenter-KeyRingProtection-Require-EncryptedRing
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-AcceptedNewRing
+        title: >-
+          The Hosting subsystem shall accept a new key ring with an empty or missing key folder, also when
+          DataProtection:RequireEncryptedKeys is true, and create no key for it.
+        justification: |
+          A first start must be possible.
+        children:
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-MissingFolder
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRing-RequireEncrypted
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-NewRingNoKey
-          - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyError
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-AcceptedOlderKey
+        title: >-
+          The Hosting subsystem shall accept a key ring whose newest key opens although an older key does not, with
+          one logged error for the older key.
+        justification: |
+          An old certificate that was dropped must not stop the server.
+        children:
           - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyStart
-          - ReviewCenter-KeyRingProtection-AllowNewKeyRing
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-OlderKeyError
+
+      - id: ReviewCenter-Hosting-KeyRingProtection-Probe
+        title: >-
+          The Hosting subsystem shall probe the key ring only at the server start, describing a ring without changing
+          its folder, and create no key file or key folder when the services are only registered, as the command-line
+          verbs do.
+        justification: |
+          Looking at the key ring must not change it, and a command-line verb that only registers the services must not
+          create key files that the server would later take for its own ring.
+        children:
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-KeyFileCounts
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-MissingFolder-NothingCreated
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-ReadOnly
           - ReviewCenter-KeyRingProtection-AllowNewKeyRing-Unreadable
-          - ReviewCenter-KeyRingProtection-Validation
-          - ReviewCenter-KeyRingProtection-Validation-Scope
-          - ReviewCenter-KeyRingProtection-Validation-Report
-          - ReviewCenter-KeyRingProtection-Validation-BadType
-          - ReviewCenter-KeyRingProtection-Validation-Binding
-          - ReviewCenter-KeyRingProtection-Validation-Binding-PreviousList
-          - ReviewCenter-KeyRingProtection-Validation-Binding-RequireEncrypted
-          - ReviewCenter-KeyRingProtection-Validation-Binding-LetterCase
-          - ReviewCenter-ServerHost-KeyProtection
-          - ReviewCenter-ServerHost-KeyProtection-ReadableAfterRestart
-          - ReviewCenter-ServerHost-KeyProtection-NoPasswordLogged
-          - ReviewCenter-ServerHost-KeyProtection-InvalidSettings
-          - ReviewCenter-ServerHost-KeyProtection-NoKeyOnFailure
-          - ReviewCenter-ServerHost-KeyProtection-CertificateUnreadable
-          - ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
-          - ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
-          - ReviewCenter-ServerHost-KeyProtection-WrongCertificate
-          - ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
-          - ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
-          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes
-          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyModes-Files
-          - ReviewCenter-ServerHost-KeyProtection-PermissionsOnlyWarning
-        tests:
-          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
-          - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
-          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+          - ReviewCenter-ServerHost-LostKeyRing-ServicesCreateNoKey
 
       - id: ReviewCenter-Hosting-SecretScan
         title: >-
-          The Hosting subsystem shall be able to scan the database and the key ring without changing either, counting
-          the key files and how many are not encrypted and the protected repository tokens and second-factor secrets
-          and how many of them the ring can no longer decrypt, never creating a key, and never disclosing a secret or
-          a path.
+          The Hosting subsystem shall count the key files of the key ring and how many are not encrypted, and the
+          protected repository tokens and second-factor secrets and how many of them the ring can no longer decrypt.
         justification: |
           The key ring and the database are backed up and restored separately, and a restore that mixes them loses
-          every stored secret without any error. Finding that needs a look that is true to what the server can decrypt
-          and has no side effect, so that it can run before the server starts and on a restored copy.
+          every stored secret without any error. The counts show whether the ring that is at hand can still read what
+          the database holds.
         children:
           - ReviewCenter-SecretScan-RingState
           - ReviewCenter-SecretScan-RingState-Unencrypted
@@ -471,79 +965,184 @@ sections:
           - ReviewCenter-SecretScan-SecretReadability-MissingDatabase
           - ReviewCenter-SecretScan-SecretReadability-MissingTables
           - ReviewCenter-SecretScan-SecretReadability-NoRows
+        tests:
+          - SecretScan_ScanAsync_SecretsOfTheRing_AreCountedReadable
+          - SecretScan_ScanAsync_OtherRing_CountsEverySecretUnreadableWithIds
+
+      - id: ReviewCenter-Hosting-SecretScan-ReadOnly
+        title: >-
+          The Hosting subsystem shall scan without changing the database or any file of the key ring, without creating
+          a database, a key folder, or a key, also for an empty or malformed ring, and without protecting a value.
+        justification: |
+          The scan has to run before the server starts and on a restored copy, and a scan that created a key or a
+          database would itself turn a lost key ring into a new one.
+        children:
           - ReviewCenter-SecretScan-ReadOnly
           - ReviewCenter-SecretScan-ReadOnly-NoDatabase
           - ReviewCenter-SecretScan-ReadOnly-NoKey
           - ReviewCenter-SecretScan-ReadOnly-NoKeyFolder
           - ReviewCenter-SecretScan-ReadOnly-NoProtect
-          - ReviewCenter-SecretScan-ReadOnly-Arguments
+        tests:
+          - SecretScan_ScanAsync_AnyRing_LeavesDatabaseAndRingUnchanged
+
+      - id: ReviewCenter-Hosting-SecretScan-NoDisclosure
+        title: >-
+          The Hosting subsystem shall never disclose a secret, a decrypted value, a ciphertext, or a path in the result
+          of the scan, returning only counts and the ids of the rows that cannot be read.
+        justification: |
+          The result of the scan is printed and kept in logs and tickets, so anything beyond counts and row ids would
+          leak a secret or the layout of the server to everybody who can read them.
+        children:
           - ReviewCenter-SecretScan-NoDisclosure
           - ReviewCenter-SecretScan-NoDisclosure-IdsOnly
-        tests:
-          - SecretScan_ScanAsync_SecretsOfTheRing_AreCountedReadable
-          - SecretScan_ScanAsync_OtherRing_CountsEverySecretUnreadableWithIds
-          - SecretScan_ScanAsync_AnyRing_LeavesDatabaseAndRingUnchanged
 
       - id: ReviewCenter-Hosting-KeyRingLost
         title: >-
-          The Hosting subsystem shall refuse to start, with a message that names the key folder and the setting
-          DataProtection:AllowNewKeyRing, when the key folder holds no key file and the database holds protected
-          secrets, shall start with a warning when that setting is true, and shall log an error with the counts and the
-          remedy, without refusing, when the ring has keys but some secrets cannot be decrypted. When the database
-          cannot be read to tell, it shall refuse an empty ring, without creating a key, and start with a warning
-          otherwise.
+          The Hosting subsystem shall refuse to start, with an error that names the key folder, the number of protected
+          secrets, and DataProtection:AllowNewKeyRing, creating no key and showing no secret, when the key folder holds
+          no key file and the database holds protected secrets.
         justification: |
           A database restored without its key ring would otherwise start with a new ring and silently make every stored
           repository token and second-factor secret unreadable. The operator must decide, knowingly, that the loss is
-          acceptable. A database that cannot be read does not tell whether there is a loss to accept.
+          acceptable.
         children:
           - ReviewCenter-ServerHost-LostKeyRing
           - ReviewCenter-ServerHost-LostKeyRing-NoKeyCreated
           - ReviewCenter-ServerHost-LostKeyRing-NoSecretShown
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-Hosting-KeyRingLost-AllowNewKeyRing
+        title: >-
+          The Hosting subsystem shall start with a new key and a warning that names DataProtection:AllowNewKeyRing and
+          the number of lost secrets when the key folder holds no key file, the database holds protected secrets, and
+          that setting is true.
+        justification: |
+          An operator who knows that the old key ring is gone for good must be able to accept the loss and get a
+          working server, with a warning that keeps the loss visible.
+        children:
           - ReviewCenter-ServerHost-LostKeyRing-AllowNewKeyRing
           - ReviewCenter-ServerHost-LostKeyRing-AllowWarning
+        tests:
+          - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
+
+      - id: ReviewCenter-Hosting-KeyRingLost-UnreadableDatabase
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names the key folder and
+          Database:ConnectionString and creates no key, when the key folder holds no key file and the database cannot
+          be read, whether or not DataProtection:AllowNewKeyRing is set.
+        justification: |
+          A database that cannot be read does not tell whether there is a loss to accept, so an empty key ring must
+          not be replaced by a new one on a guess.
+        children:
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableDatabase
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableSanitized
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableNoKey
+        tests:
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
+
+      - id: ReviewCenter-Hosting-KeyRingLost-StartsWithKeys
+        title: >-
+          The Hosting subsystem shall start, and log an error with the counts per kind and the remedy, when the key
+          folder holds key files but some stored secrets cannot be decrypted.
+        justification: |
+          A ring that has keys is not lost: the server can serve everything that it can still read, and the log tells
+          the operator what to repair.
+        children:
           - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadable
           - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadableStarts
+        tests:
+          - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
+
+      - id: ReviewCenter-Hosting-KeyRingLost-StartsUnreadableDatabase
+        title: >-
+          The Hosting subsystem shall start, and log a warning that the database could not be read, when the key
+          folder holds key files and the database cannot be read.
+        justification: |
+          An unreadable database is a different fault from lost secrets.
+        children:
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeys
+          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeysWarning
+
+      - id: ReviewCenter-Hosting-KeyRingLost-NothingLost
+        title: >-
+          The Hosting subsystem shall start without an error entry and without a second key when no protected secret is
+          lost, on a new installation or with the key folder that holds the key ring of the database.
+        justification: |
+          The check for a lost key ring must stay silent on a healthy installation, or operators would learn to ignore
+          its messages.
+        children:
           - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation
           - ReviewCenter-ServerHost-LostKeyRing-FreshInstallation-NoError
           - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet
           - ReviewCenter-ServerHost-LostKeyRing-RestartQuiet-NoSecondKey
-          - ReviewCenter-ServerHost-LostKeyRing-UnreadableDatabase
-          - ReviewCenter-ServerHost-LostKeyRing-UnreadableSanitized
-          - ReviewCenter-ServerHost-LostKeyRing-UnreadableNoKey
-          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeys
-          - ReviewCenter-ServerHost-LostKeyRing-UnreadableWithKeysWarning
-          - ReviewCenter-ServerHost-LostKeyRing-ServicesCreateNoKey
-        tests:
-          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
-          - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
-          - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
-          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
 
       - id: ReviewCenter-Hosting-AttestationServices
         title: >-
-          The Hosting subsystem shall make the signed attestation available to the pages and to clients, mapping the
-          download of the attestation of a review and registering the key provider chosen by the Attestation settings,
-          with the self-signed key kept in a folder that defaults to a folder beside the Data Protection keys.
+          The Hosting subsystem shall provide the attestation signing key of the provider that the Attestation settings
+          name.
         justification: |
-          The attestation can only be offered when the server connects the Evidence subsystem to the services it
-          reads, and a default beside the keys means a new installation works without configuration and that the
-          key is kept and backed up with the other keys.
+          The attestation can only be offered when the server connects the Evidence subsystem to the key provider that
+          the operator chose.
         children:
           - ReviewCenter-ServerHost-AttestationServices
+
+      - id: ReviewCenter-Hosting-AttestationServices-SelfSignedFolder
+        title: >-
+          The Hosting subsystem shall keep the self-signed attestation key, and use the same key after a restart, in a
+          folder beside the Data Protection keys unless Attestation:SelfSignedFolder names the folder.
+        justification: |
+          A default beside the keys means a new installation works without configuration and that the key is kept and
+          backed up with the other keys, and a key that changed at every restart would invalidate the attestations that
+          were issued before.
+        children:
           - ReviewCenter-ServerHost-AttestationServices-SelfSignedDefault
           - ReviewCenter-ServerHost-AttestationServices-SelfSignedPersists
           - ReviewCenter-ServerHost-AttestationServices-SelfSignedConfigured
+        tests:
+          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
+
+      - id: ReviewCenter-Hosting-AttestationServices-UnprotectedKey
+        title: >-
+          The Hosting subsystem shall refuse a File provider key without a password, with an error that names
+          DataProtection:RequireEncryptedKeys, when that setting is true.
+        justification: |
+          An operator who requires encrypted keys must not end up with a signing key that is stored in the clear.
+        children:
           - ReviewCenter-ServerHost-AttestationServices-UnprotectedRefused
+
+      - id: ReviewCenter-Hosting-AttestationServices-UnprotectedStarts
+        title: >-
+          The Hosting subsystem shall start with a File provider key that has no password when
+          DataProtection:RequireEncryptedKeys is not set.
+        justification: |
+          An operator who does not require encryption must be able to run.
+        children:
           - ReviewCenter-ServerHost-AttestationServices-UnprotectedStarts
+
+      - id: ReviewCenter-Hosting-AttestationServices-UnprotectedWarned
+        title: >-
+          The Hosting subsystem shall log a warning that the key is not protected by a password when the server
+          starts with such a key.
+        justification: |
+          The operator must know that the key is open.
+        children:
           - ReviewCenter-ServerHost-AttestationServices-UnprotectedWarned
+
+      - id: ReviewCenter-Hosting-AttestationServices-ProtectedKeyUnreadable
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names the key file and says to delete it,
+          when the key ring cannot decrypt the protected self-signed attestation key, also when
+          DataProtection:AllowNewKeyRing is set, and leave the key file unchanged.
+        justification: |
+          A new attestation key made silently in place of a key that cannot be read would break every attestation that
+          was issued with the old one, so the operator must decide to delete the file.
+        children:
           - ReviewCenter-ServerHost-AttestationKeyProtection
           - ReviewCenter-ServerHost-AttestationKeyProtection-NamesFile
           - ReviewCenter-ServerHost-AttestationKeyProtection-AllowNewKeyRing
           - ReviewCenter-ServerHost-AttestationKeyProtection-KeyKept
-        tests:
-          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
-          - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
 
       - id: ReviewCenter-Hosting-AttestationKeyFailure
         title: >-
@@ -568,17 +1167,35 @@ sections:
 
       - id: ReviewCenter-Hosting-ApiServices
         title: >-
-          The Hosting subsystem shall make the API available to clients, registering the personal access token
-          service and mapping the API routes and the OpenAPI document under /api, so that an address under /api that
-          does not exist is answered with a JSON problem document.
+          The Hosting subsystem shall register the personal access token service and map the API routes under /api,
+          answering a request without a token to a protected route with status 401.
         justification: |
-          The API can only be used when the server connects the Api subsystem to the services it reads, and keeping
-          the prefix to the API keeps a script from receiving a web page.
+          The API can only be used when the server connects the Api subsystem to the services it reads, and a script
+          without a token must learn from the status that it has to authenticate.
         children:
           - ReviewCenter-ServerHost-ApiRegistration
           - ReviewCenter-ServerHost-ApiRegistration-Routes
           - ReviewCenter-ServerHost-ApiRegistration-Routes-Unauthorized
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-Hosting-ApiServices-OpenApi
+        title: >-
+          The Hosting subsystem shall serve the OpenAPI document at /api/openapi.json without a token.
+        justification: |
+          Client generators and people who read the API need its description before they have a token.
+        children:
           - ReviewCenter-ServerHost-ApiRegistration-OpenApi
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-Hosting-ApiServices-UnknownAddress
+        title: >-
+          The Hosting subsystem shall answer an address under /api that does not exist with status 404 and a JSON
+          problem document instead of a page.
+        justification: |
+          Keeping the prefix of the API for the API keeps a script from receiving a web page that it cannot parse.
+        children:
           - ReviewCenter-ServerHost-ApiRegistration-UnknownAddress
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
@@ -586,56 +1203,112 @@ sections:
       - id: ReviewCenter-Hosting-OidcSignIn
         title: >-
           The Hosting subsystem shall connect the sign-in with an OpenID Connect provider to the server when an
-          administrator turns it on, stopping the start with a clear error that never shows a secret when the settings
-          are wrong, and shall leave the server as it was when it is off.
+          administrator turns it on and its settings are valid.
         justification: |
-          The sign-in is optional, so a server that does not use it must not change, and a server that does must not
-          start with settings that cannot work.
+          The sign-in is optional, so a server that uses it must work when the settings are right.
+        children:
+          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds
+          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
+        tests:
+          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+
+      - id: ReviewCenter-Hosting-OidcSignIn-InvalidSettings
+        title: >-
+          The Hosting subsystem shall stop the start, with an error that names the setting that is wrong and never
+          shows a secret, when sign-in with a provider is turned on and its settings are wrong.
+        justification: |
+          A server that is configured for a sign-in that cannot work must not start, and the error is printed in
+          places where a secret must never appear.
         children:
           - ReviewCenter-ServerHost-OidcSettings
           - ReviewCenter-ServerHost-OidcSettings-NoSecret
           - ReviewCenter-ServerHost-OidcSettings-SecretFile
           - ReviewCenter-ServerHost-OidcSettings-SecretFile-InlineSecret
-          - ReviewCenter-ServerHost-OidcSettings-Off
-          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds
-          - ReviewCenter-ServerHost-OidcSettings-ValidBuilds-Loopback
         tests:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-Hosting-OidcSignIn-Off
+        title: >-
+          The Hosting subsystem shall leave the server as it was, without checking the OpenID Connect settings, when
+          sign-in with a provider is turned off.
+        justification: |
+          A server that does not use the sign-in must not change or fail because of settings that it never reads.
+        children:
+          - ReviewCenter-ServerHost-OidcSettings-Off
+        tests:
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
 
       - id: ReviewCenter-Hosting-TotpSecondFactor
         title: >-
-          The Hosting subsystem shall connect the second factor of the sign-in to the server, stopping the start with
-          a clear error when its settings are wrong, and mapping the endpoint of the second step only while the feature
-          is on.
+          The Hosting subsystem shall connect the second factor of the sign-in to the server with the settings as
+          configured, turned on with the issuer ReviewCenter when no setting is made.
         justification: |
-          A server must not start with settings that cannot work, and a feature that is off must not leave a way in.
+          A second factor protects the accounts only when the server uses the settings that the operator made, and a
+          server without settings must be safe by default.
         children:
-          - ReviewCenter-ServerHost-TotpWiring
           - ReviewCenter-ServerHost-TotpWiring-DefaultsOn
           - ReviewCenter-ServerHost-TotpWiring-SettingsApplied
           - ReviewCenter-ServerHost-TotpWiring-SettingsApplied-IssuerTrimmed
-          - ReviewCenter-ServerHost-TotpWiring-EndpointMapped
-          - ReviewCenter-ServerHost-TotpWiring-EndpointOffNotMapped
+        tests:
+          - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-Hosting-TotpSecondFactor-InvalidSettings
+        title: >-
+          The Hosting subsystem shall stop the start, with an error that names the setting of the second factor that
+          is wrong.
+        justification: |
+          A server must not start with settings that cannot work, and the operator must see which one to correct.
+        children:
+          - ReviewCenter-ServerHost-TotpWiring
         tests:
           - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
-          - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-Hosting-TotpSecondFactor-Endpoint
+        title: >-
+          The Hosting subsystem shall map the endpoint of the second step of the sign-in only while the second factor
+          is turned on.
+        justification: |
+          A feature that is off must not leave a way in, and a feature that is on needs the endpoint that receives the
+          code.
+        children:
+          - ReviewCenter-ServerHost-TotpWiring-EndpointMapped
+          - ReviewCenter-ServerHost-TotpWiring-EndpointOffNotMapped
 
       - id: ReviewCenter-Hosting-NotificationSettings
         title: >-
-          The Hosting subsystem shall check the notification settings at the start of the server while e-mail
-          notifications are enabled.
+          While e-mail notifications are enabled, the Hosting subsystem shall stop the start of the server with an
+          error that names the setting that is wrong and shows no SMTP password when the notification settings are
+          wrong.
         justification: |
-          A feature that is enabled must not start with settings that cannot work.
+          A feature that is enabled must not start with settings that cannot work, and the error is printed in places
+          where a password must never appear.
         children:
           - ReviewCenter-ServerHost-NotificationInvalidStopsStart
           - ReviewCenter-ServerHost-NotificationInvalidNamesSetting
           - ReviewCenter-ServerHost-NotificationInvalidNoSecret
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-Hosting-NotificationSettings-Valid
+        title: >-
+          The Hosting subsystem shall start the server when e-mail notifications are enabled with valid settings.
+        justification: |
+          A correct configuration must work.
+        children:
           - ReviewCenter-ServerHost-NotificationValidBuilds
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-Hosting-NotificationSettings-InlinePassword
+        title: >-
+          The Hosting subsystem shall warn at the start, without showing the password, when the SMTP password is set
+          inline in the settings.
+        justification: |
+          An inline secret is a risk the operator must be told.
+        children:
           - ReviewCenter-ServerHost-NotificationInlinePasswordWarning
           - ReviewCenter-ServerHost-NotificationWarningNoSecret
         tests:
-          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
           - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
 
       - id: ReviewCenter-Hosting-NotificationTables
@@ -653,7 +1326,7 @@ sections:
       - id: ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
         title: >-
           While e-mail notifications are not enabled, the Hosting subsystem shall start the server without checking
-          the notification settings.
+          the notification settings or the notification tables.
         justification: |
           A feature that is not enabled must leave the server as it was, so that an installation without a mail server
           keeps working.
@@ -667,7 +1340,7 @@ sections:
       - id: ReviewCenter-Hosting-NotificationWorker
         title: >-
           While e-mail notifications are enabled with a sender that sends mail, the Hosting subsystem shall run the
-          notification worker in the web server.
+          notification worker only in the web server.
         justification: |
           The mail is sent by the server that holds the data, so the worker is part of the web server. A command or the
           self-test shares the services of the server but must not send mail or start a loop, so they get no worker.
@@ -689,7 +1362,7 @@ sections:
         children:
           - ReviewCenter-ServerHost-NotificationWorkerOffNone
         tests:
-          - HostingSubsystem_NotificationWorker_OnlyEnabledWebHost
+          - HostingSubsystem_NotificationWorker_NotEnabled_WebHostHasNoWorker
           - ServerHost_CreateApplication_NotificationsOff_NoWorker
 
       - id: ReviewCenter-Hosting-NotificationSenderNoneRefused
@@ -703,3 +1376,53 @@ sections:
           - ReviewCenter-ServerHost-NotificationSenderNoneRefused
         tests:
           - ServerHost_CreateApplication_EnabledSenderNone_RefusedBeforeAnyWorker
+
+      - id: ReviewCenter-Hosting-Arguments
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the server is built.
+        justification: |
+          A call that lacks what it needs would otherwise fail later with an unclear error, so the programming mistake
+          is made visible when the server is built.
+        children:
+          - ReviewCenter-ServerHost-InputValidation
+
+      - id: ReviewCenter-Hosting-Arguments-UserAdd
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the user add verb is run.
+        justification: |
+          A verb that creates a user without what it needs would change data without a record of the run, so the
+          programming mistake is made visible at the entry point.
+        children:
+          - ReviewCenter-UserCommand-Create-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-AuditVerify
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the audit verify verb is run.
+        justification: |
+          A check of the audit trail that lacks what it needs would otherwise report a result that means nothing, so
+          the programming mistake is made visible at the entry point.
+        children:
+          - ReviewCenter-AuditCommand-Errors-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-KeysReprotect
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the keys reprotect verb is run.
+        justification: |
+          A verb that rewrites the protected secrets without what it needs would change data without a record of the
+          run, so the programming mistake is made visible at the entry point.
+        children:
+          - ReviewCenter-KeysCommand-RefusesUnreadable-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-SecretScan
+        title: >-
+          The Hosting subsystem shall refuse a missing argument with an argument exception when the secret scan is
+          called.
+        justification: |
+          A scan of the stored secrets that lacks what it needs would otherwise report a result that means nothing, so
+          the programming mistake is made visible at the call.
+        children:
+          - ReviewCenter-SecretScan-ReadOnly-Arguments
