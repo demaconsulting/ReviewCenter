@@ -63,6 +63,8 @@ sections:
           - ReviewCenter-ApiTokenAuthentication-Throttle-RetryAfter
           - ReviewCenter-ApiTokenAuthentication-Throttle-AddressLimit
           - ReviewCenter-ApiTokenAuthentication-Throttle-Basic
+        tests:
+          - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
 
       - id: ReviewCenter-Api-TokenJourney-FailureAudit
         title: >-
@@ -75,6 +77,8 @@ sections:
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-Basic
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-Once
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-NoValue
+        tests:
+          - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
 
       - id: ReviewCenter-Api-TokenJourney-NoTokenInLog
         title: >-
@@ -84,15 +88,27 @@ sections:
         children:
           - ReviewCenter-ApiTokenAuthentication-NoLog
 
+      - id: ReviewCenter-Api-ReviewJourney-ListProjects
+        title: >-
+          The Api subsystem shall let a client with a valid token list the projects that the owner of the token may
+          see.
+        justification: |
+          A pipeline has to find the project that it files a review into without a person looking it up. Which
+          projects the owner may see is decided by ReviewCenter-Api-ProjectAccess-ListProjects.
+        children:
+          - ReviewCenter-ApiEndpoints-Read
+          - ReviewCenter-ApiEndpoints-Read-NoToken
+        tests:
+          - ApiEndpoints_ListProjects_Token_ReturnsProjects
+
       - id: ReviewCenter-Api-ReviewJourney
         title: >-
-          The Api subsystem shall let a client with a valid token list the projects the owner of the token may see and
-          the reviews of such a project.
+          The Api subsystem shall let a client with a valid token list the reviews of a project that the owner of the
+          token may see.
         justification: |
           Creating a draft for every pull request from a pipeline and fetching the attestation after sign-off are
           the reasons to have an API. The same rules as for the web pages keep the record consistent.
         children:
-          - ReviewCenter-ApiEndpoints-Read
           - ReviewCenter-ApiEndpoints-Read-Reviews
           - ReviewCenter-ApiEndpoints-Read-ReviewsNotFound
           - ReviewCenter-ApiEndpoints-Read-NoToken
@@ -507,14 +523,16 @@ sections:
 
       - id: ReviewCenter-Api-ProjectAccess
         title: >-
-          The Api subsystem shall answer a request for a project, or for anything in a project, with the owner of the
-          token being neither a member of the project nor a system administrator, with the 404 that it answers for a
-          project that does not exist, with the same body, on every route of a project and for a bearer token as well as
-          for HTTP Basic credentials. A request without credentials is decided by the project (see AnonymousEvidence).
+          The Api subsystem shall answer a request for a project, or for anything in a project, from a token whose owner
+          is neither a member of the project nor a system administrator with the 404 that it answers for a project that
+          does not exist.
         justification: |
           A project may hold confidential work, and a script that holds a token must see only what its owner sees. An
           answer that differed between a project the owner may not see and a project that does not exist would tell
-          the script which projects exist.
+          the script which projects exist. The body, the routes and the token schemes (SameAnswer), the access of
+          members and administrators (Served), the list of projects (ListProjects), the effect of a removal
+          (Removed), the checklist (Checklist) and a request without credentials (AnonymousEvidence) are separate
+          requirements.
         children:
           - ReviewCenter-ApiEndpoints-ProjectAccess
           - ReviewCenter-ApiEndpoints-ProjectAccess-Create
@@ -536,6 +554,9 @@ sections:
           - ReviewCenter-ApiEndpoints-Checklist-UnknownProject
           - ReviewCenter-ApiEndpoints-Checklist-Unreadable
           - ReviewCenter-ApiEndpoints-Checklist-NoToken
+        tests:
+          - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+          - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
 
       - id: ReviewCenter-Api-ProjectAccess-SameAnswer
         title: >-
@@ -660,16 +681,12 @@ sections:
       - id: ReviewCenter-Api-AnonymousEvidence
         title: >-
           The Api subsystem shall let a project open its evidence index and its attestation PDFs to a client without
-          credentials, each by its own setting that is off by default, and no other route; shall refuse a client
-          without credentials as it refuses a missing token when the setting is off, whether or not the project
-          exists; shall never treat a request with a wrong token as a request without credentials; shall limit such
-          a client by address; shall record such a release of an attestation in the audit trail with the actor
-          anonymous; and shall describe the two routes in the OpenAPI document as callable without credentials.
+          credentials, each by its own setting that is off by default.
         justification: |
           Evidence is useful when a pipeline or an auditor can read it without an account, but whether a project
-          publishes it is the decision of the project. The exception must be narrow, switched off by default, no
-          different for a project that does not exist, limited by address, and visible in the audit trail and in the
-          contract of the API.
+          publishes it is the decision of the project, so each route has its own setting that is off by default. The
+          refusal when a setting is off, the wrong-token rule, the routes that stay closed, the limit by address, the
+          audit trail and the contract of the API are separate requirements.
         children:
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-Open

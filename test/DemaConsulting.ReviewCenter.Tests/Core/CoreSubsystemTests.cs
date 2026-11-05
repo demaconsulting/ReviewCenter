@@ -83,6 +83,40 @@ public class CoreSubsystemTests
     }
 
     /// <summary>
+    ///     Test that only a system administrator creates a project: a member of a project and an actor who is no
+    ///     user at all are refused with <see cref="DomainRule.ActorNotAllowed"/> and nothing is stored, while the
+    ///     system administrator creates the project.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_CreateProject_NotSystemAdministrator_IsRefusedAndStoresNothing()
+    {
+        // Arrange: a realm with one project, a member of it, and a system administrator
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var projectsBefore = (await realm.Store.ListProjectsAsync(cancellationToken)).Count;
+        var auditsBefore = realm.Store.Audits.Count;
+
+        // Act: a member and a stranger try to create a project
+        var byMember = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Projects.CreateAsync("Gemini", null, realm.Ann, cancellationToken));
+        var byStranger = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Projects.CreateAsync("Gemini", null, new Actor("nobody", "Nobody"), cancellationToken));
+
+        // Assert: both are refused and nothing is stored
+        Assert.Equal(DomainRule.ActorNotAllowed, byMember.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, byStranger.Rule);
+        Assert.Equal(projectsBefore, (await realm.Store.ListProjectsAsync(cancellationToken)).Count);
+        Assert.Equal(auditsBefore, realm.Store.Audits.Count);
+
+        // Act: the system administrator creates it
+        var created = await realm.Projects.CreateAsync("Gemini", null, realm.Root, cancellationToken);
+
+        // Assert: the project exists
+        Assert.Equal("Gemini", created.Name);
+        Assert.Equal(projectsBefore + 1, (await realm.Store.ListProjectsAsync(cancellationToken)).Count);
+    }
+
+    /// <summary>
     ///     Test that the same file contents give the same review fingerprint when they are submitted in another
     ///     order and under other file names.
     /// </summary>

@@ -401,10 +401,10 @@ the user, the project, the review, the given newest comment, and the time of the
 `InboxService_MarkSeenAsync_FirstCall_StoresCommentAndTime`.
 
 **InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail**: Marking a review as seen stores the state and
-leaves the record digest of the review unchanged, and the inbox service has no audit store or audit service among its
-constructor parameters or fields. That the audit trail itself stays as it was is shown over a real database by
-`StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged`. This scenario is tested by
-`InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail`.
+leaves the record digest of the review unchanged, and the review store that the inbox service works through receives
+no audit draft, so no audit entry is added by any route. That the audit trail itself stays as it was is shown over a
+real database by `StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged`. This scenario is
+tested by `InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail`.
 
 **InboxRules_SlotState_MatchesSigningServiceApproval**: The slot state is the one the signing service reports for a slot
 that was never signed, a slot with a current signature, and a slot whose signature is out of date. This scenario is

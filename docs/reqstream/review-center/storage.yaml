@@ -1047,7 +1047,6 @@ sections:
           - ReviewCenter-ReviewStore-UserImpact-Order
           - ReviewCenter-ReviewStore-UserImpact-OtherUsersSlots
           - ReviewCenter-ReviewStore-UserImpact-NoSlots
-          - ReviewCenter-ReviewStore-UserImpact-DisabledUserNotReported
         tests:
           - ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder
 
@@ -1064,6 +1063,7 @@ sections:
           - ReviewCenter-ReviewStore-UserImpact-NotAdminLeftOut
           - ReviewCenter-ReviewStore-UserImpact-DisabledAdminNotCounted
           - ReviewCenter-ReviewStore-UserImpact-OrdinaryMemberNotCounted
+          - ReviewCenter-ReviewStore-UserImpact-DisabledUserNotReported
         tests:
           - ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound
 
@@ -1750,6 +1750,8 @@ sections:
           A user must not be able to revoke the tokens of others.
         children:
           - ReviewCenter-PersonalAccessTokenStore-Revoke-OtherUsers
+        tests:
+          - StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing
 
       - id: ReviewCenter-Storage-AccessTokens-Touch
         title: >-

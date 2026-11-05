@@ -37,6 +37,8 @@ sections:
           - ReviewCenter-SignIn-LoginFailure
           - ReviewCenter-SignIn-LoginFailure-NoCookie
           - ReviewCenter-SignIn-LoginFailure-ReturnUrl
+        tests:
+          - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
 
       - id: ReviewCenter-Identity-Login-Cookie
         title: >-
@@ -534,8 +536,6 @@ sections:
           - ReviewCenter-OidcSignIn-DisabledRefused
           - ReviewCenter-OidcSignIn-DisabledRefused-NoCookie
           - ReviewCenter-OidcSignIn-DisabledRefused-AuditReason
-          - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
-          - ReviewCenter-Identity-OidcOpenPageChecked
 
       - id: ReviewCenter-Identity-OidcSignIn-ReturnAddress
         title: >-
@@ -681,6 +681,7 @@ sections:
           - ReviewCenter-OidcSignIn-LocalSession
           - ReviewCenter-OidcSignIn-LocalSession-LogoutLocalOnly
           - ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
+          - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
         tests:
           - OidcSignIn_Logout_IsLocalOnly
 

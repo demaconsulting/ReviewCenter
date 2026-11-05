@@ -183,6 +183,12 @@ database and one token is revoked; the database is closed and opened again. The 
 the revoked token is refused, both are listed, the revoked one with its revocation time, and no row holds a token value.
 This scenario is tested by `StorageSubsystem_AccessTokens_PersistAcrossReopen`.
 
+**StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing**: Two users and a token of the first
+are created through the services over a new database. The second user tries to revoke that token and is refused as
+for a token that does not exist. The token still authenticates its owner and is listed without a revocation time, and
+the audit trail holds no revocation entry. This scenario is tested by
+`StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing`.
+
 **StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing**: A database is opened with
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown
 and the file does not exist. This scenario is tested by

@@ -4778,6 +4778,7 @@ sections:
           - ReviewCenter-Identity-CircuitSession-Interval
           - ReviewCenter-Identity-CircuitSession-EndSignIn
           - ReviewCenter-Identity-CircuitSession-FailClosed
+          - ReviewCenter-Identity-OidcOpenPageChecked
           - ReviewCenter-Web-SessionEnd
           - ReviewCenter-Web-SessionEnd-ChangeRefused
           - ReviewCenter-Web-SessionEnd-NothingChanged
@@ -8143,6 +8144,7 @@ sections:
           A pipeline has to find the project and the review it files into without a person looking them up.
         children:
           - ReviewCenter-Api-ReviewJourney
+          - ReviewCenter-Api-ReviewJourney-ListProjects
           - ReviewCenter-Api-ProjectAccess-ListProjects
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd

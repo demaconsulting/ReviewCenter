@@ -266,6 +266,46 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a user cannot revoke the token of another user over a real database: the attempt is refused as
+    ///     for a token that does not exist, the token still authenticates its owner and is not marked as revoked, and
+    ///     no revocation is written to the audit trail.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing()
+    {
+        // Arrange: a new database file, a token of Ann, and a second user, Bob
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ann = new Actor("ann", "Ann");
+        var bob = new Actor("bob", "Bob");
+        var (provider, _, _, _) = Open(options);
+        using var _ = provider;
+        var users = NewUserService(provider);
+        await users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        var tokens = NewTokenService(provider);
+        var created = await tokens.CreateAsync(ann, "build server", 90, cancellationToken);
+        var audit = new AuditStore(
+            provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            new AuditAppender(TimeProvider.System));
+        var sequenceBefore = await audit.LatestSequenceAsync(cancellationToken);
+
+        // Act: Bob tries to revoke the token of Ann
+        var error = await Assert.ThrowsAsync<DomainRuleException>(
+            () => tokens.RevokeAsync(bob, created.Token.Id, cancellationToken));
+        var authenticated = await tokens.AuthenticateAsync(created.Value, cancellationToken);
+        var listed = await tokens.ListAsync(ann, cancellationToken);
+        var entries = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+
+        // Assert: refused as for a missing token, the token is intact, and nothing was audited
+        Assert.Equal(DomainRule.TokenNotFound, error.Rule);
+        Assert.True(authenticated.Succeeded);
+        Assert.Null(Assert.Single(listed).Revoked);
+        Assert.Equal(sequenceBefore, await audit.LatestSequenceAsync(cancellationToken));
+        Assert.DoesNotContain(entries, e => e.Action == "token.revoked");
+    }
+
+    /// <summary>
     ///     Test that a repository registered through the service, with its encrypted token and its disabled state,
     ///     is still there after the database is closed and opened again.
     /// </summary>
@@ -795,7 +835,7 @@ public class StorageSubsystemTests
     [Fact]
     public async Task StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged()
     {
-        // Arrange: ann authors a review and assigns bob; the audit trail and the record digest are read before
+        // Arrange: Ann authors a review and assigns bob; the audit trail and the record digest are read before
         var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
         var cancellationToken = TestContext.Current.CancellationToken;
         var bob = new Actor("bob", "Bob");

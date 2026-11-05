@@ -44,6 +44,8 @@ sections:
           - ReviewCenter-ProjectService-CreateAdmin
           - ReviewCenter-ProjectService-CreateAdmin-NoMembers
           - ReviewCenter-ProjectService-CreateAdmin-NothingStored
+        tests:
+          - CoreSubsystem_CreateProject_NotSystemAdministrator_IsRefusedAndStoresNothing
 
       - id: ReviewCenter-Core-Projects-List
         title: >-

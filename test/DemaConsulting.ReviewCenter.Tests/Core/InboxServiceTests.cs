@@ -2165,9 +2165,9 @@ public class InboxServiceTests
     }
 
     /// <summary>
-    ///     Test that marking a review as seen leaves the record digest unchanged and that the inbox service has no
-    ///     audit trail to write to: neither a constructor parameter nor a field is an audit store or an audit service.
-    ///     The behavior over a real audit trail is shown by
+    ///     Test that marking a review as seen leaves the record digest unchanged and adds no audit entry: the review
+    ///     store that the inbox service reads and writes through receives no audit draft, so nothing reaches an audit
+    ///     trail by any route. The behavior over a real audit trail is shown by
     ///     <c>StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged</c>.
     /// </summary>
     [Fact]
@@ -2177,20 +2177,17 @@ public class InboxServiceTests
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
         var before = RecordDigest.Compute((await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!);
+        var auditDraftsBefore = world.Store.Audits.Count;
+        Assert.NotEqual(0, auditDraftsBefore);
 
         // Act
         var stored = await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 7, null, Ct);
 
-        // Assert: the state is stored, the digest is unchanged, and nothing of the service can reach an audit trail
+        // Assert: the state is stored, the digest is unchanged, and no audit draft was added
         Assert.True(stored);
+        Assert.Single(world.InboxStore.States);
         Assert.Equal(before, RecordDigest.Compute((await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!));
-        var parameters = typeof(InboxService).GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.ParameterType);
-        var fields = typeof(InboxService)
-            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
-            .Select(f => f.FieldType);
-        var dependencies = parameters.Concat(fields).ToList();
-        Assert.DoesNotContain(typeof(IAuditStore), dependencies);
-        Assert.DoesNotContain(typeof(AuditService), dependencies);
+        Assert.Equal(auditDraftsBefore, world.Store.Audits.Count);
     }
 
     /// <summary>

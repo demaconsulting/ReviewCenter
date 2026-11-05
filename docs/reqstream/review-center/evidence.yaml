@@ -112,6 +112,8 @@ sections:
         children:
           - ReviewCenter-AttestationService-Report-Excluded
           - ReviewCenter-AttestationService-Report-DigestCoverage
+        tests:
+          - AttestationService_GenerateAsync_QuestionThreadWithIncludedReply_PrintsDiscussionWithOnlyIncludedComments
 
       - id: ReviewCenter-Evidence-Document-Conclusion
         title: >-
