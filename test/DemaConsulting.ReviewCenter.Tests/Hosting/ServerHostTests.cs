@@ -1753,6 +1753,43 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that a visitor who is signed in is served a page that needs a signed-in user.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_SignedInUser_ProtectedPageIsServed()
+    {
+        // Arrange: the real pipeline and a visitor who has signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+
+        // Act: request a protected page
+        var response = await browser.Client.GetAsync("/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the page is served, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
+    /// <summary>
+    ///     Test that the health route is answered to a visitor who is not signed in, without a redirect to the
+    ///     login page.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin()
+    {
+        // Arrange: the real pipeline and a visitor who is not signed in
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request the health route
+        var response = await browser.Client.GetAsync(ServerHost.HealthPath, TestContext.Current.CancellationToken);
+
+        // Assert: answered directly, not redirected to the login page
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
+    /// <summary>
     ///     Test that the home page and the login page are open to an anonymous visitor.
     /// </summary>
     [Fact]

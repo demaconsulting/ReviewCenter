@@ -111,9 +111,12 @@ scenario is tested by `ServerHost_CreateApplication_IsolatedSettings_Constrained
 
 **ServerHost_CreateApplication_HealthRoute_Returns200Healthy**: The real pipeline is started on
 an in-memory server and the health route is requested; the response is 200 with the plain-text
-body `Healthy`. The 200 status serves the health route requirement; because the request carries no credentials, the
-same 200 also serves the requirement that the health route needs no sign-in. This scenario is tested by
-`ServerHost_CreateApplication_HealthRoute_Returns200Healthy`.
+body `Healthy`. This scenario is tested by `ServerHost_CreateApplication_HealthRoute_Returns200Healthy`.
+
+**ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin**: The real pipeline is started and the
+health route is requested by a visitor who is not signed in, with redirects not followed; the answer is 200 and
+carries no redirect location. This scenario is tested by
+`ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin`.
 
 **ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry**: The pipeline is started
 with an explicit URL; the captured start-up entry carries the URL as a named value that a log
@@ -578,6 +581,10 @@ folder nor a key file exists afterwards. This scenario is tested by
 address `/projects`. This scenario is tested by
 `ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
 
+**ServerHost_CreateApplication_SignedInUser_ProtectedPageIsServed**: The real pipeline is started and a user signs in;
+`/projects` is requested with that sign-in; the answer is 200 with no redirect location. This scenario is tested by
+`ServerHost_CreateApplication_SignedInUser_ProtectedPageIsServed`.
+
 **ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed**: The real pipeline is started and `/` and
 `/login` are requested without signing in; both are answered 200. This scenario is tested by
 `ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed`.
@@ -654,5 +661,6 @@ each requirement is:
   requirement.
 - `ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts`: the successful build serves the requirement
   that the start goes on, and the error with the counts and the remedy serves the requirement for the error entry.
-- `ServerHost_CreateApplication_HealthRoute_Returns200Healthy`: see above; the 200 status serves both the health route
-  requirement and the requirement that the route needs no sign-in, because the request carries no credentials.
+- `ServerHost_CreateApplication_HealthRoute_Returns200Healthy`: see above; the 200 status serves the health route
+  requirement. The requirement that the route needs no sign-in is also linked to it, because the request carries no
+  credentials, and has its own test `ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin`.

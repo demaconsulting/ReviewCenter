@@ -16,7 +16,8 @@ N/A - standard test environment.
 ### Acceptance Criteria
 
 - All integration tests pass with zero failures.
-- The health endpoint answers HTTP status 200 with the body `Healthy`.
+- The health endpoint answers HTTP status 200 with the body `Healthy`, also to a visitor who is not signed in.
+- A signed-in user is served a protected page.
 - The health route and the home route are both registered and answer.
 - Start-up writes a structured log entry with a named property, and framework logging reaches
   the same logger providers.
@@ -88,6 +89,15 @@ instance. This scenario is tested by `HostingSubsystem_Startup_DatabaseConfigure
 **HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin**: A host is started in memory and the client,
 which follows no redirect, requests `/projects` without signing in; the answer is a redirect to the sign-in page. This
 scenario is tested by `HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
+
+**HostingSubsystem_HealthEndpoint_NotSignedIn_IsNotRedirectedToLogin**: A host is started in memory and the client,
+which has no sign-in and follows no redirect, requests `/health`; the answer has HTTP status 200 and no redirect
+location. This scenario is tested by `HostingSubsystem_HealthEndpoint_NotSignedIn_IsNotRedirectedToLogin`.
+
+**HostingSubsystem_Pages_SignedInUser_ProtectedPageIsServed**: A host is started in memory and a user signs in; the
+user requests `/projects` and the answer has HTTP status 200 with no redirect location. This scenario is tested by
+`HostingSubsystem_Pages_SignedInUser_ProtectedPageIsServed`. The restart test signs in only as setup and is not
+evidence for this criterion.
 
 **HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed**: A host is started in memory and the client requests
 `/login` without signing in; the answer has HTTP status 200. This scenario is tested by

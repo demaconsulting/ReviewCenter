@@ -23,6 +23,7 @@ sections:
           signed in.
         tests:
           - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+          - ServerHost_CreateApplication_HealthRoute_NotSignedIn_IsNotRedirectedToLogin
 
       - id: ReviewCenter-ServerHost-Logging
         title: >-
@@ -199,6 +200,14 @@ sections:
           page cannot be left open by mistake.
         tests:
           - ServerHost_CreateApplication_AnonymousVisitor_ProtectedPageRedirectsToLogin
+
+      - id: ReviewCenter-ServerHost-Authentication-SignedIn
+        title: >-
+          The ServerHost class shall serve a protected page to a visitor who is signed in.
+        justification: |
+          Pages that are closed by default must still open for the user who has signed in, or nobody could work.
+        tests:
+          - ServerHost_CreateApplication_SignedInUser_ProtectedPageIsServed
 
       - id: ReviewCenter-ServerHost-Authentication-PublicPages
         title: >-

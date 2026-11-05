@@ -13,17 +13,26 @@ sections:
       - id: ReviewCenter-Hosting-Health
         title: >-
           The Hosting subsystem shall answer requests for the /health URL with HTTP status 200
-          and the text Healthy while the server is running, without sign-in.
+          and the text Healthy while the server is running.
         justification: |
           Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
-          simple, unauthenticated way to find out whether the service is up. The route
-          must answer without sign-in because a probe has no account.
+          simple way to find out whether the service is up.
         children:
           - ReviewCenter-ServerHost-Health
-          - ReviewCenter-ServerHost-Health-NoSignIn
         tests:
           - HostingSubsystem_HealthEndpoint_Requested_ReturnsHealthy
           - HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer
+
+      - id: ReviewCenter-Hosting-Health-NoSignIn
+        title: >-
+          The Hosting subsystem shall answer requests for the /health URL from a visitor who is not signed in
+          without redirecting to the login page.
+        justification: |
+          A probe has no account, while every other page of the server is closed to a visitor who is not signed in.
+        children:
+          - ReviewCenter-ServerHost-Health-NoSignIn
+        tests:
+          - HostingSubsystem_HealthEndpoint_NotSignedIn_IsNotRedirectedToLogin
 
       - id: ReviewCenter-Hosting-Health-Routes
         title: >-
@@ -165,6 +174,17 @@ sections:
           - ReviewCenter-ServerHost-Authentication-ProtectedPages
         tests:
           - HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin
+
+      - id: ReviewCenter-Hosting-Authentication-SignedIn
+        title: >-
+          The Hosting subsystem shall serve a page that needs a signed-in user, such as the projects page, to a
+          visitor who is signed in.
+        justification: |
+          Closing the pages to visitors who are not signed in would be useless if the signed-in user were refused too.
+        children:
+          - ReviewCenter-ServerHost-Authentication-SignedIn
+        tests:
+          - HostingSubsystem_Pages_SignedInUser_ProtectedPageIsServed
 
       - id: ReviewCenter-Hosting-Authentication-LoginPage
         title: >-

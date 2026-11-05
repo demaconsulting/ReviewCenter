@@ -6975,6 +6975,16 @@ sections:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
 
+      - id: ReviewCenter-System-Authorization-SignedIn
+        title: >-
+          The tool shall serve a page that needs a signed-in user to a user who is signed in.
+        tags: [system]
+        justification: |
+          Limiting access to identified people (21 CFR Part 11 section 11.10(d)) must not lock out the people who
+          have signed in.
+        children:
+          - ReviewCenter-Hosting-Authentication-SignedIn
+
       - id: ReviewCenter-System-Authorization-UserAdmin
         title: >-
           The tool shall refuse the user administration page to a user who is not a system administrator.
@@ -6992,6 +7002,7 @@ sections:
           The health probe and the login page must work without signing in, since nobody can sign in without them.
         children:
           - ReviewCenter-Identity-Authorization
+          - ReviewCenter-Hosting-Health-NoSignIn
         tests:
           - SignIn_PublicPage_Anonymous_IsServed
           - ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed
