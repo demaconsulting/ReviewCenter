@@ -16,62 +16,126 @@ sections:
     requirements:
       - id: ReviewCenter-Api-TokenJourney
         title: >-
-          The Api subsystem shall let a client that sends a valid personal access token as a bearer token or as an HTTP
-          Basic password call the API
-          as the owner of the token, refuse a missing, unknown, revoked, or expired token with one generic answer,
-          refuse too many refused tokens from one address, and record
-          each use that is refused without recording the token value, in the audit trail or in the log.
+          The Api subsystem shall let a client that sends a valid personal access token as a bearer token call the API
+          as the owner of the token.
         justification: |
           A script cannot sign in through a page, so it needs a credential that is easy to hand out and to take back.
-          Acting as the owner keeps every change attributable to a person. One answer for every refusal does not tell
-          somebody guessing tokens whether a token ever existed, a limit makes guessing slow, and an audit record
-          without the value lets an administrator see failed use without the log becoming a source of tokens.
+          Acting as the owner keeps every change attributable to a person.
         children:
           - ReviewCenter-ApiTokenAuthentication-Bearer
-          - ReviewCenter-ApiTokenAuthentication-Basic
           - ReviewCenter-ApiTokenAuthentication-LastUsed
+        tests:
+          - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
+
+      - id: ReviewCenter-Api-TokenJourney-Basic
+        title: >-
+          The Api subsystem shall let a client that sends a valid personal access token as the password of HTTP Basic
+          credentials call the API as the owner of the token.
+        justification: |
+          Some clients, such as ReviewMark, can send only HTTP Basic credentials, so the token must work there too.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-Basic
+        tests:
+          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
+
+      - id: ReviewCenter-Api-TokenJourney-Refusal
+        title: >-
+          The Api subsystem shall refuse a missing, unknown, revoked, or expired token with one generic answer.
+        justification: |
+          One answer for every refusal does not tell somebody guessing tokens whether a token ever existed.
+        children:
           - ReviewCenter-ApiTokenAuthentication-Refusal
           - ReviewCenter-ApiTokenAuthentication-Refusal-Challenge
           - ReviewCenter-ApiTokenAuthentication-Refusal-Generic
           - ReviewCenter-ApiTokenAuthentication-Refusal-Expired
           - ReviewCenter-ApiTokenAuthentication-Refusal-MustChangePassword
           - ReviewCenter-ApiTokenAuthentication-Refusal-BasicWrong
+        tests:
+          - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
+
+      - id: ReviewCenter-Api-TokenJourney-Throttle
+        title: >-
+          The Api subsystem shall refuse too many refused tokens from one client address.
+        justification: |
+          A limit makes guessing of tokens slow.
+        children:
           - ReviewCenter-ApiTokenAuthentication-Throttle
           - ReviewCenter-ApiTokenAuthentication-Throttle-RetryAfter
           - ReviewCenter-ApiTokenAuthentication-Throttle-AddressLimit
           - ReviewCenter-ApiTokenAuthentication-Throttle-Basic
+        tests:
+          - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
+
+      - id: ReviewCenter-Api-TokenJourney-FailureAudit
+        title: >-
+          The Api subsystem shall record each use of a refused token in the audit trail without the token value.
+        justification: |
+          An audit record without the value lets an administrator see failed use without the trail becoming a source
+          of tokens.
+        children:
           - ReviewCenter-ApiTokenAuthentication-FailureAudit
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-Basic
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-Once
           - ReviewCenter-ApiTokenAuthentication-FailureAudit-NoValue
-          - ReviewCenter-ApiTokenAuthentication-NoLog
         tests:
-          - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
+          - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+
+      - id: ReviewCenter-Api-TokenJourney-NoTokenInLog
+        title: >-
+          The Api subsystem shall never write the value of a token to the log.
+        justification: |
+          A log is read by more people than the tokens are meant for.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-NoLog
+
+      - id: ReviewCenter-Api-ReviewJourney-ListProjects
+        title: >-
+          The Api subsystem shall let a client with a valid token list the projects that the owner of the token may
+          see.
+        justification: |
+          A pipeline has to find the project that it files a review into without a person looking it up. Which
+          projects the owner may see is decided by ReviewCenter-Api-ProjectAccess-ListProjects.
+        children:
+          - ReviewCenter-ApiEndpoints-Read
+          - ReviewCenter-ApiEndpoints-Read-NoToken
+        tests:
+          - ApiEndpoints_ListProjects_Token_ReturnsProjects
 
       - id: ReviewCenter-Api-ReviewJourney
         title: >-
-          The Api subsystem shall let a client with a valid token list the projects the owner of the token may see and
-          the reviews of such a project, read
-          one review (hiding the standing of the reviewers from a token exactly where the pages hide it), create a
-          review draft from uploaded files or from the changes of a repository, mark a review
-          that was created this way, download the attestation of a concluded review, report an invalid request or a
-          refused rule as a problem document that names the cause, refuse a body that is too large or beyond the
-          review limits, and answer an address that does not exist with a
-          JSON problem document.
+          The Api subsystem shall let a client with a valid token list the reviews of a project that the owner of the
+          token may see.
         justification: |
           Creating a draft for every pull request from a pipeline and fetching the attestation after sign-off are
-          the reasons to have an API. The same rules as for the web pages keep the record consistent, a mark on the
-          review keeps a draft created by a script visible to the reviewers, and a machine readable problem document
-          lets a script act on an error without parsing text.
+          the reasons to have an API. The same rules as for the web pages keep the record consistent.
         children:
-          - ReviewCenter-ApiEndpoints-Read
           - ReviewCenter-ApiEndpoints-Read-Reviews
           - ReviewCenter-ApiEndpoints-Read-ReviewsNotFound
+          - ReviewCenter-ApiEndpoints-Read-NoToken
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-ReviewJourney-Read
+        title: >-
+          The Api subsystem shall let a client with a valid token read one review of a project that the owner of the
+          token may see.
+        justification: |
+          A script that decides what to do with a pull request needs the state of its review.
+        children:
           - ReviewCenter-ApiEndpoints-Read-Details
           - ReviewCenter-ApiEndpoints-Read-DetailsNotFound
           - ReviewCenter-ApiEndpoints-Read-CheckThreadCounts
           - ReviewCenter-ApiEndpoints-Read-ThreadKinds
-          - ReviewCenter-ApiEndpoints-Read-NoToken
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-ReviewJourney-Masking
+        title: >-
+          The Api subsystem shall hide the standing of the reviewers from a token exactly where the pages hide it.
+        justification: |
+          A token must not show what the page keeps back, or a script could be used to see the ballots of other
+          reviewers before a reviewer has handed in their own.
+        children:
           - ReviewCenter-ApiEndpoints-Masking
           - ReviewCenter-ApiEndpoints-Masking-LeadOrOwner
           - ReviewCenter-ApiEndpoints-Masking-SubmittedOwner
@@ -85,13 +149,58 @@ sections:
           - ReviewCenter-ApiEndpoints-Masking-AgreedFailSubmitted
           - ReviewCenter-ApiEndpoints-Masking-NextStep
           - ReviewCenter-ApiEndpoints-Masking-NextStepMasked
+
+      - id: ReviewCenter-Api-ReviewJourney-CreateUpload
+        title: >-
+          The Api subsystem shall let a client with a valid token create a review draft from uploaded files.
+        justification: |
+          A pipeline that creates a draft for every pull request is the main reason to have an API.
+        children:
           - ReviewCenter-ApiEndpoints-Create
-          - ReviewCenter-ApiEndpoints-Create-Flag
           - ReviewCenter-ApiEndpoints-Create-Audit
+          - ReviewCenter-ApiEndpoints-Create-NoToken
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-ReviewJourney-CreateRepository
+        title: >-
+          The Api subsystem shall let a client with a valid token create a review draft from the changes of a
+          repository.
+        justification: |
+          A pipeline can name two revisions instead of sending the files itself.
+        children:
           - ReviewCenter-ApiEndpoints-Create-Repository
           - ReviewCenter-ApiEndpoints-Create-AllChanges
           - ReviewCenter-ApiEndpoints-Create-Skipped
-          - ReviewCenter-ApiEndpoints-Create-NoToken
+
+      - id: ReviewCenter-Api-ReviewJourney-Marked
+        title: >-
+          The Api subsystem shall mark a review that was created through the API.
+        justification: |
+          A mark on the review keeps a draft created by a script visible to the reviewers.
+        children:
+          - ReviewCenter-ApiEndpoints-Create-Flag
+
+      - id: ReviewCenter-Api-ReviewJourney-Attestation
+        title: >-
+          The Api subsystem shall let a client with a valid token download the attestation of a concluded review.
+        justification: |
+          Fetching the attestation after sign-off is a reason to have an API.
+        children:
+          - ReviewCenter-ApiEndpoints-Attestation
+          - ReviewCenter-ApiEndpoints-Attestation-NotFound
+          - ReviewCenter-ApiEndpoints-Attestation-NotSigned
+          - ReviewCenter-ApiEndpoints-Attestation-NoToken
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-ReviewJourney-ProblemDocument
+        title: >-
+          The Api subsystem shall report an invalid request or a refused rule as a problem document that names the
+          cause.
+        justification: |
+          A machine readable problem document lets a script act on an error without parsing text.
+        children:
           - ReviewCenter-ApiEndpoints-Validation
           - ReviewCenter-ApiEndpoints-Validation-Base64
           - ReviewCenter-ApiEndpoints-Validation-EmptyBody
@@ -106,6 +215,13 @@ sections:
           - ReviewCenter-ApiEndpoints-Validation-ConclusionRequired
           - ReviewCenter-ApiEndpoints-Validation-InvalidInput
           - ReviewCenter-ApiEndpoints-Validation-ChecklistInvalid
+
+      - id: ReviewCenter-Api-ReviewJourney-Limits
+        title: >-
+          The Api subsystem shall refuse a body that is too large or beyond the review limits.
+        justification: |
+          A limit on what one request may carry keeps a single client from exhausting the memory of the service.
+        children:
           - ReviewCenter-ApiEndpoints-Limits
           - ReviewCenter-ApiEndpoints-Limits-BodySize
           - ReviewCenter-ApiEndpoints-Limits-FileCount
@@ -114,87 +230,150 @@ sections:
           - ReviewCenter-ApiEndpoints-Limits-DecodeCount
           - ReviewCenter-ApiEndpoints-Limits-DecodeLength
           - ReviewCenter-ApiEndpoints-Limits-DecodeOrder
-          - ReviewCenter-ApiEndpoints-Attestation
-          - ReviewCenter-ApiEndpoints-Attestation-NotFound
-          - ReviewCenter-ApiEndpoints-Attestation-NotSigned
-          - ReviewCenter-ApiEndpoints-Attestation-NoToken
+
+      - id: ReviewCenter-Api-ReviewJourney-UnknownAddress
+        title: >-
+          The Api subsystem shall answer an address that does not exist with a JSON problem document.
+        justification: |
+          A script that calls a wrong address must be able to read the answer in the same way as any other error.
+        children:
           - ReviewCenter-ApiEndpoints-Errors
-        tests:
-          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
 
       - id: ReviewCenter-Api-DueDate
         title: >-
           The Api subsystem shall let a client with a valid token give a review an optional due date, a calendar day
-          in UTC, in the request that creates it, refuse a date that is not valid with a problem document, creating
-          nothing, and show the due date and whether the review is overdue in the reviews that it returns.
+          in UTC, in the request that creates it.
         justification: |
-          A pipeline that creates a draft for every pull request knows when the change is expected to be reviewed,
-          and a script that polls the reviews must see which are late without reading a page.
+          A pipeline that creates a draft for every pull request knows when the change is expected to be reviewed.
         children:
           - ReviewCenter-ApiEndpoints-CreateDueDate
           - ReviewCenter-ApiEndpoints-CreateDueDate-Audit
-          - ReviewCenter-ApiEndpoints-CreateDueDate-List
-          - ReviewCenter-ApiEndpoints-CreateDueDate-OverdueFlag
-          - ReviewCenter-ApiEndpoints-CreateDueDate-Invalid
         tests:
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
+      - id: ReviewCenter-Api-DueDate-Invalid
+        title: >-
+          The Api subsystem shall refuse a due date that is not valid with a problem document, creating nothing.
+        justification: |
+          A review created with a date that was silently dropped would be late without anybody knowing.
+        children:
+          - ReviewCenter-ApiEndpoints-CreateDueDate-Invalid
+        tests:
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
+
+      - id: ReviewCenter-Api-DueDate-Shown
+        title: >-
+          The Api subsystem shall show the due date and whether the review is overdue in the reviews that it returns.
+        justification: |
+          A script that polls the reviews must see which are late without reading a page.
+        children:
+          - ReviewCenter-ApiEndpoints-CreateDueDate-List
+          - ReviewCenter-ApiEndpoints-CreateDueDate-OverdueFlag
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
 
       - id: ReviewCenter-Api-Progress
         title: >-
           The Api subsystem shall show in every review of the list of the reviews of a project whether it is approved,
           how many reviewer slots and valid and out-of-date signatures it has, when it last changed, its due date and
-          whether it is overdue, from the same service as the project page, and shall only add these fields.
+          whether it is overdue.
         justification: |
-          A script that watches a project must see the same progress as a person who opens the project page, and an
-          added field must not break a client that already reads the list.
+          A script that watches a project must see the same progress as a person who opens the project page.
         children:
           - ReviewCenter-ApiEndpoints-ListProgress
-          - ReviewCenter-ApiEndpoints-ListProgress-ReadOnce
           - ReviewCenter-ApiEndpoints-ListProgress-Outcome
         tests:
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
+
+      - id: ReviewCenter-Api-Progress-SameService
+        title: >-
+          The Api subsystem shall take the progress of the reviews of a project from the same service as the project
+          page.
+        justification: |
+          One service for both keeps the numbers of the API and of the page from drifting apart.
+        children:
+          - ReviewCenter-ApiEndpoints-ListProgress-ReadOnce
+        tests:
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
+
+      - id: ReviewCenter-Api-Progress-OnlyAdditive
+        title: >-
+          The Api subsystem shall only add fields to the list of the reviews of a project.
+        justification: |
+          An added field must not break a client that already reads the list.
+        tests:
           - ApiDocument_Get_MatchesCommittedSnapshot
 
       - id: ReviewCenter-Api-ReadOnlyRole
         title: >-
-          The Api subsystem shall let a token of a member whose role is Auditor read what the member may see and refuse
-          every change by it with a problem document, and shall answer a token of a user who is no member of the project
-          as for a project that does not exist.
+          The Api subsystem shall let a token of a member whose role is Auditor read what the member may see.
         justification: |
-          A script that acts for an auditor must be as read-only as the auditor, and must not reveal which projects
-          exist.
+          A script that acts for an auditor must see what the auditor sees.
         children:
           - ReviewCenter-ApiEndpoints-ReadOnlyRole
-          - ReviewCenter-ApiEndpoints-ReadOnlyRole-Auditor403
-          - ReviewCenter-ApiEndpoints-ReadOnlyRole-NonMember404
           - ReviewCenter-ApiEndpoints-ReadOnlyRole-OpenWork
         tests:
           - ApiAuditor_Reads_Token_ServeTheProject
+
+      - id: ReviewCenter-Api-ReadOnlyRole-Refused
+        title: >-
+          The Api subsystem shall refuse every change by a token of a member whose role is Auditor with a problem
+          document.
+        justification: |
+          A script that acts for an auditor must be as read-only as the auditor.
+        children:
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole-Auditor403
+        tests:
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+
+      - id: ReviewCenter-Api-ReadOnlyRole-NonMember
+        title: >-
+          The Api subsystem shall answer a token of a user who is no member of the project as for a project that does
+          not exist.
+        justification: |
+          A script must not be able to find out which projects exist.
+        children:
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole-NonMember404
+        tests:
           - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
 
       - id: ReviewCenter-Api-FollowUp
         title: >-
           The Api subsystem shall let a client with a valid token create a review as a follow-up of an earlier review
-          of the project by naming it in the request that creates the review, refuse a review that cannot be followed
-          with a problem document, creating nothing, and show the followed review in the reviews that it returns.
+          of the project by naming it in the request that creates the review.
         justification: |
           A pipeline that creates the next draft after a failed review must be able to carry over the work that was
-          fine, and a script that polls the reviews must see which ones are follow-ups without reading a page.
+          fine.
         children:
           - ReviewCenter-ApiEndpoints-CreateFollowUp
-          - ReviewCenter-ApiEndpoints-CreateFollowUp-Shown
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+
+      - id: ReviewCenter-Api-FollowUp-Invalid
+        title: >-
+          The Api subsystem shall refuse a review that cannot be followed with a problem document, creating nothing.
+        justification: |
+          A follow-up of a review that cannot be followed would carry over nothing and hide the mistake.
+        children:
           - ReviewCenter-ApiEndpoints-CreateFollowUp-Invalid
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+
+      - id: ReviewCenter-Api-FollowUp-Shown
+        title: >-
+          The Api subsystem shall show the followed review in the reviews that it returns.
+        justification: |
+          A script that polls the reviews must see which ones are follow-ups without reading a page.
+        children:
+          - ReviewCenter-ApiEndpoints-CreateFollowUp-Shown
         tests:
           - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
 
       - id: ReviewCenter-Api-EvidenceJourney
         title: >-
           The Api subsystem shall let ReviewMark read the evidence index of a project and follow the file address of an
-          entry with a personal access token that it sends as the password of HTTP Basic credentials, and shall refuse
-          the token once it is revoked. A project may also open the index and its files to a client without credentials
-          (see AnonymousEvidence).
+          entry with a personal access token that it sends as the password of HTTP Basic credentials. A project may
+          also open the index and its files to a client without credentials (see AnonymousEvidence).
         justification: |
           ReviewMark can send only HTTP Basic credentials. Accepting the token that way, with the same checks and the
           same refusal as a bearer token, lets a pipeline verify the reviews against ReviewCenter without a second
@@ -214,94 +393,160 @@ sections:
         tests:
           - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
 
+      - id: ReviewCenter-Api-EvidenceJourney-Revoked
+        title: >-
+          The Api subsystem shall refuse a personal access token that was used to read the evidence index once it is
+          revoked.
+        justification: |
+          A token that is taken back must stop working for the pipeline at once.
+        tests:
+          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
+
       - id: ReviewCenter-Api-Isolation
         title: >-
           The Api subsystem shall keep a token to the API: a token shall not sign a review or change the reviewers of
-          a review, shall not sign in to a web page or to the sign-in endpoints, and a session cookie shall not be
-          accepted by the API.
+          a review.
         justification: |
           A signature must prove that the person was present, which a stored secret does not. A token that could
-          sign, or that could open the web pages, would turn a leaked token into the identity of the person, and a
-          cookie accepted by the API would open it to forgery from other sites.
+          sign would turn a leaked token into the identity of the person.
         children:
-          - ReviewCenter-ApiTokenAuthentication-Cookie
-          - ReviewCenter-ApiTokenAuthentication-Cookie-WebPage
-          - ReviewCenter-ApiTokenAuthentication-Cookie-AuthAndBlazor
           - ReviewCenter-ApiEndpoints-NoSigning
         tests:
           - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
 
+      - id: ReviewCenter-Api-Isolation-NoWebPages
+        title: >-
+          The Api subsystem shall not let a token sign in to a web page or to the sign-in endpoints.
+        justification: |
+          A token that could open the web pages would turn a leaked token into the identity of the person.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-Cookie-WebPage
+        tests:
+          - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
+
+      - id: ReviewCenter-Api-Isolation-NoCookie
+        title: >-
+          The Api subsystem shall not accept a session cookie for the API.
+        justification: |
+          A cookie accepted by the API would open it to forgery from other sites.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-Cookie
+          - ReviewCenter-ApiTokenAuthentication-Cookie-AuthAndBlazor
+
       - id: ReviewCenter-Api-LockedReview
         title: >-
           The Api subsystem shall keep a review that is approved and locked readable to a client with a valid token,
-          with its attestation and its evidence index, shall report a change that the lock refuses, or that would make
-          a signature out of date without acknowledgement, or that a review rule of the project refuses, as a problem
-          document with status 409, and shall not let a token reopen a review.
+          with its attestation and its evidence index.
         justification: |
-          The approved record is what pipelines and auditors read, so the lock must not hide it, while a script that
-          tries to change it must learn the reason in a form it can act on.
+          The approved record is what pipelines and auditors read, so the lock must not hide it.
         children:
           - ReviewCenter-ApiEndpoints-LockedReview
+        tests:
+          - ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409
+
+      - id: ReviewCenter-Api-LockedReview-Conflict409
+        title: >-
+          The Api subsystem shall report a change that the lock refuses, or that would make a signature out of date
+          without acknowledgement, or that a review rule of the project refuses, as a problem document with status 409.
+        justification: |
+          A script that tries to change an approved review must learn the reason in a form it can act on.
+        children:
           - ReviewCenter-ApiEndpoints-OutOfDateConflict
           - ReviewCenter-ApiEndpoints-RuleConflict
         tests:
           - ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409
 
+      - id: ReviewCenter-Api-LockedReview-NoReopen
+        title: >-
+          The Api subsystem shall not let a token reopen a review.
+        justification: |
+          Reopening withdraws an approval, which must stay a decision of a person who is signed in.
+        tests:
+          - ApiSubsystem_LockedReview_TokenCannotReopen
+
       - id: ReviewCenter-Api-Document
         title: >-
-          The Api subsystem shall describe the API in an OpenAPI document, served without a token, that names the
-          bearer scheme, marks the two operations that can be called without credentials, is the same for every server
-          start, and matches the document that is kept with the documentation.
+          The Api subsystem shall describe the API in an OpenAPI document that is served without a token.
         justification: |
-          A client generator and a person reading the documentation both need the contract of the API. A document
-          that is committed and compared with the running server is kept from drifting away from the behavior.
+          A client generator and a person reading the documentation both need the contract of the API.
         children:
           - ReviewCenter-ApiDocument-Document
           - ReviewCenter-ApiDocument-Document-Version
           - ReviewCenter-ApiDocument-Document-NoServer
-          - ReviewCenter-ApiDocument-Document-Scheme
-          - ReviewCenter-ApiDocument-Document-OpenOperations
           - ReviewCenter-ApiDocument-Document-RequiredMembers
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-Api-Document-Scheme
+        title: >-
+          The Api subsystem shall name the bearer scheme in the OpenAPI document.
+        justification: |
+          A client generator must know how to send the token.
+        children:
+          - ReviewCenter-ApiDocument-Document-Scheme
+          - ReviewCenter-OTS-OpenApi-Document-SecurityScheme
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-Api-Document-AnonymousOperations
+        title: >-
+          The Api subsystem shall mark the two operations that can be called without credentials in the OpenAPI
+          document.
+        justification: |
+          A client generator must not ask for a token where none is needed.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-Api-Document-Stable
+        title: >-
+          The Api subsystem shall give the same OpenAPI document at every server start.
+        justification: |
+          A document that changes between starts cannot be committed and compared.
+        children:
+          - ReviewCenter-OTS-OpenApi-Document-Stable
+        tests:
+          - ApiDocument_Get_MatchesCommittedSnapshot
+
+      - id: ReviewCenter-Api-Document-Snapshot
+        title: >-
+          The Api subsystem shall match the OpenAPI document that it serves with the document that is kept with the
+          documentation.
+        justification: |
+          A document that is committed and compared with the running server is kept from drifting away from the
+          behavior.
+        children:
           - ReviewCenter-ApiDocument-Snapshot
           - ReviewCenter-ApiDocument-Snapshot-Committed
           - ReviewCenter-OTS-OpenApi-Document
-          - ReviewCenter-OTS-OpenApi-Document-SecurityScheme
-          - ReviewCenter-OTS-OpenApi-Document-Stable
         tests:
-          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
           - ApiDocument_Get_MatchesCommittedSnapshot
 
       - id: ReviewCenter-Api-ProjectAccess
         title: >-
-          The Api subsystem shall answer a request for a project, or for anything in a project, with the owner of the
-          token being neither a member of the project nor a system administrator, with the 404 that it answers for a
-          project that does not exist, with the same body, on every route of a project and for a bearer token as well as
-          for HTTP Basic credentials, list only the projects the owner may see, serve a member and a system
-          administrator, and stop serving a token for a project at once when its owner is removed from it. A request
-          without credentials is decided by the project (see AnonymousEvidence).
+          The Api subsystem shall answer a request for a project, or for anything in a project, from a token whose owner
+          is neither a member of the project nor a system administrator with the 404 that it answers for a project that
+          does not exist.
         justification: |
           A project may hold confidential work, and a script that holds a token must see only what its owner sees. An
           answer that differed between a project the owner may not see and a project that does not exist would tell
-          the script which projects exist. The token carries no copy of the memberships, so a change of them takes
-          effect with the next request.
+          the script which projects exist. The body, the routes and the token schemes (SameAnswer), the access of
+          members and administrators (Served), the list of projects (ListProjects), the effect of a removal
+          (Removed), the checklist (Checklist) and a request without credentials (AnonymousEvidence) are separate
+          requirements.
         children:
           - ReviewCenter-ApiEndpoints-ProjectAccess
           - ReviewCenter-ApiEndpoints-ProjectAccess-Create
-          - ReviewCenter-ApiEndpoints-EvidenceIndex
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-OnlyPlanned
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-Result
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-File
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-UrlBuild
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-RequestHost
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-Basic
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoStore
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-Empty
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-UnknownProject
-          - ReviewCenter-ApiEndpoints-EvidenceIndex-NoToken
-          - ReviewCenter-ApiEndpoints-Attestation
-          - ReviewCenter-ApiEndpoints-Attestation-NotFound
-          - ReviewCenter-ApiEndpoints-Attestation-NotSigned
-          - ReviewCenter-ApiEndpoints-Attestation-NoToken
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+
+      - id: ReviewCenter-Api-ProjectAccess-Checklist
+        title: >-
+          The Api subsystem shall serve the checklist of a project to the token of a member of the project and shall
+          answer a token of a non-member, an unknown project, and a missing token as for any other route of a project.
+        justification: |
+          A script that prepares a review must read the checklist that the reviewers will answer, and the route must
+          not tell it which projects exist.
+        children:
           - ReviewCenter-ApiEndpoints-Checklist
           - ReviewCenter-ApiEndpoints-Checklist-Custom
           - ReviewCenter-ApiEndpoints-Checklist-EmptyHint
@@ -310,10 +555,8 @@ sections:
           - ReviewCenter-ApiEndpoints-Checklist-Unreadable
           - ReviewCenter-ApiEndpoints-Checklist-NoToken
         tests:
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
-          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
-          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+          - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+          - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
 
       - id: ReviewCenter-Api-ProjectAccess-SameAnswer
         title: >-
@@ -357,21 +600,14 @@ sections:
 
       - id: ReviewCenter-Api-AuditExport
         title: >-
-          The Api subsystem shall let a signed-in user who may read the audit trail (a project admin or a system
-          administrator for a project, a system administrator for the whole trail) download the trail that matches
-          a filter as CSV or JSON from a cookie-authenticated route, with the state of the chain in the response
-          headers, refuse everybody else as the audit pages do and a request without a session, and keep these
-          routes out of the token API and its OpenAPI document.
+          The Api subsystem shall let a signed-in user who may read the audit trail download the trail that matches
+          a filter as CSV or JSON from a cookie-authenticated route.
         justification: |
-          An auditor needs a copy of the trail that can be kept and checked elsewhere, and the export of a trail that
-          names every user and action must be limited like the page that shows it.
+          An auditor needs a copy of the trail that can be kept and checked elsewhere.
         children:
           - ReviewCenter-ApiEndpoints-AuditExport
           - ReviewCenter-ApiEndpoints-AuditExport-FileName
-          - ReviewCenter-ApiEndpoints-AuditExport-Chain
           - ReviewCenter-ApiEndpoints-AuditExport-NoStore
-          - ReviewCenter-ApiEndpoints-AuditExport-System
-          - ReviewCenter-ApiEndpoints-AuditExport-WholeTrail
           - ReviewCenter-ApiEndpoints-AuditExport-Json
           - ReviewCenter-ApiEndpoints-AuditExport-JsonEnvelope
           - ReviewCenter-ApiEndpoints-AuditExport-Filter
@@ -379,66 +615,124 @@ sections:
           - ReviewCenter-ApiEndpoints-AuditExport-Audited
           - ReviewCenter-ApiEndpoints-AuditExport-ProjectRouteScope
           - ReviewCenter-ApiEndpoints-AuditExport-GlobalScope
-          - ReviewCenter-ApiEndpoints-AuditExport-Forbidden
-          - ReviewCenter-ApiEndpoints-AuditExport-NotFound
-          - ReviewCenter-ApiEndpoints-AuditExport-Auditor
-          - ReviewCenter-ApiEndpoints-AuditExport-SignedOut
-          - ReviewCenter-ApiEndpoints-AuditExport-GlobalRefused
           - ReviewCenter-ApiEndpoints-AuditExport-Hostile
           - ReviewCenter-ApiEndpoints-AuditExport-UnknownFormat
-          - ReviewCenter-ApiEndpoints-AuditExport-Broken
-          - ReviewCenter-ApiEndpoints-AuditExport-NotInApiDocument
           - ReviewCenter-ApiEndpoints-AuditExport-ClientAbort
           - ReviewCenter-ApiEndpoints-AuditExport-WriteFailure
         tests:
           - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-Api-AuditExport-ChainHeaders
+        title: >-
+          The Api subsystem shall send the state of the audit chain in the response headers of an audit export.
+        justification: |
+          A copy of the trail is worth keeping only when the reader can tell at once whether the chain was intact.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport-Chain
+          - ReviewCenter-ApiEndpoints-AuditExport-Broken
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-Api-AuditExport-Allowed
+        title: >-
+          The Api subsystem shall let a project admin, an auditor of the project, or a system administrator export the
+          trail of a project, and a system administrator the whole trail.
+        justification: |
+          The export of a trail that names every user and action must be open to the people who may read the page
+          that shows it.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport-System
+          - ReviewCenter-ApiEndpoints-AuditExport-WholeTrail
+          - ReviewCenter-ApiEndpoints-AuditExport-Auditor
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+
+      - id: ReviewCenter-Api-AuditExport-Refused
+        title: >-
+          The Api subsystem shall refuse an audit export to everybody else as the audit pages do.
+        justification: |
+          The export of a trail that names every user and action must not be open to people who may not read the page
+          that shows it.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport-Forbidden
+          - ReviewCenter-ApiEndpoints-AuditExport-NotFound
+          - ReviewCenter-ApiEndpoints-AuditExport-GlobalRefused
+        tests:
           - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
           - AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403
+
+      - id: ReviewCenter-Api-AuditExport-NoSession
+        title: >-
+          The Api subsystem shall refuse an audit export for a request without a session.
+        justification: |
+          The export is for people who are signed in, so a request without a session is sent to sign in.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport-SignedOut
+
+      - id: ReviewCenter-Api-AuditExport-NotInApi
+        title: >-
+          The Api subsystem shall keep the audit export routes out of the token API and its OpenAPI document.
+        justification: |
+          A token must not read the trail, and a route that cannot be used with a token does not belong in the
+          contract of the API.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport-NotInApiDocument
 
       - id: ReviewCenter-Api-AnonymousEvidence
         title: >-
           The Api subsystem shall let a project open its evidence index and its attestation PDFs to a client without
-          credentials, each by its own setting that is off by default, and no other route; shall refuse a client
-          without credentials as it refuses a missing token when the setting is off, whether or not the project
-          exists; shall never treat a request with a wrong token as a request without credentials; shall limit such
-          a client by address; shall record such a release of an attestation in the audit trail with the actor
-          anonymous; and shall describe the two routes in the OpenAPI document as callable without credentials.
+          credentials, each by its own setting that is off by default.
         justification: |
           Evidence is useful when a pipeline or an auditor can read it without an account, but whether a project
-          publishes it is the decision of the project. The exception must be narrow, switched off by default, no
-          different for a project that does not exist, limited by address, and visible in the audit trail and in the
-          contract of the API.
+          publishes it is the decision of the project, so each route has its own setting that is off by default. The
+          refusal when a setting is off, the wrong-token rule, the routes that stay closed, the limit by address, the
+          audit trail and the contract of the API are separate requirements.
         children:
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-Open
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnRoute
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OwnProject
-          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-TurnedOff
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-OtherRoutes
           - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-AttestationPage
-          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-WrongToken
-          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-ValidToken
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-PerAddress
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-NewWindow
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-RetryAfter
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Capacity
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictExpired
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictOldest
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Renewed
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ClockBack
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Concurrent
-          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ConcurrentCapacity
-          - ReviewCenter-ApiDocument-Document
-          - ReviewCenter-ApiDocument-Document-Version
-          - ReviewCenter-ApiDocument-Document-NoServer
-          - ReviewCenter-ApiDocument-Document-Scheme
-          - ReviewCenter-ApiDocument-Document-OpenOperations
-          - ReviewCenter-ApiDocument-Document-RequiredMembers
         tests:
           - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
           - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
-          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
+
+      - id: ReviewCenter-Api-AnonymousEvidence-OffRefused
+        title: >-
+          The Api subsystem shall refuse a client without credentials as it refuses a missing token when the setting is
+          off, whether or not the project exists.
+        justification: |
+          An answer that differed for a project that does not exist would tell a stranger which projects exist, and a
+          setting that is turned off must close the route at once.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-TurnedOff
+        tests:
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+
+      - id: ReviewCenter-Api-AnonymousEvidence-WrongToken
+        title: >-
+          The Api subsystem shall never treat a request with a wrong token as a request without credentials.
+        justification: |
+          A script that sends a wrong token has made a mistake that it must learn about, not get an answer as a
+          stranger would.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-WrongToken
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence-ValidToken
+        tests:
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+
+      - id: ReviewCenter-Api-AnonymousEvidence-OpenApi
+        title: >-
+          The Api subsystem shall describe the two routes that can be called without credentials in the OpenAPI
+          document as callable without credentials.
+        justification: |
+          The exception must be visible in the contract of the API, so that a client generator does not ask for a token
+          where none is needed.
+        children:
+          - ReviewCenter-ApiDocument-Document-OpenOperations
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
 
       - id: ReviewCenter-Api-AnonymousEvidence-OpenRoutes
         title: >-
@@ -487,6 +781,17 @@ sections:
         justification: |
           An anonymous attestation costs a signature and the caller has no account to hold responsible, but a member
           who is signed in with a token must not be locked out by the requests of strangers.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-PerAddress
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-NewWindow
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Capacity
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictExpired
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-EvictOldest
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Renewed
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ClockBack
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-Concurrent
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-ConcurrentCapacity
         tests:
           - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
 
@@ -496,5 +801,7 @@ sections:
           it has to wait.
         justification: |
           A script must know when it may try again.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit-RetryAfter
         tests:
           - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
