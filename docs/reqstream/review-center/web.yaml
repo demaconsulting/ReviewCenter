@@ -122,15 +122,37 @@ sections:
 
       - id: ReviewCenter-Web-HomePage-ClientScript
         title: >-
-          The Web subsystem shall load the interactive client script and its browser helpers in the HTML document of
-          every page.
+          The Web subsystem shall load the interactive client script in the HTML document of every page.
         justification: |
-          Interactive pages need the client script and its helpers (copy, focus, Ctrl+Enter) in the document, or the
-          live connection and the shortcuts would not work on any page.
+          Interactive pages need the client script in the document, or the live connection would not work on any page.
         children:
           - ReviewCenter-App-Shell-ClientScript
+
+      - id: ReviewCenter-Web-HomePage-ClientCopyHelper
+        title: >-
+          The Web subsystem shall define in the HTML document of every page the browser helper that copies text to the
+          clipboard.
+        justification: |
+          Copy buttons of all pages must behave the same, so one helper is shared.
+        children:
           - ReviewCenter-App-Shell-CopyHelper
+
+      - id: ReviewCenter-Web-HomePage-ClientFocusHelper
+        title: >-
+          The Web subsystem shall define in the HTML document of every page the browser helper that moves the focus to
+          a field by its test id.
+        justification: |
+          Pages that move the focus after an update need one shared way to do it.
+        children:
           - ReviewCenter-App-Shell-FocusHelper
+
+      - id: ReviewCenter-Web-HomePage-ClientCtrlEnter
+        title: >-
+          The Web subsystem shall define in the HTML document of every page the keyboard shortcut that presses the
+          submit button of a comment field when Ctrl+Enter is pressed in it.
+        justification: |
+          A keyboard user submits a text form the same way on every page.
+        children:
           - ReviewCenter-App-Shell-CtrlEnterShortcut
 
       - id: ReviewCenter-Web-HomePage-Tagline
@@ -167,12 +189,19 @@ sections:
 
       - id: ReviewCenter-Web-Help-HeaderLink
         title: >-
-          The Web subsystem shall show in the header of every page a link to the help, before the sign-in link when
-          nobody is signed in.
+          The Web subsystem shall show in the header of every page a link to the help.
         justification: |
           A visitor who is stuck, including one who cannot sign in yet, finds the Help from every page.
         children:
           - ReviewCenter-App-HelpLink
+
+      - id: ReviewCenter-Web-Help-HeaderLinkBeforeSignIn
+        title: >-
+          The Web subsystem shall place the link to the help before the sign-in link in the header when nobody is signed
+          in.
+        justification: |
+          A visitor who cannot sign in yet must meet the Help before the sign-in link.
+        children:
           - ReviewCenter-App-HelpLink-BeforeSignIn
 
       - id: ReviewCenter-Web-Help-About
@@ -318,13 +347,20 @@ sections:
 
       - id: ReviewCenter-Web-Projects-Empty
         title: >-
-          The Web subsystem shall tell a user who may see no project that there are no projects, and why when the user
-          is a member of none.
+          The Web subsystem shall tell a user who may see no project that there are no projects.
         justification: |
-          An empty list without a word looks like a failure. The message, and the reason for a user who no
-          administrator has added yet, tell the user what to do next.
+          An empty list without a word looks like a failure. The message tells the user that the list is empty on
+          purpose.
         children:
           - ReviewCenter-ProjectsPage-List-Empty
+
+      - id: ReviewCenter-Web-Projects-EmptyReason
+        title: >-
+          The Web subsystem shall tell a user who is a member of no project that the list is empty because no
+          administrator added the user.
+        justification: |
+          The reason for a user who no administrator has added yet tells the user what to do next.
+        children:
           - ReviewCenter-ProjectsPage-Visibility-EmptyReason
 
       - id: ReviewCenter-Web-Projects-NewButton
@@ -352,20 +388,41 @@ sections:
         title: >-
           The Web subsystem shall serve a page at /projects/new that holds the project creation form.
         justification: |
-          A page of its own for the form keeps the project list short and gives the creation a plain address.
+          A page of its own for the form gives the creation a plain address.
+        children:
+          - ReviewCenter-ProjectsPage-NewForm-FormPage
+
+      - id: ReviewCenter-Web-Projects-NewPageNotInList
+        title: >-
+          The Web subsystem shall keep the project creation form off the project list.
+        justification: |
+          A form in the list would make the list long and would invite a creation by mistake.
         children:
           - ReviewCenter-ProjectsPage-NewForm-NotInList
-          - ReviewCenter-ProjectsPage-NewForm-FormPage
+
+      - id: ReviewCenter-Web-Projects-NewPageCancel
+        title: >-
+          The Web subsystem shall offer on the page for a new project a Cancel link back to the project list.
+        justification: |
+          A user who does not want to create a project must be able to leave the form without a detour.
+        children:
           - ReviewCenter-ProjectsPage-NewForm-Cancel
 
       - id: ReviewCenter-Web-Projects-NewPageCreate
         title: >-
           The Web subsystem shall create a project from the name and the description entered on the page for a new
-          project and show its page.
+          project.
         justification: |
-          The form exists to create the project, and the user continues at the page of the project just created.
+          The form exists to create the project, so that users can start a new body of work without any other tool.
         children:
           - ReviewCenter-ProjectsPage-Create
+
+      - id: ReviewCenter-Web-Projects-NewPageOpens
+        title: >-
+          The Web subsystem shall show the page of the new project once the project has been created.
+        justification: |
+          The user continues at the page of the project just created.
+        children:
           - ReviewCenter-ProjectsPage-Create-Opens
 
       - id: ReviewCenter-Web-Projects-NewPageError
@@ -632,12 +689,21 @@ sections:
 
       - id: ReviewCenter-Web-ProjectAccess-AuditorRoleChange
         title: >-
-          The Web subsystem shall drop the comment composer and the typed draft of an open page when the role of the
-          user changes to auditor.
+          The Web subsystem shall drop the comment composer of the Diff view of an open page when the role of the user
+          changes to auditor.
         justification: |
-          A page that stays open while the role is taken away must not let the user submit a draft with the old role.
+          A page that stays open while the role is taken away must not keep a form that the new role of the user may
+          not use.
         children:
           - ReviewCenter-ReviewPage-ReadOnly-RoleChange
+
+      - id: ReviewCenter-Web-ProjectAccess-AuditorRoleChangeDraft
+        title: >-
+          The Web subsystem shall discard the typed comment draft of an open page when the role of the user changes to
+          auditor.
+        justification: |
+          A draft that was typed with the old role must not be submitted after the role was taken away.
+        children:
           - ReviewCenter-ReviewPage-ReadOnly-RoleChangeDraft
 
       - id: ReviewCenter-Web-ProjectAccess-AuditorNoRepositoryRead
@@ -679,12 +745,19 @@ sections:
       - id: ReviewCenter-Web-ProjectAccess-AddMemberUnusableName
         title: >-
           The Web subsystem shall show one message for a name that does not exist and for the name of a disabled user,
-          add nobody, and keep the typed name.
+          and add nobody.
         justification: |
           A single message gives nobody a way to find out which accounts exist, and the kept name lets the
           administrator correct the typing error.
         children:
           - ReviewCenter-ProjectPage-AddMember-UnusableName
+
+      - id: ReviewCenter-Web-ProjectAccess-AddMemberUnusableName-NameKept
+        title: >-
+          The Web subsystem shall keep the typed name in the field after the user could not be added.
+        justification: |
+          The kept name lets the administrator correct the typing error.
+        children:
           - ReviewCenter-ProjectPage-AddMember-NameKept
 
       - id: ReviewCenter-Web-ProjectAccess-AddMemberAlreadyMember
@@ -730,16 +803,38 @@ sections:
 
       - id: ReviewCenter-Web-ProjectAccess-CreateAccountPassword
         title: >-
-          The Web subsystem shall show the generated temporary password once with the user name, and let the user copy
-          it and hide it with the Done button.
+          The Web subsystem shall show the generated temporary password once with the user name.
         justification: |
           The password is the only way for the new user to sign in, and it must not stay on the screen or be stored in
           the page for later.
         children:
           - ReviewCenter-ProjectPage-CreateAccount-TempPassword
-          - ReviewCenter-ProjectPage-CreateAccount-DoneHides
-          - ReviewCenter-ProjectPage-CreateAccount-DoneReturns
+
+      - id: ReviewCenter-Web-ProjectAccess-CreateAccountPassword-Copy
+        title: >-
+          The Web subsystem shall hand the temporary password to the clipboard of the browser when the Copy button is
+          used, and say "Copied.".
+        justification: |
+          Copying avoids a typing error when the password is passed to the new user.
+        children:
           - ReviewCenter-ProjectPage-CreateAccount-CopyButton
+
+      - id: ReviewCenter-Web-ProjectAccess-CreateAccountPassword-DoneHides
+        title: >-
+          The Web subsystem shall hide the temporary password when the Done button is used.
+        justification: |
+          The password must not stay on the screen after the administrator is done with it.
+        children:
+          - ReviewCenter-ProjectPage-CreateAccount-DoneHides
+
+      - id: ReviewCenter-Web-ProjectAccess-CreateAccountPassword-DoneReturns
+        title: >-
+          The Web subsystem shall show the project page when the Done button is used after the temporary password was
+          shown.
+        justification: |
+          The administrator needs a way back to the project once the password has been passed on.
+        children:
+          - ReviewCenter-ProjectPage-CreateAccount-DoneReturns
 
       - id: ReviewCenter-Web-ProjectAccess-CreateAccountCopyFailure
         title: >-
@@ -1007,13 +1102,20 @@ sections:
 
       - id: ReviewCenter-Web-Reviews-OtherProject
         title: >-
-          The Web subsystem shall show the other project and discard the previous form values and file selection when
-          the page for a new review is reused for another project.
+          The Web subsystem shall show the other project when the page for a new review is reused for another project.
         justification: |
-          The page is reused when the user moves between projects, and files chosen for one project must not be
-          submitted to another.
+          The page is reused when the user moves between projects, and a page that kept showing the first project would
+          send the work of the user to the wrong place.
         children:
           - ReviewCenter-ProjectPage-Selection-OtherProject
+
+      - id: ReviewCenter-Web-Reviews-OtherProjectReset
+        title: >-
+          The Web subsystem shall discard the previous form values and the file selection when the page for a new
+          review is reused for another project.
+        justification: |
+          Files chosen for one project must not be submitted to another.
+        children:
           - ReviewCenter-ProjectPage-Selection-OtherProjectReset
 
       - id: ReviewCenter-Web-Reviews-ProjectLink
@@ -1132,18 +1234,25 @@ sections:
 
       - id: ReviewCenter-Web-Reviews-Files
         title: >-
-          The Web subsystem shall show the files of the review and the content of a selected file ahead of the
-          fingerprint and the file hashes.
+          The Web subsystem shall show the files of the review and the content of a selected file.
         justification: |
-          The content is what a reviewer reads, so it comes first, and the technical identifiers follow.
+          Reviewers read the files and their content, so the page must list them and show what is selected.
         children:
           - ReviewCenter-ReviewPage-Files
           - ReviewCenter-ReviewPage-Files-ButtonName
           - ReviewCenter-ReviewPage-Files-Highlight
-          - ReviewCenter-ReviewPage-Layout
-          - ReviewCenter-ReviewPage-Layout-Content
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-Reviews-FilesLayout
+        title: >-
+          The Web subsystem shall place the files and the content of the review ahead of the fingerprint and the file
+          hashes.
+        justification: |
+          The content is what a reviewer reads, so it comes first, and the technical identifiers follow.
+        children:
+          - ReviewCenter-ReviewPage-Layout
+          - ReviewCenter-ReviewPage-Layout-Content
 
       - id: ReviewCenter-Web-Reviews-Content
         title: >-
@@ -1206,25 +1315,38 @@ sections:
 
       - id: ReviewCenter-Web-Comments-StartError
         title: >-
-          The Web subsystem shall show a violated rule or an unreadable line number of a new thread as a message next
-          to the form and keep the entered values.
+          The Web subsystem shall show an error and store no thread when a thread cannot be started.
         justification: |
-          A user whose comment is refused must see why, next to the form, and must not have to type the comment
-          again.
+          A user whose comment is refused must see why, next to the form.
         children:
           - ReviewCenter-ReviewPage-ThreadStart-Error
-          - ReviewCenter-ReviewPage-ThreadStart-KeepValues
           - ReviewCenter-ReviewPage-ThreadComposer-Error
+
+      - id: ReviewCenter-Web-Comments-StartErrorKeepValues
+        title: >-
+          The Web subsystem shall keep the values typed into the form of a thread that could not be started.
+        justification: |
+          A user whose comment is refused must not have to type the comment again.
+        children:
+          - ReviewCenter-ReviewPage-ThreadStart-KeepValues
 
       - id: ReviewCenter-Web-Comments-Shortcut
         title: >-
           The Web subsystem shall make Ctrl+Enter in a comment field or a reply field press the submit button of that
-          form and tell the reader.
+          form.
         justification: |
-          Writers of long comments save time with the keyboard, and the hint tells them that the shortcut exists.
+          Writers of long comments save time with the keyboard.
         children:
           - ReviewCenter-ReviewPage-ThreadStart-CtrlEnter
           - ReviewCenter-ReviewPage-ThreadStart-ReplyShortcut
+
+      - id: ReviewCenter-Web-Comments-ShortcutHint
+        title: >-
+          The Web subsystem shall tell the reader next to the submit button of a comment and of a reply that Ctrl+Enter
+          submits.
+        justification: |
+          The hint tells the writers that the shortcut exists.
+        children:
           - ReviewCenter-ReviewPage-ThreadStart-ShortcutHint
 
       - id: ReviewCenter-Web-Comments-BinaryWholeFile
@@ -1257,52 +1379,133 @@ sections:
           The Web subsystem shall offer, wherever a new thread is started, a choice between Question and Finding with
           Question chosen by default.
         justification: |
-          A Finding goes into the report and can block a conclusion, so the author chooses that kind deliberately and
-          a plain question is the safe default.
+          A Finding goes into the report and can block a conclusion, so a plain question is the safe default.
         children:
           - ReviewCenter-ReviewPage-ThreadComposer
+
+      - id: ReviewCenter-Web-Comments-KindChoiceFinding
+        title: >-
+          The Web subsystem shall start the new thread as a Finding when the reader chooses Finding.
+        justification: |
+          The author chooses the kind that goes into the report deliberately.
+        children:
           - ReviewCenter-ReviewPage-ThreadComposer-Finding
+
+      - id: ReviewCenter-Web-Comments-KindChoiceSingleSlot
+        title: >-
+          The Web subsystem shall offer the choice between Question and Finding also in a review with a single slot.
+        justification: |
+          A review with a single slot is no reason to hide the kind of a thread.
+        children:
           - ReviewCenter-ReviewPage-ThreadComposer-SingleSlot
+
+      - id: ReviewCenter-Web-Comments-KindChoiceCheck
+        title: >-
+          The Web subsystem shall start a discussion about a check from the status panel as a Finding when the reader
+          chooses Finding.
+        justification: |
+          A discussion about a check can be a Finding as well.
+        children:
           - ReviewCenter-ReviewPage-ThreadComposer-Check
 
       - id: ReviewCenter-Web-Comments-ReplyReport
         title: >-
-          The Web subsystem shall offer in the reply box an Add to report check box and include the reply in the
-          report only when it is ticked.
+          The Web subsystem shall offer in the reply box an Add to report check box that includes the reply in the
+          report when it is ticked.
         justification: |
-          A reply that only discusses must stay out of the report, while a reply that holds a decision must be able to
-          enter it.
+          A reply that holds a decision must be able to enter the report.
         children:
           - ReviewCenter-ReviewPage-ThreadComposer-ReplyReport
+
+      - id: ReviewCenter-Web-Comments-ReplyChat
+        title: >-
+          The Web subsystem shall treat a reply as chat that is not part of the report unless the Add to report check
+          box is ticked.
+        justification: |
+          A reply that only discusses must stay out of the report.
+        children:
           - ReviewCenter-ReviewPage-ThreadComposer-ReplyChat
 
       - id: ReviewCenter-Web-Comments-KindBadge
         title: >-
           The Web subsystem shall show the kind of a thread, Question or Finding, with its own icon and visible word.
         justification: |
-          A reader must tell a Question from a Finding at a glance and without depending on color alone.
+          A reader must tell a Question from a Finding at a glance.
         children:
           - ReviewCenter-ReviewPage-ThreadKinds
           - ReviewCenter-ReviewPage-ThreadKinds-Finding
-          - ReviewCenter-ReviewPage-ThreadKinds-InReport
           - ReviewCenter-ReviewPage-ThreadKinds-DistinctIcons
+
+      - id: ReviewCenter-Web-Comments-KindBadgeInReport
+        title: >-
+          The Web subsystem shall show an In report badge on a Finding and mark the starting comment of a Finding with
+          an In report mark.
+        justification: |
+          A reader must see at a glance which thread goes into the report.
+        children:
+          - ReviewCenter-ReviewPage-ThreadKinds-InReport
+          - ReviewCenter-ReviewPage-ThreadActions-InReportMark
+
+      - id: ReviewCenter-Web-Comments-KindBadgeCard
+        title: >-
+          The Web subsystem shall show the kind badge of a thread in its thread card and in the card of check
+          discussions.
+        justification: |
+          The kind must be visible wherever a thread is read.
+        children:
           - ReviewCenter-ReviewPage-ThreadKinds-Card
           - ReviewCenter-ReviewPage-ThreadKinds-CheckCard
+
+      - id: ReviewCenter-Web-Comments-KindBadgeNotColorAlone
+        title: >-
+          The Web subsystem shall give every kind marker a visible word or accessible name and hide its icon from
+          assistive technology, so that no kind rests on the icon or the color alone.
+        justification: |
+          A reader must tell a Question from a Finding without depending on color alone.
+        children:
           - ReviewCenter-ReviewPage-ThreadKinds-NotColorAlone
+
+      - id: ReviewCenter-Web-Comments-KindBadgeChatBubble
+        title: >-
+          The Web subsystem shall show the comments of a Question as chat bubbles.
+        justification: |
+          A thread that is not for the report reads as a conversation.
+        children:
           - ReviewCenter-ReviewPage-ThreadActions-ChatBubble
-          - ReviewCenter-ReviewPage-ThreadActions-InReportMark
 
       - id: ReviewCenter-Web-Comments-DiffMarkers
         title: >-
-          The Web subsystem shall mark a diff row that has threads with one marker per kind, with the number of
-          threads, and no marker on a row without threads.
+          The Web subsystem shall mark a diff row that has threads with one marker per kind, and show both markers on a
+          row that has threads of both kinds.
         justification: |
           A reviewer who scans a diff finds where the discussion is, and what kind it is, without opening every line.
         children:
           - ReviewCenter-ReviewPage-ThreadKinds-DiffMarkers
-          - ReviewCenter-ReviewPage-ThreadKinds-MarkerCount
-          - ReviewCenter-ReviewPage-ThreadKinds-MarkerName
           - ReviewCenter-ReviewPage-ThreadKinds-MixedRow
+
+      - id: ReviewCenter-Web-Comments-DiffMarkersCount
+        title: >-
+          The Web subsystem shall show the number of threads of its kind on every diff marker.
+        justification: |
+          A reviewer must see how much discussion a row holds.
+        children:
+          - ReviewCenter-ReviewPage-ThreadKinds-MarkerCount
+
+      - id: ReviewCenter-Web-Comments-DiffMarkersName
+        title: >-
+          The Web subsystem shall give every diff marker a title and an accessible name such as 2 questions or 1
+          finding.
+        justification: |
+          A marker must be readable without sight of its icon.
+        children:
+          - ReviewCenter-ReviewPage-ThreadKinds-MarkerName
+
+      - id: ReviewCenter-Web-Comments-DiffMarkersNone
+        title: >-
+          The Web subsystem shall show no marker on a diff row without threads.
+        justification: |
+          A marker on a quiet row would suggest a discussion that does not exist.
+        children:
           - ReviewCenter-ReviewPage-ThreadKinds-NoMarker
 
       - id: ReviewCenter-Web-Comments-Reply
@@ -1356,24 +1559,39 @@ sections:
 
       - id: ReviewCenter-Web-Comments-ResolveFinding
         title: >-
-          The Web subsystem shall ask for a resolution note when a Finding is resolved, refuse a blank note with a
-          message, and hand over no note when the person cancels.
+          The Web subsystem shall ask for a resolution note when a Finding is resolved and refuse a blank note with a
+          message.
         justification: |
           A Finding goes into the report, so closing it needs a note that says how it was settled, and a cancelled
           dialog must not resolve it.
         children:
           - ReviewCenter-ReviewPage-ThreadActions-NoteFinding
+
+      - id: ReviewCenter-Web-Comments-ResolveFinding-Cancel
+        title: >-
+          The Web subsystem shall hand over no note and tell the card when the person cancels the resolution note.
+        justification: |
+          A canceled dialog must not resolve the Finding.
+        children:
           - ReviewCenter-ReviewPage-ThreadActions-NoteCancel
 
       - id: ReviewCenter-Web-Comments-SignatureWarning
         title: >-
           The Web subsystem shall ask for a confirmation that names the signers whose signatures a change of a thread
-          makes stale before that change is made, and keep the typed note meanwhile.
+          makes stale before that change is made.
         justification: |
           A change of a thread alters the record, so the signers whose signatures go out of date must be named before
           they are lost, and the typed note must survive the question.
         children:
           - ReviewCenter-ReviewPage-ThreadActions-SignatureWarning
+
+      - id: ReviewCenter-Web-Comments-SignatureWarning-KeepNote
+        title: >-
+          The Web subsystem shall keep the typed resolution note while the confirmation is canceled and store it when
+          the change is confirmed.
+        justification: |
+          A note that was typed with care must survive the question about the signatures.
+        children:
           - ReviewCenter-ReviewPage-ThreadActions-KeepNote
 
       - id: ReviewCenter-Web-Comments-WarningCancelled
@@ -1443,14 +1661,36 @@ sections:
 
       - id: ReviewCenter-Web-Comments-IndexSelect
         title: >-
-          The Web subsystem shall select the file of a thread, highlight its anchored lines and scroll to them, in the
-          Diff view when the file has a diff, when the reader chooses the thread in the index.
+          The Web subsystem shall select the file of a thread when the reader chooses the thread in the index.
         justification: |
-          The reader who picks a discussion in the index wants to see the code that it is about, not to look for it.
+          The reader who picks a discussion in the index wants to see its file, not to look for it.
         children:
           - ReviewCenter-ReviewPage-ThreadIndex-SelectFile
+
+      - id: ReviewCenter-Web-Comments-IndexSelectHighlight
+        title: >-
+          The Web subsystem shall highlight the anchored lines of the chosen thread on the side, baseline or head, that
+          the thread belongs to.
+        justification: |
+          The reader must see which lines the discussion is about.
+        children:
           - ReviewCenter-ReviewPage-ThreadIndex-Highlight
+
+      - id: ReviewCenter-Web-Comments-IndexSelectScroll
+        title: >-
+          The Web subsystem shall scroll to the first anchored line of the thread that the reader chose in the index.
+        justification: |
+          The anchored lines may lie far down in a long file.
+        children:
           - ReviewCenter-ReviewPage-ThreadIndex-Scroll
+
+      - id: ReviewCenter-Web-Comments-IndexSelectDiffView
+        title: >-
+          The Web subsystem shall show the thread that the reader chose in the index in the Diff view, at its row, when
+          the file has a diff.
+        justification: |
+          A file with a diff is read in the Diff view, so the thread must appear at its row.
+        children:
           - ReviewCenter-ReviewPage-ThreadIndex-DiffView
 
       - id: ReviewCenter-Web-Comments-IndexNoDiff
@@ -1491,18 +1731,52 @@ sections:
 
       - id: ReviewCenter-Web-Comments-CheckThreads
         title: >-
-          The Web subsystem shall show a thread about a check in the index of threads and in a card of check
-          discussions, apart from the threads of the selected file.
+          The Web subsystem shall show a thread about a check in the index of threads with the label Check discussion.
         justification: |
-          A discussion about a check belongs to no file, so it needs a place of its own that a reader can still find
-          from the index.
+          A discussion about a check belongs to no file, but a reader must still find it from the index.
         children:
           - ReviewCenter-ReviewPage-CheckThreads
+
+      - id: ReviewCenter-Web-Comments-CheckThreadsCard
+        title: >-
+          The Web subsystem shall show a thread about a check in a card of check discussions with its anchor, state and
+          comments.
+        justification: |
+          A discussion about a check belongs to no file, so it needs a place of its own.
+        children:
           - ReviewCenter-ReviewPage-CheckThreads-Card
+
+      - id: ReviewCenter-Web-Comments-CheckThreadsApart
+        title: >-
+          The Web subsystem shall keep a thread about a check out of the list of threads of the selected file.
+        justification: |
+          A thread about a check must not be mistaken for a thread about the code of the file.
+        children:
           - ReviewCenter-ReviewPage-CheckThreads-Apart
+
+      - id: ReviewCenter-Web-Comments-CheckThreadsPlainText
+        title: >-
+          The Web subsystem shall show the text of a comment of a thread about a check as plain text.
+        justification: |
+          Text that a reader typed must not be able to change the page.
+        children:
           - ReviewCenter-ReviewPage-CheckThreads-PlainText
+
+      - id: ReviewCenter-Web-Comments-CheckThreadsActions
+        title: >-
+          The Web subsystem shall let a reader reply to a thread about a check and resolve it like any other thread.
+        justification: |
+          A discussion about a check must be as workable as any other discussion.
+        children:
           - ReviewCenter-ReviewPage-CheckThreads-Reply
           - ReviewCenter-ReviewPage-CheckThreads-Resolve
+
+      - id: ReviewCenter-Web-Comments-CheckThreadsNoForm
+        title: >-
+          The Web subsystem shall offer no form to start a thread in the card of check discussions.
+        justification: |
+          The card of check discussions is for reading and answering, not for starting threads.
+        children:
           - ReviewCenter-ReviewPage-CheckThreads-NoForm
 
       - id: ReviewCenter-Web-Comments-CheckThreadOpen
@@ -1561,17 +1835,33 @@ sections:
 
       - id: ReviewCenter-Web-Comments-Counts
         title: >-
-          The Web subsystem shall show the number of open and of resolved threads on the review page.
+          The Web subsystem shall show the number of open and of resolved threads of the review on the filter buttons of
+          the thread index.
         justification: |
           The counts tell a reader at a glance how much discussion is left. The subsystem test covers the counts
           served from the database.
         children:
           - ReviewCenter-ReviewPage-ThreadSummary
           - ReviewCenter-ReviewPage-ThreadSummary-Resolved
-          - ReviewCenter-ReviewPage-ThreadSummary-FileCount
-          - ReviewCenter-ReviewPage-ThreadUpdate-Counts
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
+      - id: ReviewCenter-Web-Comments-CountsFile
+        title: >-
+          The Web subsystem shall show the number of open threads next to every file in the list of files.
+        justification: |
+          A reader finds the files that still have open discussion.
+        children:
+          - ReviewCenter-ReviewPage-ThreadSummary-FileCount
+
+      - id: ReviewCenter-Web-Comments-CountsUpdate
+        title: >-
+          The Web subsystem shall update the counts of open and of resolved threads when a thread is resolved or
+          reopened.
+        justification: |
+          A count that does not follow the change would mislead the reader.
+        children:
+          - ReviewCenter-ReviewPage-ThreadUpdate-Counts
 
       - id: ReviewCenter-Web-Checklist
         title: >-
@@ -1652,43 +1942,83 @@ sections:
 
       - id: ReviewCenter-Web-Checklist-Answer
         title: >-
-          The Web subsystem shall let a reviewer answer each check of the checklist as Pass, Fail or N/A, with Pass
-          needing no justification.
+          The Web subsystem shall offer a Pass, a Fail and an N/A answer for each check of the checklist.
         justification: |
           An answer is the reviewer's own statement of the check. The subsystem test covers that the answers survive
           a reload; answering needs a live connection.
         children:
           - ReviewCenter-ChecklistPage-Answer
           - ReviewCenter-ChecklistPage-Answer-Label
-          - ReviewCenter-ChecklistPage-Answer-Pass
-          - ReviewCenter-ChecklistPage-Answer-PassNoJustification
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
+      - id: ReviewCenter-Web-Checklist-AnswerPass
+        title: >-
+          The Web subsystem shall store a Pass at once when the reviewer presses Pass.
+        justification: |
+          A Pass needs no further step, so it is stored as soon as it is given.
+        children:
+          - ReviewCenter-ChecklistPage-Answer-Pass
+
+      - id: ReviewCenter-Web-Checklist-AnswerPassNoJustification
+        title: >-
+          The Web subsystem shall not ask for a justification when the reviewer answers Pass.
+        justification: |
+          Only a Fail or an N/A needs a reason, so a Pass must not be held up by a question.
+        children:
+          - ReviewCenter-ChecklistPage-Answer-PassNoJustification
+
       - id: ReviewCenter-Web-Checklist-AnswerJustify
         title: >-
-          The Web subsystem shall ask for a justification, marked as required, when the reviewer answers Fail or N/A,
-          and store the answer only with it.
+          The Web subsystem shall ask for a justification, marked as required, when the reviewer answers Fail or N/A.
         justification: |
           A Fail or an N/A that is not explained cannot be judged by the others, so it is not stored without a reason.
         children:
           - ReviewCenter-ChecklistPage-Answer-Fail
           - ReviewCenter-ChecklistPage-Answer-NotApplicable
+
+      - id: ReviewCenter-Web-Checklist-AnswerJustify-Required
+        title: >-
+          The Web subsystem shall not store a Fail whose justification is empty.
+        justification: |
+          A Fail without a reason cannot be judged by the others, so it is not stored.
+        children:
           - ReviewCenter-ChecklistPage-Answer-Required
+
+      - id: ReviewCenter-Web-Checklist-AnswerJustify-Save
+        title: >-
+          The Web subsystem shall store a Fail or an N/A together with its justification when the reviewer saves it.
+        justification: |
+          The justification is part of the answer and must be kept with it.
+        children:
           - ReviewCenter-ChecklistPage-Answer-Save
           - ReviewCenter-ChecklistPage-Answer-SaveNotApplicable
 
       - id: ReviewCenter-Web-Checklist-AnswerBy
         title: >-
-          The Web subsystem shall store each answer in the ballot of the reviewer slot of the signed-in user and show
-          who answered and when, with no field for a name.
+          The Web subsystem shall store each answer in the ballot of the reviewer slot of the signed-in user and record
+          the signed-in user as the person who answered.
         justification: |
-          An answer is a statement of one person, so it is recorded in the own ballot under the own name and never
-          under a name that was typed in.
+          An answer is a statement of one person, so it is recorded in the own ballot under the own name.
         children:
           - ReviewCenter-ChecklistPage-Answer-OwnSlot
-          - ReviewCenter-ChecklistPage-Answer-AnsweredBy
           - ReviewCenter-ChecklistPage-Answer-User
+
+      - id: ReviewCenter-Web-Checklist-AnswerByShown
+        title: >-
+          The Web subsystem shall show with an answer the display name of the person who answered and the UTC time of
+          the answer.
+        justification: |
+          A reader judges an answer by who gave it and when.
+        children:
+          - ReviewCenter-ChecklistPage-Answer-AnsweredBy
+
+      - id: ReviewCenter-Web-Checklist-AnswerByNoNameField
+        title: >-
+          The Web subsystem shall offer no field for the name of the person who answers.
+        justification: |
+          An answer must never be recorded under a name that was typed in.
+        children:
           - ReviewCenter-ChecklistPage-Answer-NoNameField
 
       - id: ReviewCenter-Web-Checklist-AnswerViolation
@@ -1714,23 +2044,37 @@ sections:
 
       - id: ReviewCenter-Web-Checklist-ApplicabilityRefused
         title: >-
-          The Web subsystem shall show the message of a violated rule next to the reason field of a section and keep
-          counting the section as applying when its reason is saved empty.
+          The Web subsystem shall show the message of a violated rule next to the reason field of a section when its
+          reason is saved empty.
         justification: |
           A section can only be dropped from the count with a reason, so a missing reason must be refused visibly.
         children:
           - ReviewCenter-ChecklistPage-Applicability-Violation
+
+      - id: ReviewCenter-Web-Checklist-ApplicabilityRefused-Counted
+        title: >-
+          The Web subsystem shall keep counting a section as applying when its reason is saved empty.
+        justification: |
+          A section without a reason must not silently leave the count.
+        children:
           - ReviewCenter-ChecklistPage-Applicability-Required
 
       - id: ReviewCenter-Web-Checklist-ApplicabilityPending
         title: >-
           The Web subsystem shall show a section whose switch is off and whose reason is not saved yet in a Reason
-          needed state and store nothing.
+          needed state with a hint that nothing is saved until the reason is saved.
         justification: |
-          A switch that is turned off before the reason is written down must not change the record by itself.
+          The reader must see that a section that is switched off is not final until its reason is saved.
         children:
           - ReviewCenter-ChecklistPage-Applicability-Pending
           - ReviewCenter-ChecklistPage-Applicability-Hint
+
+      - id: ReviewCenter-Web-Checklist-ApplicabilityPendingNothingStored
+        title: >-
+          The Web subsystem shall store nothing while the switch of a section is off and the reason is not saved.
+        justification: |
+          A switch that is turned off before the reason is written down must not change the record by itself.
+        children:
           - ReviewCenter-ChecklistPage-Applicability-NothingStored
 
       - id: ReviewCenter-Web-Checklist-SubmitBallot
@@ -1781,13 +2125,19 @@ sections:
 
       - id: ReviewCenter-Web-Checklist-NextUnansweredDone
         title: >-
-          The Web subsystem shall offer a link back to the review and no Next unanswered check button once the
-          checklist is complete.
+          The Web subsystem shall offer a link back to the review once the checklist is complete.
         justification: |
-          When nothing is left to answer, the way on is back to the review and not to a check that does not exist.
+          When nothing is left to answer, the way on is back to the review.
         children:
           - ReviewCenter-ChecklistPage-NextUnanswered-Complete
           - ReviewCenter-ChecklistPage-NextUnanswered-SectionEndBack
+
+      - id: ReviewCenter-Web-Checklist-NextUnansweredNoNext
+        title: >-
+          The Web subsystem shall not offer the Next unanswered check button once the checklist is complete.
+        justification: |
+          A button for a check that does not exist would lead nowhere.
+        children:
           - ReviewCenter-ChecklistPage-NextUnanswered-NoNext
 
       - id: ReviewCenter-Web-Checklist-JoinNotice
@@ -1842,22 +2192,45 @@ sections:
       - id: ReviewCenter-Web-Signatures-ChangeSlot
         title: >-
           The Web subsystem shall let a signed-in user change the primary and the alternate reviewer of a slot that
-          has no signature, or remove the slot.
+          has no signature.
         justification: |
           The staffing of a review changes while it runs, as long as no signature depends on it.
         children:
           - ReviewCenter-ReviewPage-Reviewers-ChangeSlot
+
+      - id: ReviewCenter-Web-Signatures-ChangeSlotRemove
+        title: >-
+          The Web subsystem shall let a signed-in user remove a slot that has no signature.
+        justification: |
+          A slot that is no longer needed must go, as long as no signature depends on it.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-RemoveSlot
+
+      - id: ReviewCenter-Web-Signatures-ChangeSlotBallotNote
+        title: >-
+          The Web subsystem shall show next to the controls of an unsigned slot a note that removing or replacing a
+          reviewer also removes the ballot that reviewer handed in.
+        justification: |
+          The user must know that the ballot of a reviewer goes with the reviewer.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-BallotNote
 
       - id: ReviewCenter-Web-Signatures-SlotRefusal
         title: >-
-          The Web subsystem shall show the reason next to the add control or the slot and keep the slots unchanged
-          when the add or the change of a slot is refused.
+          The Web subsystem shall show the reason next to the add control and add nothing when the choices of a new slot
+          are refused.
         justification: |
           A person whose change was refused must see why and must be able to rely on the slots being as before.
         children:
           - ReviewCenter-ReviewPage-Reviewers-AddRefusal
+
+      - id: ReviewCenter-Web-Signatures-SlotRefusal-Change
+        title: >-
+          The Web subsystem shall show the reason next to the slot and keep the slot unchanged when a change of the slot
+          is refused.
+        justification: |
+          A person whose change of a slot was refused must see why and must be able to rely on the slot being as before.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-ChangeRefusal
 
       - id: ReviewCenter-Web-Signatures-SignedSlotFixed
@@ -1870,37 +2243,75 @@ sections:
 
       - id: ReviewCenter-Web-Signatures-EditWarning
         title: >-
-          The Web subsystem shall show before a change or removal of a slot that makes signatures of other slots out
-          of date a warning that names the signers, and carry it out only after the user confirms.
+          The Web subsystem shall show a warning that names the signers before a change or removal of a slot that makes
+          signatures of other slots out of date.
         justification: |
           Whoever edits a slot must know whose signatures will be lost before it happens, and may still back out.
         children:
           - ReviewCenter-ReviewPage-Reviewers-EditWarning
-          - ReviewCenter-ReviewPage-Reviewers-EditConfirm
           - ReviewCenter-ReviewPage-Reviewers-RemoveWarning
+
+      - id: ReviewCenter-Web-Signatures-EditWarning-Confirm
+        title: >-
+          The Web subsystem shall carry out a change or removal of a slot that carries such a warning only after the
+          user confirms.
+        justification: |
+          The user may still back out, so nothing is stored or removed before the confirmation.
+        children:
+          - ReviewCenter-ReviewPage-Reviewers-EditConfirm
           - ReviewCenter-ReviewPage-Reviewers-RemoveConfirm
 
       - id: ReviewCenter-Web-Signatures-NonMember
         title: >-
-          The Web subsystem shall mark an assignee who is no longer a member of the project with a badge and a hint,
-          and keep that assignee and a disabled assignee as labeled choices in the change lists.
+          The Web subsystem shall mark an assignee who is no longer a member of the project with a badge.
         justification: |
           A reader must see that an assignee lost the access, and the lists must not silently replace an assignee that
           is still entered.
         children:
           - ReviewCenter-ReviewPage-Reviewers-NonMemberBadge
+
+      - id: ReviewCenter-Web-Signatures-NonMember-Hint
+        title: >-
+          The Web subsystem shall show for a slot with an assignee who is no longer a member the hint that this reviewer
+          cannot sign until added to the project again.
+        justification: |
+          The hint tells the administrator what to do about the slot.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-NonMemberHint
+
+      - id: ReviewCenter-Web-Signatures-NonMember-Choice
+        title: >-
+          The Web subsystem shall keep a primary or alternate reviewer who is no longer a member of the project as a
+          labeled choice in the change lists.
+        justification: |
+          The list must not silently replace an assignee that is still entered by a blank choice.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-NonMemberChoice
+
+      - id: ReviewCenter-Web-Signatures-NonMember-DisabledChoice
+        title: >-
+          The Web subsystem shall keep a primary or alternate reviewer who is disabled as a labeled choice in the change
+          lists.
+        justification: |
+          The list must not silently replace a disabled assignee that is still entered by a blank choice.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-DisabledChoice
 
       - id: ReviewCenter-Web-Signatures-MemberUnmarked
         title: >-
-          The Web subsystem shall show neither the badge nor the hint for assignees who are members and add no extra
-          option to the change lists for a current reviewer who is an enabled member.
+          The Web subsystem shall show neither the badge nor the hint for assignees who are members of the project.
         justification: |
           A mark that appears for everybody says nothing, so the marks and the extra options show only where needed.
         children:
           - ReviewCenter-ReviewPage-Reviewers-MemberUnmarked
+
+      - id: ReviewCenter-Web-Signatures-MemberUnmarked-NoExtraOption
+        title: >-
+          The Web subsystem shall add no extra option to the change lists for a current reviewer who is an enabled
+          member.
+        justification: |
+          An extra option for everybody would clutter the lists, so it appears only where a choice would be lost.
+        children:
           - ReviewCenter-ReviewPage-Reviewers-NoExtraOption
 
       - id: ReviewCenter-Web-Signatures-SignatureWarning
@@ -1911,8 +2322,30 @@ sections:
           Discussing a review does not change the signed record, so it must not be held up by a question.
         children:
           - ReviewCenter-ReviewPage-SignatureWarning
+
+      - id: ReviewCenter-Web-Signatures-SignatureWarning-SignatureKept
+        title: >-
+          The Web subsystem shall leave the signature of a review current after chat was posted on it.
+        justification: |
+          Chat does not alter the signed record, so it must not cost a signature.
+        children:
           - ReviewCenter-ReviewPage-SignatureWarning-SignatureKept
+
+      - id: ReviewCenter-Web-Signatures-SignatureWarning-Question
+        title: >-
+          The Web subsystem shall post a new thread as a Question, which is not included in the report, on a review with
+          a current signature.
+        justification: |
+          A new thread on a signed review must not change the signed report, so it starts as a Question.
+        children:
           - ReviewCenter-ReviewPage-SignatureWarning-Question
+
+      - id: ReviewCenter-Web-Signatures-SignatureWarning-ResolveNote
+        title: >-
+          The Web subsystem shall resolve a Question without a resolution note.
+        justification: |
+          A Question is not part of the report, so closing it needs no note about how it was settled.
+        children:
           - ReviewCenter-ReviewPage-SignatureWarning-ResolveNote
 
       - id: ReviewCenter-Web-Signatures-ChatRefusal
@@ -1927,27 +2360,64 @@ sections:
 
       - id: ReviewCenter-Web-Signatures-ChecklistWarning
         title: >-
-          The Web subsystem shall show a warning that names every affected slot and its signer when a hand-in, taking
-          back a counted dissent, or switching a section back on would make a signature out of date, and store nothing
-          meanwhile.
+          The Web subsystem shall show a warning that names every affected slot and its signer when handing the own
+          ballot in would make a signature out of date.
         justification: |
           A change on the checklist that alters the record must name the signatures that it costs before any answer is
           stored.
         children:
           - ReviewCenter-ChecklistPage-SignatureWarning
+
+      - id: ReviewCenter-Web-Signatures-ChecklistWarning-TakenBack
+        title: >-
+          The Web subsystem shall show a warning that names every affected slot and its signer when taking back a
+          counted dissent would make a signature out of date.
+        justification: |
+          Taking back a dissent changes the consolidated outcome, so the signatures it costs must be named first.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-TakenBack
+
+      - id: ReviewCenter-Web-Signatures-ChecklistWarning-Applicability
+        title: >-
+          The Web subsystem shall show a warning that names every affected slot and its signer when switching a section
+          back on would make a signature out of date.
+        justification: |
+          A section that counts again changes the record, so the signatures it costs must be named first.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-Applicability
-          - ReviewCenter-ChecklistPage-SignatureWarning-NothingStored
+
+      - id: ReviewCenter-Web-Signatures-ChecklistWarning-ApplicabilityDropped
+        title: >-
+          The Web subsystem shall drop the warning for switching a section on when the reviewer switches the section off
+          again.
+        justification: |
+          A warning for a change that was undone would be wrong and would hide the real state of the checklist.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-SwitchOff
+
+      - id: ReviewCenter-Web-Signatures-ChecklistWarning-NothingStored
+        title: >-
+          The Web subsystem shall store nothing while a signature warning is shown on the checklist page.
+        justification: |
+          The reviewer has not yet consented to losing signatures, so no answer may be stored before the consent.
+        children:
+          - ReviewCenter-ChecklistPage-SignatureWarning-NothingStored
 
       - id: ReviewCenter-Web-Signatures-ChecklistConfirm
         title: >-
-          The Web subsystem shall repeat the change with the warned slots acknowledged and make their signatures out
-          of date when the reviewer confirms a signature warning.
+          The Web subsystem shall repeat the change with the warned slots acknowledged when the reviewer confirms a
+          signature warning.
         justification: |
-          Confirming is the explicit consent to lose the named signatures, and only then are they made out of date.
+          Confirming is the explicit consent to lose the named signatures.
         children:
           - ReviewCenter-ChecklistPage-SignatureWarning-Confirm
+
+      - id: ReviewCenter-Web-Signatures-ChecklistConfirmOutOfDate
+        title: >-
+          The Web subsystem shall make the signatures that were named in a confirmed warning out of date.
+        justification: |
+          Only the confirmed change may make a signature out of date.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-OutOfDate
 
       - id: ReviewCenter-Web-Signatures-ChecklistMerged
@@ -1962,13 +2432,29 @@ sections:
 
       - id: ReviewCenter-Web-Signatures-ChecklistCancel
         title: >-
-          The Web subsystem shall leave the signatures and the record unchanged, keep the unsaved switch position, and
-          put an enabling switch back to off when the reviewer cancels a signature warning.
+          The Web subsystem shall leave the signatures and the record unchanged when the reviewer cancels a signature
+          warning.
         justification: |
           Cancelling must undo the attempt completely, with the page showing what is really stored.
         children:
           - ReviewCenter-ChecklistPage-SignatureWarning-Cancel
+
+      - id: ReviewCenter-Web-Signatures-ChecklistCancel-KeepChoice
+        title: >-
+          The Web subsystem shall keep the unsaved switch position and reason of a section when the reviewer cancels the
+          warning of a hand-in.
+        justification: |
+          The reviewer must not have to type the reason of a section again after backing out of a warning.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-KeepChoice
+
+      - id: ReviewCenter-Web-Signatures-ChecklistCancel-Revert
+        title: >-
+          The Web subsystem shall put the switch of a section that does not apply back to off when the reviewer cancels
+          the warning for switching it on.
+        justification: |
+          The switch must show what is stored, so an enabling switch that was canceled goes back to off.
+        children:
           - ReviewCenter-ChecklistPage-SignatureWarning-Revert
 
       - id: ReviewCenter-Web-Signatures-ChecklistNoWarning
@@ -1988,13 +2474,43 @@ sections:
           A signature is the statement of a person, so the person confirms the password before it is recorded.
         children:
           - ReviewCenter-ReviewPage-Sign
-          - ReviewCenter-ReviewPage-Sign-ApprovedOutcome
           - ReviewCenter-ReviewPage-Sign-Signature
-          - ReviewCenter-ReviewPage-Sign-PasswordHidden
-          - ReviewCenter-ReviewPage-Sign-NoSecondForm
-          - ReviewCenter-ReviewPage-Sign-ApprovedResult
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
+      - id: ReviewCenter-Web-Signatures-ApproveOutcome
+        title: >-
+          The Web subsystem shall show in the sign form of a review that can be approved the outcome Approved and the
+          meaning of that outcome.
+        justification: |
+          The signer must know what an approval means before giving it.
+        children:
+          - ReviewCenter-ReviewPage-Sign-ApprovedOutcome
+
+      - id: ReviewCenter-Web-Signatures-ApprovePasswordHidden
+        title: >-
+          The Web subsystem shall never show the typed password in the page, neither after a wrong nor after a correct
+          password.
+        justification: |
+          A secret must not stay readable in the page.
+        children:
+          - ReviewCenter-ReviewPage-Sign-PasswordHidden
+
+      - id: ReviewCenter-Web-Signatures-ApproveNoSecondForm
+        title: >-
+          The Web subsystem shall offer no sign form for a slot after it was signed.
+        justification: |
+          A slot that is signed needs no second signature.
+        children:
+          - ReviewCenter-ReviewPage-Sign-NoSecondForm
+
+      - id: ReviewCenter-Web-Signatures-ApproveResult
+        title: >-
+          The Web subsystem shall show the review as Approved when every slot has a current signature.
+        justification: |
+          The reader must see when the review is approved.
+        children:
+          - ReviewCenter-ReviewPage-Sign-ApprovedResult
 
       - id: ReviewCenter-Web-Signatures-WrongPassword
         title: >-
@@ -2006,12 +2522,19 @@ sections:
 
       - id: ReviewCenter-Web-Signatures-StaleRecord
         title: >-
-          The Web subsystem shall not sign a slot and tell the signer that the record has changed when the record
-          changed since the page was drawn.
+          The Web subsystem shall not sign a slot when the record has changed since the page was drawn.
         justification: |
           A signature must vouch for the record that the signer saw, not for one that changed meanwhile.
         children:
           - ReviewCenter-ReviewPage-Sign-StaleRecord
+
+      - id: ReviewCenter-Web-Signatures-StaleRecord-Message
+        title: >-
+          The Web subsystem shall tell the signer that the record has changed when signing is refused because the record
+          changed since the page was drawn.
+        justification: |
+          A signer whose signature was refused must learn why, so that the page can be read again.
+        children:
           - ReviewCenter-ReviewPage-Sign-StaleMessage
 
       - id: ReviewCenter-Web-Signatures-Blockers
@@ -2035,12 +2558,19 @@ sections:
 
       - id: ReviewCenter-Web-Signatures-Reject
         title: >-
-          The Web subsystem shall let a reviewer who occupies a slot sign the review as a rejection, with a conclusion
-          text, when the ballots agree on a Fail.
+          The Web subsystem shall show in the sign form of a review that can be rejected the outcome Rejected and the
+          meaning of that outcome.
         justification: |
-          A review that finds the work not acceptable must be able to end with a rejection that says why.
+          A signer must know what a rejection means before giving it.
         children:
           - ReviewCenter-ReviewPage-Sign-RejectedOutcome
+
+      - id: ReviewCenter-Web-Signatures-RejectResult
+        title: >-
+          The Web subsystem shall show the review as Rejected when every slot is signed with the outcome Rejected.
+        justification: |
+          A review that finds the work not acceptable must be able to end with a rejection.
+        children:
           - ReviewCenter-ReviewPage-Sign-RejectedResult
 
       - id: ReviewCenter-Web-Signatures-Conclusion
@@ -2151,14 +2681,21 @@ sections:
 
       - id: ReviewCenter-Web-ReviewLock-Reading
         title: >-
-          The Web subsystem shall keep selecting a file and reading the comments of its threads, and the sections of
-          the checklist, available on a locked review.
+          The Web subsystem shall keep selecting a file, reading the comments of its threads and opening the sections of
+          the checklist available on a locked review.
         justification: |
           A lock stops changes, not reading, so the record of a concluded review stays open to its readers.
         children:
           - ReviewCenter-ReviewPage-Locked-Reading
-          - ReviewCenter-ReviewPage-Locked-ThreadsAll
           - ReviewCenter-ChecklistPage-Locked-Readable
+
+      - id: ReviewCenter-Web-ReviewLock-ReadingThreads
+        title: >-
+          The Web subsystem shall list all threads, not only the open ones, at first on a concluded review.
+        justification: |
+          A reader of a concluded review wants the whole discussion, not only what is still open.
+        children:
+          - ReviewCenter-ReviewPage-Locked-ThreadsAll
 
       - id: ReviewCenter-Web-ReviewLock-Reopen
         title: >-
@@ -2185,12 +2722,18 @@ sections:
 
       - id: ReviewCenter-Web-ReviewLock-ReopenRefused
         title: >-
-          The Web subsystem shall show the message of the rule and keep the review locked, with no reopening
-          recorded, when the service refuses to reopen the review.
+          The Web subsystem shall show the message of the rule when the service refuses to reopen the review.
         justification: |
           A refused reopening must leave no trace in the record and must tell the person why.
         children:
           - ReviewCenter-ReviewPage-Reopen-Refusal
+
+      - id: ReviewCenter-Web-ReviewLock-ReopenRefused-StaysLocked
+        title: >-
+          The Web subsystem shall keep the review locked and record no reopening when the service refuses to reopen it.
+        justification: |
+          A refused reopening must leave no trace in the record.
+        children:
           - ReviewCenter-ReviewPage-Reopen-StaysLocked
 
       - id: ReviewCenter-Web-ReviewLock-ReopenHistory
@@ -2260,13 +2803,29 @@ sections:
 
       - id: ReviewCenter-Web-ReviewRules-Conflict
         title: >-
-          The Web subsystem shall show the message of the rule and the stored values, and record no audit entry, when
-          the administrator saves a switch that somebody else changed.
+          The Web subsystem shall show the message of the rule when the administrator saves the independent-reviewers
+          switch that somebody else changed.
         justification: |
           A save that rests on an out-of-date page must not overwrite the change of another administrator unseen.
         children:
           - ReviewCenter-ProjectPage-ReviewRules-Conflict
+
+      - id: ReviewCenter-Web-ReviewRules-ConflictShowsStored
+        title: >-
+          The Web subsystem shall show the stored values of the review rules, instead of the unsaved choices, after a
+          save of the independent-reviewers switch was refused because somebody else changed it.
+        justification: |
+          The administrator must see what is really stored before choosing again.
+        children:
           - ReviewCenter-ProjectPage-ReviewRules-ConflictShowsStored
+
+      - id: ReviewCenter-Web-ReviewRules-ConflictNothingRecorded
+        title: >-
+          The Web subsystem shall record no audit entry when a save of the independent-reviewers switch is refused
+          because somebody else changed it.
+        justification: |
+          The audit trail must tell what happened, and nothing was changed by the refused save.
+        children:
           - ReviewCenter-ProjectPage-ReviewRules-ConflictNothingRecorded
 
       - id: ReviewCenter-Web-ReviewRules-Hidden
@@ -2303,13 +2862,30 @@ sections:
 
       - id: ReviewCenter-Web-ReviewRuleSwitches-Conflict
         title: >-
-          The Web subsystem shall show the message of the rule and the stored values, and record no audit entry, when
-          the administrator saves a switch that somebody else changed.
+          The Web subsystem shall show the message of the rule when the administrator saves the author-answers or
+          reopener-signing switch that somebody else changed.
         justification: |
-          A save that rests on an out-of-date page must not overwrite the change of another administrator unseen.
+          A save of these two switches that rests on an out-of-date page must not overwrite the change of another
+          administrator unseen.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-ConflictShowsStored
+        title: >-
+          The Web subsystem shall show the stored values of the author-answers and reopener-signing switches, instead of
+          the unsaved choices, after a save was refused because somebody else changed one.
+        justification: |
+          The administrator must see what is really stored for these switches before choosing again.
+        children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-ConflictNothingRecorded
+        title: >-
+          The Web subsystem shall record no audit entry when a save of the author-answers or reopener-signing switch is
+          refused because somebody else changed it.
+        justification: |
+          A refused save of these switches changes nothing, so the audit trail must not show a change.
+        children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
 
       - id: ReviewCenter-Web-ReviewRuleSwitches-ReopenerSigning
@@ -2326,20 +2902,27 @@ sections:
 
       - id: ReviewCenter-Web-ReviewRuleSwitches-DefaultNotice
         title: >-
-          The Web subsystem shall say next to the rules that they are on by default and apply to every project of the
-          tool, also to the projects that existed before.
+          The Web subsystem shall say with each review rule switch that the rule applies to every project, including a
+          project that was created before the rule was enforced.
         justification: |
           The rules are enforced for every project from the day they are enforced, so a page that offered a switch
           without saying so would hide that an existing project is affected too.
         children:
-          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
           - ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+
+      - id: ReviewCenter-Web-ReviewRuleSwitches-DefaultOn
+        title: >-
+          The Web subsystem shall show both review rule switches on for a project that was not given another value.
+        justification: |
+          A project that nobody has set up must still follow the rules.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
 
       - id: ReviewCenter-Web-ReviewRuleSwitches-Hidden
         title: >-
           The Web subsystem shall not show the two review rules to any other user.
         justification: |
-          Only the people who administer the project may see and change a rule that protects its reviews.
+          Only the people who administer the project may see and change the rules on who answers and who signs.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
         tests:
@@ -2370,13 +2953,21 @@ sections:
 
       - id: ReviewCenter-Web-ReviewRuleNotices-AuthorRefusal
         title: >-
-          The Web subsystem shall show the message of the rule next to the check and store nothing when a page loaded
-          before the rule was switched on sends an answer of the author.
+          The Web subsystem shall show the message of the rule next to the check when a page loaded before the rule was
+          switched on sends an answer of the author.
         justification: |
           A page that was loaded earlier can still send an answer, so the refusal must reach the reader and must leave
           the ballot unchanged.
         children:
           - ReviewCenter-ChecklistPage-AuthorBlocked-Refusal
+
+      - id: ReviewCenter-Web-ReviewRuleNotices-AuthorRefusal-NotStored
+        title: >-
+          The Web subsystem shall store nothing when a page loaded before the rule was switched on sends an answer of
+          the author.
+        justification: |
+          The refused answer must leave the ballot unchanged.
+        children:
           - ReviewCenter-ChecklistPage-AuthorBlocked-NotStored
 
       - id: ReviewCenter-Web-ReviewRuleNotices-AuthorControls
@@ -2560,22 +3151,35 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-ChangePasswordRefused
         title: >-
-          The Web subsystem shall show a violated password rule as a message and leave the password unchanged.
+          The Web subsystem shall show a violated password rule as a message.
         justification: |
-          A password that breaks a rule must be refused with the reason, and the old password must stay in force.
+          A password that breaks a rule must be refused with the reason.
         children:
           - ReviewCenter-AccountPage-ChangePassword-RuleViolation
+
+      - id: ReviewCenter-Web-SignIn-ChangePasswordNothingChanged
+        title: >-
+          The Web subsystem shall leave the password unchanged when the change of the password is refused.
+        justification: |
+          The old password must stay in force after a refused change.
+        children:
           - ReviewCenter-AccountPage-ChangePassword-NothingChanged
 
       - id: ReviewCenter-Web-SignIn-ChangePasswordCodeField
         title: >-
           The Web subsystem shall ask a user who has turned on the second factor for a code or a recovery code in the
-          form that changes the password and empty the code field after an attempt.
+          form that changes the password.
         justification: |
-          A second factor protects the password change too, and a code that stays in the field could be reused by
-          somebody who looks at the screen.
+          A second factor protects the password change too.
         children:
           - ReviewCenter-AccountPage-ChangePassword-CodeField
+
+      - id: ReviewCenter-Web-SignIn-ChangePasswordClearCode
+        title: >-
+          The Web subsystem shall empty the code field after an attempt to change the password.
+        justification: |
+          A code that stays in the field could be reused by somebody who looks at the screen.
+        children:
           - ReviewCenter-AccountPage-ChangePassword-ClearCode
 
       - id: ReviewCenter-Web-SignIn-ChangePasswordNoCodeField
@@ -2632,15 +3236,22 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-TemporaryPassword
         title: >-
-          The Web subsystem shall show a user who signed in with a temporary password a banner and the password change
-          only.
+          The Web subsystem shall show a user who signed in with a temporary password a banner that says so.
+        justification: |
+          The user must be told why the page offers nothing but the change of the password.
+        children:
+          - ReviewCenter-AccountPage-TemporaryPassword
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+
+      - id: ReviewCenter-Web-SignIn-TemporaryPasswordFormOnly
+        title: >-
+          The Web subsystem shall show a user who signed in with a temporary password only the form for changing the
+          password, with no card of personal access tokens and no appearance card.
         justification: |
           A temporary password is known to the person who set it, so the user must replace it before anything else.
         children:
-          - ReviewCenter-AccountPage-TemporaryPassword
           - ReviewCenter-AccountPage-TemporaryPassword-PasswordFormOnly
-        tests:
-          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
 
       - id: ReviewCenter-Web-SignIn-TemporaryPasswordNone
         title: >-
@@ -2710,14 +3321,20 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-UsersFilter
         title: >-
-          The Web subsystem shall narrow the list of users by the typed text and the chosen status together, without a
-          new request to the store.
+          The Web subsystem shall narrow the list of users by the typed text and the chosen status together.
         justification: |
-          A long list must be searchable at once, so both conditions apply together and need no round trip.
+          A long list must be searchable, so both conditions apply together.
         children:
           - ReviewCenter-UsersPage-SearchFilter
           - ReviewCenter-UsersPage-SearchFilter-Status
           - ReviewCenter-UsersPage-SearchFilter-Combined
+
+      - id: ReviewCenter-Web-SignIn-UsersFilterNoReload
+        title: >-
+          The Web subsystem shall narrow the list of users without a new request to the store.
+        justification: |
+          A long list must be searchable at once, without a round trip.
+        children:
           - ReviewCenter-UsersPage-SearchFilter-NoReload
 
       - id: ReviewCenter-Web-SignIn-UsersStatus
@@ -2734,14 +3351,27 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-UsersUnlock
         title: >-
-          The Web subsystem shall offer the button that ends the lockout only for a locked user, end the lockout at
-          once without a confirmation, and show the outcome.
+          The Web subsystem shall offer the button that ends the lockout only for a locked user.
         justification: |
-          Ending a lockout is harmless and urgent for the person who is locked out, so it needs no confirmation but
-          must report what happened.
+          A button for a user who is not locked would invite an action that does nothing.
         children:
           - ReviewCenter-UsersPage-Status-UnlockButton
+
+      - id: ReviewCenter-Web-SignIn-UsersUnlockAction
+        title: >-
+          The Web subsystem shall end the lockout of a user at once when the button is clicked, without a
+          confirmation.
+        justification: |
+          Ending a lockout is harmless and urgent for the person who is locked out, so it needs no confirmation.
+        children:
           - ReviewCenter-UsersPage-Status-Unlock
+
+      - id: ReviewCenter-Web-SignIn-UsersUnlockOutcome
+        title: >-
+          The Web subsystem shall show the outcome when the lockout of a user was ended.
+        justification: |
+          An action without a confirmation must at least report what happened.
+        children:
           - ReviewCenter-UsersPage-Status-UnlockOutcome
 
       - id: ReviewCenter-Web-SignIn-UsersLink
@@ -2783,12 +3413,18 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-DisableLoadError
         title: >-
-          The Web subsystem shall show an error and open no confirmation of disabling when the impact of disabling
-          cannot be loaded.
+          The Web subsystem shall show an error when the impact of disabling a user cannot be loaded.
+        justification: |
+          The administrator must be told that the impact could not be loaded.
+        children:
+          - ReviewCenter-UsersPage-DisableImpact-LoadError
+
+      - id: ReviewCenter-Web-SignIn-DisableLoadErrorNoPanel
+        title: >-
+          The Web subsystem shall open no confirmation of disabling when the impact of disabling cannot be loaded.
         justification: |
           A confirmation without the impact would ask for a decision on what is not known.
         children:
-          - ReviewCenter-UsersPage-DisableImpact-LoadError
           - ReviewCenter-UsersPage-DisableImpact-NoPanel
 
       - id: ReviewCenter-Web-SignIn-MakeAdmin
@@ -2812,13 +3448,21 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-LastAdmin
         title: >-
-          The Web subsystem shall show an error and change nothing when a system administrator tries to disable or
-          demote the last enabled system administrator.
+          The Web subsystem shall show an error when a system administrator tries to disable or demote the last enabled
+          system administrator.
         justification: |
           The tool must always keep one enabled administrator, so an action that would remove the last one is refused
           visibly.
         children:
           - ReviewCenter-UsersPage-LastAdmin
+
+      - id: ReviewCenter-Web-SignIn-LastAdminNothingChanged
+        title: >-
+          The Web subsystem shall change nothing when a system administrator tries to disable or demote the last
+          enabled system administrator.
+        justification: |
+          A refused action must leave every user as it was.
+        children:
           - ReviewCenter-UsersPage-LastAdmin-NothingChanged
 
       - id: ReviewCenter-Web-SignIn-SetPassword
@@ -2867,11 +3511,18 @@ sections:
 
       - id: ReviewCenter-Web-SignIn-NewUserRefused
         title: >-
-          The Web subsystem shall show a rule that the new user violates as a message and create no user.
+          The Web subsystem shall show a rule that the new user violates as a message.
         justification: |
-          An account that breaks a rule must be refused with the reason and must not be created half-way.
+          An account that breaks a rule must be refused with the reason.
         children:
           - ReviewCenter-UsersPage-Create-Violation
+
+      - id: ReviewCenter-Web-SignIn-NewUserNothingCreated
+        title: >-
+          The Web subsystem shall create no user when a rule is violated by the entry for a new user.
+        justification: |
+          An account that breaks a rule must not be created half-way.
+        children:
           - ReviewCenter-UsersPage-Create-NothingCreated
 
       - id: ReviewCenter-Web-SignIn-NewUserCancel
@@ -2885,19 +3536,27 @@ sections:
       - id: ReviewCenter-Web-SessionEnd
         title: >-
           The Web subsystem shall replace an open protected page whose user is no longer valid by a message that the
-          session has ended, with a link to the login page.
+          session has ended.
         justification: |
           A page that stays open makes no request, so a user who was disabled, removed, or given another role would
           otherwise keep seeing and changing review data until the page is reloaded. The page is replaced once the
           sign-in state of the page ends, and the component tests of the page units cover the live pages.
         children:
           - ReviewCenter-App-SessionGate-Ended
-          - ReviewCenter-App-SessionGate-LoginLink
           - ReviewCenter-App-SessionGate-NoContent
         tests:
           - ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions
           - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
+
+      - id: ReviewCenter-Web-SessionEnd-LoginLink
+        title: >-
+          The Web subsystem shall show in the message that the session has ended a link to the login page that returns
+          to the same page.
+        justification: |
+          A user whose session has ended needs a way to sign in again and to come back to the page.
+        children:
+          - ReviewCenter-App-SessionGate-LoginLink
 
       - id: ReviewCenter-Web-SessionEnd-Active
         title: >-
@@ -3079,48 +3738,114 @@ sections:
       - id: ReviewCenter-Web-AuditPage-Paging
         title: >-
           The Web subsystem shall show links to the older and the newer page of the audit trail only when entries exist
-          behind them and carry the filter and the page size in them.
+          behind them.
         justification: |
-          A link that leads to an empty page is useless, and a link that drops the filter would change what is read.
+          A link that leads to an empty page is useless.
         children:
           - ReviewCenter-AuditPage-Display-Paging
+
+      - id: ReviewCenter-Web-AuditPage-PagingFilter
+        title: >-
+          The Web subsystem shall carry the filter in the links to the older and the newer page, as escaped query
+          values, so that paging stays inside the filtered entries.
+        justification: |
+          A link that drops the filter would change what is read.
+        children:
           - ReviewCenter-AuditPage-Paging
-          - ReviewCenter-AuditPage-Paging-Size
           - ReviewCenter-AuditPage-Paging-Escaped
+
+      - id: ReviewCenter-Web-AuditPage-PagingSize
+        title: >-
+          The Web subsystem shall carry the page size in the links to the older and the newer page.
+        justification: |
+          A link that drops the page size would change how much is read.
+        children:
+          - ReviewCenter-AuditPage-Paging-Size
 
       - id: ReviewCenter-Web-AuditPage-ShortHash
         title: >-
-          The Web subsystem shall show a long hexadecimal value in the detail of an entry shortened and make the full
-          value available as the tooltip.
+          The Web subsystem shall show a long hexadecimal value in the detail of an entry shortened to its first 12
+          characters followed by an ellipsis.
         justification: |
-          A hash makes a row unreadable, but the full value must stay available for a check.
+          A hash makes a row unreadable.
         children:
           - ReviewCenter-AuditPage-ShortHash
+
+      - id: ReviewCenter-Web-AuditPage-ShortHashTooltip
+        title: >-
+          The Web subsystem shall make the full value of a shortened hexadecimal value available as the tooltip of the
+          shortened value.
+        justification: |
+          The full value must stay available for a check.
+        children:
           - ReviewCenter-AuditPage-ShortHash-Tooltip
 
       - id: ReviewCenter-Web-AuditPage-Refused
         title: >-
-          The Web subsystem shall show an error and no entry, and read nothing from the audit trail, to a user who is
-          not an enabled system administrator in the user store.
+          The Web subsystem shall show an error instead of the audit trail to a user who is not an enabled system
+          administrator.
         justification: |
           The role of a user can change while a page is open, so the page asks the user store again and reads nothing
           for a user who may no longer read.
         children:
           - ReviewCenter-AuditPage-Admin-Refused
+
+      - id: ReviewCenter-Web-AuditPage-Refused-Role
+        title: >-
+          The Web subsystem shall decide from the role in the user store, not from the claims of the session, whether a
+          user is a system administrator.
+        justification: |
+          The role of a user can change while a page is open, so the page asks the user store again.
+        children:
           - ReviewCenter-AuditPage-Admin-Role
+
+      - id: ReviewCenter-Web-AuditPage-Refused-Disabled
+        title: >-
+          The Web subsystem shall refuse a system administrator who is disabled in the user store.
+        justification: |
+          A disabled account must not read the audit trail whatever its role.
+        children:
           - ReviewCenter-AuditPage-Admin-Enabled
+
+      - id: ReviewCenter-Web-AuditPage-Refused-NoEntries
+        title: >-
+          The Web subsystem shall show no entry of the audit trail to a user who is refused.
+        justification: |
+          An entry that is shown to a refused user would leak the trail.
+        children:
           - ReviewCenter-AuditPage-Admin-NoEntries
+
+      - id: ReviewCenter-Web-AuditPage-Refused-NoRead
+        title: >-
+          The Web subsystem shall read nothing from the audit trail for a user who is refused.
+        justification: |
+          Reading for a refused user would expose the trail to a later mistake.
+        children:
           - ReviewCenter-AuditPage-Admin-NoRead
 
       - id: ReviewCenter-Web-AuditPage-VerifyRefused
         title: >-
-          The Web subsystem shall refuse a verification with an error, show no entry and no result, and read nothing
-          when the user who presses it is no longer an enabled system administrator.
+          The Web subsystem shall refuse a verification with an error when the user who presses it is no longer an
+          enabled system administrator.
         justification: |
           A verification reads the whole trail, so it needs the same check of the user as the page itself.
         children:
           - ReviewCenter-AuditPage-Admin-Verify
+
+      - id: ReviewCenter-Web-AuditPage-VerifyRefused-NoEntries
+        title: >-
+          The Web subsystem shall show no entry and no verification result after a refused verification.
+        justification: |
+          A refused user must learn nothing of the trail from the verification.
+        children:
           - ReviewCenter-AuditPage-Admin-VerifyNoEntries
+
+      - id: ReviewCenter-Web-AuditPage-VerifyRefused-NoRead
+        title: >-
+          The Web subsystem shall read nothing from the audit trail for a refused verification.
+        justification: |
+          A refused verification must not even touch the trail.
+        children:
           - ReviewCenter-AuditPage-Admin-VerifyNoRead
 
       - id: ReviewCenter-Web-AuditPage-HeaderLink
@@ -3141,12 +3866,22 @@ sections:
 
       - id: ReviewCenter-Web-AuditPage-Intact
         title: >-
-          The Web subsystem shall show the entry count and the head hash of an intact chain.
+          The Web subsystem shall show the number of entries of an intact hash chain when a system administrator
+          verifies the chain.
+        justification: |
+          The count tells the system administrator how much of the trail the verification covered.
+        children:
+          - ReviewCenter-AuditPage-Verify
+        tests:
+          - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
+
+      - id: ReviewCenter-Web-AuditPage-IntactHeadHash
+        title: >-
+          The Web subsystem shall show the full head hash of an intact hash chain, not shortened.
         justification: |
           The head hash is what a system administrator records outside the database to detect the later removal of the
           newest entries.
         children:
-          - ReviewCenter-AuditPage-Verify
           - ReviewCenter-AuditPage-Verify-HeadHash
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
@@ -3158,6 +3893,15 @@ sections:
           A system administrator who learns that the trail was altered needs to know where to look first.
         children:
           - ReviewCenter-AuditPage-Verify-Broken
+        tests:
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+
+      - id: ReviewCenter-Web-AuditPage-BrokenHeadHash
+        title: >-
+          The Web subsystem shall show the head hash of the last entry that verified when the hash chain is broken.
+        justification: |
+          The last verified entry tells where the intact part of the trail ends.
+        children:
           - ReviewCenter-AuditPage-Verify-BrokenHeadHash
         tests:
           - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
@@ -3185,23 +3929,45 @@ sections:
 
       - id: ReviewCenter-Web-AuditPage-FilterAddress
         title: >-
-          The Web subsystem shall read the choice of the filter from the address and treat a value that cannot be used
-          as no condition, and a page size that cannot be used as 50.
+          The Web subsystem shall read the choice of the filter from the address and show it in the filter form, so that
+          the form and a link to a view are the same.
         justification: |
-          A filter that lives in the address can be shared, and a hand-edited address must not break the page.
+          A filter that lives in the address can be shared.
         children:
           - ReviewCenter-AuditPage-Filter-Address
+
+      - id: ReviewCenter-Web-AuditPage-FilterAddressFallback
+        title: >-
+          The Web subsystem shall treat a filter value of the address that cannot be used as no condition instead of
+          failing.
+        justification: |
+          A hand-edited address must not break the page.
+        children:
           - ReviewCenter-AuditPage-Filter-Fallback
+
+      - id: ReviewCenter-Web-AuditPage-FilterAddressFallbackSize
+        title: >-
+          The Web subsystem shall use a page size of 50 when the page size of the address cannot be used.
+        justification: |
+          A page size that is not offered must not change how much is read.
+        children:
           - ReviewCenter-AuditPage-Filter-FallbackSize
 
       - id: ReviewCenter-Web-AuditPage-FilterReversed
         title: >-
-          The Web subsystem shall ignore a range of days that ends before it starts and say so.
+          The Web subsystem shall ignore a range of days that ends before it starts.
         justification: |
-          A range that ends before it starts matches nothing, so it is dropped with a message instead of an empty
-          trail that looks like no activity.
+          A range that ends before it starts matches nothing, so it is dropped instead of showing an empty trail that
+          looks like no activity.
         children:
           - ReviewCenter-AuditPage-Filter-Reversed
+
+      - id: ReviewCenter-Web-AuditPage-FilterReversedMessage
+        title: >-
+          The Web subsystem shall say that a range of days that ends before it starts is ignored.
+        justification: |
+          The reader must learn why the range has no effect.
+        children:
           - ReviewCenter-AuditPage-Filter-ReversedMessage
 
       - id: ReviewCenter-Web-AuditPage-ExportCsv
@@ -3215,26 +3981,49 @@ sections:
 
       - id: ReviewCenter-Web-AuditPage-ExportLinks
         title: >-
-          The Web subsystem shall point the export links to /audit/export for the whole audit trail and to
-          /projects/{project}/audit/export for a project, carrying the filter and never the paging.
+          The Web subsystem shall point the export links of the whole audit trail to /audit/export and the export links
+          of the audit trail of a project to /projects/{project}/audit/export of that project.
         justification: |
-          An export must hold what the reader filtered, and all of it, so the links carry the filter and not the page.
+          An export must come from the endpoint of the trail that the reader is looking at.
         children:
           - ReviewCenter-AuditPage-Export-GlobalTarget
           - ReviewCenter-AuditPage-Export-ProjectTarget
+
+      - id: ReviewCenter-Web-AuditPage-ExportFilter
+        title: >-
+          The Web subsystem shall carry the current filter in the export links, and the chosen project in those of the
+          whole audit trail, as escaped query values.
+        justification: |
+          An export must hold what the reader filtered.
+        children:
           - ReviewCenter-AuditPage-Export-Filter
           - ReviewCenter-AuditPage-Export-Project
           - ReviewCenter-AuditPage-Export-Escaped
+
+      - id: ReviewCenter-Web-AuditPage-ExportNoPaging
+        title: >-
+          The Web subsystem shall never carry the page size or the paging cursors in the export links.
+        justification: |
+          An export must hold all matching entries, so the links carry the filter and not the page.
+        children:
           - ReviewCenter-AuditPage-Export-NoPaging
 
       - id: ReviewCenter-Web-AuditPage-ExportNote
         title: >-
           The Web subsystem shall state next to the export links that the export covers every entry that matches the
-          filter and whether the audit chain is intact.
+          filter, not only the page shown.
         justification: |
-          A reader who takes the trail away must know that it is complete and whether it can be trusted.
+          A reader who takes the trail away must know that it is complete.
         children:
           - ReviewCenter-AuditPage-Export-Note
+
+      - id: ReviewCenter-Web-AuditPage-ExportNoteChain
+        title: >-
+          The Web subsystem shall state next to the export links that the export states whether the audit chain is
+          intact.
+        justification: |
+          A reader who takes the trail away must know whether it can be trusted.
+        children:
           - ReviewCenter-AuditPage-Export-Chain
 
       - id: ReviewCenter-Web-AuditPage-ExportJson
@@ -3337,12 +4126,18 @@ sections:
 
       - id: ReviewCenter-Web-Repositories-RegisterRefused
         title: >-
-          The Web subsystem shall show a violated rule as an error message and create no repository when a repository
-          is registered.
+          The Web subsystem shall show a violated rule as an error message when a repository is registered.
         justification: |
-          A repository that breaks a rule must be refused with the reason and must not be half registered.
+          A repository that breaks a rule must be refused with the reason.
         children:
           - ReviewCenter-RepositoriesPage-Create-Violation
+
+      - id: ReviewCenter-Web-Repositories-RegisterNothingCreated
+        title: >-
+          The Web subsystem shall create no repository when a rule is violated by the registration.
+        justification: |
+          A repository that breaks a rule must not be half registered.
+        children:
           - ReviewCenter-RepositoriesPage-Create-NothingCreated
 
       - id: ReviewCenter-Web-Repositories-AddPage
@@ -3635,12 +4430,19 @@ sections:
       - id: ReviewCenter-Web-DiffReview-CommentForm
         title: >-
           The Web subsystem shall offer in the comment form of the Diff view a whole-file comment that keeps the typed
-          text, and a Cancel that closes the form and clears the selection.
+          text.
         justification: |
-          A reader who started on a line may decide that the remark is about the file, or may give up, and must not
-          lose the text or be left with a stale selection.
+          A reader who started on a line may decide that the remark is about the file, and must not lose the text.
         children:
           - ReviewCenter-ReviewPage-DiffComment-WholeFile
+
+      - id: ReviewCenter-Web-DiffReview-CommentFormCancel
+        title: >-
+          The Web subsystem shall close the comment form of the Diff view and clear the selection when Cancel is
+          chosen.
+        justification: |
+          A reader who gives up must not be left with a stale selection.
+        children:
           - ReviewCenter-ReviewPage-DiffComment-Cancel
 
       - id: ReviewCenter-Web-DiffReview-LineThreads
@@ -3658,13 +4460,18 @@ sections:
 
       - id: ReviewCenter-Web-DiffReview-FileThreads
         title: >-
-          The Web subsystem shall list the whole-file threads of a file below its Diff view and count the open threads
-          of both sides in the file list.
+          The Web subsystem shall list the whole-file threads of a file below its Diff view.
         justification: |
-          A remark about a whole file has no line to sit under, and the reader needs to see in the file list where
-          open discussions wait.
+          A remark about a whole file has no line to sit under.
         children:
           - ReviewCenter-ReviewPage-DiffThreads-WholeFileOnly
+
+      - id: ReviewCenter-Web-DiffReview-FileThreadsCounts
+        title: >-
+          The Web subsystem shall count the open threads of both sides of a file in the file list.
+        justification: |
+          The reader needs to see in the file list where open discussions wait.
+        children:
           - ReviewCenter-ReviewPage-DiffThreads-Counts
 
       - id: ReviewCenter-Web-DiffReview-Unavailable
@@ -3731,19 +4538,34 @@ sections:
 
       - id: ReviewCenter-Web-DeepLinks-ThreadLink
         title: >-
-          The Web subsystem shall show on every thread a link to its address and a Copy link button that copies the
-          absolute address and confirms it with "Copied" for two seconds.
+          The Web subsystem shall show on every thread a link to its address.
         justification: |
-          A reviewer who wants to point a colleague at one thread needs the address at hand and should not have to
-          build it from the address bar. The subsystem test guards the style of the link to a thread.
+          A reviewer who wants to point a colleague at one thread needs the address at hand. The subsystem test guards
+          the style of the link to a thread.
         children:
           - ReviewCenter-ReviewPage-DeepLinks-ThreadLink
-          - ReviewCenter-ReviewPage-DeepLinks-CopyButton
-          - ReviewCenter-ReviewPage-DeepLinks-CopyLink
-          - ReviewCenter-ReviewPage-DeepLinks-CopyConfirm
-          - ReviewCenter-ReviewPage-DeepLinks-CopyTiming
         tests:
           - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
+
+      - id: ReviewCenter-Web-DeepLinks-ThreadLinkCopy
+        title: >-
+          The Web subsystem shall show on every thread a Copy link button that copies the absolute address of the
+          thread to the clipboard.
+        justification: |
+          A reviewer should not have to build the address from the address bar.
+        children:
+          - ReviewCenter-ReviewPage-DeepLinks-CopyButton
+          - ReviewCenter-ReviewPage-DeepLinks-CopyLink
+
+      - id: ReviewCenter-Web-DeepLinks-ThreadLinkCopyConfirm
+        title: >-
+          The Web subsystem shall confirm a copy of the thread address with the message "Copied" until two seconds
+          after the latest click.
+        justification: |
+          A copy to the clipboard shows nothing by itself, so the reader needs a short confirmation.
+        children:
+          - ReviewCenter-ReviewPage-DeepLinks-CopyConfirm
+          - ReviewCenter-ReviewPage-DeepLinks-CopyTiming
 
       - id: ReviewCenter-Web-DeepLinks-CopyFailed
         title: >-
@@ -3763,17 +4585,36 @@ sections:
 
       - id: ReviewCenter-Web-DeepLinks-NotFound
         title: >-
-          The Web subsystem shall answer an address that names nothing in the review with a message in the page, with
-          a link back to the file list, a working file list and no error page, and clear the message when the reader
-          chooses a file.
+          The Web subsystem shall answer an address that names nothing in the review with a message in the page and not
+          with an error page.
         justification: |
-          A stale or mistyped link is common, and the reader must be able to carry on with the review from the same
-          page instead of meeting an error page.
+          A stale or mistyped link is common, and the reader must meet a message instead of an error page.
         children:
           - ReviewCenter-ReviewPage-DeepLinksNotFound
           - ReviewCenter-ReviewPage-DeepLinksNotFound-NoErrorPage
+
+      - id: ReviewCenter-Web-DeepLinks-NotFoundWayBack
+        title: >-
+          The Web subsystem shall show with the not-found message a link back to the file list of the review.
+        justification: |
+          The reader must be able to carry on with the review from the same page.
+        children:
           - ReviewCenter-ReviewPage-DeepLinksNotFound-WayBack
+
+      - id: ReviewCenter-Web-DeepLinks-NotFoundFileList
+        title: >-
+          The Web subsystem shall keep the file list working when it shows the not-found message.
+        justification: |
+          A file list that stops working would leave the reader stuck on the message.
+        children:
           - ReviewCenter-ReviewPage-DeepLinksNotFound-FileList
+
+      - id: ReviewCenter-Web-DeepLinks-NotFoundCleared
+        title: >-
+          The Web subsystem shall clear the not-found message when the reader chooses a file.
+        justification: |
+          A message about an address that was left must not stay on the page.
+        children:
           - ReviewCenter-ReviewPage-DeepLinksNotFound-Cleared
 
       - id: ReviewCenter-Web-DeepLinks-UnknownSide
@@ -3839,32 +4680,45 @@ sections:
 
       - id: ReviewCenter-Web-PlanReviews-NoForm
         title: >-
-          The Web subsystem shall show a plain message instead of the plan form for a project that does not exist or
-          that has no repository.
+          The Web subsystem shall show a plain message that names the project, instead of the plan form, for a project
+          that does not exist.
         justification: |
-          A plan needs a project with a repository, so an address that names no such project must end in a plain
-          message and not in an empty form.
+          A plan needs a project, so an address that names no such project must end in a plain message and not in an
+          empty form.
         children:
           - ReviewCenter-PlanPage-Form-NotFound
+
+      - id: ReviewCenter-Web-PlanReviews-NoRepository
+        title: >-
+          The Web subsystem shall show a plain message that names whom to ask, instead of the plan form, for a project
+          that has no repository.
+        justification: |
+          A plan needs a repository, and the user must learn whom to ask for one.
+        children:
           - ReviewCenter-PlanPage-Form-NoRepository
 
       - id: ReviewCenter-Web-PlanReviews-Incomplete
         title: >-
-          The Web subsystem shall say what is missing and read nothing from the repository when a plan is requested
-          with an incomplete form.
+          The Web subsystem shall say what is missing when a plan is requested with an incomplete form.
         justification: |
-          A user who forgot a field must be told which one, and a half-filled request must not make the server run
-          git.
+          A user who forgot a field must be told which one.
         children:
           - ReviewCenter-PlanPage-Form-MissingRepository
           - ReviewCenter-PlanPage-Form-MissingHead
           - ReviewCenter-PlanPage-Form-MissingBaseline
+
+      - id: ReviewCenter-Web-PlanReviews-IncompleteNoGitRead
+        title: >-
+          The Web subsystem shall read nothing from the repository when a plan is requested with an incomplete form.
+        justification: |
+          A half-filled request must not make the server run git.
+        children:
           - ReviewCenter-PlanPage-Form-NoGitRead
 
       - id: ReviewCenter-Web-PlanReviews-Reset
         title: >-
-          The Web subsystem shall discard the plan, and a shown error, when the head revision, the baseline choice,
-          the repository or the baseline revision of the form changes.
+          The Web subsystem shall discard the plan when the head revision, the baseline choice, the repository or the
+          baseline revision of the form changes.
         justification: |
           A plan that was made for other inputs would mislead the user into creating reviews that no longer match the
           form.
@@ -3873,32 +4727,68 @@ sections:
           - ReviewCenter-PlanPage-State-Mode
           - ReviewCenter-PlanPage-State-Repository
           - ReviewCenter-PlanPage-State-BaselineRevision
+
+      - id: ReviewCenter-Web-PlanReviews-Reset-Error
+        title: >-
+          The Web subsystem shall discard a shown error when the form of the plan page changes.
+        justification: |
+          An error about an earlier input would mislead the user about the new input.
+        children:
           - ReviewCenter-PlanPage-State-Error
 
       - id: ReviewCenter-Web-PlanReviews-ProjectSwitch
         title: >-
-          The Web subsystem shall clear the form, the plan and the results, and ignore a late answer, when the plan
-          page is reused for another project.
+          The Web subsystem shall clear the form, the plan and the results of created reviews when the plan page is
+          reused for another project.
         justification: |
           The plan page is reused when the user moves between projects, and nothing of one project may show in or be
           created for another.
         children:
           - ReviewCenter-PlanPage-State-Project
           - ReviewCenter-PlanPage-State-ProjectResults
+
+      - id: ReviewCenter-Web-PlanReviews-ProjectSwitchLateAnswer
+        title: >-
+          The Web subsystem shall ignore a plan or the results of creating that arrive after the plan page was reused
+          for another project.
+        justification: |
+          A slow answer for the former project must not appear under the new one.
+        children:
           - ReviewCenter-PlanPage-State-StaleRead
           - ReviewCenter-PlanPage-State-StaleCreate
+
+      - id: ReviewCenter-Web-PlanReviews-ProjectSwitchFreeForm
+        title: >-
+          The Web subsystem shall leave the form of the new project usable after a late answer of the former project
+          was ignored.
+        justification: |
+          Ignoring a late answer must not leave the form of the new project locked.
+        children:
           - ReviewCenter-PlanPage-State-FreeForm
 
       - id: ReviewCenter-Web-PlanReviews-Busy
         title: >-
-          The Web subsystem shall say that the repository is being read, and disable the form while it is read or
-          while reviews are created.
+          The Web subsystem shall say that the repository is being read while it is read.
         justification: |
           Reading a repository and creating reviews take time, and a second click in the meantime would start the work
           twice.
         children:
           - ReviewCenter-PlanPage-State-Loading
+
+      - id: ReviewCenter-Web-PlanReviews-Busy-ReadDisabled
+        title: >-
+          The Web subsystem shall disable the form while the repository is read.
+        justification: |
+          A second click while the repository is read would start the work twice.
+        children:
           - ReviewCenter-PlanPage-State-ReadDisabled
+
+      - id: ReviewCenter-Web-PlanReviews-Busy-CreateDisabled
+        title: >-
+          The Web subsystem shall disable the form while the reviews are created.
+        justification: |
+          A second click while the reviews are created would create them twice.
+        children:
           - ReviewCenter-PlanPage-State-CreateDisabled
 
       - id: ReviewCenter-Web-PlanReviews-Interactive
@@ -3978,13 +4868,20 @@ sections:
 
       - id: ReviewCenter-Web-PlanReviews-OtherSets
         title: >-
-          The Web subsystem shall show the sets that are already filed with a link to their review, and the sets that
-          cannot be planned with the reason as plain text and without a checkbox.
+          The Web subsystem shall show the sets that are already filed with a link to their review.
         justification: |
-          A user must see why a set is not offered for creation, either because the review exists or because the plan
-          could not be made, and must not be able to tick it.
+          A user must see why a set is not offered for creation when the review exists, and must be able to open it.
         children:
           - ReviewCenter-PlanPage-Rows-FiledSets
+
+      - id: ReviewCenter-Web-PlanReviews-ProblemSets
+        title: >-
+          The Web subsystem shall show the sets that cannot be planned with the reason as plain text, and without a
+          checkbox.
+        justification: |
+          A user must see why a set is not offered for creation, in words that tell what to correct, and must not be
+          able to tick it.
+        children:
           - ReviewCenter-PlanPage-Rows-ProblemSets
           - ReviewCenter-PlanPage-Rows-PlainReason
 
@@ -4007,22 +4904,34 @@ sections:
 
       - id: ReviewCenter-Web-PlanReviews-RowFailed
         title: >-
-          The Web subsystem shall show a review that could not be created as failed, with the reason and never the
-          text printed by git.
+          The Web subsystem shall show a review that could not be created as failed, with the reason.
         justification: |
-          A user needs to know which review failed and why, in words, and the output of git would not help.
+          A user needs to know which review failed and why.
         children:
           - ReviewCenter-PlanPage-Create-ResultFailed
+
+      - id: ReviewCenter-Web-PlanReviews-RowFailedNoGitText
+        title: >-
+          The Web subsystem shall never show the text printed by git in a result of creating reviews.
+        justification: |
+          The output of git would not help the user and may expose details of the server.
+        children:
           - ReviewCenter-PlanPage-Create-NoGitText
 
       - id: ReviewCenter-Web-PlanReviews-RowFailedKeeps
         title: >-
-          The Web subsystem shall continue with the other ticked rows and keep the reviews already created when one
-          row fails.
+          The Web subsystem shall continue with the other ticked rows when one row fails.
         justification: |
-          One bad set must not undo the work for the others or leave the user to repeat it.
+          One bad set must not stop the work for the others.
         children:
           - ReviewCenter-PlanPage-Create-FailedKeepsOthers
+
+      - id: ReviewCenter-Web-PlanReviews-RowFailedKeepsEarlier
+        title: >-
+          The Web subsystem shall keep the reviews already created when a later row fails.
+        justification: |
+          One bad set must not undo the work already done or leave the user to repeat it.
+        children:
           - ReviewCenter-PlanPage-Create-FailedKeepsEarlier
 
       - id: ReviewCenter-Web-PlanReviews-Refused
@@ -4035,13 +4944,19 @@ sections:
 
       - id: ReviewCenter-Web-PlanReviews-RefusedNothing
         title: >-
-          The Web subsystem shall keep the plan and its ticks and create no review when the whole batch is refused.
+          The Web subsystem shall create no review when the whole batch is refused.
         justification: |
-          A refused batch must leave nothing half done, and the user must be able to correct the cause and press
-          Create again without planning anew.
+          A refused batch must leave nothing half done.
+        children:
+          - ReviewCenter-PlanPage-Create-RefusedCreatesNothing
+
+      - id: ReviewCenter-Web-PlanReviews-RefusedKeepsPlan
+        title: >-
+          The Web subsystem shall keep the plan and its ticks when the whole batch is refused.
+        justification: |
+          The user must be able to correct the cause and press Create again without planning anew.
         children:
           - ReviewCenter-PlanPage-Create-RefusedKeepsPlan
-          - ReviewCenter-PlanPage-Create-RefusedCreatesNothing
 
       - id: ReviewCenter-Web-PlanReviews-Failures
         title: >-
@@ -4095,9 +5010,17 @@ sections:
           A user who completes a review needs the evidence at hand, and a review that is not concluded has none yet.
         children:
           - ReviewCenter-ReviewPage-Attestation
-          - ReviewCenter-ReviewPage-Attestation-Address
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+
+      - id: ReviewCenter-Web-Attestation-Address
+        title: >-
+          The Web subsystem shall link the download button of the attestation to the attestation address of the project
+          and the review.
+        justification: |
+          The download must fetch the attestation of this review, not of another.
+        children:
+          - ReviewCenter-ReviewPage-Attestation-Address
 
       - id: ReviewCenter-Web-Attestation-NotConcluded
         title: >-
@@ -4190,16 +5113,22 @@ sections:
 
       - id: ReviewCenter-Web-AccessTokens-ValueOnce
         title: >-
-          The Web subsystem shall show the value of a new token once, until the user dismisses it, with a note that it
-          cannot be shown again.
+          The Web subsystem shall show the value of a new token once, until the user dismisses it.
         justification: |
           The value of a token cannot be read again later, so the one time that it is shown is the only chance to note
           it down.
         children:
           - ReviewCenter-AccountPage-TokenCreate-ValueOnce
-          - ReviewCenter-AccountPage-TokenCreate-Note
         tests:
           - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+
+      - id: ReviewCenter-Web-AccessTokens-ValueOnceNote
+        title: >-
+          The Web subsystem shall show with the value of a new token a note that the value cannot be shown again.
+        justification: |
+          A user who does not know that the value is shown only once may close it before taking it.
+        children:
+          - ReviewCenter-AccountPage-TokenCreate-Note
 
       - id: ReviewCenter-Web-AccessTokens-Refused
         title: >-
@@ -4230,13 +5159,19 @@ sections:
 
       - id: ReviewCenter-Web-AccessTokens-CopyRefused
         title: >-
-          The Web subsystem shall show a hint to copy the value by hand, and keep the value on the page, when the
-          browser refuses the copy of a new token.
+          The Web subsystem shall show a hint to copy the value by hand when the browser refuses the copy of a new
+          token.
         justification: |
-          A browser may refuse the clipboard, and the user must still be able to take the value, which appears only
-          once.
+          A browser may refuse the clipboard, and the user must still be told how to take the value.
         children:
           - ReviewCenter-AccountPage-TokenCopy-Hint
+
+      - id: ReviewCenter-Web-AccessTokens-CopyRefusedValueKept
+        title: >-
+          The Web subsystem shall keep the value of a new token on the page when the browser refuses the copy.
+        justification: |
+          The value appears only once, so it must stay at hand for the copy by hand.
+        children:
           - ReviewCenter-AccountPage-TokenCopy-ValueKept
 
       - id: ReviewCenter-Web-AccessTokens-List
@@ -4395,13 +5330,19 @@ sections:
 
       - id: ReviewCenter-Web-EvidenceSettings-SaveUnchanged
         title: >-
-          The Web subsystem shall say that there is nothing to save, and record no audit entry, when the user saves
-          the evidence switches without a change.
+          The Web subsystem shall say that there is nothing to save when the user saves the evidence switches without a
+          change.
         justification: |
-          A save without a change must not look like a decision, and an audit trail that holds entries for no change
-          would hide the real ones.
+          A save without a change must not look like a decision.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingToSave
+
+      - id: ReviewCenter-Web-EvidenceSettings-SaveUnchangedNothingRecorded
+        title: >-
+          The Web subsystem shall record no audit entry when the user saves the evidence switches without a change.
+        justification: |
+          An audit trail that holds entries for no change would hide the real ones.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingRecorded
 
       - id: ReviewCenter-Web-EvidenceSettings-Audit
@@ -4426,13 +5367,29 @@ sections:
 
       - id: ReviewCenter-Web-EvidenceSettings-RightLost
         title: >-
-          The Web subsystem shall refuse a save of the evidence switches after the right to administer the project was
-          lost.
+          The Web subsystem shall replace the evidence settings page with the not-found message, without form, error or
+          status, when the user saves after the right to administer the project was lost.
         justification: |
           A page that stays open must not let a user who lost the right keep deciding.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsRightLost
+
+      - id: ReviewCenter-Web-EvidenceSettings-RightLostNothingChanged
+        title: >-
+          The Web subsystem shall store and record nothing when the user saves or changes a switch after the right to
+          administer the project was lost.
+        justification: |
+          A user who lost the right must not leave a trace in the settings of the project.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsRightLost-NothingChanged
+
+      - id: ReviewCenter-Web-EvidenceSettings-RightLostSwitch
+        title: >-
+          The Web subsystem shall replace the evidence settings with the not-found message, without warning, summary
+          or settings, when the user changes a switch after the right to administer the project was lost.
+        justification: |
+          A switch that is changed on a page that stays open must lead to the refusal at once.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsRightLost-Switch
 
       - id: ReviewCenter-Web-EvidenceSettings-OtherProject
@@ -4484,7 +5441,7 @@ sections:
           The Web subsystem shall show anybody else who opens the checklist template page the page of a project that
           does not exist.
         justification: |
-          The page must not reveal a project to a user who may not administer it.
+          The checklist template page must not reveal a project to a user who may not administer it.
         children:
           - ReviewCenter-ProjectPage-ChecklistAccess-NotFound
           - ReviewCenter-ProjectPage-ChecklistAccess-MissingProject
@@ -4556,13 +5513,18 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate-ImportFileRefused
         title: >-
-          The Web subsystem shall refuse a chosen checklist file larger than 256 KiB, naming the limit, and drop the
-          earlier import.
+          The Web subsystem shall refuse a chosen checklist file larger than 256 KiB, naming the limit.
         justification: |
-          A file of unbounded size would burden the server, and an import that was dropped must not be mistaken for
-          the one that is shown.
+          A file of unbounded size would burden the server.
         children:
           - ReviewCenter-ProjectPage-ChecklistImport-FileTooLarge
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ImportFileRefusedDropsImport
+        title: >-
+          The Web subsystem shall drop the earlier import when it refuses a chosen checklist file.
+        justification: |
+          An import that was dropped must not be mistaken for the one that is shown.
+        children:
           - ReviewCenter-ProjectPage-ChecklistImport-RefusedFileDropsImport
 
       - id: ReviewCenter-Web-ChecklistTemplate-Validation
@@ -4577,14 +5539,28 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate-ValidationNothingChanged
         title: >-
-          The Web subsystem shall say that nothing was changed, show no preview and store and audit nothing while it
-          only checks a checklist definition.
+          The Web subsystem shall say that nothing was changed when it shows the errors of an invalid checklist
+          definition.
         justification: |
           Checking a definition is a dry run, and the administrator must be told that the current checklist is still
           in force.
         children:
           - ReviewCenter-ProjectPage-ChecklistImport-NothingChangedNotice
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ValidationNoPreview
+        title: >-
+          The Web subsystem shall show no preview for an invalid checklist definition.
+        justification: |
+          A preview of a definition that cannot be used would suggest that it could be put in force.
+        children:
           - ReviewCenter-ProjectPage-ChecklistImport-NoPreview
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ValidationNothingStored
+        title: >-
+          The Web subsystem shall store and audit nothing while it only checks a checklist definition.
+        justification: |
+          A check must not change the stored checklist or leave an entry in the audit trail.
+        children:
           - ReviewCenter-ProjectPage-ChecklistImport-NothingStored
 
       - id: ReviewCenter-Web-ChecklistTemplate-ValidationSample
@@ -4619,14 +5595,21 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate-DifferencesNone
         title: >-
-          The Web subsystem shall report no difference between identical checklists, for a change of letter case,
-          order or a missing hint only, and say that there is nothing to replace.
+          The Web subsystem shall report no difference between identical checklists, or for a change of letter case,
+          order or a missing hint only.
         justification: |
-          A change that does not alter the meaning of the checklist must not raise a new version of it, and the
-          administrator must be told that a replacement would do nothing.
+          A change that does not alter the meaning of the checklist must not raise a new version of it.
         children:
           - ReviewCenter-ProjectPage-ChecklistPreview-Ignored
           - ReviewCenter-ProjectPage-ChecklistPreview-NoChange
+
+      - id: ReviewCenter-Web-ChecklistTemplate-DifferencesNothingToReplace
+        title: >-
+          The Web subsystem shall say that there is nothing to replace when the definition equals the current
+          checklist.
+        justification: |
+          The administrator must be told that a replacement would do nothing.
+        children:
           - ReviewCenter-ProjectPage-ChecklistPreview-NothingToReplace
 
       - id: ReviewCenter-Web-ChecklistTemplate-LabelWarning
@@ -4685,14 +5668,28 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate-ReplaceRefused
         title: >-
-          The Web subsystem shall show that the version label must change, leave the stored checklist unchanged and
-          keep the definition and its preview when the service refuses a replacement.
+          The Web subsystem shall show that the version label must change when the service refuses a replacement that
+          keeps the version label.
         justification: |
-          An administrator whose replacement is refused must learn what to fix and must not have to paste the
-          definition again.
+          An administrator whose replacement is refused must learn what to fix.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace-Refusal
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ReplaceNothingStored
+        title: >-
+          The Web subsystem shall leave the stored checklist unchanged when the service refuses a replacement.
+        justification: |
+          A refused replacement must not alter the checklist that is in force.
+        children:
           - ReviewCenter-ProjectPage-ChecklistReplace-RefusalNothingStored
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ReplaceKeepsCandidate
+        title: >-
+          The Web subsystem shall keep the definition and its preview on the page after the service refused the
+          replacement.
+        justification: |
+          An administrator must not have to paste the definition again after fixing the version label.
+        children:
           - ReviewCenter-ProjectPage-ChecklistReplace-RefusalKeepsCandidate
 
       - id: ReviewCenter-Web-ChecklistTemplate-Reset
@@ -4796,12 +5793,19 @@ sections:
       - id: ReviewCenter-Web-DueDate-PastRefused
         title: >-
           The Web subsystem shall refuse a due date in the past on the page for a new review, naming the due date in
-          the error, and create no review.
+          the error.
         justification: |
           A date that has already passed cannot be met, so a review that starts with one would be late from the first
           day.
         children:
           - ReviewCenter-ProjectPage-NewReviewDueDate-PastDate
+
+      - id: ReviewCenter-Web-DueDate-PastNothingCreated
+        title: >-
+          The Web subsystem shall create no review when it has refused the due date of the page for a new review.
+        justification: |
+          A refused request must leave nothing behind that the user has to find and remove.
+        children:
           - ReviewCenter-ProjectPage-NewReviewDueDate-PastDateNothingCreated
 
       - id: ReviewCenter-Web-DueDate-PlanDefault
@@ -4875,12 +5879,19 @@ sections:
           The date is a commitment, so only those who answer for the review may move it, and a locked review is
           closed.
         children:
-          - ReviewCenter-ReviewPage-DueDate-SaveDate
           - ReviewCenter-ReviewPage-DueDate-SystemAdminForm
           - ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
           - ReviewCenter-ReviewPage-DueDate-CreatorForm
         tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+
+      - id: ReviewCenter-Web-DueDate-ChangeSave
+        title: >-
+          The Web subsystem shall show the new date after the save button was pressed with a valid date.
+        justification: |
+          The entitled user must see that the date was stored.
+        children:
+          - ReviewCenter-ReviewPage-DueDate-SaveDate
 
       - id: ReviewCenter-Web-DueDate-NoForm
         title: >-
@@ -4918,27 +5929,30 @@ sections:
         title: >-
           The Web subsystem shall show on the project page, for every review, its stage.
         justification: |
-          The project page is where a lead starts. It has to show who is holding each review up. The behavior needs a
-          live connection, so it is verified by the component tests of the unit.
-        children:
-          - ReviewCenter-ProjectPage-Approval
-          - ReviewCenter-ProjectPage-Approval-Setup
-          - ReviewCenter-ProjectPage-Approval-Rejected
-          - ReviewCenter-ProjectPage-Approval-InReview
+          The project page is where a lead starts. The lead must see at a glance how far each review has come. The
+          behavior needs a live connection, so it is verified by the component tests of the unit.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
       - id: ReviewCenter-Web-Progress-Signatures
         title: >-
-          The Web subsystem shall show on the project page, for every review, its signatures, including those that need
-          to be given again.
+          The Web subsystem shall show on the project page, for every review, how many signatures were given of how many
+          are needed, and a dash for a review in Setup.
         justification: |
-          A lead must see who has signed and who has to sign again.
+          A lead must see who has signed.
         children:
           - ReviewCenter-ProjectPage-Progress
-          - ReviewCenter-ProjectPage-Progress-OutOfDate
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-SignaturesOutOfDate
+        title: >-
+          The Web subsystem shall say on the project page, for a review in which a signature is out of date, that the
+          signature was given and the review changed afterwards.
+        justification: |
+          A lead must see who has to sign again.
+        children:
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
 
       - id: ReviewCenter-Web-Progress-Blockers
         title: >-
@@ -4984,41 +5998,72 @@ sections:
 
       - id: ReviewCenter-Web-Progress-DateFormat
         title: >-
-          The Web subsystem shall write the dates of the project page in the invariant culture, in Gregorian digits,
-          and give the times as machine-readable attributes.
+          The Web subsystem shall write the dates of the project page in the invariant culture, in Gregorian digits.
         justification: |
-          A date that reads differently for each visitor, or that a script cannot parse, cannot be compared between
-          people or tools.
+          A date that reads differently for each visitor cannot be compared between people.
         children:
           - ReviewCenter-ProjectPage-Progress-Culture
+        tests:
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-Web-Progress-DateFormat-Attributes
+        title: >-
+          The Web subsystem shall give the times of the project page as machine-readable attributes.
+        justification: |
+          A date that a script cannot parse cannot be compared between tools.
+        children:
           - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
       - id: ReviewCenter-Web-Progress-DueDate
         title: >-
-          The Web subsystem shall show on the project page, for every review, its due date with the Overdue badge.
+          The Web subsystem shall show on the project page, for every review, its due date, or a dash for a review
+          without one.
         justification: |
-          A lead must see which reviews are late without opening them.
+          A lead must see when each review is due without opening it.
         children:
           - ReviewCenter-ProjectPage-Progress-DueDate
-          - ReviewCenter-ProjectPage-Progress-Overdue
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
+      - id: ReviewCenter-Web-Progress-DueDateOverdue
+        title: >-
+          The Web subsystem shall show an Overdue badge on the project page on a review whose due date has passed.
+        justification: |
+          A lead must see which reviews are late without comparing dates.
+        children:
+          - ReviewCenter-ProjectPage-Progress-Overdue
+
       - id: ReviewCenter-Web-Progress-Summary
         title: >-
-          The Web subsystem shall show on the project page a summary of the reviews by stage and the overdue ones.
+          The Web subsystem shall show on the project page a summary of the number of reviews by stage, including the
+          rejected ones.
         justification: |
           A lead reads the state of the project before reading the table.
         children:
           - ReviewCenter-ProjectPage-Summary
           - ReviewCenter-ProjectPage-Summary-Rejected
-          - ReviewCenter-ProjectPage-Summary-Overdue
-          - ReviewCenter-ProjectPage-Summary-AllReviews
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+
+      - id: ReviewCenter-Web-Progress-SummaryOverdue
+        title: >-
+          The Web subsystem shall show the number of overdue reviews in the summary on the project page.
+        justification: |
+          A lead must see how many reviews are late before reading the table.
+        children:
+          - ReviewCenter-ProjectPage-Summary-Overdue
+
+      - id: ReviewCenter-Web-Progress-SummaryAllReviews
+        title: >-
+          The Web subsystem shall count all reviews of the project in the summary, and not only the ones that a filter
+          shows.
+        justification: |
+          A filter changes what the table shows, and the figures of the summary must not follow it.
+        children:
+          - ReviewCenter-ProjectPage-Summary-AllReviews
 
       - id: ReviewCenter-Web-Progress-Filters
         title: >-
@@ -5116,13 +6161,29 @@ sections:
 
       - id: ReviewCenter-Web-Progress-AuditorRestrictions
         title: >-
-          The Web subsystem shall offer a read-only auditor of the project no control that creates, plans or
-          administers, including on the page for a new review and after an administrator made the own role auditor.
+          The Web subsystem shall offer a read-only auditor of the project no control that creates, plans or administers
+          on the project page.
         justification: |
           Read access must not become a way to change records, and the rights must follow a change of role at once.
         children:
           - ReviewCenter-ProjectPage-ReadOnly-NoControls
+
+      - id: ReviewCenter-Web-Progress-AuditorRestrictions-NewReviewPage
+        title: >-
+          The Web subsystem shall show a read-only auditor on the page for a new review the read-only notice instead of
+          the form.
+        justification: |
+          The form of a new review would invite an action that the auditor may not take.
+        children:
           - ReviewCenter-ProjectPage-ReadOnly-NewReviewPage
+
+      - id: ReviewCenter-Web-Progress-AuditorRestrictions-OwnRole
+        title: >-
+          The Web subsystem shall show a project admin who made the own role auditor the read-only notice and the Audit
+          trail button, and neither the members card nor the + New review button.
+        justification: |
+          The rights must follow a change of the own role at once.
+        children:
           - ReviewCenter-ProjectPage-ReadOnly-OwnRole
 
       - id: ReviewCenter-Web-Progress-AuditorNoRead
@@ -5185,15 +6246,21 @@ sections:
 
       - id: ReviewCenter-Web-FollowUp-Title
         title: >-
-          The Web subsystem shall suggest the title "Follow-up to" followed by the identifier of the followed review
-          and keep a title that the user typed.
+          The Web subsystem shall suggest the title "Follow-up to" followed by the identifier of the followed review.
         justification: |
-          A suggested title saves typing, and a title that the user chose must never be overwritten.
+          A suggested title saves typing.
         children:
           - ReviewCenter-ProjectPage-FollowUp-Title
-          - ReviewCenter-ProjectPage-FollowUp-TypedTitle
         tests:
           - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+
+      - id: ReviewCenter-Web-FollowUp-TitleTyped
+        title: >-
+          The Web subsystem shall keep a title that the user typed instead of replacing it with the suggestion.
+        justification: |
+          A title that the user chose must never be overwritten.
+        children:
+          - ReviewCenter-ProjectPage-FollowUp-TypedTitle
 
       - id: ReviewCenter-Web-FollowUp-Tag
         title: >-
@@ -5206,13 +6273,20 @@ sections:
 
       - id: ReviewCenter-Web-FollowUp-Refusal
         title: >-
-          The Web subsystem shall show the message of the service instead of the follow-up preview, and create no
-          review on creating, when the service refuses the follow-up.
+          The Web subsystem shall show the message of the service instead of the follow-up preview when the service
+          refuses the follow-up.
         justification: |
-          The rules of the service decide what may be followed, so the page shows their message and keeps the data
-          unchanged.
+          The rules of the service decide what may be followed, so the page shows their message.
         children:
           - ReviewCenter-ProjectPage-FollowUp-Refusal
+
+      - id: ReviewCenter-Web-FollowUp-RefusalOnCreate
+        title: >-
+          The Web subsystem shall show the same message of the service and create no review when the user creates a
+          follow-up that the service refuses.
+        justification: |
+          A refusal on creation must read as the one on the form and must keep the data unchanged.
+        children:
           - ReviewCenter-ProjectPage-FollowUp-RefusalOnCreate
 
       - id: ReviewCenter-Web-FollowUp-Preview
@@ -5382,13 +6456,28 @@ sections:
 
       - id: ReviewCenter-Web-OidcSignIn-SignatureFailed
         title: >-
-          The Web subsystem shall say after a failed confirmation of identity at the provider that no usable sign-in
-          time was reported, that the sign-in was not recent enough, or give the general message.
+          The Web subsystem shall say after a failed confirmation of identity at the provider, because the provider
+          reported no usable sign-in time, that no usable sign-in time was reported.
         justification: |
-          A signer whose confirmation failed must learn what to do next without the page revealing more than needed.
+          A signer whose confirmation failed must learn what to do next.
         children:
           - ReviewCenter-ReviewPage-ExternalSignature-MissingTime
+
+      - id: ReviewCenter-Web-OidcSignIn-SignatureFailedStale
+        title: >-
+          The Web subsystem shall say after a failed confirmation of identity, because the sign-in was not recent
+          enough, that the sign-in was not recent enough.
+        justification: |
+          A signer whose sign-in is too old needs to know that a fresh sign-in is the way on.
+        children:
           - ReviewCenter-ReviewPage-ExternalSignature-StaleTime
+
+      - id: ReviewCenter-Web-OidcSignIn-SignatureFailedGeneral
+        title: >-
+          The Web subsystem shall give the general message after any other failed confirmation of identity.
+        justification: |
+          The page must not reveal more than needed about other failures.
+        children:
           - ReviewCenter-ReviewPage-ExternalSignature-GeneralMessage
 
       - id: ReviewCenter-Web-OidcSignIn-HelpTopics
@@ -5420,26 +6509,49 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-Counts
         title: >-
-          The Web subsystem shall tell a reviewer who has not handed in the own ballot how many ballots are handed in,
-          who is missing and that the answers of the others stay hidden.
+          The Web subsystem shall tell a reviewer who has not handed in the own ballot how many ballots are handed in
+          out of how many.
         justification: |
-          A reviewer waiting for the others needs to know how far they are, without learning what they answered.
+          A reviewer waiting for the others needs to know how far they are.
         children:
           - ReviewCenter-ChecklistPage-HiddenBallots
-          - ReviewCenter-ChecklistPage-HiddenBallots-Notice
-          - ReviewCenter-ChecklistPage-HiddenBallots-Missing
         tests:
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
 
+      - id: ReviewCenter-Web-BallotExperience-CountsNotice
+        title: >-
+          The Web subsystem shall tell a reviewer who has not handed in the own ballot that the answers of the others
+          stay hidden until the own ballot is handed in.
+        justification: |
+          A reviewer must not learn what the others answered before committing to the own answers.
+        children:
+          - ReviewCenter-ChecklistPage-HiddenBallots-Notice
+
+      - id: ReviewCenter-Web-BallotExperience-CountsMissing
+        title: >-
+          The Web subsystem shall name the other reviewers who have not handed in to a reviewer who has not handed in
+          the own ballot.
+        justification: |
+          A reviewer who waits needs to know whom to ask.
+        children:
+          - ReviewCenter-ChecklistPage-HiddenBallots-Missing
+
       - id: ReviewCenter-Web-BallotExperience-MemberView
         title: >-
-          The Web subsystem shall tell a project member who holds no reviewer slot how many ballots are handed in and
-          show no status line and no progress line.
+          The Web subsystem shall tell a project member who holds no reviewer slot how many ballots are handed in out
+          of how many.
         justification: |
-          A member who does not take part still sees how far the review is, but gets no standing that could hint at
-          the answers.
+          A member who does not take part still sees how far the review is.
         children:
           - ReviewCenter-ChecklistPage-HiddenBallots-MemberCount
+
+      - id: ReviewCenter-Web-BallotExperience-MemberViewNoStanding
+        title: >-
+          The Web subsystem shall show a project member who holds no reviewer slot of a review with several slots no
+          status line and no progress line.
+        justification: |
+          A standing could hint at the answers of the reviewers.
+        children:
           - ReviewCenter-ChecklistPage-HiddenBallots-MemberNoStanding
 
       - id: ReviewCenter-Web-BallotExperience-Administrator
@@ -5497,14 +6609,38 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-ProjectBallots
         title: >-
-          The Web subsystem shall show on the project page how many ballots were handed in of how many a review needs
-          and who is missing, the same to every viewer, and a dash for a review with fewer than two reviewer slots.
+          The Web subsystem shall show on the project page how many ballots were handed in of how many a review with
+          several reviewer slots needs.
         justification: |
-          A lead needs the progress of the ballots at a glance, and the figures must not depend on who looks.
+          A lead needs the progress of the ballots at a glance.
         children:
           - ReviewCenter-ProjectPage-Ballots
+
+      - id: ReviewCenter-Web-BallotExperience-ProjectBallotsMissing
+        title: >-
+          The Web subsystem shall name on the project page the people whose ballot is missing on a review with several
+          reviewer slots.
+        justification: |
+          A lead needs to know whom to ask for a ballot.
+        children:
           - ReviewCenter-ProjectPage-Ballots-Missing
+
+      - id: ReviewCenter-Web-BallotExperience-ProjectBallotsSameForEveryViewer
+        title: >-
+          The Web subsystem shall show the same ballot counts and names on the project page to every viewer, also to a
+          viewer who has not handed in their own ballot.
+        justification: |
+          The figures must not depend on who looks.
+        children:
           - ReviewCenter-ProjectPage-Ballots-SameForEveryViewer
+
+      - id: ReviewCenter-Web-BallotExperience-ProjectBallotsSingleSlot
+        title: >-
+          The Web subsystem shall show only a dash on the project page for the ballots of a review with fewer than two
+          reviewer slots.
+        justification: |
+          A review with a single slot has no ballots to compare.
+        children:
           - ReviewCenter-ProjectPage-Ballots-SingleSlot
 
       - id: ReviewCenter-Web-BallotExperience-MaskedNote
@@ -5563,12 +6699,19 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-SideBySideSummary
         title: >-
-          The Web subsystem shall say at the top of the checklist how many checks are answered differently and word the
-          status line when the submitted ballots agree on a failure.
+          The Web subsystem shall say at the top of the checklist how many checks are answered differently.
         justification: |
-          Reviewers need the size of the dispute and the state of the review before they read the single checks.
+          Reviewers need the size of the dispute before they read the single checks.
         children:
           - ReviewCenter-ChecklistPage-SideBySide-Summary
+
+      - id: ReviewCenter-Web-BallotExperience-SideBySideFailedStatus
+        title: >-
+          The Web subsystem shall word the status line "Checklist complete, N checks failed." when the submitted
+          ballots agree on a failure.
+        justification: |
+          Reviewers need the state of the review when the ballots agree on a failure.
+        children:
           - ReviewCenter-ChecklistPage-SideBySide-FailedStatus
 
       - id: ReviewCenter-Web-BallotExperience-Discuss
@@ -5581,24 +6724,52 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-DiscussThread
         title: >-
-          The Web subsystem shall start a discussion thread about the check, as a Finding when chosen, when the
-          reviewer starts the discussion in the Discuss form, and link the notice to the review page.
+          The Web subsystem shall start a discussion thread about the check with the text given when the reviewer starts
+          the discussion in the Discuss form.
         justification: |
           The discussion must be a record on the review, so that its outcome is kept and can be found.
         children:
           - ReviewCenter-ChecklistPage-SideBySide-Thread
-          - ReviewCenter-ChecklistPage-SideBySide-ThreadLink
+
+      - id: ReviewCenter-Web-BallotExperience-DiscussThreadKind
+        title: >-
+          The Web subsystem shall start the discussion as a Finding when the reviewer chooses the kind Finding in the
+          Discuss form.
+        justification: |
+          A difference that the reviewers cannot settle may be a finding that must be tracked.
+        children:
           - ReviewCenter-ChecklistPage-SideBySide-DiscussKind
+
+      - id: ReviewCenter-Web-BallotExperience-DiscussThreadLink
+        title: >-
+          The Web subsystem shall link the notice of a started discussion to the review page.
+        justification: |
+          The reviewer must be able to reach the thread that was started.
+        children:
+          - ReviewCenter-ChecklistPage-SideBySide-ThreadLink
 
       - id: ReviewCenter-Web-BallotExperience-DiscussNoThread
         title: >-
-          The Web subsystem shall refuse an empty Discuss text with a message and start no thread, and close the
-          Discuss form without a thread when the reviewer cancels.
+          The Web subsystem shall refuse an empty Discuss text with a message next to the form.
         justification: |
-          An empty thread would be noise, and a reviewer who changes their mind must be able to leave without a trace.
+          An empty thread would be noise, so the reviewer is told what is missing.
         children:
           - ReviewCenter-ChecklistPage-SideBySide-Empty
+
+      - id: ReviewCenter-Web-BallotExperience-DiscussNotStarted
+        title: >-
+          The Web subsystem shall start no thread when the Discuss text is empty.
+        justification: |
+          A refused discussion must leave no record on the review.
+        children:
           - ReviewCenter-ChecklistPage-SideBySide-EmptyNotStarted
+
+      - id: ReviewCenter-Web-BallotExperience-DiscussCancel
+        title: >-
+          The Web subsystem shall close the Discuss form without starting a thread when the reviewer cancels.
+        justification: |
+          A reviewer who changes their mind must be able to leave without a trace.
+        children:
           - ReviewCenter-ChecklistPage-SideBySide-Cancel
 
       - id: ReviewCenter-Web-BallotExperience-SubmitAndSign
@@ -5635,59 +6806,130 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-Provider
         title: >-
-          The Web subsystem shall hand the ballot in for an account of an identity provider, ask the user to confirm
-          the identity at the provider, and show and hand over no password or code.
+          The Web subsystem shall hand the ballot in for an account of an identity provider when the Submit and sign
+          button is pressed.
         justification: |
-          An account of a provider has no password here, so the provider confirms the identity.
+          An account of a provider has no password here, so the hand-in goes through the provider.
         children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderHandIn
+
+      - id: ReviewCenter-Web-BallotExperience-ProviderConfirm
+        title: >-
+          The Web subsystem shall ask the user of an account of an identity provider to confirm the identity at the
+          provider before the ballot is handed in.
+        justification: |
+          The provider confirms the identity that signs the ballot.
+        children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderConfirm
+
+      - id: ReviewCenter-Web-BallotExperience-ProviderNoSecrets
+        title: >-
+          The Web subsystem shall show no field, and hand nothing over, for an account of an identity provider when the
+          button to sign is pressed.
+        justification: |
+          A password or a code must never be asked for, or passed on, for an account that has none here.
+        children:
           - ReviewCenter-ChecklistPage-SignConfirm-NoFields
           - ReviewCenter-ChecklistPage-SignConfirm-NoEntries
 
       - id: ReviewCenter-Web-BallotExperience-Revealed
         title: >-
-          The Web subsystem shall sign nothing and tell the user that something changed when the view reloaded after
-          the hand-in shows a check that the submitted ballots answer differently, skipping the confirmation at the
-          provider for a provider account.
+          The Web subsystem shall sign nothing when the view reloaded after the hand-in shows a check that the submitted
+          ballots answer differently.
         justification: |
           A signature given before the user saw the differences that the hand-in revealed would not be informed.
         children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-Revealed
+
+      - id: ReviewCenter-Web-BallotExperience-Revealed-Explains
+        title: >-
+          The Web subsystem shall tell the user that something changed when the view reloaded after the hand-in shows a
+          check that the submitted ballots answer differently.
+        justification: |
+          A user whose signing was stopped must learn why.
+        children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-RevealedExplains
+
+      - id: ReviewCenter-Web-BallotExperience-Revealed-Provider
+        title: >-
+          The Web subsystem shall skip the confirmation of the identity at the provider for an account of an identity
+          provider when the hand-in revealed a difference.
+        justification: |
+          No signature follows, so asking the provider to confirm the identity would be pointless.
+        children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderRevealed
 
       - id: ReviewCenter-Web-BallotExperience-Refused
         title: >-
-          The Web subsystem shall keep the ballot handed in and say that the signature failed, with a link to the
-          review, when the signature is refused after the hand-in.
+          The Web subsystem shall keep the ballot handed in when the signature is refused after the hand-in.
         justification: |
           A refusal of the signature must not undo or hide the hand-in that was already made.
         children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-RefusedKeeps
+
+      - id: ReviewCenter-Web-BallotExperience-RefusedExplains
+        title: >-
+          The Web subsystem shall say that the ballot is handed in but the signature failed, with a link to the review,
+          when the signature is refused after the hand-in.
+        justification: |
+          The reviewer must learn what state the ballot is in and where to go on.
+        children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-RefusedExplains
 
       - id: ReviewCenter-Web-BallotExperience-NotOffered
         title: >-
-          The Web subsystem shall offer neither Submit and sign nor Submit ballot for a draft that is not complete, and
-          no Submit and sign in a review with a single reviewer slot.
+          The Web subsystem shall offer neither Submit and sign nor Submit ballot for a draft that is not complete.
         justification: |
-          The rules refuse these cases, so the page must not offer buttons that can only fail.
+          The rules refuse an incomplete draft, so the page must not offer buttons that can only fail.
         children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-Incomplete
+
+      - id: ReviewCenter-Web-BallotExperience-NotOfferedSingleSlot
+        title: >-
+          The Web subsystem shall not offer Submit and sign in a review with a single reviewer slot.
+        justification: |
+          The rules refuse the signed hand-in for a single slot, so the page must not offer a button that can only fail.
+        children:
           - ReviewCenter-ChecklistPage-SubmitAndSign-SingleSlot
 
       - id: ReviewCenter-Web-BallotExperience-Confirm
         title: >-
-          The Web subsystem shall show a password field, and a code field for an account with a second factor, hand
-          them over once when the button is pressed and clear the password field afterwards.
+          The Web subsystem shall show a password field to a local account that confirms a signature.
         justification: |
           A secret that is typed once must travel once and must not stay in the page afterwards.
         children:
           - ReviewCenter-ChecklistPage-SignConfirm
+
+      - id: ReviewCenter-Web-BallotExperience-Confirm-Code
+        title: >-
+          The Web subsystem shall show a code field to a local account that has a second factor.
+        justification: |
+          A second factor is useless unless the signer can enter the code.
+        children:
           - ReviewCenter-ChecklistPage-SignConfirm-Code
+
+      - id: ReviewCenter-Web-BallotExperience-Confirm-HandOver
+        title: >-
+          The Web subsystem shall hand the password to the page once when the button is pressed.
+        justification: |
+          A secret that is typed once must travel once.
+        children:
           - ReviewCenter-ChecklistPage-SignConfirm-HandOver
+
+      - id: ReviewCenter-Web-BallotExperience-Confirm-HandOverCode
+        title: >-
+          The Web subsystem shall hand the code to the page together with the password when the button is pressed.
+        justification: |
+          The server checks the code with the password, so both must arrive together.
+        children:
           - ReviewCenter-ChecklistPage-SignConfirm-HandOverCode
+
+      - id: ReviewCenter-Web-BallotExperience-Confirm-Clear
+        title: >-
+          The Web subsystem shall clear the password field after the button is pressed.
+        justification: |
+          A secret must not stay in the page after it was handed over.
+        children:
           - ReviewCenter-ChecklistPage-SignConfirm-Clear
 
       - id: ReviewCenter-Web-BallotExperience-AssignMe
@@ -5702,13 +6944,31 @@ sections:
 
       - id: ReviewCenter-Web-BallotExperience-AssignMeSlot
         title: >-
-          The Web subsystem shall add a new reviewer slot with the user as primary reviewer and no alternate, leaving
-          every existing slot as it is, when Assign me as reviewer is pressed.
+          The Web subsystem shall add a new reviewer slot with the user as primary reviewer when Assign me as reviewer
+          is pressed.
         justification: |
           Joining must never take over or disturb the place of another reviewer.
         children:
           - ReviewCenter-ChecklistPage-AssignMe-NewSlot
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-Web-BallotExperience-AssignMeSlot-NoAlternate
+        title: >-
+          The Web subsystem shall add the new reviewer slot of Assign me as reviewer with no alternate reviewer.
+        justification: |
+          The user joins alone; an alternate is a decision of the project.
+        children:
           - ReviewCenter-ChecklistPage-AssignMe-NoAlternate
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-Web-BallotExperience-AssignMeSlot-KeepsSlots
+        title: >-
+          The Web subsystem shall leave every existing reviewer slot as it is when Assign me as reviewer is pressed.
+        justification: |
+          Joining must leave the place of every other reviewer as it was, never taking over or disturbing it.
+        children:
           - ReviewCenter-ChecklistPage-AssignMe-KeepsSlots
         tests:
           - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
@@ -5756,28 +7016,53 @@ sections:
 
       - id: ReviewCenter-Web-TotpSecondFactor-WrongCode
         title: >-
-          The Web subsystem shall answer a wrong code on the account page with a general message, keep the set-up open
-          or the second factor on and show no recovery codes, for the confirmation, the new recovery codes and the
-          turning off.
+          The Web subsystem shall answer a wrong code on the account page with a general message, for the confirmation,
+          the new recovery codes and the turning off.
         justification: |
           A wrong code must reveal nothing and must never leave the account in a half-changed state.
         children:
           - ReviewCenter-AccountPage-Totp-ConfirmWrongCode
-          - ReviewCenter-AccountPage-Totp-ConfirmWrongCode-SetupOpen
           - ReviewCenter-AccountPage-Totp-RegenerateWrongCode
-          - ReviewCenter-AccountPage-Totp-RegenerateWrongCode-NoCodes
           - ReviewCenter-AccountPage-Totp-DisableWrongCode
+
+      - id: ReviewCenter-Web-TotpSecondFactor-WrongCode-SetupOpen
+        title: >-
+          The Web subsystem shall keep the set-up of the second factor open after a wrong code for its confirmation.
+        justification: |
+          The account must not be left half changed after a wrong code.
+        children:
+          - ReviewCenter-AccountPage-Totp-ConfirmWrongCode-SetupOpen
+
+      - id: ReviewCenter-Web-TotpSecondFactor-WrongCode-NoCodes
+        title: >-
+          The Web subsystem shall show no recovery codes after a wrong code for new recovery codes.
+        justification: |
+          Recovery codes must not be revealed to a person who did not prove the code.
+        children:
+          - ReviewCenter-AccountPage-Totp-RegenerateWrongCode-NoCodes
+
+      - id: ReviewCenter-Web-TotpSecondFactor-WrongCode-StaysOn
+        title: >-
+          The Web subsystem shall keep the second factor on after a wrong code for turning it off.
+        justification: |
+          Turning a protection off needs the proof, so a wrong code leaves it on.
+        children:
           - ReviewCenter-AccountPage-Totp-DisableWrongCode-StaysOn
 
       - id: ReviewCenter-Web-TotpSecondFactor-Recovery
         title: >-
-          The Web subsystem shall show how many recovery codes are left and replace the recovery codes when the user
-          gives the password and a code.
+          The Web subsystem shall show how many recovery codes are left.
         justification: |
-          A person who lost the device needs the recovery codes, so they must see when the supply runs low and be
-          able to renew it safely.
+          A person who lost the device needs the recovery codes, so they must see when the supply runs low.
         children:
           - ReviewCenter-AccountPage-Totp-RecoveryLeft
+
+      - id: ReviewCenter-Web-TotpSecondFactor-RecoveryRegenerate
+        title: >-
+          The Web subsystem shall replace the recovery codes when the user gives the password and a code.
+        justification: |
+          Renewing the supply of recovery codes must need proof that the user holds the account.
+        children:
           - ReviewCenter-AccountPage-Totp-Regenerate
 
       - id: ReviewCenter-Web-TotpSecondFactor-FieldsEmptied
@@ -5829,13 +7114,20 @@ sections:
 
       - id: ReviewCenter-Web-TotpSecondFactor-CodePage-Refused
         title: >-
-          The Web subsystem shall show the same message for a wrong code whatever the reason, and a message about too
-          many attempts when the client made too many.
+          The Web subsystem shall show the same message for a wrong code whatever the reason, a message that does not
+          tell the cause.
         justification: |
-          An identical message gives an attacker nothing to tell the causes apart, and the limit on attempts slows
-          down guessing.
+          An identical message gives an attacker nothing to tell the causes apart.
         children:
           - ReviewCenter-TotpLoginPage-SecondStepForm-WrongCode
+
+      - id: ReviewCenter-Web-TotpSecondFactor-CodePageThrottled
+        title: >-
+          The Web subsystem shall show a message that there were too many attempts when the client made too many
+          attempts.
+        justification: |
+          The limit on attempts slows down guessing, and the user must learn why the code was not taken.
+        children:
           - ReviewCenter-TotpLoginPage-SecondStepForm-Throttled
 
       - id: ReviewCenter-Web-TotpSecondFactor-CodePage-NoPending
@@ -5944,13 +7236,19 @@ sections:
 
       - id: ReviewCenter-Web-TotpSecondFactor-ResetRefused
         title: >-
-          The Web subsystem shall show an error and keep the second factor of the account when the reset is refused
-          because the signed-in user is no longer a system administrator or nobody is signed in.
+          The Web subsystem shall show an error when the second factor is reset while the signed-in user is no longer a
+          system administrator or nobody is signed in.
         justification: |
-          A right can be withdrawn between showing the button and pressing it, so the refusal must be shown and the
-          protection must stay.
+          A right can be withdrawn between showing the button and pressing it, so the refusal must be shown.
         children:
           - ReviewCenter-UsersPage-TotpReset-ResetError
+
+      - id: ReviewCenter-Web-TotpSecondFactor-ResetKept
+        title: >-
+          The Web subsystem shall keep the second factor of the account when the reset is refused.
+        justification: |
+          A refused reset must leave the protection of the account in force.
+        children:
           - ReviewCenter-UsersPage-TotpReset-ResetKept
 
       - id: ReviewCenter-Web-TotpSecondFactor-HelpTopic
@@ -5984,6 +7282,7 @@ sections:
           - ReviewCenter-InboxPage-Sections-DetailLine
         tests:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-DueMark
         title: >-
@@ -6005,14 +7304,11 @@ sections:
 
       - id: ReviewCenter-Web-Inbox-Interactive
         title: >-
-          The Web subsystem shall set the interactive marker on the inbox page once it has rendered and offer the
-          button that marks everything as read.
+          The Web subsystem shall set the interactive marker on the inbox page once it has rendered.
         justification: |
-          The button needs the live session of the user, and the marker tells that the page is ready to be used.
+          The marker tells that the page is ready to be used.
         children:
           - ReviewCenter-InboxPage-Interactive
-        tests:
-          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-Summary
         title: >-
@@ -6220,12 +7516,20 @@ sections:
 
       - id: ReviewCenter-Web-WhereAreWe-DiscussWarning
         title: >-
-          The Web subsystem shall show the signature warning in the form first, and store the discussion only when the
-          warning is confirmed, when starting a discussion would make a signature stale.
+          The Web subsystem shall show the signature warning in the form first when starting a discussion would make a
+          signature stale.
         justification: |
-          A discussion can change the record that reviewers have signed, so the user must agree to that first.
+          A discussion can change the record that reviewers have signed, so the user must see that first.
         children:
           - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+
+      - id: ReviewCenter-Web-WhereAreWe-DiscussConfirm
+        title: >-
+          The Web subsystem shall store a discussion that would make a signature stale only when the signature warning
+          is confirmed.
+        justification: |
+          The user must agree to the effect on the signatures before the discussion is stored.
+        children:
           - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
 
       - id: ReviewCenter-Web-WhereAreWe-DiscussCancel
@@ -6300,85 +7604,181 @@ sections:
 
       - id: ReviewCenter-Web-NotificationCodeSent
         title: >-
-          The Web subsystem shall have exactly one confirmation e-mail sent to a valid address, show the address that
-          waits for its code, the field for the code and a notice that a code was sent.
+          The Web subsystem shall have exactly one confirmation e-mail sent to a valid address that the user submits.
         justification: |
-          The person proves the address by receiving a code there, so one mail must go out and the page must show
-          where the answer is expected.
+          The person proves the address by receiving a code there, so one mail must go out.
         children:
           - ReviewCenter-AccountPage-NotificationCodeMailed
-          - ReviewCenter-AccountPage-NotificationPendingAddressShown
-          - ReviewCenter-AccountPage-NotificationCodeFieldShown
-          - ReviewCenter-AccountPage-NotificationSentNotice
         tests:
           - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
 
+      - id: ReviewCenter-Web-NotificationPendingAddress
+        title: >-
+          The Web subsystem shall show the address that waits for its code after the confirmation e-mail was sent.
+        justification: |
+          The page must show which address the answer is expected for.
+        children:
+          - ReviewCenter-AccountPage-NotificationPendingAddressShown
+
+      - id: ReviewCenter-Web-NotificationCodeField
+        title: >-
+          The Web subsystem shall show a field for the confirmation code after the confirmation e-mail was sent.
+        justification: |
+          The user needs a place to enter the code that arrived.
+        children:
+          - ReviewCenter-AccountPage-NotificationCodeFieldShown
+
+      - id: ReviewCenter-Web-NotificationSentNotice
+        title: >-
+          The Web subsystem shall show a notice that a code was sent after the confirmation e-mail was sent.
+        justification: |
+          The user must know that a mail was sent and should be looked for.
+        children:
+          - ReviewCenter-AccountPage-NotificationSentNotice
+
       - id: ReviewCenter-Web-NotificationInvalidAddress
         title: >-
-          The Web subsystem shall show an error and send no e-mail when the user submits an address that is not a valid
-          e-mail address.
+          The Web subsystem shall show an error when the user submits an address that is not a valid e-mail address.
         justification: |
-          A mail to a malformed address cannot arrive, so the user is told at once and no mail is attempted.
+          A mail to a malformed address cannot arrive, so the user is told at once.
         children:
           - ReviewCenter-AccountPage-NotificationInvalidAddressError
+
+      - id: ReviewCenter-Web-NotificationInvalidAddressNoMail
+        title: >-
+          The Web subsystem shall have no e-mail sent when the user submits an address that is not a valid e-mail
+          address.
+        justification: |
+          No mail may be attempted to an address that cannot receive one.
+        children:
           - ReviewCenter-AccountPage-NotificationInvalidAddressNoMail
 
       - id: ReviewCenter-Web-NotificationRightCode
         title: >-
-          The Web subsystem shall show the address as confirmed, with the message "Your e-mail address is confirmed.",
-          and remove the field for the code after the user enters the right code.
+          The Web subsystem shall show the address as confirmed after the user enters the right code.
         justification: |
-          The user must see that the proof worked and that nothing more is asked.
+          The user must see that the proof worked.
         children:
           - ReviewCenter-AccountPage-NotificationRightCodeConfirmed
-          - ReviewCenter-AccountPage-NotificationRightCodeNotice
-          - ReviewCenter-AccountPage-NotificationRightCodeClosesForm
         tests:
           - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
 
+      - id: ReviewCenter-Web-NotificationRightCodeNotice
+        title: >-
+          The Web subsystem shall show the message "Your e-mail address is confirmed." after the user enters the right
+          code.
+        justification: |
+          The user must be told in words that the address is confirmed.
+        children:
+          - ReviewCenter-AccountPage-NotificationRightCodeNotice
+
+      - id: ReviewCenter-Web-NotificationRightCodeClosesForm
+        title: >-
+          The Web subsystem shall remove the field for the code after the user enters the right code.
+        justification: |
+          Nothing more is asked once the proof worked.
+        children:
+          - ReviewCenter-AccountPage-NotificationRightCodeClosesForm
+
       - id: ReviewCenter-Web-NotificationWrongCode
         title: >-
-          The Web subsystem shall show an error, keep and empty the field for the code and show no address as
-          confirmed when the user enters a wrong code.
+          The Web subsystem shall show an error when the user enters a wrong code.
         justification: |
-          A wrong code proves nothing, so the address must stay unconfirmed and the user may try again.
+          A wrong code proves nothing, so the user is told and may try again.
         children:
           - ReviewCenter-AccountPage-NotificationWrongCodeError
+
+      - id: ReviewCenter-Web-NotificationWrongCodeKeepsForm
+        title: >-
+          The Web subsystem shall keep the field for the code on the page after the user enters a wrong code.
+        justification: |
+          The user must be able to try again at once.
+        children:
           - ReviewCenter-AccountPage-NotificationWrongCodeKeepsForm
+
+      - id: ReviewCenter-Web-NotificationWrongCodeEmptiesField
+        title: >-
+          The Web subsystem shall empty the field for the code after the user enters a wrong code.
+        justification: |
+          A wrong code that stays in the field invites a second try with the same value.
+        children:
           - ReviewCenter-AccountPage-NotificationWrongCodeEmptiesField
+
+      - id: ReviewCenter-Web-NotificationWrongCodeNotConfirmed
+        title: >-
+          The Web subsystem shall show no address as confirmed after the user enters a wrong code.
+        justification: |
+          A wrong code proves nothing, so the address must stay unconfirmed.
+        children:
           - ReviewCenter-AccountPage-NotificationWrongCodeNotConfirmed
 
       - id: ReviewCenter-Web-NotificationResend
         title: >-
-          The Web subsystem shall show a button that sends a new code while an address waits for its code and have a
-          new confirmation e-mail sent more than 60 seconds after the previous one.
+          The Web subsystem shall show a button that sends a new code while an address waits for its code.
         justification: |
-          A code that did not arrive must be replaceable, and the wait keeps the button from being used to flood a
-          mailbox.
+          A code that did not arrive must be replaceable.
         children:
           - ReviewCenter-AccountPage-NotificationResendButton
+
+      - id: ReviewCenter-Web-NotificationResendAfterCooldown
+        title: >-
+          The Web subsystem shall have a new confirmation e-mail sent when the user asks for a new code more than 60
+          seconds after the previous confirmation e-mail.
+        justification: |
+          The wait keeps the button from being used to flood a mailbox, but must not block a later request.
+        children:
           - ReviewCenter-AccountPage-NotificationResendAfterCooldown
 
       - id: ReviewCenter-Web-NotificationResendCooldown
         title: >-
-          The Web subsystem shall show an error and send no e-mail when the user asks for a new code within 60 seconds
-          of the previous confirmation e-mail.
+          The Web subsystem shall show an error when the user asks for a new code within 60 seconds of the previous
+          confirmation e-mail.
         justification: |
-          Repeated requests must not turn the page into a way to send many mails to one address.
+          Repeated requests must not turn the page into a way to send many mails to one address, and the user must
+          learn why nothing came.
         children:
           - ReviewCenter-AccountPage-NotificationResendCooldownError
+
+      - id: ReviewCenter-Web-NotificationResendCooldownNoMail
+        title: >-
+          The Web subsystem shall have no e-mail sent when the user asks for a new code within 60 seconds of the
+          previous confirmation e-mail.
+        justification: |
+          A refused request must not send a mail to the address.
+        children:
           - ReviewCenter-AccountPage-NotificationResendCooldownNoMail
 
       - id: ReviewCenter-Web-NotificationRemove
         title: >-
-          The Web subsystem shall show a button to remove a confirmed address, and after the removal show the field for
-          a new address, the message "Your e-mail address was removed." and not the removed address.
+          The Web subsystem shall show a button to remove a confirmed address.
         justification: |
           A person must be able to stop all mail to an address, and the page must show that it is done.
         children:
           - ReviewCenter-AccountPage-NotificationRemoveButton
+
+      - id: ReviewCenter-Web-NotificationRemove-Form
+        title: >-
+          The Web subsystem shall show the field for a new address after the user removes the address.
+        justification: |
+          After the removal the user may enter another address.
+        children:
           - ReviewCenter-AccountPage-NotificationRemoveShowsForm
+
+      - id: ReviewCenter-Web-NotificationRemove-Notice
+        title: >-
+          The Web subsystem shall show the message "Your e-mail address was removed." after the user removes the
+          address.
+        justification: |
+          The page must show that the removal is done.
+        children:
           - ReviewCenter-AccountPage-NotificationRemoveNotice
+
+      - id: ReviewCenter-Web-NotificationRemove-HidesAddress
+        title: >-
+          The Web subsystem shall not show the removed address after the user removes the address.
+        justification: |
+          An address that was removed must not stay on the page.
+        children:
           - ReviewCenter-AccountPage-NotificationRemoveHidesAddress
 
       - id: ReviewCenter-Web-NotificationTemporaryPassword
@@ -6424,23 +7824,45 @@ sections:
       - id: ReviewCenter-Web-WhereAreWe-SigningGuidance
         title: >-
           The Web subsystem shall state in plain words that the review will be Rejected, and which check failed, when
-          all reviewers failed a check, and caution a viewer who is about to sign, naming the reviewers who have not
-          handed in.
+          all reviewers failed a check.
         justification: |
           A reviewer must know the outcome that follows from the answers before signing it.
         children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance-Outcome
+
+      - id: ReviewCenter-Web-WhereAreWe-SigningCaution
+        title: >-
+          The Web subsystem shall caution a viewer who is about to sign, naming the reviewers who have not handed in a
+          ballot.
+        justification: |
+          A signature given before all ballots are in may be made on an incomplete picture.
+        children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance-Caution
 
       - id: ReviewCenter-Web-WhereAreWe-Waiting
         title: >-
-          The Web subsystem shall tell the asker of an open question whom they wait for, show the asked reviewer a link
-          to answer, and say to a reviewer who signed whom the review waits for.
+          The Web subsystem shall show the person who asked an open question a sentence that says whom they wait for,
+          instead of a button.
         justification: |
-          A question or a signature that waits on someone else is only useful when the page says on whom.
+          A question that waits on someone else is only useful when the page says on whom.
         children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance-AskerWaits
+
+      - id: ReviewCenter-Web-WhereAreWe-WaitingOtherParty
+        title: >-
+          The Web subsystem shall show the reviewer who is asked a link to answer the open questions.
+        justification: |
+          The asked reviewer needs a way to the questions that wait for an answer.
+        children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance-OtherParty
+
+      - id: ReviewCenter-Web-WhereAreWe-WaitingAfterSigning
+        title: >-
+          The Web subsystem shall say to a reviewer who signed whom the review waits for, in the same meaning as the
+          next-step line.
+        justification: |
+          A signature that waits on someone else is only useful when the page says on whom.
+        children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance-AfterSigning
 
       - id: ReviewCenter-Web-WhereAreWe-GuidanceMasked
@@ -6493,37 +7915,76 @@ sections:
 
       - id: ReviewCenter-Web-NotificationModeNeedsAddress
         title: >-
-          The Web subsystem shall show the mode selector as disabled, with no save button and the explanation that a
-          confirmed address is needed, while the user has no confirmed address, and show the mode None after the
-          address is removed.
+          The Web subsystem shall show the mode selector as disabled while the user has no confirmed address.
         justification: |
           Mail cannot go to an address that does not exist, so the choice is closed until one is confirmed and falls
           back to None when it is removed.
         children:
           - ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled
+
+      - id: ReviewCenter-Web-NotificationModeNeedsAddress-NoSaveButton
+        title: >-
+          The Web subsystem shall show no save button for the mode while the user has no confirmed address.
+        justification: |
+          A save button on a closed choice would invite an action that cannot succeed.
+        children:
           - ReviewCenter-AccountPage-NotificationModeNeedsAddressDisabled-NoSaveButton
+
+      - id: ReviewCenter-Web-NotificationModeNeedsAddress-Explained
+        title: >-
+          The Web subsystem shall explain next to the disabled selector that a confirmed address is needed.
+        justification: |
+          The user needs to know how to open the closed choice.
+        children:
           - ReviewCenter-AccountPage-NotificationModeNeedsAddressExplained
+
+      - id: ReviewCenter-Web-NotificationModeNeedsAddress-RemovedNone
+        title: >-
+          The Web subsystem shall show the mode None in the disabled selector when the user removes the address.
+        justification: |
+          The choice falls back to None when the address it relied on is removed.
+        children:
           - ReviewCenter-AccountPage-NotificationModeRemoveAddressNone
 
       - id: ReviewCenter-Web-NotificationModeSave
         title: >-
           The Web subsystem shall set the selected mode through the notification preference service when the user saves
-          it, and show a notice, and no error, that the choice was saved.
+          it.
         justification: |
-          The stored preference is what later decides about mail, and the user needs to see that the save worked.
+          The stored preference is what later decides about mail.
         children:
           - ReviewCenter-AccountPage-NotificationModeSaveCalls
+
+      - id: ReviewCenter-Web-NotificationModeSavedNotice
+        title: >-
+          The Web subsystem shall show a notice that the choice was saved when a mode was saved.
+        justification: |
+          The user needs to see that the save worked.
+        children:
           - ReviewCenter-AccountPage-NotificationModeSavedNotice
+
+      - id: ReviewCenter-Web-NotificationModeSavedNoError
+        title: >-
+          The Web subsystem shall show no error when a mode was saved.
+        justification: |
+          An error beside a saved choice would contradict the notice.
+        children:
           - ReviewCenter-AccountPage-NotificationModeSavedNotice-NoError
 
       - id: ReviewCenter-Web-NotificationModeRefused
         title: >-
-          The Web subsystem shall show the message of the refusal, and no notice that the choice was saved, when the
-          service refuses a mode.
+          The Web subsystem shall show the message of the refusal when the service refuses a mode.
         justification: |
-          A refused mode is not stored, so the page must not claim that it was saved and must say why.
+          A refused mode is not stored, so the page must say why.
         children:
           - ReviewCenter-AccountPage-NotificationModeRefusedMessage
+
+      - id: ReviewCenter-Web-NotificationModeRefusedNoSavedNotice
+        title: >-
+          The Web subsystem shall show no notice that the choice was saved when the service refuses a mode.
+        justification: |
+          A refused mode is not stored, so the page must not claim that it was saved.
+        children:
           - ReviewCenter-AccountPage-NotificationModeRefusedMessage-NoSavedNotice
 
       - id: ReviewCenter-Web-NotificationModeHiddenNotAvailable
