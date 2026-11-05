@@ -210,8 +210,10 @@ stops the application from being created with a message that names the setting a
 secret. The test is in the `ServerHost` tests and is linked from the settings validation requirement of this unit. This
 scenario is tested by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
 
-**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in off, or with valid settings, the
-application is created. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in on and valid settings (an https
+authority and the largest age), the application is created. The name of the test is kept from the time when it also
+covered sign-in off, which is now tested by `ServerHost_CreateApplication_OidcOff_BuildsTheApplication`. This scenario is
+tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
 
 **OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause**: After a refused confirmation the review page names the
 cause when the provider sent no usable `auth_time` (absent, or present but negative): the text says the provider did not

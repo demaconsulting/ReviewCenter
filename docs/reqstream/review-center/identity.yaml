@@ -754,7 +754,6 @@ sections:
         justification: |
           A server that does not use a provider must not need any provider setting.
         tests:
-          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
           - ServerHost_CreateApplication_OidcOff_BuildsTheApplication
 
       - id: ReviewCenter-Identity-OidcStartupValidation

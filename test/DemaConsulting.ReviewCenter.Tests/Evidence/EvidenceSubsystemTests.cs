@@ -178,15 +178,17 @@ public class EvidenceSubsystemTests
     public async Task EvidenceSubsystem_CompletedReview_StatesBallotsAppendixWithFingerprint()
     {
         // Act: the downloaded document of the approved review
-        var lines = (await ApprovedPdf.Value.WaitAsync(TestContext.Current.CancellationToken)).TextLines;
+        var lines = (await ApprovedPdf.Value.WaitAsync(TestContext.Current.CancellationToken)).TextLines.ToList();
 
-        // Assert: the appendix, the ballot of slot 1 and the fingerprint with the version of its algorithm
+        // Assert: the appendix, the ballot of slot 1 and the fingerprint (a 64 hexadecimal character value directly
+        // after its label) with the version of its algorithm
         Assert.Contains("Ballots appendix", lines);
         Assert.Contains("Slot 1: Ann (ann)", lines);
         Assert.Contains("Ballot submitted", lines);
-        Assert.Contains("Ballot fingerprint", lines);
+        var label = lines.IndexOf("Ballot fingerprint");
+        Assert.True(label >= 0, "The document has no 'Ballot fingerprint' row.");
+        Assert.Matches("^[0-9a-f]{64}$", lines[label + 1]);
         Assert.Contains($"({RecordDigest.BallotsHeader})", lines);
-        Assert.Contains(lines, l => l.Length == 64 && l.All(Uri.IsHexDigit));
     }
 
     /// <summary>
@@ -197,16 +199,20 @@ public class EvidenceSubsystemTests
     public async Task EvidenceSubsystem_CompletedReview_StatesReviewerSignOffs()
     {
         // Act: the downloaded document of the approved review
-        var lines = (await ApprovedPdf.Value.WaitAsync(TestContext.Current.CancellationToken)).TextLines;
+        var lines = (await ApprovedPdf.Value.WaitAsync(TestContext.Current.CancellationToken)).TextLines.ToList();
 
-        // Assert: the section, the slot, who signed and when, what the signature means, and the digest it covers
+        // Assert: the section, the slot, who signed (the name after the label) and when, what the signature means, and
+        // the digest it covers (a hexadecimal value after the label)
         Assert.Contains("Reviewer sign-offs", lines);
         Assert.Contains("Primary reviewer", lines);
-        Assert.Contains("Signed by", lines);
-        Assert.Contains(lines, l => l.StartsWith("Ann (", StringComparison.Ordinal));
+        var signedBy = lines.IndexOf("Signed by");
+        Assert.True(signedBy >= 0, "The document has no 'Signed by' row.");
+        Assert.StartsWith("Ann (", lines[signedBy + 1], StringComparison.Ordinal);
         Assert.Contains("Signed at", lines);
         Assert.Contains("Meaning", lines);
-        Assert.Contains("Record digest", lines);
+        var digest = lines.IndexOf("Record digest");
+        Assert.True(digest >= 0, "The document has no 'Record digest' row.");
+        Assert.Matches("^[0-9a-f]{64}$", lines[digest + 1]);
     }
 
     /// <summary>
@@ -305,8 +311,10 @@ public class EvidenceSubsystemTests
         Assert.Contains("Reopened by", lines);
         Assert.Contains("Dee (dee)", lines);
         Assert.Contains("Missed a case.", lines);
-        Assert.Contains("Previous digest", lines);
-        Assert.Contains(previous, string.Concat(lines.Where(l => l.All(Uri.IsHexDigit))), StringComparison.Ordinal);
+        var label = lines.IndexOf("Previous digest");
+        Assert.True(label >= 0, "The document has no 'Previous digest' row.");
+        var shown = string.Concat(lines.Skip(label + 1).TakeWhile(l => l.All(Uri.IsHexDigit)));
+        Assert.Equal(previous, shown, ignoreCase: true);
     }
 
     /// <summary>

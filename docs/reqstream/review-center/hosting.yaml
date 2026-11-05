@@ -1269,7 +1269,6 @@ sections:
         children:
           - ReviewCenter-ServerHost-OidcSettings-Off
         tests:
-          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
           - ServerHost_CreateApplication_OidcOff_BuildsTheApplication
 
       - id: ReviewCenter-Hosting-TotpSecondFactor
@@ -1370,7 +1369,6 @@ sections:
           - ReviewCenter-ServerHost-NotificationOffNotChecked
           - ReviewCenter-ServerHost-NotificationTablesMissingOffStarts
         tests:
-          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
           - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn
           - ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings
           - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_StartsWhenNotificationsAreOff

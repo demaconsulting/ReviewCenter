@@ -124,7 +124,8 @@ ring and its escape hatch are verified by `ServerHost_CreateApplication_LostRing
 `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`, and the scan that feeds them by the unit
 tests of `SecretScan`. The registration of the
 review planner and of the parser of the review-set file is verified by
-`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser` and
+`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser` (which, despite its name, checks the planner only)
+and
 `ServerHost_AddServices_Configured_RegistersReviewSetParserAsSingleton`.
 
 **Attestation services and the start-up check**: Starting the real pipeline with no attestation setting creates the
@@ -166,10 +167,11 @@ refuse with exit code 1 and no change, which is tested by `KeysCommand_Run_Unrea
 
 **OpenID Connect settings**: Starting the real pipeline with sign-in with a provider enabled and an invalid setting
 throws an `InvalidOperationException` that names the setting and does not contain the client secret, which is tested
-by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`. With the provider off, or on with
-valid settings, the application is built, which is tested by
-`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`, with the provider off by
-`ServerHost_CreateApplication_OidcOff_BuildsTheApplication`, and with an http loopback authority by
+by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`. With the provider on and valid
+settings (an https authority and the largest age), the application is built, which is tested by
+`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`; the name of that test is kept from the time when
+it also covered the provider off, which is now tested by `ServerHost_CreateApplication_OidcOff_BuildsTheApplication`.
+With an http loopback authority the application is built, which is tested by
 `ServerHost_CreateApplication_OidcLoopbackHttpAuthority_BuildsTheApplication`; all are unit tests of `ServerHost`. With
 the provider off, its endpoints answer 404, which is tested by
 `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown` (see the `OidcSignIn` verification).
@@ -182,9 +184,12 @@ is tested by `ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`
 **Notification settings**: Starting the real pipeline with notifications on and an invalid setting throws an
 `InvalidOperationException` that says the notification settings are invalid, names the setting, and does not contain the
 password, which is tested by `ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret`.
-With notifications off and an invalid address the application is built, and with valid settings and an inline password
-it is built and logs a warning that names the password file setting and does not contain the password, which is tested
-by `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`. A database that already has
+With notifications off and an invalid address the application is built, which is tested by
+`ServerHost_CreateApplication_NotificationsOff_DoesNotCheckTheSettings`. With valid settings and an inline password
+the application is built and logs a warning that names the password file setting and does not contain the password,
+which is tested by `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`; the name of
+that test is kept from the time when it also covered the off case, and it now covers the inline password case only. A
+database that already has
 a table but no notification tables stops the start while notifications are on and does not while they are off, which is
 tested by `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`; all three
 are unit tests of `ServerHost`. Each of these outcomes also has a test of its own:
