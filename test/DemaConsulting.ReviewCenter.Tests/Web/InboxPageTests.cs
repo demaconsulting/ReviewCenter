@@ -74,6 +74,90 @@ public class InboxPageTests : InboxWebTestBase
     }
 
     /// <summary>
+    ///     Test that the page reports that it is interactive once it has rendered, also when nothing is listed.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_AfterRender_NothingWaiting_SetsInteractiveMarker()
+    {
+        // Arrange: ann is a member of a project without reviews, so that the inbox lists nothing
+        await ArrangeProjectAsync();
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the page (bUnit runs OnAfterRender like a live circuit does)
+        var cut = Render<InboxPage>();
+
+        // Assert: the root element reports interactivity although no row is listed
+        Assert.Equal("true", cut.Find("[data-testid='inbox-page']").GetAttribute("data-interactive"));
+        Assert.Empty(cut.FindAll("[data-testid='inbox-row-1']"));
+    }
+
+    /// <summary>
+    ///     Test that the Mark all as read button is offered while the inbox lists a review.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_ItemsListed_OffersMarkAllReadButton()
+    {
+        // Arrange: ann has a review waiting
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: a row is listed and the button says what it does
+        Assert.NotEmpty(cut.FindAll("[data-testid='inbox-row-1']"));
+        Assert.Equal("Mark all as read", cut.Find("[data-testid='inbox-mark-read']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a reply waiting is shown under the titled section Replies waiting, with the row of the review.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_RepliesWaiting_ShowsTitledSection()
+    {
+        // Arrange: ann is a reviewer of r1 who asked a question and bob answered
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        await StartAndAnswerThreadAsync("r1", "ann", "bob");
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and holds the row of the review
+        Assert.Equal("Replies waiting", cut.Find("[data-testid='inbox-section-replies-waiting']").TextContent);
+        var list = cut.Find("[data-testid='inbox-list-replies-waiting']");
+        Assert.Contains("Apollo / r1", list.TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the author of a review, who took no part in a thread, finds the review under the titled section
+    ///     Replies waiting when someone else wrote the latest comment of the thread.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_RepliesWaitingOnOwnReview_ShowsTitledSection()
+    {
+        // Arrange: ann is a reviewer of r1 who asked a question and bob answered; the author took no part in the thread
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        await StartAndAnswerThreadAsync("r1", "ann", "bob");
+        SignInAs("author", "Author", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and holds the row of the review with the count of replies waiting
+        Assert.Equal("Replies waiting", cut.Find("[data-testid='inbox-section-replies-waiting']").TextContent);
+        var list = cut.Find("[data-testid='inbox-list-replies-waiting']");
+        Assert.Contains("Apollo / r1", list.TextContent, StringComparison.Ordinal);
+        Assert.Contains("1 waiting", list.TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the router, which applies the authorization rules of a page, does not show the inbox to a visitor
     ///     who is not signed in and points the visitor to the login page, which returns to the inbox.
     /// </summary>
@@ -257,7 +341,7 @@ public class InboxPageTests : InboxWebTestBase
     [Fact]
     public async Task InboxPage_Render_Update_ShowsTitledSection()
     {
-        // Arrange: ann and bob signed r1, so the review was approved after ann signed
+        // Arrange: ann signed r1 and looked at it, then bob signed, so the review was approved after ann looked
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
         var annSlot = await AddSlotAsync("r1", "ann");
@@ -265,6 +349,7 @@ public class InboxPageTests : InboxWebTestBase
         await AnswerAllAsync("r1", "ann");
         await AnswerAllAsync("r1", "bob");
         await SignSlotAsync("r1", annSlot.Id, "ann");
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("ann"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
         await SignSlotAsync("r1", bobSlot.Id, "bob");
         SignInAs("ann", "Ann", false);
 
@@ -274,7 +359,101 @@ public class InboxPageTests : InboxWebTestBase
         // Assert: the section has its title and the row of the review
         Assert.Equal("Updates", cut.Find("[data-testid='inbox-section-updates']").TextContent);
         Assert.Equal("Apollo / r1", cut.Find("[data-testid='inbox-review-1']").TextContent);
+        Assert.Single(
+            cut.FindAll("[data-testid^='inbox-chip-']"),
+            element => element.TextContent == InboxService.ApprovedChip);
     }
+
+    /// <summary>
+    ///     Test that a review that was rejected after the author last looked is shown to its author under the titled
+    ///     section Updates, with the chip Rejected, the signer and a link to the review.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip()
+    {
+        // Arrange: ann is the only reviewer of r1, answers one check with Fail, writes the conclusion and signs,
+        // after the author looked at r1
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var slot = await AddSlotAsync("r1", "ann");
+        var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        foreach (var item in items)
+        {
+            var failed = item == items[0];
+            await Checklists.SetAnswerAsync(
+                ProjectId,
+                "r1",
+                item.Id,
+                failed ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                failed ? "Wrong" : null,
+                ActorOf("ann"),
+                Ct);
+        }
+
+        await Checklists.SubmitBallotAsync(ProjectId, "r1", ActorOf("ann"), Ct);
+        await Checklists.SetReviewConclusionTextAsync(ProjectId, "r1", "Not ready.", ActorOf("ann"), Ct);
+
+        // The author looked at r1 before the rejection
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("author"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
+        await SignSlotAsync("r1", slot.Id, "ann");
+        SignInAs("author", "Author", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and a row with the chip Rejected, the signer and a link to the review
+        Assert.Equal("Updates", cut.Find("[data-testid='inbox-section-updates']").TextContent);
+        var chip = cut.FindAll("[data-testid^='inbox-chip-']").Single(element => element.TextContent == InboxService.RejectedChip);
+        var number = chip.GetAttribute("data-testid")!["inbox-chip-".Length..];
+        Assert.Equal(
+            $"/projects/{ProjectId}/reviews/r1",
+            cut.Find($"[data-testid='inbox-link-{number}']").GetAttribute("href"));
+        Assert.Contains(
+            "Signed by Ann",
+            cut.Find($"[data-testid='inbox-detail-{number}']").TextContent,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a review that an administrator reopened after the author last looked is shown to its author under
+    ///     the titled section Updates, with the chip Reopened and the name of the administrator.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip()
+    {
+        // Arrange: ann is the only reviewer and signed, so r1 is approved; after the author looked at it, an
+        // administrator reopens it
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var slot = await AddSlotAsync("r1", "ann");
+        await AnswerAllAsync("r1", "ann");
+        await SignSlotAsync("r1", slot.Id, "ann");
+        await Users.CreateAsync("root", "Root", true, Password, Ct);
+
+        // The author looked at the approved r1 before the reopening
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("author"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
+        await Signing.ReopenReviewAsync(ActorOf("root"), ProjectId, "r1", "Missed a case.", Ct);
+        SignInAs("author", "Author", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section has its title and a row with the chip Reopened and the name of the administrator
+        Assert.Equal("Updates", cut.Find("[data-testid='inbox-section-updates']").TextContent);
+        var chip = cut.FindAll("[data-testid^='inbox-chip-']").Single(element => element.TextContent == InboxService.ReopenedChip);
+        var number = chip.GetAttribute("data-testid")!["inbox-chip-".Length..];
+        Assert.Contains(
+            "Reopened by Root",
+            cut.Find($"[data-testid='inbox-detail-{number}']").TextContent,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Gets a time shortly before the arranging services stamp signatures and reopenings (they use a fixed clock
+    ///     equal to the start of the test clock), so a review marked as seen at this time was seen before them.
+    /// </summary>
+    /// <returns>The time to record as the moment a review was last seen.</returns>
+    private DateTimeOffset SeenBeforeSigning() => Time.GetUtcNow().AddMinutes(-1);
 
     /// <summary>
     ///     Test that a row the user has not seen carries the New marker, and that it is gone once the review was seen.
@@ -431,6 +610,10 @@ public class InboxPageTests : InboxWebTestBase
 
         // Assert: the row is under To answer with its chip, text and a link to the review
         Assert.Equal("To answer", cut.Find("[data-testid='inbox-section-to-answer']").TextContent);
+        Assert.Contains(
+            InboxService.QuestionChip,
+            cut.Find("[data-testid='inbox-list-to-answer']").TextContent,
+            StringComparison.Ordinal);
         var chip = cut.FindAll("[data-testid^='inbox-chip-']").Single(element => element.TextContent == InboxService.QuestionChip);
         var number = chip.GetAttribute("data-testid")!["inbox-chip-".Length..];
         Assert.Equal(
