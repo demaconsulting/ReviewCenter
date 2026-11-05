@@ -7610,7 +7610,7 @@ sections:
         children:
           - ReviewCenter-AccountPage-NotificationCodeMailed
         tests:
-          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+          - AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm
 
       - id: ReviewCenter-Web-NotificationPendingAddress
         title: >-
