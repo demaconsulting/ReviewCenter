@@ -341,7 +341,7 @@ public class InboxPageTests : InboxWebTestBase
     [Fact]
     public async Task InboxPage_Render_Update_ShowsTitledSection()
     {
-        // Arrange: ann and bob signed r1, so the review was approved after ann signed
+        // Arrange: ann signed r1 and looked at it, then bob signed, so the review was approved after ann looked
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
         var annSlot = await AddSlotAsync("r1", "ann");
@@ -349,6 +349,7 @@ public class InboxPageTests : InboxWebTestBase
         await AnswerAllAsync("r1", "ann");
         await AnswerAllAsync("r1", "bob");
         await SignSlotAsync("r1", annSlot.Id, "ann");
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("ann"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
         await SignSlotAsync("r1", bobSlot.Id, "bob");
         SignInAs("ann", "Ann", false);
 
@@ -370,7 +371,8 @@ public class InboxPageTests : InboxWebTestBase
     [Fact]
     public async Task InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip()
     {
-        // Arrange: ann is the only reviewer of r1, answers one check with Fail, writes the conclusion and signs
+        // Arrange: ann is the only reviewer of r1, answers one check with Fail, writes the conclusion and signs,
+        // after the author looked at r1
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
         var slot = await AddSlotAsync("r1", "ann");
@@ -390,6 +392,9 @@ public class InboxPageTests : InboxWebTestBase
 
         await Checklists.SubmitBallotAsync(ProjectId, "r1", ActorOf("ann"), Ct);
         await Checklists.SetReviewConclusionTextAsync(ProjectId, "r1", "Not ready.", ActorOf("ann"), Ct);
+
+        // The author looked at r1 before the rejection
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("author"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
         await SignSlotAsync("r1", slot.Id, "ann");
         SignInAs("author", "Author", false);
 
@@ -416,13 +421,17 @@ public class InboxPageTests : InboxWebTestBase
     [Fact]
     public async Task InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip()
     {
-        // Arrange: ann is the only reviewer and signed, so r1 is approved; then an administrator reopens it
+        // Arrange: ann is the only reviewer and signed, so r1 is approved; after the author looked at it, an
+        // administrator reopens it
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
         var slot = await AddSlotAsync("r1", "ann");
         await AnswerAllAsync("r1", "ann");
         await SignSlotAsync("r1", slot.Id, "ann");
         await Users.CreateAsync("root", "Root", true, Password, Ct);
+
+        // The author looked at the approved r1 before the reopening
+        Assert.True(await Inbox.MarkSeenAsync(ActorOf("author"), ProjectId, "r1", 0, SeenBeforeSigning(), Ct));
         await Signing.ReopenReviewAsync(ActorOf("root"), ProjectId, "r1", "Missed a case.", Ct);
         SignInAs("author", "Author", false);
 
@@ -438,6 +447,13 @@ public class InboxPageTests : InboxWebTestBase
             cut.Find($"[data-testid='inbox-detail-{number}']").TextContent,
             StringComparison.Ordinal);
     }
+
+    /// <summary>
+    ///     Gets a time shortly before the arranging services stamp signatures and reopenings (they use a fixed clock
+    ///     equal to the start of the test clock), so a review marked as seen at this time was seen before them.
+    /// </summary>
+    /// <returns>The time to record as the moment a review was last seen.</returns>
+    private DateTimeOffset SeenBeforeSigning() => Time.GetUtcNow().AddMinutes(-1);
 
     /// <summary>
     ///     Test that a row the user has not seen carries the New marker, and that it is gone once the review was seen.

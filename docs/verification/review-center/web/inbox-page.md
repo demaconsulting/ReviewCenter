@@ -73,18 +73,20 @@ review, counted as action. This scenario is tested by `InboxPage_Render_Signatur
 the author finds the group Failed checks with its title and the row of the review. This scenario is tested by
 `InboxPage_Render_FailedChecks_ShowsTitledSection`.
 
-**InboxPage_Render_Update_ShowsTitledSection**: Both reviewers signed a review, so it was approved after the user
-signed; the user finds the group Updates with its title and the row of the review, which carries the chip Approved.
-This scenario is tested by `InboxPage_Render_Update_ShowsTitledSection`.
+**InboxPage_Render_Update_ShowsTitledSection**: One reviewer signed a review and looked at it, then the other reviewer
+signed, so the review was approved after the user last looked; the user finds the group Updates with its title and the
+row of the review, which carries the chip Approved. This scenario is tested by
+`InboxPage_Render_Update_ShowsTitledSection`.
 
-**InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip**: The only reviewer of a review answers one check with
-Fail, writes the conclusion text and signs, so the review is rejected; the author finds the group Updates with the row
-that carries the chip Rejected, names the signer ("Signed by Ann"), and links to the review. This scenario is tested by
+**InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip**: The author looked at a review; afterwards its only
+reviewer answers one check with Fail, writes the conclusion text and signs, so the review is rejected after the author
+last looked. The author finds the group Updates with the row that carries the chip Rejected, names the signer ("Signed
+by Ann"), and links to the review. This scenario is tested by
 `InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip`.
 
 **InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip**: The only reviewer of a review signs, so it is approved,
-and a system administrator reopens it; the author finds the group Updates with the row that carries the chip Reopened
-and names the administrator ("Reopened by Root"). This scenario is tested by
+and the author looks at it; afterwards a system administrator reopens it. The author finds the group Updates with the
+row that carries the chip Reopened and names the administrator ("Reopened by Root"). This scenario is tested by
 `InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip`.
 
 **InboxPage_Render_UnreadItem_ShowsDot**: A row that the user has not seen carries the New marker (here a To answer row
