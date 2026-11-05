@@ -1708,6 +1708,17 @@ sections:
           - ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge
           - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
 
+      - id: ReviewCenter-ReviewPage-Reviewers-RejectedBadge
+        title: >-
+          The ReviewPage unit shall show next to the review title the badge "Rejected", styled as rejected, when the
+          review is concluded as rejected.
+        justification: |
+          A rejection is as decisive as an approval; a reader must see at a glance that the review ended without
+          approval and not mistake it for one still in progress.
+        tests:
+          - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
+          - ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes
+
       - id: ReviewCenter-ReviewPage-Sign
         title: >-
           The ReviewPage unit shall offer the signed-in user who is the primary or the alternate reviewer of a slot that

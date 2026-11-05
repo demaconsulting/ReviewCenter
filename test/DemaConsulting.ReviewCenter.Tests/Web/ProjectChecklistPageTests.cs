@@ -661,6 +661,32 @@ public class ProjectChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that cancelling the confirmation of a reset leaves the own checklist of the project in place and
+    ///     records no audit entry.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistPage_Reset_Cancelled_ChangesNothing()
+    {
+        // Arrange: a project with its own checklist
+        var apollo = await ArrangeAsync();
+        await SetChecklistAsync(apollo, Definition("custom-1"));
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+        var cut = RenderPage(apollo);
+        var auditsBefore = Store.Audits.Count(a => a.Action == ProjectChecklistService.ChangedAction);
+
+        // Act: ask for the reset, then cancel the confirmation
+        await cut.Find("[data-testid='checklist-reset']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='checklist-reset-confirmation']"));
+        await cut.Find("[data-testid='checklist-reset-cancel']").ClickAsync();
+
+        // Assert: the confirmation is gone, the own checklist is shown and stored, and nothing was recorded
+        Assert.Empty(cut.FindAll("[data-testid='checklist-reset-confirmation']"));
+        Assert.Equal("custom-1", cut.Find("[data-testid='checklist-current-version']").TextContent);
+        Assert.False((await ChecklistTemplates.GetAsync(TestActors.Ann, apollo, TestContext.Current.CancellationToken)).IsDefault);
+        Assert.Equal(auditsBefore, Store.Audits.Count(a => a.Action == ProjectChecklistService.ChangedAction));
+    }
+
+    /// <summary>
     ///     Test that a reset based on a checklist that someone else changed in the meantime overwrites nothing and
     ///     shows the message and the checklist that is stored now.
     /// </summary>

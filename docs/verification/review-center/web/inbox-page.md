@@ -29,6 +29,9 @@ N/A - standard test environment.
 - A row that the user has not seen carries the New marker, and the marker is gone once the review was seen.
 - An open review past its due date is marked overdue, and one that is not yet due is not.
 - Mark all as read stores the read state of every listed review and clears the markers.
+- The Mark all as read button is offered while the inbox lists a review, and the page reports that it is interactive
+  also when nothing is listed.
+- A reply waiting is shown in the group Replies waiting with its title and the row of the review.
 - An auditor is not offered a signature to give.
 - The page reports through its root marker that it is interactive once rendered, and the router shows nothing of the
   inbox to a visitor who is not signed in.
@@ -57,7 +60,8 @@ others" to the summary, and is not counted as action. This scenario is tested by
 `InboxPage_Render_WaitingForOthers_NotCountedInSummary`.
 
 **InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview**: A reviewer who handed in finds, under To answer, a row
-with the chip "Question for you" for an open question that another user started in the review; the row names the asker,
+with the chip "Question for you" for an open question that another user started in the review (the To answer list holds
+the chip); the row names the asker,
 does not quote the question, counts the review once as action, and links to the review page, not to the checklist. This
 scenario is tested by `InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview`.
 
@@ -70,8 +74,18 @@ the author finds the group Failed checks with its title and the row of the revie
 `InboxPage_Render_FailedChecks_ShowsTitledSection`.
 
 **InboxPage_Render_Update_ShowsTitledSection**: Both reviewers signed a review, so it was approved after the user
-signed; the user finds the group Updates with its title and the row of the review. This scenario is tested by
-`InboxPage_Render_Update_ShowsTitledSection`.
+signed; the user finds the group Updates with its title and the row of the review, which carries the chip Approved.
+This scenario is tested by `InboxPage_Render_Update_ShowsTitledSection`.
+
+**InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip**: The only reviewer of a review answers one check with
+Fail, writes the conclusion text and signs, so the review is rejected; the author finds the group Updates with the row
+that carries the chip Rejected, names the signer ("Signed by Ann"), and links to the review. This scenario is tested by
+`InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip`.
+
+**InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip**: The only reviewer of a review signs, so it is approved,
+and a system administrator reopens it; the author finds the group Updates with the row that carries the chip Reopened
+and names the administrator ("Reopened by Root"). This scenario is tested by
+`InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip`.
 
 **InboxPage_Render_UnreadItem_ShowsDot**: A row that the user has not seen carries the New marker (here a To answer row
 with the chip "Not started"), and after the review was seen the marker is gone. This scenario is tested by
@@ -92,6 +106,23 @@ scenario is tested by `InboxPage_Render_Auditor_ShowsNoSignItems`.
 **InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead**: A user with a review waiting renders the page; the
 root element has `data-interactive` equal to `true` and the Mark all as read button is offered. This scenario is tested
 by `InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead`.
+
+**InboxPage_AfterRender_NothingWaiting_SetsInteractiveMarker**: A user with nothing waiting renders the page; the root
+element has `data-interactive` equal to `true` although no row is listed. This scenario is tested by
+`InboxPage_AfterRender_NothingWaiting_SetsInteractiveMarker`.
+
+**InboxPage_Render_ItemsListed_OffersMarkAllReadButton**: A user with a review waiting renders the page; the row is
+listed and the Mark all as read button is offered. This scenario is tested by
+`InboxPage_Render_ItemsListed_OffersMarkAllReadButton`.
+
+**InboxPage_Render_RepliesWaiting_ShowsTitledSection**: A reviewer asked a question and another user answered it; the
+reviewer finds the group Replies waiting with its title and the row of the review. This scenario is tested by
+`InboxPage_Render_RepliesWaiting_ShowsTitledSection`.
+
+**InboxPage_Render_RepliesWaitingOnOwnReview_ShowsTitledSection**: A reviewer asked a question and another user
+answered it; the author of the review, who did not take part in the thread, finds the group Replies waiting with its
+title and the row of the review with the chip "1 waiting". This scenario is tested by
+`InboxPage_Render_RepliesWaitingOnOwnReview_ShowsTitledSection`.
 
 **InboxPage_Render_AnonymousThroughRouter_ShowsLoginLinkAndNoInbox**: Nobody is signed in and the router, which applies
 the authorization rules of a page, is rendered at `/inbox`; the inbox and its rows are not shown, and a link to the
