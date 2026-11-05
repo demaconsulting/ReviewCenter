@@ -2369,6 +2369,7 @@ sections:
         justification: |
           Cancelling must be safe.
         tests:
+          - ProjectChecklistPage_Reset_Cancelled_ChangesNothing
           - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
 
       - id: ReviewCenter-ProjectPage-ChecklistReset-Confirmed

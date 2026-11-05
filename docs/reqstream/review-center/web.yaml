@@ -1951,6 +1951,7 @@ sections:
           - ReviewCenter-ChecklistPage-Answer-Label
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+          - WebSubsystem_ChecklistPage_NotApplicableAnswerSurvivesReload
 
       - id: ReviewCenter-Web-Checklist-AnswerPass
         title: >-
@@ -2628,6 +2629,7 @@ sections:
         children:
           - ReviewCenter-ReviewPage-Reviewers-ApprovedBadge
           - ReviewCenter-ReviewPage-Reviewers-InReviewBadge
+          - ReviewCenter-ReviewPage-Reviewers-RejectedBadge
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
@@ -5247,21 +5249,43 @@ sections:
 
       - id: ReviewCenter-Web-EvidenceSettings
         title: >-
-          The Web subsystem shall let only whoever administers a project, a system administrator or a project admin of
-          it, open the evidence settings page of the project from an Evidence settings button on the project page.
+          The Web subsystem shall show the evidence settings page of a project to whoever administers the project, a
+          system administrator or a project admin of it.
         justification: |
           Opening evidence to anonymous readers and reducing what a PDF contains are decisions with regulatory
           consequences, so they belong to the people who answer for the project. The behavior needs a live
           connection, so it is verified by the component tests of the units.
         children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+
+      - id: ReviewCenter-Web-EvidenceSettings-Button
+        title: >-
+          The Web subsystem shall show whoever administers a project an Evidence settings button on the project page
+          that leads to the evidence settings page of the project.
+        justification: |
+          The administrator finds the evidence settings page from the project without knowing its address.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsLink
           - ReviewCenter-ProjectPage-EvidenceSettingsLink-SystemAdmin
+
+      - id: ReviewCenter-Web-EvidenceSettings-ButtonHidden
+        title: >-
+          The Web subsystem shall show a plain member of a project no Evidence settings button on the project page.
+        justification: |
+          A control that leads a plain member only to a refusal is noise.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsLink-Hidden
-          - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+
+      - id: ReviewCenter-Web-EvidenceSettings-BackButton
+        title: >-
+          The Web subsystem shall show a Back to project button on the evidence settings page that leads to the
+          project.
+        justification: |
+          The administrator returns to the project without the history of the browser.
+        children:
           - ReviewCenter-ProjectPage-EvidenceSettingsAccess-BackButton
-        tests:
-          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
-          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
 
       - id: ReviewCenter-Web-EvidenceSettings-HiddenProject
         title: >-
@@ -5433,21 +5457,51 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate
         title: >-
-          The Web subsystem shall let only whoever administers a project, a system administrator or a project admin of
-          it, open the checklist template page of the project from a Checklist button on the project page.
+          The Web subsystem shall show the checklist template page with the current checklist of a project to whoever
+          administers the project, a system administrator or a project admin of it.
         justification: |
           The checklist is how a formal review shows what was examined, so changing it belongs to the people who answer
           for the project. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
-          - ReviewCenter-ProjectPage-ChecklistLink
-          - ReviewCenter-ProjectPage-ChecklistLink-SystemAdmin
-          - ReviewCenter-ProjectPage-ChecklistLink-Hidden
           - ReviewCenter-ProjectPage-ChecklistAccess
-          - ReviewCenter-ProjectPage-ChecklistAccess-DefaultBadge
-          - ReviewCenter-ProjectPage-ChecklistAccess-BackButton
         tests:
           - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
-          - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+
+      - id: ReviewCenter-Web-ChecklistTemplate-Button
+        title: >-
+          The Web subsystem shall show whoever administers a project a Checklist button on the project page that leads
+          to the checklist template page of the project.
+        justification: |
+          The administrator finds the checklist template page from the project without knowing its address.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistLink
+          - ReviewCenter-ProjectPage-ChecklistLink-SystemAdmin
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ButtonHidden
+        title: >-
+          The Web subsystem shall show a plain member of a project no Checklist button on the project page.
+        justification: |
+          A control that leads a plain member only to a refusal is noise.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistLink-Hidden
+
+      - id: ReviewCenter-Web-ChecklistTemplate-DefaultBadge
+        title: >-
+          The Web subsystem shall show a badge on the checklist template page while the current checklist is the
+          built-in default and none while it is a custom checklist.
+        justification: |
+          The administrator sees at once whether the project has its own wording.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistAccess-DefaultBadge
+
+      - id: ReviewCenter-Web-ChecklistTemplate-BackButton
+        title: >-
+          The Web subsystem shall show a Back to project button on the checklist template page that leads to the
+          project.
+        justification: |
+          The administrator returns to the project without the history of the browser.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistAccess-BackButton
 
       - id: ReviewCenter-Web-ChecklistTemplate-HiddenProject
         title: >-
@@ -5658,25 +5712,42 @@ sections:
 
       - id: ReviewCenter-Web-ChecklistTemplate-Confirmation
         title: >-
-          The Web subsystem shall ask for a confirmation before the checklist is replaced or reset that says that
-          existing reviews keep their checklist.
+          The Web subsystem shall ask for a confirmation before the checklist is replaced that says that existing
+          reviews keep their checklist.
         justification: |
-          The administrator must know that the change does not touch reviews that are under way.
+          The administrator must know that the replacement does not touch reviews that are under way.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace-Confirmation
-          - ReviewCenter-ProjectPage-ChecklistReset-Confirmation
         tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
 
+      - id: ReviewCenter-Web-ChecklistTemplate-ConfirmationReset
+        title: >-
+          The Web subsystem shall ask for a confirmation before the checklist is reset to the built-in default that
+          says that existing reviews keep their checklist.
+        justification: |
+          A reset replaces the wording of the project in one step, so the administrator must be told first that it does
+          not touch reviews that are under way.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistReset-Confirmation
+
       - id: ReviewCenter-Web-ChecklistTemplate-ConfirmationCancelled
         title: >-
-          The Web subsystem shall store and audit nothing, and leave the checklist unchanged, when the administrator
-          cancels the confirmation of a replacement or a reset.
+          The Web subsystem shall store and audit nothing when the administrator cancels the confirmation of a
+          replacement of the checklist.
         justification: |
           An administrator who thinks twice must be able to back out without leaving a trace in the checklist or in the
           audit trail.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace-Cancelled
+
+      - id: ReviewCenter-Web-ChecklistTemplate-ConfirmationCancelledReset
+        title: >-
+          The Web subsystem shall leave the checklist of the project unchanged when the administrator cancels the
+          confirmation of a reset to the built-in default.
+        justification: |
+          A reset throws away the own wording of the project, so backing out of the confirmation must keep that wording.
+        children:
           - ReviewCenter-ProjectPage-ChecklistReset-Cancelled
 
       - id: ReviewCenter-Web-ChecklistTemplate-ReplaceRefused
@@ -7284,13 +7355,10 @@ sections:
 
       - id: ReviewCenter-Web-Inbox
         title: >-
-          The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user in
-          eight groups (to answer, disputed, ready to sign, signature no longer counts, replies waiting, failed checks,
-          waiting for others, and updates).
+          The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user.
         justification: |
           A reviewer should learn from the first page what waits and be led to it.
         children:
-          - ReviewCenter-InboxPage-Sections
           - ReviewCenter-InboxPage-Sections-Project
           - ReviewCenter-InboxPage-Sections-ChecklistLink
           - ReviewCenter-InboxPage-Sections-ReviewLink
@@ -7300,14 +7368,131 @@ sections:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
           - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
+      - id: ReviewCenter-Web-Inbox-ToAnswer
+        title: >-
+          The Web subsystem shall list in the group To answer of the inbox the reviews in which the user has a ballot
+          to hand in.
+        justification: |
+          The reader must see first what is theirs to do, and a ballot not yet handed in is the most basic work.
+        children:
+          - ReviewCenter-InboxPage-Sections
+
+      - id: ReviewCenter-Web-Inbox-Question
+        title: >-
+          The Web subsystem shall list in the group To answer of the inbox the reviews in which someone else asked the
+          user a question that the user has not answered.
+        justification: |
+          The inbox is where a reviewer learns what waits, so a question that waits for an answer must be listed there
+          with the work.
+        children:
+          - ReviewCenter-InboxPage-Sections-Question
+
+      - id: ReviewCenter-Web-Inbox-Disputed
+        title: >-
+          The Web subsystem shall list in the group Disputed of the inbox the reviews in which the user handed in the
+          ballot and the ballots differ on some check.
+        justification: |
+          A difference between the ballots is settled by the reviewers, so the user who gave a ballot must be led to
+          it.
+        children:
+          - ReviewCenter-InboxPage-Sections-Disputed
+
+      - id: ReviewCenter-Web-Inbox-ReadyToSign
+        title: >-
+          The Web subsystem shall list in the group Ready to sign of the inbox the reviews in which nothing blocks the
+          signature of the user and a slot of the user has no current signature.
+        justification: |
+          A signature that is ready to be given is the last step of the work of a reviewer, so it must not be missed.
+        children:
+          - ReviewCenter-InboxPage-Sections-ReadyToSign
+
+      - id: ReviewCenter-Web-Inbox-SignatureLost
+        title: >-
+          The Web subsystem shall list in the group Your signature no longer counts of the inbox the reviews that
+          changed after the user signed and still block a new signature.
+        justification: |
+          A lost signature leaves the review short of approval without a word, so the signer must be told.
+        children:
+          - ReviewCenter-InboxPage-Sections-SignatureLost
+
+      - id: ReviewCenter-Web-Inbox-RepliesWaiting
+        title: >-
+          The Web subsystem shall list in the group Replies waiting of the inbox the reviews in which someone else
+          answered in a thread that the user took part in.
+        justification: |
+          A person who asked a question must learn that the answer has come without opening every review.
+        children:
+          - ReviewCenter-InboxPage-Sections-RepliesWaiting
+
+      - id: ReviewCenter-Web-Inbox-RepliesWaitingReview
+        title: >-
+          The Web subsystem shall list in the group Replies waiting of the inbox the reviews that the user authored and
+          in which someone else wrote the latest comment of an open thread.
+        justification: |
+          The author is the one who answers the discussion on the review, so the inbox must lead the author to it.
+        children:
+          - ReviewCenter-InboxPage-Sections-RepliesWaitingReview
+
+      - id: ReviewCenter-Web-Inbox-FailedChecks
+        title: >-
+          The Web subsystem shall list in the group Failed checks of the inbox the reviews of the user in which a check
+          is answered with Fail.
+        justification: |
+          The author must see at once that a reviewer found a defect, because the author is the one who fixes it.
+        children:
+          - ReviewCenter-InboxPage-Sections-FailedChecks
+
+      - id: ReviewCenter-Web-Inbox-WaitingForOthers
+        title: >-
+          The Web subsystem shall list in the group Waiting for others of the inbox the reviews in which the user did
+          their part and the review waits for other people.
+        justification: |
+          The user must see that the review is under way and not forgotten, without taking it for work to do.
+        children:
+          - ReviewCenter-InboxPage-Sections-WaitingForOthers
+
+      - id: ReviewCenter-Web-Inbox-Updates
+        title: >-
+          The Web subsystem shall list in the group Updates of the inbox the reviews of the user that someone else
+          approved since the user last looked.
+        justification: |
+          News that need no action must not mix with the work, but the author must still learn them.
+        children:
+          - ReviewCenter-InboxPage-Sections-Updates
+
+      - id: ReviewCenter-Web-Inbox-UpdatesRejected
+        title: >-
+          The Web subsystem shall list in the group Updates of the inbox, with the chip Rejected, the reviews of the
+          user that someone else rejected since the user last looked.
+        justification: |
+          The inbox is the list of notifications, so the end of a review without approval must reach the author there.
+        children:
+          - ReviewCenter-InboxPage-Sections-UpdatesRejected
+
+      - id: ReviewCenter-Web-Inbox-UpdatesReopened
+        title: >-
+          The Web subsystem shall list in the group Updates of the inbox, with the chip Reopened, the reviews of the
+          user that someone else reopened since the user last looked.
+        justification: |
+          The inbox is the list of notifications, so the author must learn from it that a concluded review is open
+          again.
+        children:
+          - ReviewCenter-InboxPage-Sections-UpdatesReopened
+
       - id: ReviewCenter-Web-Inbox-DueMark
         title: >-
-          The Web subsystem shall mark the due date of an action item with the word Due, and with the word Overdue
-          when the date has passed.
+          The Web subsystem shall mark the due date of an action item with the word Due.
+        justification: |
+          A user who sorts the work by urgency must see when each item is expected without opening it.
+        children:
+          - ReviewCenter-InboxPage-Sections-DueMark
+
+      - id: ReviewCenter-Web-Inbox-OverdueMark
+        title: >-
+          The Web subsystem shall mark the due date of an action item with the word Overdue when the date has passed.
         justification: |
           A user who sorts the work by urgency must see which items are late without opening them.
         children:
-          - ReviewCenter-InboxPage-Sections-DueMark
           - ReviewCenter-InboxPage-Sections-OverdueMark
 
       - id: ReviewCenter-Web-Inbox-Empty
@@ -7364,7 +7549,7 @@ sections:
         children:
           - ReviewCenter-InboxPage-MarkAllRead
           - ReviewCenter-InboxPage-MarkAllRead-BadgesCleared
-          - ReviewCenter-InboxPage-Interactive
+          - ReviewCenter-InboxPage-Interactive-MarkAllRead
 
       - id: ReviewCenter-Web-Inbox-HomeCount
         title: >-

@@ -850,6 +850,10 @@ the checklist stored now, and compares the candidate with it. This scenario is t
 cancelled without a change; confirming returns the project to the built-in default, shows the badge, confirms in words,
 and records the change. This scenario is tested by `ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits`.
 
+**ProjectChecklistPage_Reset_Cancelled_ChangesNothing**: A project with its own checklist; the administrator asks for
+the reset and cancels the confirmation; the confirmation is gone, the own checklist is still shown and stored, and no
+audit entry was added. This scenario is tested by `ProjectChecklistPage_Reset_Cancelled_ChangesNothing`.
+
 **ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist**: Someone else replaces the checklist
 while the page is open; confirming the reset stores nothing and shows the message and the checklist stored now. This
 scenario is tested by `ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist`.

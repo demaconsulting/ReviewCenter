@@ -1177,7 +1177,20 @@ sections:
           - ReviewCenter-Storage-Inbox-Candidates
           - ReviewCenter-Storage-Inbox-LightRecords
           - ReviewCenter-Web-Inbox
+          - ReviewCenter-Web-Inbox-ToAnswer
+          - ReviewCenter-Web-Inbox-Question
+          - ReviewCenter-Web-Inbox-Disputed
+          - ReviewCenter-Web-Inbox-ReadyToSign
+          - ReviewCenter-Web-Inbox-SignatureLost
+          - ReviewCenter-Web-Inbox-RepliesWaiting
+          - ReviewCenter-Web-Inbox-RepliesWaitingReview
+          - ReviewCenter-Web-Inbox-FailedChecks
+          - ReviewCenter-Web-Inbox-WaitingForOthers
+          - ReviewCenter-Web-Inbox-Updates
+          - ReviewCenter-Web-Inbox-UpdatesRejected
+          - ReviewCenter-Web-Inbox-UpdatesReopened
           - ReviewCenter-Web-Inbox-DueMark
+          - ReviewCenter-Web-Inbox-OverdueMark
           - ReviewCenter-Web-Inbox-Empty
           - ReviewCenter-Web-Inbox-Interactive
           - ReviewCenter-Web-Inbox-HomeCountNone
@@ -1987,6 +2000,9 @@ sections:
           are.
         children:
           - ReviewCenter-Web-ChecklistTemplate
+          - ReviewCenter-Web-ChecklistTemplate-Button
+          - ReviewCenter-Web-ChecklistTemplate-DefaultBadge
+          - ReviewCenter-Web-ChecklistTemplate-BackButton
           - ReviewCenter-Web-ChecklistTemplate-StartLineHidden
           - ReviewCenter-Web-ChecklistTemplate-ExportRightLost
           - ReviewCenter-Web-ChecklistTemplate-ImportFileRefused
@@ -2000,6 +2016,7 @@ sections:
           - ReviewCenter-Web-ChecklistTemplate-LabelWarning
           - ReviewCenter-Web-ChecklistTemplate-PreviewNullArgument
           - ReviewCenter-Web-ChecklistTemplate-ConfirmationCancelled
+          - ReviewCenter-Web-ChecklistTemplate-ConfirmationCancelledReset
           - ReviewCenter-Web-ChecklistTemplate-ReplaceRefused
           - ReviewCenter-Web-ChecklistTemplate-ReplaceNothingStored
           - ReviewCenter-Web-ChecklistTemplate-ReplaceKeepsCandidate
@@ -2013,6 +2030,7 @@ sections:
           - ReviewCenter-Web-ChecklistTemplate-Differences
           - ReviewCenter-Web-ChecklistTemplate-Replace
           - ReviewCenter-Web-ChecklistTemplate-Confirmation
+          - ReviewCenter-Web-ChecklistTemplate-ConfirmationReset
           - ReviewCenter-Web-ChecklistTemplate-Reset
           - ReviewCenter-Web-ChecklistTemplate-Topic
           - ReviewCenter-Core-ProjectChecklist
@@ -2052,6 +2070,7 @@ sections:
           validation, or that was overtaken by another change, must not replace the checklist.
         children:
           - ReviewCenter-Web-ChecklistTemplate-HiddenProject
+          - ReviewCenter-Web-ChecklistTemplate-ButtonHidden
           - ReviewCenter-Web-ChecklistTemplate-Validation
           - ReviewCenter-Web-ChecklistTemplate-Conflict
           - ReviewCenter-Web-ChecklistTemplate-RightLost
@@ -4898,6 +4917,8 @@ sections:
           - ReviewCenter-Storage-EvidenceSettings-Stale
           - ReviewCenter-Storage-EvidenceSettings-MissingProject
           - ReviewCenter-Web-EvidenceSettings
+          - ReviewCenter-Web-EvidenceSettings-Button
+          - ReviewCenter-Web-EvidenceSettings-BackButton
           - ReviewCenter-Web-EvidenceSettings-NoWarnings
           - ReviewCenter-Web-EvidenceSettings-SaveUnchanged
           - ReviewCenter-Web-EvidenceSettings-SaveUnchangedNothingRecorded
@@ -4924,6 +4945,7 @@ sections:
           - ReviewCenter-Core-EvidenceSettings-OtherActors
           - ReviewCenter-Core-EvidenceSettings-RefusalChangesNothing
           - ReviewCenter-Web-EvidenceSettings
+          - ReviewCenter-Web-EvidenceSettings-ButtonHidden
           - ReviewCenter-Web-EvidenceSettings-NoWarnings
           - ReviewCenter-Web-EvidenceSettings-SaveUnchanged
           - ReviewCenter-Web-EvidenceSettings-SaveUnchangedNothingRecorded

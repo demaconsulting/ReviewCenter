@@ -233,6 +233,50 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a check answered as not applicable through the domain service is presented by the checklist page
+    ///     through the real pipeline with its justification, still there when the page is requested again, while Pass
+    ///     and Fail are offered for the check as well.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ChecklistPage_NotApplicableAnswerSurvivesReload()
+    {
+        // Arrange: start the real pipeline, create a review (by Bob, because its author may not answer it) and answer
+        // one check as not applicable
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        using var bobBrowser = await TestBrowser.SignedInAsync(app, "bob");
+        var client = browser.Client;
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
+        await SeatAsync(app, project.Id, "rev-1", "ann");
+        await app.Services.GetRequiredService<ChecklistService>().SetAnswerAsync(
+            project.Id,
+            "rev-1",
+            "REQ-03",
+            ChecklistOutcome.NotApplicable,
+            "Not in scope",
+            TestActors.Ann,
+            TestContext.Current.CancellationToken);
+
+        // Act: request the checklist page twice
+        var route = $"/projects/{project.Id}/reviews/rev-1/checklist";
+        var first = await ParseAsync(client, route);
+        var reloaded = await ParseAsync(client, route);
+
+        // Assert: both loads show the not applicable answer with its justification, and offer all three answers
+        foreach (var page in new[] { first, reloaded })
+        {
+            Assert.Equal("true", page.QuerySelector("[data-testid='check-na-req-03']")?.GetAttribute("aria-pressed"));
+            Assert.Equal("Not in scope", page.QuerySelector("[data-testid='check-justification-req-03']")?.TextContent);
+            Assert.Equal("false", page.QuerySelector("[data-testid='check-pass-req-03']")?.GetAttribute("aria-pressed"));
+            Assert.Equal("false", page.QuerySelector("[data-testid='check-fail-req-03']")?.GetAttribute("aria-pressed"));
+        }
+    }
+
+    /// <summary>
     ///     Test that slots and signatures created through the domain services are presented by the review page
     ///     and the project page through the real pipeline: Approved after signing, and In review with an
     ///     out-of-date signature once the record changes.

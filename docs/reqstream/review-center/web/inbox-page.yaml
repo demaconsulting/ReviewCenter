@@ -18,17 +18,117 @@ sections:
 
       - id: ReviewCenter-InboxPage-Sections
         title: >-
-          The InboxPage unit shall show the items under the titled groups to answer, disputed, ready to sign,
-          signature no longer counts, replies waiting, failed checks, waiting for others, and updates.
+          The InboxPage unit shall show under the titled group To answer the reviews in which the user has a ballot
+          to hand in.
         justification: |
-          The reader must see what to do, and what only to know, in one place and grouped by the kind of action.
+          The reader must see first what is theirs to do, and a ballot not yet handed in is the most basic work.
         tests:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
           - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+
+      - id: ReviewCenter-InboxPage-Sections-Question
+        title: >-
+          The InboxPage unit shall show under the titled group To answer the reviews in which someone else asked the
+          user a question that the user has not answered.
+        justification: |
+          A question left unanswered holds up the whole review, and the person asked must see it as work to do and
+          not as news.
+        tests:
+          - InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview
+
+      - id: ReviewCenter-InboxPage-Sections-Disputed
+        title: >-
+          The InboxPage unit shall show under the titled group Disputed the reviews in which the user handed in the
+          ballot and the ballots differ on some check.
+        justification: |
+          A difference between the ballots is settled by the reviewers, so the user who gave a ballot must be led to
+          it.
+        tests:
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+
+      - id: ReviewCenter-InboxPage-Sections-ReadyToSign
+        title: >-
+          The InboxPage unit shall show under the titled group Ready to sign the reviews in which nothing blocks the
+          signature of the user and a slot of the user has no current signature.
+        justification: |
+          A signature that is ready to be given is the last step of the work of a reviewer, so it must not be missed.
+        tests:
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
+
+      - id: ReviewCenter-InboxPage-Sections-SignatureLost
+        title: >-
+          The InboxPage unit shall show under the titled group Your signature no longer counts the reviews that
+          changed after the user signed and still block a new signature.
+        justification: |
+          A lost signature leaves the review short of approval without a word, so the signer must be told.
+        tests:
           - InboxPage_Render_SignatureLost_ShowsSectionChipAndReason
-          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+
+      - id: ReviewCenter-InboxPage-Sections-RepliesWaiting
+        title: >-
+          The InboxPage unit shall show under the titled group Replies waiting the reviews in which someone else
+          answered in a thread that the user took part in.
+        justification: |
+          A person who asked a question must learn that the answer has come without opening every review.
+        tests:
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_RepliesWaiting_ShowsTitledSection
+
+      - id: ReviewCenter-InboxPage-Sections-RepliesWaitingReview
+        title: >-
+          The InboxPage unit shall show under the titled group Replies waiting the reviews that the user authored and
+          in which someone else wrote the latest comment of an open thread.
+        justification: |
+          The author owns the review and must learn of every open discussion on it, also of one the author did not
+          start.
+        tests:
+          - InboxPage_Render_RepliesWaitingOnOwnReview_ShowsTitledSection
+
+      - id: ReviewCenter-InboxPage-Sections-FailedChecks
+        title: >-
+          The InboxPage unit shall show under the titled group Failed checks the reviews of the user in which a check
+          is answered with Fail.
+        justification: |
+          The author must see at once that a reviewer found a defect, because the author is the one who fixes it.
+        tests:
           - InboxPage_Render_FailedChecks_ShowsTitledSection
+
+      - id: ReviewCenter-InboxPage-Sections-WaitingForOthers
+        title: >-
+          The InboxPage unit shall show under the titled group Waiting for others the reviews in which the user did
+          their part and the review waits for other people.
+        justification: |
+          The user must see that the review is under way and not forgotten, without taking it for work to do.
+        tests:
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
+
+      - id: ReviewCenter-InboxPage-Sections-Updates
+        title: >-
+          The InboxPage unit shall show under the titled group Updates the reviews of the user that someone else
+          approved since the user last looked.
+        justification: |
+          News that need no action must not mix with the work, but the author must still learn them.
+        tests:
           - InboxPage_Render_Update_ShowsTitledSection
+
+      - id: ReviewCenter-InboxPage-Sections-UpdatesRejected
+        title: >-
+          The InboxPage unit shall show under the titled group Updates, with the chip Rejected, the reviews of the
+          user that someone else rejected since the user last looked.
+        justification: |
+          A rejection ends the review without approval and the author must rework it, so the author must be told at
+          once.
+        tests:
+          - InboxPage_Render_UpdateRejected_ShowsTitledSectionAndChip
+
+      - id: ReviewCenter-InboxPage-Sections-UpdatesReopened
+        title: >-
+          The InboxPage unit shall show under the titled group Updates, with the chip Reopened, the reviews of the
+          user that someone else reopened since the user last looked.
+        justification: |
+          A reopened review needs fresh signatures, so the author must not keep taking it for concluded.
+        tests:
+          - InboxPage_Render_UpdateReopened_ShowsTitledSectionAndChip
 
       - id: ReviewCenter-InboxPage-Sections-Project
         title: >-
@@ -170,12 +270,22 @@ sections:
 
       - id: ReviewCenter-InboxPage-Interactive
         title: >-
-          The InboxPage unit shall set the interactive marker on its page once the page has rendered, and offer the
-          button that marks everything as read.
+          The InboxPage unit shall set the interactive marker on its page once the page has rendered.
         justification: |
-          The button that marks everything as read needs the live session of the user, and the marker tells that the
-          page has become interactive. Serving the page only to a signed-in user belongs to the Web subsystem.
+          The marker tells that the page has become interactive, so that a driver waits for it before it acts. Serving
+          the page only to a signed-in user belongs to the Web subsystem.
         tests:
+          - InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead
+          - InboxPage_AfterRender_NothingWaiting_SetsInteractiveMarker
+
+      - id: ReviewCenter-InboxPage-Interactive-MarkAllRead
+        title: >-
+          The InboxPage unit shall offer the Mark all as read button only while the inbox lists at least one review.
+        justification: |
+          A user with nothing listed has nothing to mark, and a button without effect would confuse.
+        tests:
+          - InboxPage_Render_ItemsListed_OffersMarkAllReadButton
+          - InboxPage_Render_NothingWaiting_ShowsEmptyState
           - InboxPage_AfterRender_Interactive_SetsMarkerAndOffersMarkAllRead
 
       - id: ReviewCenter-InboxPage-Interactive-Challenge

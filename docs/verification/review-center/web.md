@@ -189,6 +189,12 @@ checks answered", a link to the checklist page, and "56 checklist checks unanswe
 next step. This
 scenario is tested by `WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`.
 
+**WebSubsystem_ChecklistPage_NotApplicableAnswerSurvivesReload**: A review is created by a second user through the Core
+services of the real pipeline, ann is seated in the only reviewer slot, and one check (REQ-03) is answered as not
+applicable with the justification "Not in scope". The checklist page is requested twice as ann. Both loads show the N/A
+button of the check pressed, the saved justification, and the Pass and Fail buttons of the check not pressed. This
+scenario is tested by `WebSubsystem_ChecklistPage_NotApplicableAnswerSurvivesReload`.
+
 **WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges**: The pipeline is started in memory
 on a temporary database, and a project and a review with every check answered Pass are created through the real Core
 services, with one reviewer slot of the signed-in user (primary, who is also a project administrator). The review
