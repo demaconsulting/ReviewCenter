@@ -5927,10 +5927,17 @@ sections:
 
       - id: ReviewCenter-Web-Progress
         title: >-
-          The Web subsystem shall show on the project page, for every review, its stage.
+          The Web subsystem shall show on the project page, for every review, its stage (Setup, In review, Approved, or
+          Rejected).
         justification: |
           The project page is where a lead starts. The lead must see at a glance how far each review has come. The
           behavior needs a live connection, so it is verified by the component tests of the unit.
+        children:
+          - ReviewCenter-ProjectPage-Approval
+          - ReviewCenter-ProjectPage-Approval-Setup
+          - ReviewCenter-ProjectPage-Approval-Rejected
+          - ReviewCenter-ProjectPage-Approval-InReview
+          - ReviewCenter-ProjectPage-Approval-Current
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -7282,7 +7289,6 @@ sections:
           - ReviewCenter-InboxPage-Sections-DetailLine
         tests:
           - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
-          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-DueMark
         title: >-
@@ -7309,6 +7315,8 @@ sections:
           The marker tells that the page is ready to be used.
         children:
           - ReviewCenter-InboxPage-Interactive
+        tests:
+          - WebSubsystem_InboxPage_SignedIn_IsServedAsInteractivePage
 
       - id: ReviewCenter-Web-Inbox-Summary
         title: >-
@@ -7348,6 +7356,7 @@ sections:
         children:
           - ReviewCenter-InboxPage-MarkAllRead
           - ReviewCenter-InboxPage-MarkAllRead-BadgesCleared
+          - ReviewCenter-InboxPage-Interactive
 
       - id: ReviewCenter-Web-Inbox-HomeCount
         title: >-
