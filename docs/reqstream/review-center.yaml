@@ -868,8 +868,8 @@ sections:
 
       - id: ReviewCenter-System-FollowUpReview-NotCarried
         title: >-
-          The tool shall not carry over into a follow-up the Fail answers, the resolved threads, the reviewer
-          slots, or the signatures of the earlier review.
+          The tool shall not carry over into a follow-up the Fail answers, the resolved threads, the threads about
+          checks, the reviewer slots, or the signatures of the earlier review.
         tags: [system]
         justification: |
           A failed check must be decided again for the corrected content, and a signature or a slot of the earlier
@@ -877,12 +877,25 @@ sections:
         children:
           - ReviewCenter-Core-FollowUp-NotCarriedAnswers
           - ReviewCenter-Core-FollowUp-NotCarried
-          - ReviewCenter-Core-FollowUp-ResolvedCounted
           - ReviewCenter-Core-FollowUp-CheckThreads
+        tests:
+          - ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn
+
+      - id: ReviewCenter-System-FollowUpReview-NotCarriedCounted
+        title: >-
+          The tool shall count the threads that a follow-up leaves out of the carry.
+        tags: [system]
+        justification: |
+          The creator sees what the carry left out and need not guess whether anything was lost, and is asked to
+          confirm only a real loss, because a thread about a check is left out by design and is not counted twice.
+        children:
+          - ReviewCenter-Core-FollowUp-ResolvedCounted
           - ReviewCenter-Core-FollowUp-CheckThreadsCounted
           - ReviewCenter-Core-FollowUp-CheckThreadsNotDropped
         tests:
-          - ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn
+          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+          - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
+          - ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut
 
       - id: ReviewCenter-System-FollowUpReview-Marks
         title: >-
@@ -1508,12 +1521,10 @@ sections:
 
       - id: ReviewCenter-System-Comments-ReportInclusion
         title: >-
-          The tool shall let the writer of a comment include it in the report, tell a Finding from a Question by
-          whether its starting comment is included, and treat a comment that is not included as chat.
+          The tool shall let the writer of a comment include it in the report.
         tags: [system]
         justification: |
-          Only what the reviewers want to be part of the formal result goes into the report, and the rest of the
-          conversation stays out of it.
+          Only what the reviewers want to be part of the formal result goes into the report.
         children:
           - ReviewCenter-Core-Threads-IncludedComment
           - ReviewCenter-Core-Threads-IncludedList
@@ -1768,11 +1779,11 @@ sections:
       - id: ReviewCenter-System-Checklist-ProjectTemplate
         title: >-
           The tool shall let a project administrator define the checklist that new reviews of the project start
-          with, by importing a definition or by resetting to the built-in default, and record every change.
+          with, by importing a definition or by resetting to the built-in default.
         tags: [system]
         justification: |
-          A project has its own standard, and a change of it must be traceable and must leave the checklists of
-          existing reviews as they are.
+          A project has its own standard, and a change of it must leave the checklists of existing reviews as they
+          are.
         children:
           - ReviewCenter-Web-ChecklistTemplate
           - ReviewCenter-Web-ChecklistTemplate-StartLine
@@ -1785,7 +1796,6 @@ sections:
           - ReviewCenter-Web-ChecklistTemplate-Replace
           - ReviewCenter-Web-ChecklistTemplate-Confirmation
           - ReviewCenter-Web-ChecklistTemplate-Reset
-          - ReviewCenter-Web-ChecklistTemplate-Audit
           - ReviewCenter-Web-ChecklistTemplate-Topic
           - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Core-ProjectChecklist-Access
@@ -1794,11 +1804,22 @@ sections:
           - ReviewCenter-Core-ProjectChecklist-Change
           - ReviewCenter-Core-ProjectChecklist-NoChange
           - ReviewCenter-Core-ProjectChecklist-Reset
-          - ReviewCenter-Core-ProjectChecklist-Audit
           - ReviewCenter-Core-ProjectChecklist-ValidationRules
           - ReviewCenter-Storage-ProjectChecklist
           - ReviewCenter-Storage-ProjectChecklist-Default
           - ReviewCenter-Storage-ProjectChecklist-CompareAndSet
+        tests:
+          - ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault
+
+      - id: ReviewCenter-System-Checklist-ProjectTemplate-Audit
+        title: >-
+          The tool shall record every change of the checklist of a project in the audit trail.
+        tags: [system]
+        justification: |
+          A change of what the reviews are answered against must be traceable in the history of the project.
+        children:
+          - ReviewCenter-Web-ChecklistTemplate-Audit
+          - ReviewCenter-Core-ProjectChecklist-Audit
           - ReviewCenter-Storage-ProjectChecklist-Audit
         tests:
           - ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault
@@ -4182,7 +4203,7 @@ sections:
           - ReviewCenter-AuditCommand-Verify
           - ReviewCenter-AuditCommand-Verify-EmptyTrail
         tests:
-          - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
+          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
 
       - id: ReviewCenter-System-AuditVerify-ExitOne
         title: >-
@@ -5411,13 +5432,36 @@ sections:
           A mail must reach only the person who owns the address, so a typed address alone must never be enough to
           receive mail.
         children:
-          - ReviewCenter-Core-NotificationAddress
           - ReviewCenter-Core-NotificationConfirmation
-          - ReviewCenter-Storage-NotificationPreferences
           - ReviewCenter-Storage-NotificationConfirmOneWinner
         tests:
           - NotificationPreferenceService_Confirm_RightCode_ConfirmsAddress
           - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-System-NotificationAddressValid
+        title: >-
+          The tool shall accept a text as the e-mail address for notifications only when the text is exactly one
+          syntactically valid address.
+        tags: [system]
+        justification: |
+          The address is typed by a person and ends up in the header of a mail that the server sends, so a list or a
+          display name must not aim the mail at someone else.
+        children:
+          - ReviewCenter-Core-NotificationAddress
+        tests:
+          - NotificationAddress_TryNormalize_PlainAddress_Succeeds
+
+      - id: ReviewCenter-System-NotificationAddressKept
+        title: >-
+          The tool shall keep the e-mail address of a user for notifications until the user removes it.
+        tags: [system]
+        justification: |
+          The address decides where the server sends mail, so it survives a restart and goes away only when the user
+          removes it.
+        children:
+          - ReviewCenter-Storage-NotificationPreferences
+        tests:
+          - NotificationStore_RemoveAsync_DeletesRowWithAuditOnce
 
       - id: ReviewCenter-System-NotificationLimits
         title: >-

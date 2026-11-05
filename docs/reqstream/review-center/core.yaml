@@ -604,9 +604,9 @@ sections:
       - id: ReviewCenter-Core-ProjectChecklist-AdminChange
         title: >-
           The Core subsystem shall let only a system administrator or a project administrator of the project
-          replace or reset the checklist of the project, and check the right again at every call.
+          replace or reset the checklist of the project.
         justification: |
-          The decision belongs to those who administer the project, and a revoked right must take effect at once.
+          The decision belongs to those who administer the project.
         children:
           - ReviewCenter-ProjectChecklistService-Access-Change
           - ReviewCenter-ProjectChecklistService-Access-Reset
