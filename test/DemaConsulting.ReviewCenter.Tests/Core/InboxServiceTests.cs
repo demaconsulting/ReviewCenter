@@ -2166,7 +2166,9 @@ public class InboxServiceTests
 
     /// <summary>
     ///     Test that marking a review as seen leaves the record digest unchanged and that the inbox service has no
-    ///     audit trail to write to.
+    ///     audit trail to write to: neither a constructor parameter nor a field is an audit store or an audit service.
+    ///     The behavior over a real audit trail is shown by
+    ///     <c>StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged</c>.
     /// </summary>
     [Fact]
     public async Task InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail()
@@ -2182,8 +2184,13 @@ public class InboxServiceTests
         // Assert: the state is stored, the digest is unchanged, and nothing of the service can reach an audit trail
         Assert.True(stored);
         Assert.Equal(before, RecordDigest.Compute((await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!));
-        var dependencies = typeof(InboxService).GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.ParameterType);
+        var parameters = typeof(InboxService).GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.ParameterType);
+        var fields = typeof(InboxService)
+            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+            .Select(f => f.FieldType);
+        var dependencies = parameters.Concat(fields).ToList();
         Assert.DoesNotContain(typeof(IAuditStore), dependencies);
+        Assert.DoesNotContain(typeof(AuditService), dependencies);
     }
 
     /// <summary>

@@ -412,16 +412,33 @@ sections:
           qualify.
         children:
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
-          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Off
-          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Organization
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoSigningUsage
-          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoKeyUsageExtension
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Validity
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-EveryCall
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Store
-          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-File
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-FileExpired
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoChainCheck
+
+      - id: ReviewCenter-Evidence-Key-RequireTrusted-Accepted
+        title: >-
+          The Evidence subsystem shall accept a key that the RequireTrustedKey rule allows.
+        justification: |
+          The rule must keep out the keys that do not qualify without turning away the keys that do: an organization
+          key, a key without a key usage extension, a key from a file, and any key when the rule is off.
+        children:
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Off
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Organization
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-NoKeyUsageExtension
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-File
+
+      - id: ReviewCenter-Evidence-Key-CodeSigningWarning
+        title: >-
+          The Evidence subsystem shall warn, without refusing the key, when the certificate of a key is for code
+          signing only.
+        justification: |
+          Adobe Acrobat does not trust a code-signing certificate for document signatures, so the operator must hear
+          of it, but the certificate is still a key of the organization, so the trust rule does not change.
+        children:
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NoExtension
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-Wording

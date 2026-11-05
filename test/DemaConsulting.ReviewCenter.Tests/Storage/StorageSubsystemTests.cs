@@ -788,6 +788,52 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that marking reviews as seen over a real database, one review and then all reviews, appends nothing to
+    ///     the audit trail, leaves the entries and the chain as they were, and leaves the record digest of the review
+    ///     unchanged, although the read state itself is stored.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged()
+    {
+        // Arrange: ann authors a review and assigns bob; the audit trail and the record digest are read before
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var bob = new Actor("bob", "Bob");
+        var (provider, projects, reviews, store) = Open(options);
+        using var _ = provider;
+        var users = NewUserService(provider);
+        var annUser = await users.CreateAsync("ann", "Ann", false, "correct horse battery", cancellationToken);
+        var bobUser = await users.CreateAsync("bob", "Bob", false, "correct horse battery", cancellationToken);
+        var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(annUser.Id, project.Id, cancellationToken);
+        await store.AddMembershipAsync(bobUser.Id, project.Id, cancellationToken);
+        await reviews.CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], new Actor("ann", "Ann"), cancellationToken);
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
+        await signing.AddSlotAsync(new Actor("ann", "Ann"), project.Id, "rev-1", bobUser.Id, null, cancellationToken);
+        var audit = new AuditStore(
+            provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            new AuditAppender(TimeProvider.System));
+        var entriesBefore = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+        var sequenceBefore = await audit.LatestSequenceAsync(cancellationToken);
+        var digestBefore = RecordDigest.Compute((await store.GetRecordAsync(project.Id, "rev-1", cancellationToken))!);
+        var inbox = NewInboxService(provider, store);
+
+        // Act: bob marks the review as seen, and then marks everything as read
+        var seen = await inbox.MarkSeenAsync(bob, project.Id, "rev-1", 0, null, cancellationToken);
+        var marked = await inbox.MarkAllReadAsync(bob, cancellationToken);
+        var entriesAfter = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+
+        // Assert: the state was stored, but no entry was added or changed, the chain is intact, and the digest is the same
+        Assert.True(seen);
+        Assert.Equal(1, marked);
+        Assert.Equal(sequenceBefore, await audit.LatestSequenceAsync(cancellationToken));
+        Assert.Equal(entriesBefore.Select(e => (e.Sequence, e.Action, e.Hash)), entriesAfter.Select(e => (e.Sequence, e.Action, e.Hash)));
+        Assert.True(AuditChain.Verify(entriesAfter).IsIntact);
+        Assert.Equal(digestBefore, RecordDigest.Compute((await store.GetRecordAsync(project.Id, "rev-1", cancellationToken))!));
+    }
+
+    /// <summary>
     ///     Test that the first use of a database that does not exist creates the file and its tables, so that
     ///     the services work at once.
     /// </summary>

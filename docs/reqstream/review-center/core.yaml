@@ -379,6 +379,15 @@ sections:
           - ReviewCenter-ProjectService-AuditorRole-Account
           - ReviewCenter-ProjectService-AuditorRole-ChangeRole
           - ReviewCenter-ProjectService-AuditorRole-Audit
+
+      - id: ReviewCenter-Core-ProjectAccess-AuditorRoleBlocked
+        title: >-
+          The Core subsystem shall refuse the Auditor role for a member who holds an open reviewer slot, and name the
+          reviews that hold the member.
+        justification: |
+          A member who still owes a signature or an answer must not become a person who cannot work in the project,
+          because the review would wait for somebody who may no longer sign.
+        children:
           - ReviewCenter-ProjectService-AuditorRole-OpenWork
           - ReviewCenter-ProjectService-AuditorRole-OutOfDate
           - ReviewCenter-ProjectService-AuditorRole-ReviewNames
@@ -601,9 +610,17 @@ sections:
         children:
           - ReviewCenter-ProjectChecklistService-Access-Change
           - ReviewCenter-ProjectChecklistService-Access-Reset
-          - ReviewCenter-ProjectChecklistService-Access-Revoked
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-Core-ProjectChecklist-AdminChange-Recheck
+        title: >-
+          The Core subsystem shall check the right to change the checklist of the project again at every call, so
+          that a project administrator whose membership was removed is refused.
+        justification: |
+          A revoked right must take effect at once, also for a form that the person opened before.
+        children:
+          - ReviewCenter-ProjectChecklistService-Access-Revoked
 
       - id: ReviewCenter-Core-ProjectChecklist-MemberRefused
         title: >-
@@ -1800,19 +1817,48 @@ sections:
 
       - id: ReviewCenter-Core-Checklist-BallotSubmit
         title: >-
-          The Core subsystem shall let a reviewer hand in the ballot of the own slot, refusing a ballot that is
-          incomplete and treating a repeated hand-in as harmless.
+          The Core subsystem shall let a reviewer hand in the ballot of the own slot.
         justification: |
           Handing in the ballot is how a reviewer says that the checks are done, and the consolidation must only
           count ballots that are complete.
         children:
+          - ReviewCenter-ChecklistService-BallotSubmit
+
+      - id: ReviewCenter-Core-Checklist-BallotSubmit-Incomplete
+        title: >-
+          The Core subsystem shall refuse the hand-in of a ballot that is incomplete.
+        justification: |
+          The consolidation must only count ballots that are complete, so an incomplete ballot stays a draft.
+        children:
+          - ReviewCenter-ChecklistService-BallotSubmit-Incomplete
+
+      - id: ReviewCenter-Core-Checklist-BallotSubmit-Repeat
+        title: >-
+          The Core subsystem shall treat a repeated hand-in of a ballot as harmless.
+        justification: |
+          A reviewer who hands in twice, for example by a double click, must not change a ballot that is already in.
+        children:
+          - ReviewCenter-ChecklistService-BallotSubmit-Repeat
+
+      - id: ReviewCenter-Core-Checklist-BallotSlot
+        title: >-
+          The Core subsystem shall refuse an answer, a hand-in, or a change of the applicability of a section from an
+          actor who holds no reviewer slot of the review.
+        justification: |
+          Only the reviewers of a review may speak for its checks, so a person without a slot must not leave a trace
+          in a ballot.
+        children:
           - ReviewCenter-ChecklistService-BallotSlot
           - ReviewCenter-ChecklistService-BallotSlot-Submit
           - ReviewCenter-ChecklistService-BallotSlot-Section
+
+      - id: ReviewCenter-Core-Checklist-BallotSlot-OwnBallot
+        title: >-
+          The Core subsystem shall record an answer in the ballot of the slot of the actor only.
+        justification: |
+          One reviewer must not change what another reviewer answered.
+        children:
           - ReviewCenter-ChecklistService-BallotSlot-OwnBallot
-          - ReviewCenter-ChecklistService-BallotSubmit
-          - ReviewCenter-ChecklistService-BallotSubmit-Incomplete
-          - ReviewCenter-ChecklistService-BallotSubmit-Repeat
 
       - id: ReviewCenter-Core-Checklist-SingleSlot
         title: >-
@@ -3751,8 +3797,7 @@ sections:
 
       - id: ReviewCenter-Core-ReviewRuleSwitches-DefaultOn
         title: >-
-          The Core subsystem shall keep the two further review rules on for a new project and for every project that
-          existed before the rules were enforced.
+          The Core subsystem shall keep the two further review rules on for a new project.
         justification: |
           The default is on, so that a project is only without a rule when somebody chose that.
         children:
@@ -4253,10 +4298,10 @@ sections:
         children:
           - ReviewCenter-AuditService-Export-Empty
 
-      - id: ReviewCenter-Core-AuditTrail-ExportCancelled
+      - id: ReviewCenter-Core-AuditTrail-ExportCanceled
         title: >-
           The Core subsystem shall stop reading and writing at once and throw the cancellation when an export is
-          cancelled.
+          canceled.
         justification: |
           A user who abandons a large download must free the server at once.
         children:
@@ -4328,7 +4373,7 @@ sections:
 
       - id: ReviewCenter-Core-AuditTrail-ExportAuditedIncomplete
         title: >-
-          The Core subsystem shall record the audit entry of an export that is cancelled or fails, marked
+          The Core subsystem shall record the audit entry of an export that is canceled or fails, marked
           incomplete, let the failure reach the caller, and complete an export normally when the audit entry
           cannot be stored, reporting that failure to the error hook.
         justification: |
@@ -4410,16 +4455,46 @@ sections:
 
       - id: ReviewCenter-Core-AuditTrail-ProjectMembers
         title: >-
-          The Core subsystem shall record the adding of a member, the change of the role of a member, the removal of
-          a member, and the creation of a member account in the audit trail, naming the actor, the user, the role,
-          and the project, and never a temporary password.
+          The Core subsystem shall record the adding of a member in the audit trail, naming the actor, the user, the
+          role, and the project.
         justification: |
           Who may see and sign a review depends on membership, so every change of it must be traceable.
         children:
           - ReviewCenter-ProjectService-MemberAudit
+
+      - id: ReviewCenter-Core-AuditTrail-ProjectMembers-RoleChange
+        title: >-
+          The Core subsystem shall record the change of the role of a member in the audit trail, naming the actor,
+          the user, the new role, and the project.
+        justification: |
+          A change of the role changes what a member may do in the project, so it must be traceable.
+        children:
           - ReviewCenter-ProjectService-MemberAudit-RoleChange
+
+      - id: ReviewCenter-Core-AuditTrail-ProjectMembers-Removal
+        title: >-
+          The Core subsystem shall record the removal of a member in the audit trail, naming the actor, the user, and
+          the project.
+        justification: |
+          The end of the access of a member must be traceable as well as its start.
+        children:
           - ReviewCenter-ProjectService-MemberAudit-Removal
+
+      - id: ReviewCenter-Core-AuditTrail-ProjectMembers-Account
+        title: >-
+          The Core subsystem shall record the creation of a member account in the audit trail, naming the actor, the
+          user, the role, and the project.
+        justification: |
+          A new account gives a new person a way in, so its creation must be traceable.
+        children:
           - ReviewCenter-ProjectService-MemberAudit-Account
+
+      - id: ReviewCenter-Core-AuditTrail-ProjectMembers-NoPassword
+        title: >-
+          The Core subsystem shall never record a temporary password in the audit trail.
+        justification: |
+          The audit trail is read by many people, so a password in it would be a password that many people know.
+        children:
           - ReviewCenter-ProjectService-MemberAudit-NoPassword
 
       - id: ReviewCenter-Core-AuditTrail-ProjectMemberRefused
@@ -5780,7 +5855,7 @@ sections:
         title: >-
           The Core subsystem shall pass on a cancellation and not report it as a failed request.
         justification: |
-          A cancelled batch is not a failure of the request that was running.
+          A canceled batch is not a failure of the request that was running.
         children:
           - ReviewCenter-ReviewPlanner-Create-Cancel
 
@@ -8599,6 +8674,7 @@ sections:
           What a user looked at is private to the user, and it must not change what a signature covers.
         tests:
           - InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail
+          - StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged
 
       - id: ReviewCenter-Core-AccessTokens
         title: >-

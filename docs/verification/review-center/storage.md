@@ -308,4 +308,7 @@ and the counts of the sent mails are tested by the unit tests of `NotificationSt
 **Inbox**: The candidate reviews of a user and the read state that never moves backwards, also when many writers race,
 are verified in the unit tests of `InboxStore`. The read state of a user is still present, and still honored, after the
 database is closed and opened again, which is tested by
-`StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems`.
+`StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems`. Marking one review as seen and then all
+reviews as read adds no entry to the audit trail, leaves every entry and the hash chain as they were, and leaves the
+record digest of the review unchanged, although the state is stored; this is tested over a real database by
+`StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged`.

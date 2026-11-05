@@ -49,6 +49,8 @@ sections:
           - ReviewCenter-SignIn-Cookie-Session
           - ReviewCenter-SignIn-Cookie-Secure
           - ReviewCenter-SignIn-Cookie-InputValidation
+        tests:
+          - SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime
 
       - id: ReviewCenter-Identity-Login-Antiforgery
         title: >-
@@ -591,13 +593,21 @@ sections:
         children:
           - ReviewCenter-OidcSignIn-Reauth
           - ReviewCenter-OidcSignIn-Reauth-PromptLoginMaxAge0
-          - ReviewCenter-OidcSignIn-Reauth-Antiforgery
-          - ReviewCenter-OidcSignIn-Reauth-NotAllowedNeverSent
-          - ReviewCenter-OidcSignIn-Reauth-RecordedRefusal
           - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationButton
           - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationThenSigning
         tests:
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+      - id: ReviewCenter-Identity-OidcSignIn-ReauthRefused
+        title: >-
+          The Identity subsystem shall refuse and record a confirmation of identity with a provider that is not
+          allowed.
+        justification: |
+          A request without a valid antiforgery token, from a person who may not sign, or without a confirmation must
+          not reach the provider or lead to a signature, and the refusal must leave a record.
+        children:
+          - ReviewCenter-OidcSignIn-Reauth-Antiforgery
+          - ReviewCenter-OidcSignIn-Reauth-NotAllowedNeverSent
+          - ReviewCenter-OidcSignIn-Reauth-RecordedRefusal
       - id: ReviewCenter-Identity-OidcSignIn-Reauth-Fresh
         title: >-
           The Identity subsystem shall accept a confirmation of identity with a provider only when the

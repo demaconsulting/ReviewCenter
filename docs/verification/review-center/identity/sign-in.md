@@ -97,6 +97,11 @@ return URL. This scenario is tested by `SignIn_ProtectedPage_Anonymous_Redirects
 **SignIn_PublicPage_Anonymous_IsServed**: A theory over the home, login, and health routes; an anonymous request is
 answered with status 200. This scenario is tested by `SignIn_PublicPage_Anonymous_IsServed`.
 
+**SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime**: A theory over two starts of the application. With
+`Auth:SessionHours` set to 3, the options of the cookie scheme have a ticket lifetime of three hours. Without the
+setting, the lifetime is the default of eight hours. In both cases the lifetime slides with use. This scenario is
+tested by `SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime`.
+
 **SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed**: The users page is requested by a signed-in ordinary user and
 by a signed-in system administrator; the ordinary user gets status 403 with an access-denied explanation and the system
 administrator status 200. The role claim therefore opens the page only for a system administrator. This scenario is

@@ -819,9 +819,7 @@ sections:
           Refusing the role while the member still owes a signature keeps a review from waiting for somebody who
           may no longer sign.
         children:
-          - ReviewCenter-ProjectService-AuditorRole-OpenWork
-          - ReviewCenter-ProjectService-AuditorRole-OutOfDate
-          - ReviewCenter-ProjectService-AuditorRole-ReviewNames
+          - ReviewCenter-Core-ProjectAccess-AuditorRoleBlocked
 
       - id: ReviewCenter-System-FollowUpReview
         title: >-
@@ -1048,26 +1046,73 @@ sections:
 
       - id: ReviewCenter-Inbox
         title: >-
-          The tool shall give every signed-in user an inbox of the reviews that wait for them, in eight groups: the
-          ballots to hand in and the questions of others to answer, the checks the reviewers answered differently,
-          the signatures to give or to give again, the signatures that no longer count and cannot be given again
-          yet, the open threads whose last comment is by someone else, the failed checks of the reviews the user
-          created, and, for information, the reviews that wait for other people and the reviews that were approved
-          or reopened by someone else since the user last looked.
+          The tool shall show each signed-in user an inbox of the reviews that wait for them.
         tags: [system]
         justification: |
           A reviewer should not have to open every project to learn what waits for them, and a late review should be
           found by the one who must act. The inbox is also the list of notifications, so a separate notification
-          record is not needed.
+          record is not needed. The groups of the inbox are decomposed in the requirements that follow.
+        children:
+          - ReviewCenter-Core-Inbox-AccessConcluded
+          - ReviewCenter-Core-Inbox-EachGroup
+          - ReviewCenter-Storage-Inbox-Candidates
+          - ReviewCenter-Storage-Inbox-LightRecords
+          - ReviewCenter-Web-Inbox
+          - ReviewCenter-Web-Inbox-Summary
+          - ReviewCenter-Web-Inbox-Chip
+          - ReviewCenter-Web-Inbox-SignedInOnly
+          - ReviewCenter-Web-Inbox-HelpTopic
+        tests:
+          - ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned
+          - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
+
+      - id: ReviewCenter-Inbox-ToAnswer
+        title: >-
+          The tool shall list in the inbox as to answer the ballots that the user has not handed in, with a chip and
+          a link to the checklist of the review.
+        tags: [system]
+        justification: |
+          A reviewer who has not handed in a ballot holds up the review, and must find the ballot at once.
         children:
           - ReviewCenter-Core-Inbox
           - ReviewCenter-Core-Inbox-ToAnswerRow
           - ReviewCenter-Core-Inbox-ToAnswerAgain
           - ReviewCenter-Core-Inbox-ToAnswerLink
           - ReviewCenter-Core-Inbox-ToAnswerExcluded
+
+      - id: ReviewCenter-Inbox-QuestionForYou
+        title: >-
+          The tool shall list in the inbox as to answer an open question of someone else that the user can answer.
+        tags: [system]
+        justification: |
+          A question that nobody answers keeps a review open, so the person who can answer it must be told.
+        children:
+          - ReviewCenter-Core-Inbox-QuestionForYou
+          - ReviewCenter-Core-Inbox-QuestionRow
+          - ReviewCenter-Core-Inbox-QuestionCount
+          - ReviewCenter-Core-Inbox-QuestionNotListed
+
+      - id: ReviewCenter-Inbox-Disputed
+        title: >-
+          The tool shall list in the inbox as disputed a review in which the ballots that were handed in differ on
+          some checks.
+        tags: [system]
+        justification: |
+          Reviewers who answered a check differently must settle it before the review can conclude.
+        children:
           - ReviewCenter-Core-Inbox-Disputed
           - ReviewCenter-Core-Inbox-DisputedRow
           - ReviewCenter-Core-Inbox-DisputedSettled
+
+      - id: ReviewCenter-Inbox-ToSign
+        title: >-
+          The tool shall list in the inbox as ready to sign a review that the user may sign now, with the state of
+          the signature, the due date, and the reviewers that are waited for.
+        tags: [system]
+        justification: |
+          The signature is the last step of a review, so the signer must see when the step is ready and what is
+          missing.
+        children:
           - ReviewCenter-Core-Inbox-ToSign
           - ReviewCenter-Core-Inbox-ToSignBallotNotIn
           - ReviewCenter-Core-Inbox-ToSignBlocked
@@ -1084,10 +1129,16 @@ sections:
           - ReviewCenter-Core-Inbox-ToSignOverdue
           - ReviewCenter-Core-Inbox-ToSignConcluded
           - ReviewCenter-Core-Inbox-ToSignMissingBallots
-          - ReviewCenter-Core-Inbox-QuestionForYou
-          - ReviewCenter-Core-Inbox-QuestionRow
-          - ReviewCenter-Core-Inbox-QuestionCount
-          - ReviewCenter-Core-Inbox-QuestionNotListed
+
+      - id: ReviewCenter-Inbox-SignatureLost
+        title: >-
+          The tool shall list in the inbox as signature lost a review in which the signature of the user no longer
+          counts, and turn the row into ready to sign when nothing blocks a new signature.
+        tags: [system]
+        justification: |
+          A signer whose approval was taken away by a change must learn it, because the review cannot conclude
+          without a new signature.
+        children:
           - ReviewCenter-Core-Inbox-SignatureLost
           - ReviewCenter-Core-Inbox-SignatureLostRow
           - ReviewCenter-Core-Inbox-SignatureLostReady
@@ -1095,39 +1146,65 @@ sections:
           - ReviewCenter-Core-Inbox-SignatureLostCount
           - ReviewCenter-Core-Inbox-SignatureLostNobodyElse
           - ReviewCenter-Core-Inbox-SignatureLostConcluded
+
+      - id: ReviewCenter-Inbox-RepliesWaiting
+        title: >-
+          The tool shall list in the inbox as replies waiting a review with an open thread whose last comment is by
+          someone else, and word the text by the kind of the open threads.
+        tags: [system]
+        justification: |
+          A discussion that waits for an answer holds up the review, and the person who must answer must see it.
+        children:
           - ReviewCenter-Core-Inbox-RepliesWaiting
           - ReviewCenter-Core-Inbox-RepliesWaitingAuthor
           - ReviewCenter-Core-Inbox-RepliesWaitingSystem
           - ReviewCenter-Core-Inbox-RepliesWaitingChip
           - ReviewCenter-Core-Inbox-RepliesWaitingNot
+          - ReviewCenter-Core-Inbox-KindWording
+
+      - id: ReviewCenter-Inbox-FailedChecks
+        title: >-
+          The tool shall list in the inbox as failed checks the checks that the submitted ballots agree to be failed,
+          to the creator of the review.
+        tags: [system]
+        justification: |
+          The creator must act on the failed checks of the review, and must not be misled by a draft or by a
+          disagreement.
+        children:
           - ReviewCenter-Core-Inbox-FailedChecks
           - ReviewCenter-Core-Inbox-FailedChecksNotCounted
           - ReviewCenter-Core-Inbox-FailedChecksRow
           - ReviewCenter-Core-Inbox-FailedChecksNotCreator
           - ReviewCenter-Core-Inbox-FailedChecksNotApplicable
           - ReviewCenter-Core-Inbox-FailedChecksConcluded
+
+      - id: ReviewCenter-Inbox-WaitingForOthers
+        title: >-
+          The tool shall list in the inbox, for information, a review that waits for other people, without a due
+          date.
+        tags: [system]
+        justification: |
+          A user who has done their part wants to know who holds up the review, and must not mistake that for an
+          action.
+        children:
           - ReviewCenter-Core-Inbox-WaitingForOthers
           - ReviewCenter-Core-Inbox-WaitingRow
           - ReviewCenter-Core-Inbox-WaitingNoDueDate
+
+      - id: ReviewCenter-Inbox-Updates
+        title: >-
+          The tool shall list in the inbox, for information, a review that was approved, rejected, or reopened by
+          someone else since the user last looked.
+        tags: [system]
+        justification: |
+          The user must learn how a review ended or that it was reopened, without opening every review again.
+        children:
           - ReviewCenter-Core-Inbox-Updates
           - ReviewCenter-Core-Inbox-UpdatesRejected
           - ReviewCenter-Core-Inbox-UpdatesReopened
           - ReviewCenter-Core-Inbox-UpdatesOwn
           - ReviewCenter-Core-Inbox-UpdatesSeen
           - ReviewCenter-Core-Inbox-UpdatesCreator
-          - ReviewCenter-Core-Inbox-AccessConcluded
-          - ReviewCenter-Core-Inbox-EachGroup
-          - ReviewCenter-Core-Inbox-KindWording
-          - ReviewCenter-Storage-Inbox-Candidates
-          - ReviewCenter-Storage-Inbox-LightRecords
-          - ReviewCenter-Web-Inbox
-          - ReviewCenter-Web-Inbox-Summary
-          - ReviewCenter-Web-Inbox-Chip
-          - ReviewCenter-Web-Inbox-SignedInOnly
-          - ReviewCenter-Web-Inbox-HelpTopic
-        tests:
-          - ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned
-          - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
 
       - id: ReviewCenter-Inbox-NoOthersAnswers
         title: >-
@@ -1142,6 +1219,20 @@ sections:
           - ReviewCenter-Core-Inbox-WaitingNoVerdict
           - ReviewCenter-Core-Inbox-UnreadHidden
 
+      - id: ReviewCenter-Inbox-ActionCount
+        title: >-
+          The tool shall count as needing action only the reviews in the groups that ask the user to act, and not an
+          update and not a review that waits for others.
+        tags: [system]
+        justification: |
+          One number is shown in two places, so it must be calculated by one rule, and a number that includes
+          information would stop the user from trusting it.
+        children:
+          - ReviewCenter-Core-Inbox-Count
+          - ReviewCenter-Core-Inbox-CountNotCounted
+        tests:
+          - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
+
       - id: ReviewCenter-Inbox-HomeCount
         title: >-
           The tool shall show the number of reviews that need action on the home page.
@@ -1149,8 +1240,6 @@ sections:
         justification: |
           The user sees at the first page whether something waits, without opening the inbox.
         children:
-          - ReviewCenter-Core-Inbox-Count
-          - ReviewCenter-Core-Inbox-CountNotCounted
           - ReviewCenter-Web-Inbox-HomeCount
         tests:
           - ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned
@@ -1162,8 +1251,6 @@ sections:
         justification: |
           The user sees on every page whether something waits.
         children:
-          - ReviewCenter-Core-Inbox-Count
-          - ReviewCenter-Core-Inbox-CountNotCounted
           - ReviewCenter-Web-Inbox-HeaderTab
 
       - id: ReviewCenter-Inbox-NewMarks
@@ -1429,10 +1516,28 @@ sections:
           conversation stays out of it.
         children:
           - ReviewCenter-Core-Threads-IncludedComment
-          - ReviewCenter-Core-Threads-Chat
-          - ReviewCenter-Core-Threads-Kind
           - ReviewCenter-Core-Threads-IncludedList
           - ReviewCenter-Core-Threads-CommentToggle
+          - ReviewCenter-Storage-Threads-Report
+
+      - id: ReviewCenter-System-Comments-ReportInclusion-Chat
+        title: >-
+          The tool shall treat a comment that is not included in the report as chat.
+        tags: [system]
+        justification: |
+          The conversation of the reviewers must be able to stay out of the formal result.
+        children:
+          - ReviewCenter-Core-Threads-Chat
+
+      - id: ReviewCenter-System-Comments-ReportInclusion-Kind
+        title: >-
+          The tool shall tell a Finding from a Question by whether the starting comment of the thread is included in
+          the report.
+        tags: [system]
+        justification: |
+          The reader of the report must see at once which threads are findings, without a second flag to maintain.
+        children:
+          - ReviewCenter-Core-Threads-Kind
           - ReviewCenter-Storage-Threads-Report
 
       - id: ReviewCenter-System-Comments-ReportInclusionRefused
@@ -1639,6 +1744,10 @@ sections:
         children:
           - ReviewCenter-Web-Checklist-SubmitBallot
           - ReviewCenter-Core-Checklist-BallotSubmit
+          - ReviewCenter-Core-Checklist-BallotSubmit-Incomplete
+          - ReviewCenter-Core-Checklist-BallotSubmit-Repeat
+          - ReviewCenter-Core-Checklist-BallotSlot
+          - ReviewCenter-Core-Checklist-BallotSlot-OwnBallot
           - ReviewCenter-Core-Checklist-SingleSlot
           - ReviewCenter-Storage-Checklist-BallotStatus
           - ReviewCenter-Storage-Checklist-BallotSlotLifecycle
@@ -1681,6 +1790,7 @@ sections:
           - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Core-ProjectChecklist-Access
           - ReviewCenter-Core-ProjectChecklist-AdminChange
+          - ReviewCenter-Core-ProjectChecklist-AdminChange-Recheck
           - ReviewCenter-Core-ProjectChecklist-Change
           - ReviewCenter-Core-ProjectChecklist-NoChange
           - ReviewCenter-Core-ProjectChecklist-Reset
@@ -2016,11 +2126,21 @@ sections:
           - ReviewCenter-Core-Signatures-ThreadAcknowledge
           - ReviewCenter-Core-Signatures-ThreadNames
           - ReviewCenter-Core-Signatures-ThreadNothingStored
-          - ReviewCenter-Core-Signatures-ThreadAfterValidation
-          - ReviewCenter-Core-Signatures-ThreadNotFound
           - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
         tests:
           - ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate
+
+      - id: ReviewCenter-System-Signatures-AcknowledgeValidation
+        title: >-
+          The tool shall report a change request for a thread that does not exist, or that is not valid, as that
+          error and not as a signature impact.
+        tags: [system]
+        justification: |
+          A reviewer who made a wrong request must be told what is wrong with it, and not be asked to acknowledge
+          an impact that the request cannot have.
+        children:
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
 
       - id: ReviewCenter-System-Signatures-Acknowledged
         title: >-
@@ -3003,15 +3123,24 @@ sections:
 
       - id: ReviewCenter-System-ReviewRuleSwitches-DefaultOn
         title: >-
-          The tool shall keep each of the two review rules on for a new project and for every project that existed
-          before the rules were enforced, and say so next to the switches.
+          The tool shall keep each of the two review rules on for a new project and for every project that does not
+          say otherwise.
         tags: [system]
         justification: |
-          The rules are on by default for every project, also the ones that were created before they were enforced,
-          so that no project is left without the protection by accident.
+          The rules are on by default for every project, so that no project is left without the protection by
+          accident.
         children:
           - ReviewCenter-Core-ReviewRuleSwitches-DefaultOn
           - ReviewCenter-Storage-ReviewRuleSwitches-Default
+
+      - id: ReviewCenter-System-ReviewRuleSwitches-DefaultNotice
+        title: >-
+          The tool shall say next to the switches of the review rules that the rules are on by default and apply to
+          every project of the tool, also to the projects that existed before.
+        tags: [system]
+        justification: |
+          A lead who sees a switch must know what the value means for the project that has never been changed.
+        children:
           - ReviewCenter-Web-ReviewRuleSwitches-DefaultNotice
 
       - id: ReviewCenter-System-ReviewRuleSwitches-AdminOnly
@@ -3311,6 +3440,7 @@ sections:
           A proof that cannot be checked must count as no proof.
         children:
           - ReviewCenter-Identity-OidcSignIn-Reauth-FailsClosed
+          - ReviewCenter-Identity-OidcSignIn-ReauthRefused
 
       - id: ReviewCenter-System-SignatureReauthentication-ProviderRefused
         title: >-
@@ -3856,6 +3986,10 @@ sections:
           - ReviewCenter-Core-AuditTrail
           - ReviewCenter-Core-AuditTrail-Projects
           - ReviewCenter-Core-AuditTrail-ProjectMembers
+          - ReviewCenter-Core-AuditTrail-ProjectMembers-RoleChange
+          - ReviewCenter-Core-AuditTrail-ProjectMembers-Removal
+          - ReviewCenter-Core-AuditTrail-ProjectMembers-Account
+          - ReviewCenter-Core-AuditTrail-ProjectMembers-NoPassword
           - ReviewCenter-Core-AuditTrail-ProjectMemberRefused
           - ReviewCenter-Core-AuditTrail-EvidenceSettings
           - ReviewCenter-Core-AuditTrail-ProjectChecklist
@@ -4045,7 +4179,8 @@ sections:
         justification: |
           A script or scheduled job reads the exit code to decide that the trail is fine.
         children:
-          - ReviewCenter-Hosting-AuditVerify
+          - ReviewCenter-AuditCommand-Verify
+          - ReviewCenter-AuditCommand-Verify-EmptyTrail
         tests:
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
 
@@ -4057,7 +4192,10 @@ sections:
           A check that cannot read the trail must not look like a check that passed, so a script or scheduled job
           treats the failure as a finding.
         children:
-          - ReviewCenter-Hosting-AuditVerify
+          - ReviewCenter-AuditCommand-Verify-EditedEntry
+          - ReviewCenter-AuditCommand-Verify-DeletedEntry
+          - ReviewCenter-AuditCommand-Errors
+          - ReviewCenter-AuditCommand-Errors-Unreadable
         tests:
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
 
@@ -4162,7 +4300,7 @@ sections:
           - ReviewCenter-Core-AuditTrail-Export
           - ReviewCenter-Core-AuditTrail-ExportScope
           - ReviewCenter-Core-AuditTrail-ExportEmpty
-          - ReviewCenter-Core-AuditTrail-ExportCancelled
+          - ReviewCenter-Core-AuditTrail-ExportCanceled
           - ReviewCenter-Core-AuditTrail-ExportFile
           - ReviewCenter-Core-AuditTrail-ExportCsv
           - ReviewCenter-Core-AuditTrail-ExportCsvSafe
@@ -4248,6 +4386,8 @@ sections:
           - ReviewCenter-Evidence-Key-CertificateStore
           - ReviewCenter-Evidence-Key-File
           - ReviewCenter-Evidence-Key-ExpiryWarning
+          - ReviewCenter-Evidence-Key-CodeSigningWarning
+          - ReviewCenter-Evidence-Key-RequireTrusted-Accepted
           - ReviewCenter-Hosting-AttestationServices
 
       - id: ReviewCenter-System-Attestation-KeyKind
@@ -4547,6 +4687,7 @@ sections:
           - ReviewCenter-Identity-Login-Cookie
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime
 
       - id: ReviewCenter-System-Login-Logout
         title: >-
@@ -6241,7 +6382,9 @@ sections:
         children:
           - ReviewCenter-Identity-Authorization
         tests:
-          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - SignIn_PublicPage_Anonymous_IsServed
+          - ServerHost_CreateApplication_AnonymousVisitor_HomeAndLoginPagesAreServed
+          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
 
       - id: ReviewCenter-System-ProjectAccess
         title: >-
@@ -7293,7 +7436,24 @@ sections:
           A key ring that is protected differently from what the operator asked for would give a false sense of
           security, so a mistake in the settings must stop the start, and the message must not leak a secret.
         children:
-          - ReviewCenter-Hosting-KeyRingProtection
+          - ReviewCenter-KeyRingProtection-Certificate-NoPath
+          - ReviewCenter-KeyRingProtection-Certificate-Missing
+          - ReviewCenter-KeyRingProtection-Certificate-WrongPassword
+          - ReviewCenter-KeyRingProtection-Certificate-NoPrivateKey
+          - ReviewCenter-KeyRingProtection-Certificate-Rsa
+          - ReviewCenter-KeyRingProtection-Certificate-Platform
+          - ReviewCenter-KeyRingProtection-Certificate-BothPasswords
+          - ReviewCenter-KeyRingProtection-Certificate-PasswordHidden
+          - ReviewCenter-KeyRingProtection-Dpapi-OtherSystem
+          - ReviewCenter-KeyRingProtection-Validation
+          - ReviewCenter-KeyRingProtection-Validation-Scope
+          - ReviewCenter-KeyRingProtection-Validation-Report
+          - ReviewCenter-KeyRingProtection-Validation-BadType
+          - ReviewCenter-ServerHost-KeyProtection-InvalidSettings
+          - ReviewCenter-ServerHost-KeyProtection-CertificateUnreadable
+          - ReviewCenter-ServerHost-KeyProtection-CertificateWrongPassword
+          - ReviewCenter-ServerHost-KeyProtection-CertificateNoSecret
+          - ReviewCenter-ServerHost-KeyProtection-DpapiOffWindows
           - ReviewCenter-Utilities-SecretSource-Refusal
           - ReviewCenter-Utilities-SecretSource-NoDisclosure
           - ReviewCenter-Utilities-SecretSource-Conflict
@@ -7306,7 +7466,12 @@ sections:
           A wrong or replaced certificate would otherwise start a second ring that makes every stored token
           unreadable, so the operator has to learn of the mismatch at the start.
         children:
-          - ReviewCenter-Hosting-KeyRingProtection
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoCertificate
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-NoKeyCreated
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-UnreadableKeys
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard-ContentHidden
+          - ReviewCenter-ServerHost-KeyProtection-WrongCertificate
         tests:
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
 
@@ -7319,7 +7484,10 @@ sections:
           An operator who requires encrypted keys must never run with a plain key ring by a mistake in the settings
           or the platform.
         children:
-          - ReviewCenter-Hosting-KeyRingProtection
+          - ReviewCenter-KeyRingProtection-Require
+          - ReviewCenter-KeyRingProtection-Require-Auto
+          - ReviewCenter-KeyRingProtection-Require-PlaintextRing
+          - ReviewCenter-ServerHost-KeyProtection-RequireEncrypted
 
       - id: ReviewCenter-System-KeyProtection-NoSilentReplace
         title: >-
@@ -7358,7 +7526,8 @@ sections:
           An operator who knowingly accepts the loss of the stored secrets, for example on a test copy, must be able
           to start without restoring the keys, and the warning keeps the decision visible.
         children:
-          - ReviewCenter-Hosting-KeyRingLost
+          - ReviewCenter-ServerHost-LostKeyRing-AllowNewKeyRing
+          - ReviewCenter-ServerHost-LostKeyRing-AllowWarning
 
       - id: ReviewCenter-System-KeyRestore-PartialLog
         title: >-
@@ -7369,7 +7538,7 @@ sections:
           A ring that reads some secrets but not all is a partial restore. The operator needs the counts and the
           remedy to repair it, and the readable secrets keep the server useful, so it does not refuse to start.
         children:
-          - ReviewCenter-Hosting-KeyRingLost
+          - ReviewCenter-ServerHost-LostKeyRing-SomeUnreadable
 
       - id: ReviewCenter-System-KeyRestore-CheckConfigReport
         title: >-
@@ -7491,7 +7660,15 @@ sections:
         justification: |
           The command is the one place that writes keys and secrets, so it must be sure first that it loses nothing.
         children:
-          - ReviewCenter-Hosting-KeysReprotect
+          - ReviewCenter-KeysCommand-RefusesUnreadable
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableCount
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableIds
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoChange
+          - ReviewCenter-KeysCommand-RefusesUnreadable-UnreadableNoSecret
+          - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRing
+          - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRingNoKey
+          - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsProblem
+          - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsNoChange
         tests:
           - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
 
@@ -7502,8 +7679,12 @@ sections:
         justification: |
           A script that rotates keys must see the refusal and stop instead of carrying on with the old keys.
         children:
-          - ReviewCenter-Program-KeysReprotect
-          - ReviewCenter-Hosting-KeysReprotect
+          - ReviewCenter-KeysCommand-RefusesUnreadable
+          - ReviewCenter-KeysCommand-RefusesUnreadable-EmptyRing
+          - ReviewCenter-KeysCommand-RefusesUnreadable-SettingsProblem
+          - ReviewCenter-KeysCommand-RefusesUnreadable-MissingDatabase
+        tests:
+          - Program_Run_WithKeysReprotectVerb_MissingDatabase_ReportsErrorWithExitCodeOne
 
       - id: ReviewCenter-System-KeyRotation-NewKey
         title: >-
