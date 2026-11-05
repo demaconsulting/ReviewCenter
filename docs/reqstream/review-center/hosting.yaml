@@ -407,16 +407,6 @@ sections:
         tests:
           - HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider
 
-      - id: ReviewCenter-Hosting-DatabaseFailure-NoServing
-        title: >-
-          The Hosting subsystem shall end the run without starting to serve requests when the database setting cannot
-          be used.
-        justification: |
-          A service that starts with a database it cannot use would fail on the first request, so it must stop
-          immediately.
-        tests:
-          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
-
       - id: ReviewCenter-Hosting-DatabaseFailure-ExitCode
         title: >-
           The Hosting subsystem shall return exit code 1 when the database provider that is configured is not
@@ -1390,14 +1380,49 @@ sections:
       - id: ReviewCenter-Hosting-Arguments
         title: >-
           The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
-          the server is built, the user add verb, the audit verify verb, or the keys reprotect verb is run, or the
-          secret scan is called.
+          the server is built.
         justification: |
-          A call that lacks what it needs would otherwise fail later with an unclear error, or change data without a
-          record of the run, so the programming mistake is made visible at the entry point.
+          A call that lacks what it needs would otherwise fail later with an unclear error, so the programming mistake
+          is made visible when the server is built.
         children:
           - ReviewCenter-ServerHost-InputValidation
+
+      - id: ReviewCenter-Hosting-Arguments-UserAdd
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the user add verb is run.
+        justification: |
+          A verb that creates a user without what it needs would change data without a record of the run, so the
+          programming mistake is made visible at the entry point.
+        children:
           - ReviewCenter-UserCommand-Create-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-AuditVerify
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the audit verify verb is run.
+        justification: |
+          A check of the audit trail that lacks what it needs would otherwise report a result that means nothing, so
+          the programming mistake is made visible at the entry point.
+        children:
           - ReviewCenter-AuditCommand-Errors-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-KeysReprotect
+        title: >-
+          The Hosting subsystem shall refuse a missing context or a missing argument with an argument exception when
+          the keys reprotect verb is run.
+        justification: |
+          A verb that rewrites the protected secrets without what it needs would change data without a record of the
+          run, so the programming mistake is made visible at the entry point.
+        children:
           - ReviewCenter-KeysCommand-RefusesUnreadable-Arguments
+
+      - id: ReviewCenter-Hosting-Arguments-SecretScan
+        title: >-
+          The Hosting subsystem shall refuse a missing argument with an argument exception when the secret scan is
+          called.
+        justification: |
+          A scan of the stored secrets that lacks what it needs would otherwise report a result that means nothing, so
+          the programming mistake is made visible at the call.
+        children:
           - ReviewCenter-SecretScan-ReadOnly-Arguments

@@ -266,6 +266,46 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a user cannot revoke the token of another user over a real database: the attempt is refused as
+    ///     for a token that does not exist, the token still authenticates its owner and is not marked as revoked, and
+    ///     no revocation is written to the audit trail.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing()
+    {
+        // Arrange: a new database file, a token of Ann, and a second user, Bob
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ann = new Actor("ann", "Ann");
+        var bob = new Actor("bob", "Bob");
+        var (provider, _, _, _) = Open(options);
+        using var _ = provider;
+        var users = NewUserService(provider);
+        await users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        var tokens = NewTokenService(provider);
+        var created = await tokens.CreateAsync(ann, "build server", 90, cancellationToken);
+        var audit = new AuditStore(
+            provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            new AuditAppender(TimeProvider.System));
+        var sequenceBefore = await audit.LatestSequenceAsync(cancellationToken);
+
+        // Act: Bob tries to revoke the token of Ann
+        var error = await Assert.ThrowsAsync<DomainRuleException>(
+            () => tokens.RevokeAsync(bob, created.Token.Id, cancellationToken));
+        var authenticated = await tokens.AuthenticateAsync(created.Value, cancellationToken);
+        var listed = await tokens.ListAsync(ann, cancellationToken);
+        var entries = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+
+        // Assert: refused as for a missing token, the token is intact, and nothing was audited
+        Assert.Equal(DomainRule.TokenNotFound, error.Rule);
+        Assert.True(authenticated.Succeeded);
+        Assert.Null(Assert.Single(listed).Revoked);
+        Assert.Equal(sequenceBefore, await audit.LatestSequenceAsync(cancellationToken));
+        Assert.DoesNotContain(entries, e => e.Action == "token.revoked");
+    }
+
+    /// <summary>
     ///     Test that a repository registered through the service, with its encrypted token and its disabled state,
     ///     is still there after the database is closed and opened again.
     /// </summary>
@@ -785,6 +825,52 @@ public class StorageSubsystemTests
             Assert.Equal(1, view.ActionCount);
             Assert.Equal(1, await inbox.CountAsync(bob, cancellationToken));
         }
+    }
+
+    /// <summary>
+    ///     Test that marking reviews as seen over a real database, one review and then all reviews, appends nothing to
+    ///     the audit trail, leaves the entries and the chain as they were, and leaves the record digest of the review
+    ///     unchanged, although the read state itself is stored.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_InboxSeenState_MarkSeen_LeavesAuditTrailAndRecordDigestUnchanged()
+    {
+        // Arrange: Ann authors a review and assigns bob; the audit trail and the record digest are read before
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var bob = new Actor("bob", "Bob");
+        var (provider, projects, reviews, store) = Open(options);
+        using var _ = provider;
+        var users = NewUserService(provider);
+        var annUser = await users.CreateAsync("ann", "Ann", false, "correct horse battery", cancellationToken);
+        var bobUser = await users.CreateAsync("bob", "Bob", false, "correct horse battery", cancellationToken);
+        var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(annUser.Id, project.Id, cancellationToken);
+        await store.AddMembershipAsync(bobUser.Id, project.Id, cancellationToken);
+        await reviews.CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], new Actor("ann", "Ann"), cancellationToken);
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
+        await signing.AddSlotAsync(new Actor("ann", "Ann"), project.Id, "rev-1", bobUser.Id, null, cancellationToken);
+        var audit = new AuditStore(
+            provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            new AuditAppender(TimeProvider.System));
+        var entriesBefore = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+        var sequenceBefore = await audit.LatestSequenceAsync(cancellationToken);
+        var digestBefore = RecordDigest.Compute((await store.GetRecordAsync(project.Id, "rev-1", cancellationToken))!);
+        var inbox = NewInboxService(provider, store);
+
+        // Act: bob marks the review as seen, and then marks everything as read
+        var seen = await inbox.MarkSeenAsync(bob, project.Id, "rev-1", 0, null, cancellationToken);
+        var marked = await inbox.MarkAllReadAsync(bob, cancellationToken);
+        var entriesAfter = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+
+        // Assert: the state was stored, but no entry was added or changed, the chain is intact, and the digest is the same
+        Assert.True(seen);
+        Assert.Equal(1, marked);
+        Assert.Equal(sequenceBefore, await audit.LatestSequenceAsync(cancellationToken));
+        Assert.Equal(entriesBefore.Select(e => (e.Sequence, e.Action, e.Hash)), entriesAfter.Select(e => (e.Sequence, e.Action, e.Hash)));
+        Assert.True(AuditChain.Verify(entriesAfter).IsIntact);
+        Assert.Equal(digestBefore, RecordDigest.Compute((await store.GetRecordAsync(project.Id, "rev-1", cancellationToken))!));
     }
 
     /// <summary>

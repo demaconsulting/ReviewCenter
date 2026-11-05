@@ -151,6 +151,11 @@ through the services. The review has the Draft state, the known fingerprint, and
 size and known SHA-256 hash, and the exact bytes of the binary file can be read. This scenario is tested by
 `CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack`.
 
+**CoreSubsystem_CreateProject_NotSystemAdministrator_IsRefusedAndStoresNothing**: Under the real access rules, a
+member of a project and an actor who is no user at all each ask to create a project. Both are refused with the
+actor-not-allowed rule, and neither a project nor an audit entry is stored; the system administrator then creates
+the project. This scenario is tested by `CoreSubsystem_CreateProject_NotSystemAdministrator_IsRefusedAndStoresNothing`.
+
 **CoreSubsystem_Fingerprint_SameContentOtherNamesAndOrder_GivesSameFingerprint**: Two reviews are created in one
 project from the same three file contents, the second in reverse order and under other file names. Both reviews
 have the known fingerprint of the contents. This scenario is tested by
