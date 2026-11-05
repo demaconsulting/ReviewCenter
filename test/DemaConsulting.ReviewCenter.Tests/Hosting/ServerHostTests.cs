@@ -1003,6 +1003,26 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the review service next to the other domain services and connects it to the
+    ///     configured database.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersReviewService()
+    {
+        // Arrange: start the real pipeline on an in-memory server and store a project in its database
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+
+        // Act: resolve the service and list the reviews of the project
+        var reviews = await app.Services.GetRequiredService<ReviewService>()
+            .ListAsync(project.Id, TestContext.Current.CancellationToken);
+
+        // Assert: the service answers from the database with no reviews for the new project
+        Assert.Empty(reviews);
+    }
+
+    /// <summary>
     ///     Test that the host registers the signing service next to the other domain services.
     /// </summary>
     [Fact]

@@ -89,6 +89,7 @@ sections:
           - ReviewCenter-GitSource-Mirror-FailedClone
         tests:
           - GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp
+          - ContentSourcesSubsystem_UnreachableRepository_LeavesNoMirrorFolder
 
       - id: ReviewCenter-ContentSources-Mirror-NoToken
         title: >-
@@ -140,7 +141,7 @@ sections:
         children:
           - ReviewCenter-GitSource-Revision-Unsafe
         tests:
-          - ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound
+          - ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid
 
       - id: ReviewCenter-ContentSources-Revisions-Branch
         title: >-
@@ -220,13 +221,32 @@ sections:
 
       - id: ReviewCenter-ContentSources-ArgumentErrors
         title: >-
-          The ContentSources subsystem shall refuse a missing provider, token, text, or review-set content, and a
-          commit or blob identifier that is not a lowercase hexadecimal object identifier, with an argument error.
+          The ContentSources subsystem shall refuse a missing data protection provider, a missing token to encrypt,
+          or a missing text to decrypt with an argument error.
         justification: |
-          A wrong call fails early, and no identifier can act as a git option.
+          A call of the credential protection without its inputs is a programming error that fails early instead of
+          becoming an unclear failure later.
         children:
           - ReviewCenter-CredentialProtector-Encrypt-Arguments
+
+      - id: ReviewCenter-ContentSources-ArgumentErrors-ReviewSetContent
+        title: >-
+          The ContentSources subsystem shall refuse missing content of a ReviewMark configuration file with an
+          argument error.
+        justification: |
+          Reading review-sets from content that is not there is a programming error that fails early instead of
+          becoming an unclear failure later.
+        children:
           - ReviewCenter-ReviewSetParser-Errors-Content
+
+      - id: ReviewCenter-ContentSources-ArgumentErrors-ObjectIds
+        title: >-
+          The ContentSources subsystem shall refuse a commit or blob identifier that is not a lowercase hexadecimal
+          object identifier with an argument error.
+        justification: |
+          Refusing anything that is not an identifier keeps no text of a user from acting as an option of the git
+          command line.
+        children:
           - ReviewCenter-GitSource-Content-ObjectIds
 
       - id: ReviewCenter-ContentSources-Content-Bytes
@@ -532,7 +552,7 @@ sections:
           - ReviewCenter-GitSource-Ancestry
           - ReviewCenter-GitSource-Ancestry-Itself
         tests:
-          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+          - ContentSourcesSubsystem_Ancestry_EarlierCommitIsInTheHistoryOfALaterCommit
 
       - id: ReviewCenter-ContentSources-ReviewSets-Ancestry-NotAncestor
         title: >-
@@ -544,7 +564,7 @@ sections:
           - ReviewCenter-GitSource-Ancestry-NotAncestor
           - ReviewCenter-GitSource-Ancestry-NotAncestor-Diverged
         tests:
-          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
+          - ContentSourcesSubsystem_Ancestry_LaterCommitIsNotInTheHistoryOfAnEarlierCommit
 
       - id: ReviewCenter-ContentSources-DisabledRepository
         title: >-
@@ -562,4 +582,4 @@ sections:
           A repository that an administrator has disabled must not appear among the choices for a review, so that
           nobody picks it by mistake.
         tests:
-          - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading
+          - ContentSourcesSubsystem_DisabledRepository_IsNotOfferedForSelection

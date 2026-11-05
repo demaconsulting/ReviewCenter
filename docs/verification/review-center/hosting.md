@@ -51,9 +51,12 @@ N/A - standard test environment.
 is tested by `HostingSubsystem_HealthEndpoint_Requested_ReturnsHealthy`.
 
 **HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry**: The host is started with a
-capturing logger provider and one request is made; the application's start-up entry carries a
-named property, and entries from framework components reach the same provider. This scenario is
+capturing logger provider; the application's start-up entry carries a named property. This scenario is
 tested by `HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry`.
+
+**HostingSubsystem_Startup_LoggingConfigured_FrameworkEntriesReachTheSameSinks**: The host is started with a
+capturing logger provider and one request is made; entries from framework components reach the same provider. This
+scenario is tested by `HostingSubsystem_Startup_LoggingConfigured_FrameworkEntriesReachTheSameSinks`.
 
 **HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer**: The host is started in memory
 and both `/` and `/health` are requested; both answer HTTP status 200. This scenario is tested
@@ -66,9 +69,13 @@ is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
 
 **HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne**: The server is run through
-`ServerHost.RunAsync` with an unsupported database provider and a log file; it returns 1, the context records the
-failure, the log names the provider, and no unhandled exception escapes. This scenario is tested by
+`ServerHost.RunAsync` with an unsupported database provider; it returns 1, the context records the failure, and no
+unhandled exception escapes. This scenario is tested by
 `HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
+
+**HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider**: The server is run through
+`ServerHost.RunAsync` with an unsupported database provider and a log file; the log names the provider. This scenario
+is tested by `HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider`.
 
 **HostingSubsystem_Startup_DatabaseConfigured_CreatesTheDatabaseFile**: A host is started on a connection string that
 points to a database file that does not exist; the file is created at the configured location. This scenario is tested
@@ -79,9 +86,12 @@ project, review, user, signing, and inbox services are resolved from its service
 instance. This scenario is tested by `HostingSubsystem_Startup_DatabaseConfigured_DomainServicesResolve`.
 
 **HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin**: A host is started in memory and the client,
-which follows no redirect, requests `/projects` and `/login` without signing in; `/projects` answers a redirect to the
-sign-in page and `/login` answers HTTP status 200. This scenario is tested by
-`HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
+which follows no redirect, requests `/projects` without signing in; the answer is a redirect to the sign-in page. This
+scenario is tested by `HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin`.
+
+**HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed**: A host is started in memory and the client requests
+`/login` without signing in; the answer has HTTP status 200. This scenario is tested by
+`HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed`.
 
 **Repository services and the key ring**: The registration of the repository store, the git source, and the token
 protector, the default folders beside the database, the persistence of the key ring so that a token stays readable after
@@ -156,7 +166,8 @@ a table but no notification tables stops the start while notifications are on an
 tested by `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`; all three
 are unit tests of `ServerHost`.
 
-**Notification worker**: The running web host with notifications enabled has the worker and the worker is running, and
-the same host with notifications off has none, which is tested by `HostingSubsystem_NotificationWorker_OnlyEnabledWebHost`.
+**Notification worker**: The running web host with notifications enabled has the worker and the worker is running, which
+is tested by `HostingSubsystem_NotificationWorker_OnlyEnabledWebHost`, and the same host with notifications off has
+none, which is tested by `HostingSubsystem_NotificationWorker_NotEnabled_WebHostHasNoWorker`.
 That a command and the self-test get no worker, that an enabled transport `None` is refused, and that the worker stops
 with the host are tested by the unit tests of `ServerHost` in `ServerHostNotificationWorkerTests.cs`.

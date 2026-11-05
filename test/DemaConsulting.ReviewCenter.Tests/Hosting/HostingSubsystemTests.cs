@@ -57,20 +57,35 @@ public class HostingSubsystemTests
     }
 
     /// <summary>
-    ///     Test that logging configured by the host emits a structured start-up entry and request entries.
+    ///     Test that logging configured by the host emits a structured start-up entry with a named property.
     /// </summary>
     [Fact]
     public async Task HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry()
+    {
+        // Arrange: start the host
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Assert: the application's own entry has a named property
+        var started = Assert.Single(logs.Entries, e => e.Category == typeof(ServerHost).FullName);
+        Assert.True(started.Properties.ContainsKey("Urls"), "Start-up entry should carry a Urls property");
+    }
+
+    /// <summary>
+    ///     Test that the log entries of the web framework flow to the same sinks as the entries of the server.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_LoggingConfigured_FrameworkEntriesReachTheSameSinks()
     {
         // Arrange: start the host and make one request so the framework logs too
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var client = app.GetTestClient();
+
+        // Act: make one request
         await client.GetAsync(ServerHost.HealthPath, TestContext.Current.CancellationToken);
 
-        // Assert: the application's own entry has a named property, and framework logging flows to the same sinks
-        var started = Assert.Single(logs.Entries, e => e.Category == typeof(ServerHost).FullName);
-        Assert.True(started.Properties.ContainsKey("Urls"), "Start-up entry should carry a Urls property");
+        // Assert: framework logging reached the same sink
         Assert.Contains(logs.Entries, e => e.Category.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal)
                                            && e.Level == LogLevel.Information);
     }
@@ -167,7 +182,7 @@ public class HostingSubsystemTests
 
     /// <summary>
     ///     Test that a visitor who is not signed in is sent to the login page when asking for a page that
-    ///     needs a signed-in user, while the login page itself is served.
+    ///     needs a signed-in user.
     /// </summary>
     [Fact]
     public async Task HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin()
@@ -177,59 +192,75 @@ public class HostingSubsystemTests
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var client = app.GetTestClient();
 
-        // Act: request a protected page and the login page without signing in
+        // Act: request a protected page without signing in
         var projects = await client.GetAsync("/projects", TestContext.Current.CancellationToken);
-        var login = await client.GetAsync("/login", TestContext.Current.CancellationToken);
 
-        // Assert: the protected page redirects to the login page, which answers 200
+        // Assert: the protected page redirects to the login page
         Assert.Equal(System.Net.HttpStatusCode.Redirect, projects.StatusCode);
         Assert.Contains("/login", projects.Headers.Location?.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the login page is served to a visitor who is not signed in.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed()
+    {
+        // Arrange: a started host and a client that has no sign-in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the login page without signing in
+        var login = await client.GetAsync("/login", TestContext.Current.CancellationToken);
+
+        // Assert: the login page answers 200
         Assert.Equal(System.Net.HttpStatusCode.OK, login.StatusCode);
     }
 
     /// <summary>
-    ///     Test that a database setting the host cannot honor ends the run with exit code 1 and an error that
-    ///     names the problem on the context, instead of an unhandled exception.
+    ///     Test that a database setting the host cannot honor ends the run with exit code 1, instead of an
+    ///     unhandled exception.
     /// </summary>
     [Fact]
     public async Task HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne()
     {
+        // Arrange: configuration that selects a provider that is not implemented
+        using var context = Context.Create(["serve", "--silent"]);
+
+        // Act: run the server
+        var exitCode = await ServerHost.RunAsync(context, UnsupportedProviderOptions(), TestContext.Current.CancellationToken);
+
+        // Assert: the run failed with exit code 1 and the context holds the failure
+        Assert.Equal(1, exitCode);
+        Assert.Equal(1, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that a database setting the host cannot honor is reported with an error text that names the
+    ///     problem on the context.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider()
+    {
         // Arrange: a log file for the context and configuration that selects a provider that is not implemented
         using var folder = new TemporaryDirectory();
         var logFile = Path.Combine(folder.DirectoryPath, "run.log");
-        var options = new ServerHostOptions
-        {
-            MapStaticAssets = false,
-            ConfigureBuilder = builder =>
-            {
-                builder.WebHost.UseTestServer();
-                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:Provider"] = "Oracle",
-                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
-                });
-            }
-        };
 
         // Act: run the server
-        int exitCode;
-        int contextExitCode;
         using (var context = Context.Create(["serve", "--silent", "--log", logFile]))
         {
-            exitCode = await ServerHost.RunAsync(context, options, TestContext.Current.CancellationToken);
-            contextExitCode = context.ExitCode;
+            await ServerHost.RunAsync(context, UnsupportedProviderOptions(), TestContext.Current.CancellationToken);
         }
 
-        // Assert: the run failed with exit code 1, the context holds the failure, and the error text names the provider
-        Assert.Equal(1, exitCode);
-        Assert.Equal(1, contextExitCode);
+        // Assert: the error text names the provider
         var text = await File.ReadAllTextAsync(logFile, TestContext.Current.CancellationToken);
         Assert.Contains("Oracle", text, StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     Test that the running web host has the notification worker only when notifications are enabled, and
-    ///     that the worker is running then.
+    ///     Test that the running web host has the notification worker when notifications are enabled, and that the
+    ///     worker is running then.
     /// </summary>
     [Fact]
     public async Task HostingSubsystem_NotificationWorker_OnlyEnabledWebHost()
@@ -245,17 +276,49 @@ public class HostingSubsystemTests
             ["Notifications:File:Directory"] = folder
         };
 
-        // Act: start a host with the settings and one without
+        // Act: start a host with the settings
         await using var enabled = await TestWebApp.StartAsync(new CapturingLoggerProvider(), null, ["serve", "--silent"], settings);
-        await using var off = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
 
-        // Assert: only the first has the worker, and it was started by the host
+        // Assert: it has the worker, and the worker was started by the host
         var worker = Assert.Single(enabled.Services.GetServices<IHostedService>().OfType<NotificationWorker>());
         Assert.NotNull(worker.ExecuteTask);
-        Assert.Empty(off.Services.GetServices<IHostedService>().OfType<NotificationWorker>());
         if (Directory.Exists(folder))
         {
             Directory.Delete(folder, true);
         }
+    }
+
+    /// <summary>
+    ///     Test that the running web host has no notification worker when notifications are not enabled.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_NotificationWorker_NotEnabled_WebHostHasNoWorker()
+    {
+        // Arrange and act: start a host without notification settings
+        await using var off = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+
+        // Assert: it has no worker
+        Assert.Empty(off.Services.GetServices<IHostedService>().OfType<NotificationWorker>());
+    }
+
+    /// <summary>
+    ///     Build the host options that select a database provider that is not implemented.
+    /// </summary>
+    /// <returns>The options.</returns>
+    private static ServerHostOptions UnsupportedProviderOptions()
+    {
+        return new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:Provider"] = "Oracle",
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
+                });
+            }
+        };
     }
 }

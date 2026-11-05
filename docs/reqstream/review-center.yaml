@@ -1972,7 +1972,7 @@ sections:
           - ReviewCenter-Hosting-NotificationWorkerNotWhenOff
           - ReviewCenter-Messaging-WorkerNotRegisteredWhenOff
         tests:
-          - HostingSubsystem_NotificationWorker_OnlyEnabledWebHost
+          - HostingSubsystem_NotificationWorker_NotEnabled_WebHostHasNoWorker
           - NotificationRegistration_AddNotificationWorker_Off_NotRegistered
 
       - id: ReviewCenter-System-NotificationWorkerResilient
@@ -2479,6 +2479,8 @@ sections:
           - ReviewCenter-ContentSources-Content-Limit
           - ReviewCenter-ContentSources-Content-Size
           - ReviewCenter-ContentSources-ArgumentErrors
+          - ReviewCenter-ContentSources-ArgumentErrors-ReviewSetContent
+          - ReviewCenter-ContentSources-ArgumentErrors-ObjectIds
           - ReviewCenter-ContentSources-Content-Bytes
           - ReviewCenter-ContentSources-Errors
           - ReviewCenter-ContentSources-Errors-OldGit
@@ -2910,6 +2912,7 @@ sections:
           - ReviewCenter-Hosting-Database-Services
           - ReviewCenter-Hosting-Database-Restart
           - ReviewCenter-Hosting-DatabaseFailure
+          - ReviewCenter-Hosting-DatabaseFailure-NoServing
           - ReviewCenter-Hosting-DatabaseFailure-ExitCode
           - ReviewCenter-Hosting-DatabaseFailure-LocationExitCode
           - ReviewCenter-Storage-Persistence

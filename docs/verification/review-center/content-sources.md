@@ -47,25 +47,43 @@ local repository resolves a branch to the newest commit, lists the change betwee
 bytes of the changed file. This scenario is tested by
 `ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource`.
 
-**ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading**: A registered repository is disabled; it is not
-offered for selection, and building the access data for it is refused with `RepositoryDisabled`, so it cannot be
-opened. This scenario is tested by `ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading`.
+**ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading**: A registered repository is disabled; building
+the access data for it is refused with `RepositoryDisabled`, so it cannot be opened. This scenario is tested by
+`ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading`.
+
+**ContentSourcesSubsystem_DisabledRepository_IsNotOfferedForSelection**: A registered repository is disabled; the list
+of repositories that may be selected in its project is empty. This scenario is tested by
+`ContentSourcesSubsystem_DisabledRepository_IsNotOfferedForSelection`.
 
 **ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration**: A local repository holds a
 `.reviewmark.yaml` with one review-set in its first commit and a change in its second. The real git source lists the
 head commit, reads the bytes of the configuration file, and the real parser returns the set with its identifier, title,
-and paths; the ancestor check says yes from the first commit to the second and no the other way. This scenario is tested
-by `ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration`.
+and paths. This scenario is tested by `ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration`.
+
+**ContentSourcesSubsystem_Ancestry_EarlierCommitIsInTheHistoryOfALaterCommit**: A local repository has two commits. The
+ancestor check of the real git source says yes from the first commit to the second. This scenario is tested by
+`ContentSourcesSubsystem_Ancestry_EarlierCommitIsInTheHistoryOfALaterCommit`.
+
+**ContentSourcesSubsystem_Ancestry_LaterCommitIsNotInTheHistoryOfAnEarlierCommit**: A local repository has two commits.
+The ancestor check of the real git source says no from the second commit to the first. This scenario is tested by
+`ContentSourcesSubsystem_Ancestry_LaterCommitIsNotInTheHistoryOfAnEarlierCommit`.
 
 **ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound**: A local repository with one commit is opened
-through the real git source. A branch name that matches nothing is refused with `RevisionNotFound`, and a name that
-could be read as a git option is refused with `RevisionInvalid`. This scenario is tested by
-`ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound`.
+through the real git source. A branch name that matches nothing is refused with `RevisionNotFound`. This scenario is
+tested by `ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound`.
+
+**ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid**: A local repository with one commit is
+opened through the real git source. A name that could be read as a git option (`--upload-pack=x`) is refused with
+`RevisionInvalid`. This scenario is tested by `ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid`.
 
 **ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository**: A repository is opened whose
-registered location does not exist. The open is refused with `GitAccessFailed`, the message names the repository and
-not its location, and no mirror folder is left in the cache folder. This scenario is tested by
+registered location does not exist. The open is refused with `GitAccessFailed`, and the message names the repository and
+not its location. This scenario is tested by
 `ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository`.
+
+**ContentSourcesSubsystem_UnreachableRepository_LeavesNoMirrorFolder**: A repository is opened whose registered location
+does not exist. The open fails and no mirror folder is left in the cache folder. This scenario is tested by
+`ContentSourcesSubsystem_UnreachableRepository_LeavesNoMirrorFolder`.
 
 **Units**: The start of git without a shell and with a curated environment, the redaction of secrets, the limits and the
 failures are verified in the unit tests of `GitRunner`; the mirror, the revisions, the change lists, the blobs, the

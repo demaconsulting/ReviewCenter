@@ -68,7 +68,7 @@ sections:
           One audit trail for the running service needs the framework request entries next to the entries of the
           server, in the same place.
         tests:
-          - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
+          - HostingSubsystem_Startup_LoggingConfigured_FrameworkEntriesReachTheSameSinks
 
       - id: ReviewCenter-Hosting-Database
         title: >-
@@ -92,6 +92,7 @@ sections:
         children:
           - ReviewCenter-ServerHost-Database-ProjectService
           - ReviewCenter-ServerHost-Database-UserService
+          - ReviewCenter-ServerHost-Database-ReviewService
           - ReviewCenter-ServerHost-Database-SigningService
           - ReviewCenter-ServerHost-Database-InboxService
         tests:
@@ -173,7 +174,7 @@ sections:
         children:
           - ReviewCenter-ServerHost-Authentication-PublicPages
         tests:
-          - HostingSubsystem_Pages_AnonymousVisitor_ProtectedPageRedirectsToLogin
+          - HostingSubsystem_Pages_AnonymousVisitor_LoginPageIsServed
 
       - id: ReviewCenter-Hosting-GitSettings
         title: >-
@@ -395,14 +396,24 @@ sections:
 
       - id: ReviewCenter-Hosting-DatabaseFailure
         title: >-
-          The Hosting subsystem shall report a database setting that cannot be used as an error, without starting to
-          serve requests.
+          The Hosting subsystem shall report a database setting that cannot be used as an error that names the
+          problem.
         justification: |
-          A service that starts with a database it cannot use would fail on the first request. Stopping
-          immediately with a clear message lets the operator fix the setting.
+          Stopping with a clear message lets the operator fix the setting instead of searching for the cause of a
+          failure later.
         children:
           - ReviewCenter-ServerHost-DatabaseFailure
           - ReviewCenter-ServerHost-DatabaseFailure-ErrorReported
+        tests:
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_ReportsAnErrorNamingTheProvider
+
+      - id: ReviewCenter-Hosting-DatabaseFailure-NoServing
+        title: >-
+          The Hosting subsystem shall end the run without starting to serve requests when the database setting cannot
+          be used.
+        justification: |
+          A service that starts with a database it cannot use would fail on the first request, so it must stop
+          immediately.
         tests:
           - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
 
@@ -1361,7 +1372,7 @@ sections:
         children:
           - ReviewCenter-ServerHost-NotificationWorkerOffNone
         tests:
-          - HostingSubsystem_NotificationWorker_OnlyEnabledWebHost
+          - HostingSubsystem_NotificationWorker_NotEnabled_WebHostHasNoWorker
           - ServerHost_CreateApplication_NotificationsOff_NoWorker
 
       - id: ReviewCenter-Hosting-NotificationSenderNoneRefused

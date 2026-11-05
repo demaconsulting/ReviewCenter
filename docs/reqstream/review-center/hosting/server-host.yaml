@@ -93,6 +93,15 @@ sections:
         tests:
           - ServerHost_AddServices_Configured_RegistersUserService
 
+      - id: ReviewCenter-ServerHost-Database-ReviewService
+        title: >-
+          The ServerHost class shall provide a review service that works against the configured database.
+        justification: |
+          The review pages create and read reviews only through the registered service, so the composition root must
+          connect it to the configured database.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersReviewService
+
       - id: ReviewCenter-ServerHost-Database-SigningService
         title: >-
           The ServerHost class shall provide the signing service as one shared instance.
