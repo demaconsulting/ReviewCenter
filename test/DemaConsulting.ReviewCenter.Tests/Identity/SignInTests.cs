@@ -23,8 +23,10 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Tests.Identity;
 
@@ -342,6 +344,32 @@ public class SignInTests
 
         // Assert: served
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the session ticket lives for the number of hours in the <c>Auth:SessionHours</c> setting, and for
+    ///     the default of eight hours when the setting is absent.
+    /// </summary>
+    /// <param name="setting">The value of the setting; <c>null</c> for none.</param>
+    /// <param name="expectedHours">The number of hours the ticket is expected to live.</param>
+    [Theory]
+    [InlineData("3", 3)]
+    [InlineData(null, 8)]
+    public async Task SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime(string? setting, int expectedHours)
+    {
+        // Arrange: an application that starts with, or without, the session hours setting
+        var settings = setting is null
+            ? null
+            : new Dictionary<string, string?> { ["Auth:SessionHours"] = setting };
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), null, ["serve", "--silent"], settings);
+
+        // Act: read the options of the cookie scheme that the application signs in with
+        var cookie = app.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        // Assert: the ticket lives for the configured number of hours, and the lifetime slides with use
+        Assert.Equal(TimeSpan.FromHours(expectedHours), cookie.ExpireTimeSpan);
+        Assert.True(cookie.SlidingExpiration);
     }
 
     /// <summary>

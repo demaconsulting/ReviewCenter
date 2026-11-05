@@ -116,6 +116,11 @@ is read. A change to the review through `ThreadService` is refused with `ReviewL
 refusal to a 409 problem document. After an administrator reopens the review through `SigningService`, the API reports
 it as not approved. This scenario is tested by `ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409`.
 
+**ApiSubsystem_LockedReview_TokenCannotReopen**: An approved review and a token exist. A post to
+`.../reviews/REV-1/reopen` is answered with 404, because the API has no reopen route. `SigningService.ReopenReviewAsync`
+for an actor that came through the token is refused with `ActorNotAllowed`. The review read afterwards is still
+approved. This scenario is tested by `ApiSubsystem_LockedReview_TokenCannotReopen`.
+
 **ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable**: A post to a signing address under `/api` is answered
 with 404, because no such route exists; `SigningService.SignAsync` with an actor that came through the token is refused
 with `ActorNotAllowed`; and the account page requested with the token is redirected to the sign-in page. This scenario

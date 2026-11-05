@@ -16,73 +16,97 @@ sections:
     requirements:
       - id: ReviewCenter-Identity-Login
         title: >-
-          The Identity subsystem shall let a user sign in with the user name and password of an enabled account,
-          answer every failed sign-in alike, keep the user signed in with a safe session cookie, protect the
-          sign-in and sign-out requests against forgery, let the user sign out, and keep a return address only
-          when it is local.
+          The Identity subsystem shall let a user sign in with the user name and password of an enabled account.
         justification: |
-          Signing in is the basis of attributable review actions. One answer for every failure does not help
-          somebody guessing user names, a cookie that scripts cannot read and other sites cannot send limits
-          theft and forgery of the session, and a local-only return address stops the login page from sending
-          users to another site.
+          Signing in is the basis of attributable review actions.
         children:
           - ReviewCenter-SignIn-Login
           - ReviewCenter-SignIn-Login-DefaultHome
-          - ReviewCenter-SignIn-LoginFailure
-          - ReviewCenter-SignIn-LoginFailure-NoCookie
-          - ReviewCenter-SignIn-LoginFailure-ReturnUrl
-          - ReviewCenter-SignIn-ReturnUrl
-          - ReviewCenter-SignIn-ReturnUrl-HostileHome
-          - ReviewCenter-SignIn-Cookie
-          - ReviewCenter-SignIn-Cookie-SameSite
-          - ReviewCenter-SignIn-Cookie-Session
-          - ReviewCenter-SignIn-Cookie-Secure
-          - ReviewCenter-SignIn-Cookie-InputValidation
-          - ReviewCenter-SignIn-Antiforgery
-          - ReviewCenter-SignIn-Logout
-          - ReviewCenter-SignIn-Logout-RedirectHome
           - ReviewCenter-PasswordHasher-HashVerify
           - ReviewCenter-PasswordHasher-HashVerify-WrongPassword
           - ReviewCenter-PasswordHasher-HashVerify-InvalidHash
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
 
+      - id: ReviewCenter-Identity-Login-SameAnswer
+        title: >-
+          The Identity subsystem shall answer every failed sign-in alike.
+        justification: |
+          One answer for every failure does not help somebody guessing user names.
+        children:
+          - ReviewCenter-SignIn-LoginFailure
+          - ReviewCenter-SignIn-LoginFailure-NoCookie
+          - ReviewCenter-SignIn-LoginFailure-ReturnUrl
+        tests:
+          - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
+
+      - id: ReviewCenter-Identity-Login-Cookie
+        title: >-
+          The Identity subsystem shall keep the user signed in with a safe session cookie.
+        justification: |
+          A cookie that scripts cannot read and other sites cannot send limits theft and forgery of the session.
+        children:
+          - ReviewCenter-SignIn-Cookie
+          - ReviewCenter-SignIn-Cookie-SameSite
+          - ReviewCenter-SignIn-Cookie-Session
+          - ReviewCenter-SignIn-Cookie-Secure
+          - ReviewCenter-SignIn-Cookie-InputValidation
+        tests:
+          - SignIn_AddSignIn_SessionHoursSetting_SetsTicketLifetime
+
+      - id: ReviewCenter-Identity-Login-Antiforgery
+        title: >-
+          The Identity subsystem shall protect the sign-in and sign-out requests against forgery.
+        justification: |
+          A request that another site makes in the name of a browser must not sign anybody in or out.
+        children:
+          - ReviewCenter-SignIn-Antiforgery
+
+      - id: ReviewCenter-Identity-Login-Logout
+        title: >-
+          The Identity subsystem shall let the user sign out.
+        justification: |
+          A user on a shared computer must be able to end the session.
+        children:
+          - ReviewCenter-SignIn-Logout
+          - ReviewCenter-SignIn-Logout-RedirectHome
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Login-ReturnUrl
+        title: >-
+          The Identity subsystem shall keep a return address only when it is local.
+        justification: |
+          A local-only return address stops the login page from sending users to another site.
+        children:
+          - ReviewCenter-SignIn-ReturnUrl
+          - ReviewCenter-SignIn-ReturnUrl-HostileHome
+
       - id: ReviewCenter-Identity-Throttle
         title: >-
           The Identity subsystem shall refuse sign-in attempts from a client address that has made too many
-          attempts for one user name, or too many attempts overall, within a window, with the same answer whether
-          or not the user name exists, without checking the password, and shall read the limits from settings that
-          are validated when the server starts.
+          attempts for one user name within a window.
         justification: |
           The account lockout only protects accounts that exist and makes a lockout possible for any attacker who
           knows a name. A limit per client address and name slows guessing for every name alike and does not lock
-          the real user out from other addresses. The answer must not depend on the account, so it does not help
-          somebody collecting user names.
+          the real user out from other addresses.
         children:
           - ReviewCenter-SignIn-Throttle
-          - ReviewCenter-SignIn-Throttle-RefusesRightPassword
           - ReviewCenter-SignIn-Throttle-NoCookie
-          - ReviewCenter-SignIn-Throttle-SameAnswer
           - ReviewCenter-SignIn-Throttle-ReturnUrl
           - ReviewCenter-SignIn-Throttle-NoLockoutCount
           - ReviewCenter-SignIn-Throttle-Audit
           - ReviewCenter-SignIn-Throttle-Audit-NameCleaned
           - ReviewCenter-SignIn-Throttle-Audit-NoPassword
           - ReviewCenter-SignIn-Throttle-SuccessReset
-          - ReviewCenter-Identity-ThrottleSettings
-          - ReviewCenter-Identity-ThrottleSettings-NotPositive
-          - ReviewCenter-Identity-ThrottleSettings-WindowTooLong
-          - ReviewCenter-Identity-ThrottleSettings-AddressBelowName
           - ReviewCenter-SignInThrottle-Limits
           - ReviewCenter-SignInThrottle-Limits-NameLimit
-          - ReviewCenter-SignInThrottle-Limits-AddressLimit
           - ReviewCenter-SignInThrottle-Limits-PerAddress
           - ReviewCenter-SignInThrottle-Limits-WindowReset
           - ReviewCenter-SignInThrottle-Limits-SuccessGiveBack
           - ReviewCenter-SignInThrottle-Limits-RefusedNotCounted
           - ReviewCenter-SignInThrottle-Limits-NullHandling
           - ReviewCenter-SignInThrottle-Limits-Reset
-          - ReviewCenter-SignInThrottle-Options
           - ReviewCenter-SignInThrottle-Bounded
           - ReviewCenter-SignInThrottle-Bounded-EvictOldest
           - ReviewCenter-SignInThrottle-Bounded-ExistingAddressKeyKept
@@ -95,11 +119,58 @@ sections:
           - ReviewCenter-SignInThrottle-Reservation-RefundOnce
           - ReviewCenter-SignInThrottle-Reservation-InputValidation
           - ReviewCenter-SignInThrottle-Reservation-ResetGenerations
+        tests:
+          - IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow
+
+      - id: ReviewCenter-Identity-Throttle-AddressTotal
+        title: >-
+          The Identity subsystem shall refuse sign-in attempts from a client address that has made too many
+          attempts overall within a window.
+        justification: |
+          A guesser who tries many user names from one address stays below every per-name limit, so the address
+          needs a limit of its own.
+        children:
+          - ReviewCenter-SignInThrottle-Limits-AddressLimit
           - ReviewCenter-SignInThrottle-AddressOnly
           - ReviewCenter-SignInThrottle-AddressOnly-SlotReturnedOnce
           - ReviewCenter-SignInThrottle-AddressOnly-TableFullBounded
-        tests:
-          - IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow
+
+      - id: ReviewCenter-Identity-Throttle-SameAnswer
+        title: >-
+          The Identity subsystem shall refuse a throttled sign-in attempt with the same answer whether or not the
+          user name exists.
+        justification: |
+          The answer must not depend on the account, so it does not help somebody collecting user names.
+        children:
+          - ReviewCenter-SignIn-Throttle-SameAnswer
+
+      - id: ReviewCenter-Identity-Throttle-NoPasswordCheck
+        title: >-
+          The Identity subsystem shall refuse a throttled sign-in attempt without checking the password.
+        justification: |
+          A refusal that depends on the password would tell a guesser which password was right.
+        children:
+          - ReviewCenter-SignIn-Throttle-RefusesRightPassword
+
+      - id: ReviewCenter-Identity-Throttle-Settings
+        title: >-
+          The Identity subsystem shall read the limits of the sign-in throttle from settings.
+        justification: |
+          An operator must be able to tune the throttle to the size of the installation.
+        children:
+          - ReviewCenter-Identity-ThrottleSettings
+          - ReviewCenter-SignInThrottle-Options
+
+      - id: ReviewCenter-Identity-Throttle-SettingsValidated
+        title: >-
+          The Identity subsystem shall validate the limits of the sign-in throttle when the server starts.
+        justification: |
+          A limit that locks everybody out must be found when the server starts and not when the first user cannot
+          sign in.
+        children:
+          - ReviewCenter-Identity-ThrottleSettings-NotPositive
+          - ReviewCenter-Identity-ThrottleSettings-WindowTooLong
+          - ReviewCenter-Identity-ThrottleSettings-AddressBelowName
 
       - id: ReviewCenter-Identity-ThrottleSettings
         title: >-
@@ -143,49 +214,89 @@ sections:
       - id: ReviewCenter-Identity-Authorization
         title: >-
           The Identity subsystem shall send a request without a signed-in user to the login page for every page
-          except the home page and the login page, and shall refuse the user administration page to a user who
-          is not a system administrator.
+          except the home page and the login page.
         justification: |
-          Review data must only be reached by identified users, and managing users is limited to system
-          administrators. Closing pages by default means a new page cannot be left open by mistake. Which projects
-          a signed-in user may see is decided by the project access rules of the Core subsystem, not here.
+          Review data must only be reached by identified users. Closing pages by default means a new page cannot be
+          left open by mistake. Which projects a signed-in user may see is decided by the project access rules of
+          the Core subsystem, not here.
         children:
           - ReviewCenter-SignIn-Protected
           - ReviewCenter-SignIn-Protected-PublicPages
           - ReviewCenter-SignIn-ReturnDeepLink
           - ReviewCenter-SignIn-ReturnDeepLink-ExactEncoding
-          - ReviewCenter-SignIn-AdminOnly
-          - ReviewCenter-SignIn-AdminOnly-ReviewerForbidden
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Authorization-UserAdmin
+        title: >-
+          The Identity subsystem shall refuse the user administration page to a user who is not a system
+          administrator.
+        justification: |
+          Managing users is limited to system administrators, and a reviewer who reaches the page could give
+          themselves rights.
+        children:
+          - ReviewCenter-SignIn-AdminOnly
+          - ReviewCenter-SignIn-AdminOnly-ReviewerForbidden
 
       - id: ReviewCenter-Identity-AdminClaim
         title: >-
           The Identity subsystem shall give the session of a user the system administrator role only when the user is
-          a system administrator who has no temporary password to change, and no project role at all, so that the
-          memberships of a user are always read from the database when needed and a change of them takes effect at
-          once, and shall give a user who has to change a temporary password a must-change-password claim instead,
-          sign that user in to the account page, and end the session when the password is changed.
+          a system administrator who has no temporary password to change.
         justification: |
           A role that is copied into the cookie stays true until the cookie ends. Only the system administrator
-          role is kept there, and the session ends when it no longer matches the account, while project roles are
-          never copied, so removing a member from a project cannot be missed by a session that is already open. A
-          temporary password was handed over by somebody else, so it opens only the way to replacing it.
+          role is kept there, and the session ends when it no longer matches the account.
         children:
           - ReviewCenter-SignIn-AdminClaim
-          - ReviewCenter-SignIn-AdminClaim-NoProjectRole
           - ReviewCenter-SignIn-AdminClaim-Current
           - ReviewCenter-SignIn-AdminClaim-RoleChangeEndsSession
-          - ReviewCenter-SignIn-TemporaryPassword
           - ReviewCenter-SignIn-TemporaryPassword-NoAdminRole
-          - ReviewCenter-SignIn-TemporaryPassword-Claim
-          - ReviewCenter-SignIn-TemporaryPassword-StaleWhenFlagChanges
-          - ReviewCenter-SignIn-TemporaryPassword-ClaimMatchesFlag
         tests:
           - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
           - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+
+      - id: ReviewCenter-Identity-AdminClaim-NoProjectRole
+        title: >-
+          The Identity subsystem shall give the session of a user no project role at all, so that the memberships of
+          a user are read from the database when needed and a change of them takes effect at once.
+        justification: |
+          Project roles are never copied into the cookie, so removing a member from a project cannot be missed by a
+          session that is already open.
+        children:
+          - ReviewCenter-SignIn-AdminClaim-NoProjectRole
+
+      - id: ReviewCenter-Identity-AdminClaim-MustChange
+        title: >-
+          The Identity subsystem shall give a user who has to change a temporary password a must-change-password claim
+          instead of the system administrator role.
+        justification: |
+          A temporary password was handed over by somebody else, so the claim limits the session to replacing it.
+        children:
+          - ReviewCenter-SignIn-TemporaryPassword-Claim
+          - ReviewCenter-SignIn-TemporaryPassword-ClaimMatchesFlag
+        tests:
           - SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim
+
+      - id: ReviewCenter-Identity-AdminClaim-AccountPage
+        title: >-
+          The Identity subsystem shall sign a user who has to change a temporary password in to the account page.
+        justification: |
+          A temporary password opens only the way to replacing it.
+        children:
+          - ReviewCenter-SignIn-TemporaryPassword
+        tests:
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+
+      - id: ReviewCenter-Identity-AdminClaim-PasswordChanged
+        title: >-
+          The Identity subsystem shall end the session of a user when the temporary-password state of the account
+          changes.
+        justification: |
+          A session that was opened with a temporary password must not outlive the change of that password.
+        children:
+          - ReviewCenter-SignIn-TemporaryPassword-StaleWhenFlagChanges
+        tests:
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
 
       - id: ReviewCenter-Identity-Session
         title: >-
@@ -206,29 +317,32 @@ sections:
 
       - id: ReviewCenter-Identity-Actor
         title: >-
-          The Identity subsystem shall provide the signed-in user as the actor, with user name and display name,
-          for the services that record who acted, and shall refuse the action with a message, saving nothing, when
-          nobody is signed in.
+          The Identity subsystem shall provide the signed-in user as the actor, with user name and display name, for
+          the services that record who acted.
         justification: |
           Taking the person who acts from the sign-in, and never from a form field, means nobody can act in the
-          name of somebody else, and an action without a user cannot be recorded by mistake.
+          name of somebody else.
         children:
           - ReviewCenter-SignIn-Actor
-          - ReviewCenter-SignIn-Actor-NotSignedIn
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
 
+      - id: ReviewCenter-Identity-Actor-NobodyRefused
+        title: >-
+          The Identity subsystem shall refuse an action with a message, saving nothing, when nobody is signed in.
+        justification: |
+          An action without a user cannot be recorded by mistake.
+        children:
+          - ReviewCenter-SignIn-Actor-NotSignedIn
+
       - id: ReviewCenter-Identity-CircuitSession
         title: >-
-          The Identity subsystem shall check, at an interval set in Auth:RevalidationSeconds (30 seconds by
-          default), that the user of every open interactive page still exists, is enabled, and has the same system
-          administrator state as at sign-in, using the same rule as for the session cookie, and shall end the
-          sign-in state of that page when the user is not valid or cannot be read.
+          The Identity subsystem shall check that the user of every open interactive page still exists, is enabled,
+          and has the same system administrator state as at sign-in, using the same rule as for the session cookie.
         justification: |
           A page that stays open makes no request, so the check of the session cookie never reaches it. Without
           a periodic check a user who was disabled, removed, or demoted from system administrator would keep seeing
-          and changing review data until the page is reloaded. The check fails closed, so a user who cannot be
-          verified does not keep a page. The interval is the longest time such a user can keep an open page.
+          and changing review data until the page is reloaded.
         children:
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-UserDisabled
@@ -236,10 +350,6 @@ sections:
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-RoleChanged
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-DisplayNameChanged
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-NoNameClaim
-          - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-MakesAnonymous
-          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed
-          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LoopAnonymous
-          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LogsFailure
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown-StopsLoop
           - ReviewCenter-RevalidatingAuthenticationStateProvider-InputValidation
@@ -248,60 +358,114 @@ sections:
           - ReviewCenter-SignIn-SessionValidation-DisplayName
           - ReviewCenter-SignIn-SessionValidation-MissingInputs
           - ReviewCenter-SignIn-SessionValidation-Rule
-          - ReviewCenter-SignIn-RevalidationSetting
-          - ReviewCenter-SignIn-RevalidationSetting-Minimum
         tests:
           - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
+
+      - id: ReviewCenter-Identity-CircuitSession-Interval
+        title: >-
+          The Identity subsystem shall check the user of every open interactive page at an interval set in
+          Auth:RevalidationSeconds, 30 seconds by default.
+        justification: |
+          The interval is the longest time a user who is no longer valid can keep an open page.
+        children:
+          - ReviewCenter-SignIn-RevalidationSetting
+          - ReviewCenter-SignIn-RevalidationSetting-Minimum
+
+      - id: ReviewCenter-Identity-CircuitSession-EndSignIn
+        title: >-
+          The Identity subsystem shall end the sign-in state of an open interactive page when its user is not valid.
+        justification: |
+          A user who is not valid must not keep seeing and changing review data on a page that is still open.
+        children:
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-MakesAnonymous
+        tests:
+          - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
+
+      - id: ReviewCenter-Identity-CircuitSession-FailClosed
+        title: >-
+          The Identity subsystem shall end the sign-in state of an open interactive page when its user cannot be read.
+        justification: |
+          The check fails closed, so a user who cannot be verified does not keep a page.
+        children:
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LoopAnonymous
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LogsFailure
 
       - id: ReviewCenter-Identity-AuditTrail
         title: >-
           The Identity subsystem shall record successful sign-ins, sign-outs, failed sign-ins, attempts on locked
-          accounts, refusals by the sign-in throttle, and lockouts in the audit trail on a best-effort basis, taking
-          the actor from the server-side sign-in state, cleaning and capping any typed user name that does not
-          exist, never recording a password, recording repeated events of one kind at most once per minute, and
-          never letting a failure of the trail change the result of a sign-in or sign-out.
+          accounts, refusals by the sign-in throttle, and lockouts in the audit trail, taking the actor from the
+          server-side sign-in state.
         justification: |
-          Attempts to break in and the use of accounts belong to the history, but an unauthenticated caller must
-          not be able to fill the trail with text of their choice or with an unlimited number of rows, and a
-          failing trail must not lock anybody out.
+          Attempts to break in and the use of accounts belong to the history.
         children:
           - ReviewCenter-SignIn-Audit
           - ReviewCenter-SignIn-Audit-SignOut
-          - ReviewCenter-SignIn-Audit-BestEffort
           - ReviewCenter-SignIn-Audit-FailedSignIn
-          - ReviewCenter-SignIn-Audit-UnknownUser
-          - ReviewCenter-SignIn-Audit-CappedName
-          - ReviewCenter-SignIn-Audit-NoPassword
           - ReviewCenter-SignIn-Audit-Lockout
-          - ReviewCenter-SignIn-Audit-LockedAccount
           - ReviewCenter-SignIn-Audit-ChainIntact
         tests:
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
 
+      - id: ReviewCenter-Identity-AuditTrail-BestEffort
+        title: >-
+          The Identity subsystem shall never let a failure of the audit trail change the result of a sign-in or a
+          sign-out.
+        justification: |
+          A failing trail must not lock anybody out.
+        children:
+          - ReviewCenter-SignIn-Audit-BestEffort
+
+      - id: ReviewCenter-Identity-AuditTrail-TypedName
+        title: >-
+          The Identity subsystem shall clean and cap a typed user name that does not exist before it records it in
+          the audit trail.
+        justification: |
+          An unauthenticated caller must not be able to fill the trail with text of their choice.
+        children:
+          - ReviewCenter-SignIn-Audit-UnknownUser
+          - ReviewCenter-SignIn-Audit-CappedName
+
+      - id: ReviewCenter-Identity-AuditTrail-NoPassword
+        title: >-
+          The Identity subsystem shall never record a password in the audit trail.
+        justification: |
+          A password in the trail would be a leak to everybody who may read the trail.
+        children:
+          - ReviewCenter-SignIn-Audit-NoPassword
+
+      - id: ReviewCenter-Identity-AuditTrail-Coalesce
+        title: >-
+          The Identity subsystem shall record repeated events of one kind in the audit trail at most once per minute.
+        justification: |
+          An unauthenticated caller must not be able to fill the trail with an unlimited number of rows.
+        children:
+          - ReviewCenter-SignIn-Audit-LockedAccount
+
       - id: ReviewCenter-Identity-OidcSignIn
         title: >-
           The Identity subsystem shall, when an administrator has enabled it, let a person sign in with an account at
-          an OpenID Connect provider next to the password sign-in, by the authorization code flow with checks of the
-          token, create the account on the first sign-in without any right, never link it to a local account, never
-          offer a password for it, refuse it when it is disabled, keep the session as for a local user, and let the
-          person confirm a signature by signing in again at the provider, with an authentication time that is fresh,
-          for the same person, once, failing closed.
+          an OpenID Connect provider next to the password sign-in.
         justification: |
           Organizations already know their people at an identity provider and do not want a second set of passwords.
-          Using the provider for sign-in and for the confirmation of a signature keeps one place where people are
-          managed and where their passwords are protected, and the rules about accounts keep the provider from giving
-          anybody a right that only the administrators of the review tool give.
+          Using the provider for sign-in keeps one place where people are managed and where their passwords are
+          protected.
         children:
           - ReviewCenter-OidcSignIn-Login
-          - ReviewCenter-OidcSignIn-Login-CodeFlowPkce
           - ReviewCenter-OidcSignIn-Login-Antiforgery
-          - ReviewCenter-OidcSignIn-Login-StateChecked
-          - ReviewCenter-OidcSignIn-Login-TokenChecked
-          - ReviewCenter-OidcSignIn-Login-TokenSignature
-          - ReviewCenter-OidcSignIn-Login-TokenLifetime
-          - ReviewCenter-OidcSignIn-Login-CodeRefused
           - ReviewCenter-OidcSignIn-Login-EmailVerified
           - ReviewCenter-OidcSignIn-Login-Button
+        tests:
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-Identity-OidcSignIn-Settings
+        title: >-
+          The Identity subsystem shall accept the provider settings of an enabled sign-in with a provider, including
+          the client secret from a file, only when they are valid, and name the invalid setting otherwise.
+        justification: |
+          A wrong or missing provider setting must be found when the server starts and not when the first person
+          cannot sign in, and a server that does not use a provider must not need any provider setting.
+        children:
           - ReviewCenter-OidcSignIn-Settings
           - ReviewCenter-OidcSignIn-Settings-Disabled
           - ReviewCenter-OidcSignIn-Settings-NothingMapped
@@ -330,61 +494,211 @@ sections:
           - ReviewCenter-Identity-OidcClientSecretFileStartup
           - ReviewCenter-Identity-OidcClientSecretFileStartup-BothSet
           - ReviewCenter-Identity-OidcClientSecretFileStartup-NoSecret
+
+      - id: ReviewCenter-Identity-OidcSignIn-NewAccount
+        title: >-
+          The Identity subsystem shall create the account of a person at the first sign-in with a provider, enabled
+          and without any right.
+        justification: |
+          The provider must not give anybody a right that only the administrators of the review tool give.
+        children:
           - ReviewCenter-OidcSignIn-Account
           - ReviewCenter-OidcSignIn-Account-SecondSignInSameAccount
           - ReviewCenter-OidcSignIn-Account-OtherSubjectSeparate
-          - ReviewCenter-OidcSignIn-Account-NeverLinksToLocalAccount
           - ReviewCenter-OidcSignIn-Account-NamesSanitized
+        tests:
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-Identity-OidcSignIn-NoLocalLink
+        title: >-
+          The Identity subsystem shall never link an account of a provider to a local account.
+        justification: |
+          A name or an e-mail address at the provider that equals a local one would otherwise give a person the
+          rights of a local account that somebody else owns.
+        children:
+          - ReviewCenter-OidcSignIn-Account-NeverLinksToLocalAccount
+
+      - id: ReviewCenter-Identity-OidcSignIn-NoPassword
+        title: >-
+          The Identity subsystem shall never offer a password for an account of a provider.
+        justification: |
+          A password for such an account would be a second way in that the provider does not control.
+        children:
+          - ReviewCenter-OidcSignIn-NoPassword
+          - ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused
+
+      - id: ReviewCenter-Identity-OidcSignIn-DisabledRefused
+        title: >-
+          The Identity subsystem shall refuse the sign-in with a provider of an account that is disabled.
+        justification: |
+          Disabling an account must stop the person whichever way the person signs in.
+        children:
           - ReviewCenter-OidcSignIn-DisabledRefused
           - ReviewCenter-OidcSignIn-DisabledRefused-NoCookie
           - ReviewCenter-OidcSignIn-DisabledRefused-AuditReason
+
+      - id: ReviewCenter-Identity-OidcSignIn-ReturnAddress
+        title: >-
+          The Identity subsystem shall use the home page after a sign-in or a confirmation of identity with a
+          provider when the return address is not a local path.
+        justification: |
+          A return address to another site would let the sign-in send a person to a hostile page.
+        children:
           - ReviewCenter-OidcSignIn-OpenRedirect
           - ReviewCenter-OidcSignIn-OpenRedirect-Reauth
+
+      - id: ReviewCenter-Identity-OidcSignIn-Throttle
+        title: >-
+          The Identity subsystem shall refuse an answer of the provider that arrives from a client address whose
+          quota of the sign-in throttle is used up.
+        justification: |
+          Without a limit the callback address would be open to endless guessing and to the cost of every code
+          exchange.
+        children:
           - ReviewCenter-OidcSignIn-Throttle
           - ReviewCenter-OidcSignIn-Throttle-NoCodeExchange
           - ReviewCenter-OidcSignIn-Throttle-OtherPersonNotBlocked
           - ReviewCenter-OidcSignIn-Throttle-SuccessGivesSlotBack
+
+      - id: ReviewCenter-Identity-OidcSignIn-Audit
+        title: >-
+          The Identity subsystem shall record the sign-ins, account creations, failed sign-ins, and refused
+          confirmations of identity with a provider in the audit trail, without any secret or token.
+        justification: |
+          The use of accounts belongs to the history, and a secret or a token in the trail would be a leak.
+        children:
           - ReviewCenter-OidcSignIn-Audit
           - ReviewCenter-OidcSignIn-Audit-AccountCreated
           - ReviewCenter-OidcSignIn-Audit-FailedSignIn
           - ReviewCenter-OidcSignIn-Audit-ReauthRefused
           - ReviewCenter-OidcSignIn-Audit-NoSecretRecorded
           - ReviewCenter-OidcSignIn-Audit-NoTokenRecorded
+
+      - id: ReviewCenter-Identity-OidcSignIn-FailureAnswer
+        title: >-
+          The Identity subsystem shall answer every failed sign-in with a provider, whatever the cause, in the same
+          way.
+        justification: |
+          An answer that tells the cause would help somebody who probes the sign-in.
+        children:
           - ReviewCenter-OidcSignIn-FailureAnswer
           - ReviewCenter-OidcSignIn-FailureAnswer-NoCookie
           - ReviewCenter-OidcSignIn-FailureAnswer-Message
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth
+        title: >-
+          The Identity subsystem shall let a person confirm a signature by signing in again at the provider.
+        justification: |
+          A person without a password confirms with the provider, so the signature is tied to the person and not
+          only to an open session.
+        children:
           - ReviewCenter-OidcSignIn-Reauth
           - ReviewCenter-OidcSignIn-Reauth-PromptLoginMaxAge0
+          - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationButton
+          - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationThenSigning
+        tests:
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+      - id: ReviewCenter-Identity-OidcSignIn-ReauthRefused
+        title: >-
+          The Identity subsystem shall refuse and record a confirmation of identity with a provider that is not
+          allowed.
+        justification: |
+          A request without a valid antiforgery token, from a person who may not sign, or without a confirmation must
+          not reach the provider or lead to a signature, and the refusal must leave a record.
+        children:
           - ReviewCenter-OidcSignIn-Reauth-Antiforgery
           - ReviewCenter-OidcSignIn-Reauth-NotAllowedNeverSent
+          - ReviewCenter-OidcSignIn-Reauth-RecordedRefusal
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth-Fresh
+        title: >-
+          The Identity subsystem shall accept a confirmation of identity with a provider only when the
+          authentication time is fresh.
+        justification: |
+          An old sign-in at the provider would let somebody sign who found an unattended session.
+        children:
           - ReviewCenter-OidcSignIn-Reauth-AuthTimeTooOld
           - ReviewCenter-OidcSignIn-Reauth-AuthTimeInFuture
-          - ReviewCenter-OidcSignIn-Reauth-AuthTimeMissing
-          - ReviewCenter-OidcSignIn-Reauth-AuthTimeUnusable
+        tests:
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth-SamePerson
+        title: >-
+          The Identity subsystem shall accept a confirmation of identity with a provider only for the same person
+          as the account that signs.
+        justification: |
+          A confirmation by another person would let somebody sign in the name of an account that is not theirs.
+        children:
           - ReviewCenter-OidcSignIn-Reauth-OtherSubject
           - ReviewCenter-OidcSignIn-Reauth-OtherIssuer
           - ReviewCenter-OidcSignIn-Reauth-SessionUserBinding
           - ReviewCenter-OidcSignIn-Reauth-WrongBinding
+        tests:
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth-Once
+        title: >-
+          The Identity subsystem shall accept a confirmation of identity with a provider for exactly one signature.
+        justification: |
+          A confirmation that could be used again would let one sign-in stand for many signatures.
+        tests:
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth-FailsClosed
+        title: >-
+          The Identity subsystem shall issue no confirmation of identity with a provider when anything about the
+          answer is missing, unusable, or refused.
+        justification: |
+          A confirmation that is issued when something could not be checked would make the check worthless.
+        children:
+          - ReviewCenter-OidcSignIn-Reauth-AuthTimeMissing
+          - ReviewCenter-OidcSignIn-Reauth-AuthTimeUnusable
           - ReviewCenter-OidcSignIn-Reauth-ProviderRefusal
           - ReviewCenter-OidcSignIn-Reauth-TokenChecks
           - ReviewCenter-OidcSignIn-Reauth-ProviderSessionEnded
-          - ReviewCenter-OidcSignIn-Reauth-RecordedRefusal
+
+      - id: ReviewCenter-Identity-OidcSignIn-Reauth-RefusalAnswer
+        title: >-
+          The Identity subsystem shall send the person back to the review with an answer that tells the class of the
+          reason when a confirmation of identity with a provider is refused.
+        justification: |
+          A person who cannot confirm needs to know whether to sign in again or to ask an administrator, and the
+          answer names only the class of the reason so that it helps nobody who probes the sign-in.
+        children:
           - ReviewCenter-OidcSignIn-ReauthAnswer
           - ReviewCenter-OidcSignIn-ReauthAnswer-NotRecent
           - ReviewCenter-OidcSignIn-ReauthAnswer-General
           - ReviewCenter-OidcSignIn-ReauthAnswer-ReasonClass
           - ReviewCenter-OidcSignIn-ReauthAnswer-MissingText
           - ReviewCenter-OidcSignIn-ReauthAnswer-NotRecentText
-          - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationButton
           - ReviewCenter-OidcSignIn-ReauthAnswer-GeneralText
-          - ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationThenSigning
+
+      - id: ReviewCenter-Identity-OidcSignIn-LocalSession
+        title: >-
+          The Identity subsystem shall keep the session of a user of a provider as it keeps the session of a local
+          user.
+        justification: |
+          One kind of session means one set of rules for ending it and for checking it.
+        children:
           - ReviewCenter-OidcSignIn-LocalSession
           - ReviewCenter-OidcSignIn-LocalSession-LogoutLocalOnly
-          - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
-          - ReviewCenter-Identity-OidcOpenPageChecked
           - ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
-          - ReviewCenter-OidcSignIn-NoPassword
-          - ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused
+          - ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
+        tests:
+          - OidcSignIn_Logout_IsLocalOnly
+
+      - id: ReviewCenter-Identity-OidcSignIn-CodeFlow
+        title: >-
+          The Identity subsystem shall sign a person in with a provider by the authorization code flow, with checks
+          of the identity token.
+        justification: |
+          The code flow with a proof key, a state, a nonce, and the checks of signature, issuer, audience, and
+          lifetime keeps a forged or replayed answer of the provider from signing anybody in.
+        children:
+          - ReviewCenter-OidcSignIn-Login-CodeFlowPkce
+          - ReviewCenter-OidcSignIn-Login-StateChecked
+          - ReviewCenter-OidcSignIn-Login-TokenChecked
+          - ReviewCenter-OidcSignIn-Login-TokenSignature
+          - ReviewCenter-OidcSignIn-Login-TokenLifetime
+          - ReviewCenter-OidcSignIn-Login-CodeRefused
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Pkce
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestState
@@ -400,10 +714,6 @@ sections:
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-RequestParameters-MaxAge
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow-Claims
-        tests:
-          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
-          - OidcSignIn_Logout_IsLocalOnly
-          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 
       - id: ReviewCenter-Identity-OidcOpenPageChecked
         title: >-
@@ -483,16 +793,85 @@ sections:
       - id: ReviewCenter-Identity-TotpSecondFactor
         title: >-
           The Identity subsystem shall, for an account with a second factor and while the feature is on, end the
-          password step of the sign-in without a session, hold the person in a short pending sign-in that is bound
-          to the browser and the client address, open the session only with a right code or a recovery code, count the
-          wrong
-          codes in the same throttle and lockout as wrong passwords, compute and check the codes by RFC 6238 with a
-          secret that is stored encrypted and bound to its user, and leave the sign-in with a provider and with an API
-          token as it was.
+          password step of the sign-in without a session.
         justification: |
-          The second factor must not be a form that an attacker can skip, so no session exists before the code, the
-          challenge cannot be moved to another browser, and the guessing of codes has the same limits as that of
-          passwords. The secret of a person must be of no use to somebody who copies the database.
+          The second factor must not be a form that an attacker can skip, so no session exists before the code is
+          given.
+        children:
+          - ReviewCenter-TotpSignIn-SecondStep-PasswordOnlyNoSession
+          - ReviewCenter-TotpSignIn-Disabled
+          - ReviewCenter-TotpSignIn-Disabled-FeatureOffNoEndpoint
+          - ReviewCenter-TotpSignIn-Disabled-NoSecondFactorAccount
+          - ReviewCenter-TotpSignIn-Disabled-AfterReset
+          - ReviewCenter-SignIn-TotpBranch
+          - ReviewCenter-SignIn-TotpBranch-NoSecondFactor
+        tests:
+          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-PendingSignIn
+        title: >-
+          The Identity subsystem shall hold a person who passed the password step of an account with a second factor
+          in a short pending sign-in that is bound to the browser and the client address.
+        justification: |
+          A challenge that could be moved to another browser or address would let somebody who learned a password
+          pass the second step from elsewhere, and a challenge that never ends would stay open for guessing.
+        children:
+          - ReviewCenter-SignIn-TotpBranch-Challenge
+          - ReviewCenter-TotpSignIn-Challenge
+          - ReviewCenter-TotpSignIn-Challenge-SameSite
+          - ReviewCenter-TotpSignIn-Challenge-Secure
+          - ReviewCenter-TotpSignIn-Challenge-NoChallenge
+          - ReviewCenter-TotpSignIn-Challenge-Forged
+          - ReviewCenter-TotpSignIn-Challenge-OtherAddress
+          - ReviewCenter-TotpSignIn-Challenge-Expired
+          - ReviewCenter-TotpSignIn-Challenge-SingleUse
+          - ReviewCenter-TotpSignIn-Challenge-Antiforgery
+          - ReviewCenter-TotpSignIn-Challenge-AdminReset
+        tests:
+          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-OpensWithCode
+        title: >-
+          The Identity subsystem shall open the session of an account with a second factor only with a right code or
+          an unused recovery code.
+        justification: |
+          A session that opens with anything else would make the second factor useless, and a recovery code that
+          works twice would be a second password.
+        children:
+          - ReviewCenter-TotpSignIn-SecondStep
+          - ReviewCenter-TotpSignIn-SecondStep-ReturnAddress
+          - ReviewCenter-TotpSignIn-SecondStep-NeighboringStep
+          - ReviewCenter-TotpSignIn-SecondStep-SameAnswerForEveryFailure
+          - ReviewCenter-TotpSignIn-SecondStep-MissingCodeLikeWrong
+          - ReviewCenter-TotpSignIn-SecondStep-RecoveryCode
+          - ReviewCenter-TotpSignIn-SecondStep-RecoveryCodeOnce
+          - ReviewCenter-TotpSignIn-SecondStep-CodeReuseRefused
+        tests:
+          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-WrongCodes
+        title: >-
+          The Identity subsystem shall count the wrong codes of the second step in the same sign-in throttle and
+          account lockout as wrong passwords.
+        justification: |
+          A six-digit code can be guessed, so the guessing of codes must have the same limits as that of passwords.
+        children:
+          - ReviewCenter-TotpSignIn-Lockout
+          - ReviewCenter-TotpSignIn-Lockout-SharedCounter
+          - ReviewCenter-TotpSignIn-Lockout-PasswordStepKeepsCounter
+          - ReviewCenter-TotpSignIn-Lockout-SuccessResets
+          - ReviewCenter-TotpSignIn-Throttle
+          - ReviewCenter-TotpSignIn-Throttle-PasswordStepFreesAddressQuota
+          - ReviewCenter-SignInThrottle-ReleaseAddress
+          - ReviewCenter-SignInThrottle-ReleaseAddress-NameCounterKept
+          - ReviewCenter-SignInThrottle-ReleaseAddress-Once
+          - ReviewCenter-SignInThrottle-ReleaseAddress-InputValidation
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-Rfc6238
+        title: >-
+          The Identity subsystem shall compute and check the codes of the second factor by RFC 6238.
+        justification: |
+          A standard algorithm keeps the codes compatible with the authenticator apps that people already use.
         children:
           - ReviewCenter-TotpAlgorithm-Rfc6238
           - ReviewCenter-TotpAlgorithm-Rfc6238-RandomSecrets
@@ -507,58 +886,50 @@ sections:
           - ReviewCenter-TotpAlgorithm-Secret-NonsenseRefused
           - ReviewCenter-TotpAlgorithm-Secret-OtpauthUri
           - ReviewCenter-TotpAlgorithm-Secret-InputValidation
-          - ReviewCenter-TotpSecretProtector-Encrypted
-          - ReviewCenter-TotpSecretProtector-Encrypted-RoundTrip
-          - ReviewCenter-TotpSecretProtector-UserBound
-          - ReviewCenter-TotpSecretProtector-Unreadable
-          - ReviewCenter-TotpSecretProtector-Unreadable-NoSecretInMessage
-          - ReviewCenter-TotpSecretProtector-Unreadable-InputValidation
           - ReviewCenter-TotpSignIn-Options
           - ReviewCenter-TotpSignIn-Options-ValidIssuer
           - ReviewCenter-TotpSignIn-Options-InvalidIssuer
           - ReviewCenter-TotpSignIn-Options-TooLongIssuer
-          - ReviewCenter-TotpSignIn-SecondStep
-          - ReviewCenter-TotpSignIn-SecondStep-PasswordOnlyNoSession
-          - ReviewCenter-TotpSignIn-SecondStep-ReturnAddress
-          - ReviewCenter-TotpSignIn-SecondStep-NeighboringStep
-          - ReviewCenter-TotpSignIn-SecondStep-SameAnswerForEveryFailure
-          - ReviewCenter-TotpSignIn-SecondStep-MissingCodeLikeWrong
-          - ReviewCenter-TotpSignIn-SecondStep-RecoveryCode
-          - ReviewCenter-TotpSignIn-SecondStep-RecoveryCodeOnce
-          - ReviewCenter-TotpSignIn-SecondStep-CodeReuseRefused
-          - ReviewCenter-TotpSignIn-Challenge
-          - ReviewCenter-TotpSignIn-Challenge-SameSite
-          - ReviewCenter-TotpSignIn-Challenge-Secure
-          - ReviewCenter-TotpSignIn-Challenge-NoChallenge
-          - ReviewCenter-TotpSignIn-Challenge-Forged
-          - ReviewCenter-TotpSignIn-Challenge-OtherAddress
-          - ReviewCenter-TotpSignIn-Challenge-Expired
-          - ReviewCenter-TotpSignIn-Challenge-SingleUse
-          - ReviewCenter-TotpSignIn-Challenge-Antiforgery
-          - ReviewCenter-TotpSignIn-Challenge-AdminReset
-          - ReviewCenter-TotpSignIn-Lockout
-          - ReviewCenter-TotpSignIn-Lockout-SharedCounter
-          - ReviewCenter-TotpSignIn-Lockout-PasswordStepKeepsCounter
-          - ReviewCenter-TotpSignIn-Lockout-SuccessResets
-          - ReviewCenter-TotpSignIn-Throttle
-          - ReviewCenter-TotpSignIn-Throttle-PasswordStepFreesAddressQuota
-          - ReviewCenter-TotpSignIn-Disabled
-          - ReviewCenter-TotpSignIn-Disabled-FeatureOffNoEndpoint
-          - ReviewCenter-TotpSignIn-Disabled-NoSecondFactorAccount
-          - ReviewCenter-TotpSignIn-Disabled-AfterReset
-          - ReviewCenter-TotpSignIn-Disabled-PersonalAccessTokenUnaffected
-          - ReviewCenter-TotpSignIn-NoSecretLeak
-          - ReviewCenter-SignIn-TotpBranch
-          - ReviewCenter-SignIn-TotpBranch-NoSecondFactor
-          - ReviewCenter-SignIn-TotpBranch-Challenge
-          - ReviewCenter-SignInThrottle-ReleaseAddress
-          - ReviewCenter-SignInThrottle-ReleaseAddress-NameCounterKept
-          - ReviewCenter-SignInThrottle-ReleaseAddress-Once
-          - ReviewCenter-SignInThrottle-ReleaseAddress-InputValidation
           - ReviewCenter-OTS-OtpNet-Totp
           - ReviewCenter-OTS-OtpNet-Totp-TimeStep
           - ReviewCenter-OTS-OtpNet-Totp-Base32
           - ReviewCenter-OTS-OtpNet-Totp-Base32-Read
-        tests:
-          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
-          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-SecretEncrypted
+        title: >-
+          The Identity subsystem shall store the secret of a second factor encrypted.
+        justification: |
+          The secret of a person must be of no use to somebody who copies the database.
+        children:
+          - ReviewCenter-TotpSecretProtector-Encrypted
+          - ReviewCenter-TotpSecretProtector-Encrypted-RoundTrip
+          - ReviewCenter-TotpSecretProtector-Unreadable
+          - ReviewCenter-TotpSecretProtector-Unreadable-InputValidation
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-SecretBound
+        title: >-
+          The Identity subsystem shall bind the stored secret of a second factor to its user.
+        justification: |
+          A secret that is copied from one row to another must not open the account of another person.
+        children:
+          - ReviewCenter-TotpSecretProtector-UserBound
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-NoSecretLeak
+        title: >-
+          The Identity subsystem shall keep the secret, the codes, and the challenge of a second factor out of the
+          audit trail, the logs, and the answers.
+        justification: |
+          A secret or code in a log or an answer would give a reader of it the second factor.
+        children:
+          - ReviewCenter-TotpSignIn-NoSecretLeak
+          - ReviewCenter-TotpSecretProtector-Unreadable-NoSecretInMessage
+
+      - id: ReviewCenter-Identity-TotpSecondFactor-OtherSignIns
+        title: >-
+          The Identity subsystem shall leave the sign-in with a provider and with an API token as it was, without a
+          second factor.
+        justification: |
+          A provider and an API token have their own checks, and a second code would stop programs that cannot type
+          one.
+        children:
+          - ReviewCenter-TotpSignIn-Disabled-PersonalAccessTokenUnaffected

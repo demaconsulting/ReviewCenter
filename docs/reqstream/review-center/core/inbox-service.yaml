@@ -1036,12 +1036,12 @@ sections:
 
       - id: ReviewCenter-InboxService-Count-UpdatesNotCounted
         title: >-
-          The InboxService class shall not count an update in the number of reviews that need action.
+          The InboxService class shall leave a review that has only an update out of the number that CountAsync
+          returns.
         justification: |
           An update is information, and counting it would inflate the number.
         tests:
           - InboxService_CountAsync_EqualsDistinctActionReviews
-          - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
 
       - id: ReviewCenter-InboxService-Count-WaitingNotCounted
         title: >-
