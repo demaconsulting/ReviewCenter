@@ -30,6 +30,9 @@ formal code reviews of file sets against earlier revisions. Reviewers discuss th
 a project checklist in their own ballot, and sign the review with their credentials. Every action is recorded in a
 hash-chained audit trail.
 
+![The life of a review: the author creates it, reviewers answer ballots and discuss the files in parallel, then
+reconcile disputes, sign, and conclude with a signed attestation and an evidence index][image-review-workflow]
+
 ## Features
 
 - 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
@@ -144,6 +147,7 @@ By contributing to this project, you agree that your contributions will be licen
 [badge-security]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=security_rating
 
 <!-- Image References -->
+[image-review-workflow]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/images/review-workflow.png
 [image-review-inbox]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-inbox.png
 [image-review-status-panel]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-status-panel.png
 [image-review-diff-thread]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-diff-thread.png

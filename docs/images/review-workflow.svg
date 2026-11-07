@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="390" viewBox="0 0 1040 390" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect x="14" y="16" width="1015" height="365" rx="28" fill="#d5dce6"/>
+  <rect x="10" y="10" width="1015" height="365" rx="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+
+  <g transform="translate(30,30)">
+    <g font-size="13" font-weight="600" fill="#475569" text-anchor="middle">
+      <text x="80" y="14">Author</text>
+      <text x="280" y="14">Reviewers, in parallel</text>
+      <text x="480" y="14">Reviewers</text>
+      <text x="680" y="14">Each reviewer</text>
+      <text x="880" y="14">Result</text>
+    </g>
+
+    <rect x="0" y="26" width="160" height="190" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="80" y="52" font-size="15" font-weight="600" fill="#92400e" text-anchor="middle">1  Create the review</text>
+    <g font-size="12" fill="#92400e" text-anchor="middle">
+      <text x="80" y="82">Pick the files, or a git</text>
+      <text x="80" y="98">revision, to review</text>
+      <text x="80" y="122">Add a reviewer slot for</text>
+      <text x="80" y="138">each reviewer, with an</text>
+      <text x="80" y="154">optional alternate</text>
+    </g>
+
+    <rect x="200" y="26" width="160" height="90" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="280" y="50" font-size="15" font-weight="600" fill="#1e3a8a" text-anchor="middle">2  Answer ballots</text>
+    <g font-size="12" fill="#1e40af" text-anchor="middle">
+      <text x="280" y="72">Each reviewer answers the</text>
+      <text x="280" y="88">checklist alone: Pass,</text>
+      <text x="280" y="104">Fail, or N/A</text>
+    </g>
+    <rect x="200" y="126" width="160" height="90" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="280" y="150" font-size="15" font-weight="600" fill="#1e3a8a" text-anchor="middle">2  Discuss the files</text>
+    <g font-size="12" fill="#1e40af" text-anchor="middle">
+      <text x="280" y="172">Questions and Findings on</text>
+      <text x="280" y="188">lines; Findings go into</text>
+      <text x="280" y="204">the signed report</text>
+    </g>
+
+    <rect x="400" y="26" width="160" height="190" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="480" y="52" font-size="15" font-weight="600" fill="#4c1d95" text-anchor="middle">3  Reconcile</text>
+    <g font-size="12" fill="#5b21b6" text-anchor="middle">
+      <text x="480" y="82">Ballots are shown side</text>
+      <text x="480" y="98">by side; a check answered</text>
+      <text x="480" y="114">differently is disputed</text>
+      <text x="480" y="138">Agree on every dispute</text>
+      <text x="480" y="154">and resolve every open</text>
+      <text x="480" y="170">thread before signing</text>
+    </g>
+
+    <rect x="600" y="26" width="160" height="190" rx="10" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
+    <text x="680" y="52" font-size="15" font-weight="600" fill="#9d174d" text-anchor="middle">4  Sign last</text>
+    <g font-size="12" fill="#be185d" text-anchor="middle">
+      <text x="680" y="82">Every reviewer slot signs</text>
+      <text x="680" y="98">with a password, and a</text>
+      <text x="680" y="114">code if two-factor is on</text>
+      <text x="680" y="138">A later change makes the</text>
+      <text x="680" y="154">signatures out of date</text>
+    </g>
+
+    <rect x="800" y="26" width="160" height="190" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="880" y="52" font-size="15" font-weight="600" fill="#166534" text-anchor="middle">5  Conclude</text>
+    <g font-size="12" fill="#166534" text-anchor="middle">
+      <text x="880" y="82">Approved when every slot</text>
+      <text x="880" y="98">approves, rejected when</text>
+      <text x="880" y="114">they agree on a Fail and</text>
+      <text x="880" y="130">all reject. The review is</text>
+      <text x="880" y="146">then locked.</text>
+    </g>
+    <g font-size="13" fill="#14532d" text-anchor="middle">
+      <rect x="810" y="158" width="140" height="26" rx="5" fill="#ffffff" stroke="#16a34a"/>
+      <text x="880" y="176">Signed attestation</text>
+      <rect x="810" y="186" width="140" height="26" rx="5" fill="#ffffff" stroke="#16a34a"/>
+      <text x="880" y="204">Evidence index</text>
+    </g>
+
+    <g stroke="#475569" stroke-width="2" marker-end="url(#a)">
+      <line x1="164" y1="71" x2="196" y2="71"/>
+      <line x1="164" y1="171" x2="196" y2="171"/>
+      <line x1="364" y1="71" x2="396" y2="71"/>
+      <line x1="364" y1="171" x2="396" y2="171"/>
+      <line x1="564" y1="121" x2="596" y2="121"/>
+      <line x1="764" y1="121" x2="796" y2="121"/>
+    </g>
+
+    <rect x="0" y="244" width="960" height="66" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="480" y="270" font-size="14" font-weight="600" fill="#334155" text-anchor="middle">At every step: the Where are we? panel shows ballots, disputes, open threads, and the next step</text>
+    <text x="480" y="292" font-size="12" fill="#475569" text-anchor="middle">The Inbox lists what waits for you; every action is recorded in the hash-chained audit trail</text>
+  </g>
+</svg>
