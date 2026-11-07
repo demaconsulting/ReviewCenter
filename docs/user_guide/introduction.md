@@ -20,6 +20,12 @@ blocks signing until it is resolved. A concluded review is locked, and a project
 change is also recorded in a hash-chained audit trail that can be read and verified. Project roles include a
 read-only Auditor, who can read a project and its audit trail and change nothing.
 
+The figure below shows the life of a review from creation to the signed attestation. The Your First Review chapter
+walks through it step by step.
+
+![The life of a review: the author creates it, reviewers answer ballots and discuss the files in parallel, then
+reconcile disputes, sign, and conclude with a signed attestation and an evidence index](review-workflow.svg)
+
 The web interface has a built-in Help with short guides to the main tasks, and the command-line interface is
 documented in this guide. A separate development tool, Puppet, is for developers of ReviewCenter only; the
 Command-Line Reference chapter describes it at the end.

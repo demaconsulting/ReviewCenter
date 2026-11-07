@@ -92,6 +92,7 @@ words:
   - Blockquotes
   - Postconditions
   - buildmark
+  - canvasnet
   - buildtransitive
   - contentfiles
   - dblclick
