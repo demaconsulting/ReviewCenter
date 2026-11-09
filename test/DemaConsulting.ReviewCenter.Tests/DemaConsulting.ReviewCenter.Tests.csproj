@@ -39,7 +39,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" Version="2.5.2" />
-    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="xunit.v3" Version="4.0.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -49,7 +49,7 @@
   <!-- Web Component Test Dependencies -->
   <ItemGroup>
     <!-- bUnit renders Razor components in memory so component behavior can be unit tested without a browser -->
-    <PackageReference Include="bunit" Version="2.13.3" />
+    <PackageReference Include="bunit" Version="2.14.0" />
     <!-- TestHost provides the in-memory web server used to exercise the HTTP pipeline without a network port -->
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
   </ItemGroup>
@@ -58,7 +58,7 @@
   <ItemGroup>
     <!-- OpenIddict runs the in-process fake OpenID Connect provider that the sign-in tests talk to; it is only
          referenced by the tests, so no provider code ships with the server. -->
-    <PackageReference Include="OpenIddict.AspNetCore" Version="7.7.2" />
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.8.0" />
     <!-- OpenIddict pulls in a Data Protection package version whose System.Security.Cryptography.Xml has known
          vulnerabilities; the patched version is pinned here until OpenIddict moves to it. -->
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
