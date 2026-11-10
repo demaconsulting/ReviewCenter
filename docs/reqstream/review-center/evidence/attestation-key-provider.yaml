@@ -48,11 +48,11 @@ sections:
 
       - id: ReviewCenter-AttestationKeyProvider-File
         title: >-
-          The FileKeyProvider class shall load the signing key from the configured PFX or PKCS  # 12 file, using the
+          The FileKeyProvider class shall load the signing key from the configured PFX or PKCS #12 file, using the
           password of the CertificatePassword setting.
         justification: |
           Many organizations keep their signing certificate in a file that an administrator deploys, for example from
-          a secret store, and not in a certificate store. A PKCS  # 12 file is the usual form of such a file.
+          a secret store, and not in a certificate store. A PKCS #12 file is the usual form of such a file.
         tests:
           - FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_LoadsSignerAndKey
 
@@ -99,9 +99,9 @@ sections:
 
       - id: ReviewCenter-AttestationKeyProvider-File-PfxIgnoresKeyPath
         title: >-
-          The FileKeyProvider class shall ignore PrivateKeyPath when the certificate file is a PFX or PKCS  # 12 file.
+          The FileKeyProvider class shall ignore PrivateKeyPath when the certificate file is a PFX or PKCS #12 file.
         justification: |
-          A PKCS  # 12 file holds its own key, so a leftover PrivateKeyPath setting must neither fail the start nor
+          A PKCS #12 file holds its own key, so a leftover PrivateKeyPath setting must neither fail the start nor
           replace the key of the file.
         tests:
           - FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt
@@ -193,7 +193,7 @@ sections:
       - id: ReviewCenter-AttestationKeyProvider-File-LegacyPem
         title: >-
           The FileKeyProvider class shall report a legacy encrypted PEM private key as an error that gives the remedy
-          of converting the key to PKCS  # 8.
+          of converting the key to PKCS #8.
         justification: |
           The legacy encryption of a PEM key is not supported by the platform, and the operator needs to know that a
           conversion solves it.
