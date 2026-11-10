@@ -24,7 +24,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 
 /// <summary>
 ///     Unit tests of the follow-up review in <see cref="ReviewService"/>: the eligibility of the earlier review, what is
-///     carried over at both create paths, the acknowledgement of dropped threads, the audit text, and the way carried
+///     carried over at both create paths, the acknowledgment of dropped threads, the audit text, and the way carried
 ///     rows behave afterwards (re-answering, independence, signing blockers, the lock) over in-memory stores.
 /// </summary>
 public class ReviewServiceFollowUpTests
@@ -729,11 +729,11 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
-    ///     Test that open threads on files that are not in the new review need the acknowledgement of the creator: the
-    ///     refusal lists the files and stores nothing; with the acknowledgement the review is created without them.
+    ///     Test that open threads on files that are not in the new review need the acknowledgment of the creator: the
+    ///     refusal lists the files and stores nothing; with the acknowledgment the review is created without them.
     /// </summary>
     [Fact]
-    public async Task ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement()
+    public async Task ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment()
     {
         // Arrange: open threads on b.txt, and a resolved one on c.txt that never matters
         var w = await CreateAsync();
@@ -756,10 +756,10 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
-    ///     Test that an acknowledgement without dropped threads changes nothing.
+    ///     Test that an acknowledgment without dropped threads changes nothing.
     /// </summary>
     [Fact]
-    public async Task ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless()
+    public async Task ReviewService_CreateDraftAsync_AcknowledgmentWithoutDroppedThreads_IsHarmless()
     {
         // Arrange
         var w = await CreateAsync();
@@ -1144,7 +1144,7 @@ public class ReviewServiceFollowUpTests
         await w.Threads.ResolveAsync(w.ProjectId, "rev-1", resolved.Id, TestActors.Bob, TestContext.Current.CancellationToken);
         await ThreadAsync(w, "rev-1", "b.txt");
 
-        // Act: preview, then create with the acknowledgement
+        // Act: preview, then create with the acknowledgment
         var preview = await w.Reviews.PreviewFollowUpAsync(
             w.ProjectId, " rev-1 ", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
         var review = await UploadAsync(w, "rev-2", ["a.txt"], follows: "rev-1", acknowledge: true);
@@ -1162,7 +1162,7 @@ public class ReviewServiceFollowUpTests
 
     /// <summary>
     ///     Test that the preview and the creation leave threads about a check out, report only how many there are, and
-    ///     need no acknowledgement for them, while the file thread next to them is carried.
+    ///     need no acknowledgment for them, while the file thread next to them is carried.
     /// </summary>
     [Fact]
     public async Task ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut()
@@ -1176,7 +1176,7 @@ public class ReviewServiceFollowUpTests
         await w.Threads.ResolveAsync(w.ProjectId, "rev-1", done.Id, TestActors.Bob, cancellationToken);
         await ThreadAsync(w, "rev-1", "a.txt");
 
-        // Act: preview, then create without any acknowledgement
+        // Act: preview, then create without any acknowledgment
         var preview = await w.Reviews.PreviewFollowUpAsync(
             w.ProjectId, "rev-1", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
         var review = await UploadAsync(w, "rev-2", ["a.txt"], follows: "rev-1");

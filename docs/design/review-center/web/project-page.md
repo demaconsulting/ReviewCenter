@@ -185,7 +185,7 @@ form (`yyyy-MM-dd`, empty for none), a calendar day in UTC that the form states 
 reviews of the project that can be offered as the earlier review (read with `ReviewService.ListAsync` when the project
 loads), the identifier of the chosen earlier review (empty for none), what the follow-up would carry (a
 `FollowUpPreview`, only for uploaded files), the message of a refused preview, and whether the creator has ticked that
-the dropped open threads were checked. The acknowledgement is cleared whenever the choice, the files or the source change.
+the dropped open threads were checked. The acknowledgment is cleared whenever the choice, the files or the source change.
 
 **ErrorMessage**: the message of the last rejected selection or submission.
 
@@ -510,7 +510,7 @@ the form lists the files and shows the checkbox `follow-acknowledge-checkbox`; t
 `review-error`. The whole follow-up field is left out when the project has no review at all; when reviews exist but
 none suits the chosen source, the field shows the message `follow-source-none`.
 
-For both sources `CreateReviewAsync` passes the chosen identifier as `followsReviewId` and the acknowledgement to
+For both sources `CreateReviewAsync` passes the chosen identifier as `followsReviewId` and the acknowledgment to
 `CreateDraftAsync` or `CreateFromRepositoryAsync`.
 
 **ChooseSource** (`NewReviewPage`): Switches between the two sources and clears the message; the repository source

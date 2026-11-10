@@ -1,11 +1,16 @@
 package ReviewCenter {
+    private import SoftwareItemMetadata::*;
+
     part def UtilitiesSubsystem {
         doc /* Shared, independently testable helper functions used by other subsystems. */
 
-        comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Utilities/UtilitiesSubsystemTests.cs */
-        comment designRef /* Design: docs/design/review-center/utilities.md */
-        comment verificationRef /* Verification: docs/verification/review-center/utilities.md */
-        comment reqRef /* Requirements: docs/reqstream/review-center/utilities.yaml */
+        metadata info : SoftwareInfo {
+            description = "Shared, independently testable helper functions used by other subsystems.";
+            testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Utilities/UtilitiesSubsystemTests.cs");
+            designFiles = ("docs/design/review-center/utilities.md");
+            verificationFiles = ("docs/verification/review-center/utilities.md");
+            requirementFiles = ("docs/reqstream/review-center/utilities.yaml");
+        }
 
         part pathHelpers : PathHelpers;
         part temporaryDirectory : TemporaryDirectory;

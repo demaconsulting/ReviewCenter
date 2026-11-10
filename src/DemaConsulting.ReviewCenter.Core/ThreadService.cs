@@ -42,7 +42,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> unless the caller acknowledges the affected slots; a
 ///     change that leaves the digest alone (chat, the state of a thread, a note on a Question) needs none. The checks
 ///     of every change run in one order: input, the right to contribute, the lock, the thread, the person's
-///     relation to it, the rules, the acknowledgement, the store.
+///     relation to it, the rules, the acknowledgment, the store.
 ///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
 ///     A thread is anchored to a file or, through <see cref="ThreadAnchor.ForCheck"/>, to one check of the frozen
 ///     checklist; who may start the second kind is decided by <see cref="CheckThreadRules"/>, and replying, resolving
@@ -211,7 +211,7 @@ public sealed class ThreadService
             }
         }
 
-        // Only a comment included in the report alters the digest; the acknowledgement is asked for once the request
+        // Only a comment included in the report alters the digest; the acknowledgment is asked for once the request
         // is valid, from the record as the new thread would leave it
         var now = _timeProvider.GetUtcNow();
         var thread = new ReviewThread
@@ -370,7 +370,7 @@ public sealed class ThreadService
     ///     <see cref="DomainRule.CommentTextInvalid"/> when the note is too long,
     ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded,
     ///     <see cref="DomainRule.RecordChanged"/> when the thread was promoted or demoted between the check of this
-    ///     method and the write (the note and the acknowledgement were decided for the other kind; nothing is stored,
+    ///     method and the write (the note and the acknowledgment were decided for the other kind; nothing is stored,
     ///     nothing is audited), or with
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when the change alters the digest and a current
     ///     signature is not acknowledged.
@@ -395,7 +395,7 @@ public sealed class ThreadService
         var thread = snapshot?.Record.Threads.FirstOrDefault(t => t.Id == threadId)
                      ?? throw ThreadNotFound(threadId);
 
-        // Resolving a resolved thread is a no-op: no note, no acknowledgement, no audit entry
+        // Resolving a resolved thread is a no-op: no note, no acknowledgment, no audit entry
         if (thread.State == ReviewThreadState.Resolved)
         {
             return;
@@ -434,7 +434,7 @@ public sealed class ThreadService
             acknowledgedSlotIds);
 
         // The store re-reads the kind inside its transaction, refuses with RecordChanged when it is no longer the one the
-        // note, the acknowledgement and the flag above were decided for, and saves the entry only when it resolved the thread
+        // note, the acknowledgment and the flag above were decided for, and saves the entry only when it resolved the thread
         var detail = note is null ? $"thread {threadId}" : $"thread {threadId}; note sha256 {AuditText.ShortHash(note)}";
         var audit = AuditDraft.By(actor, "thread.resolved", detail, projectId, reviewId);
         await _store.ResolveThreadAsync(projectId, reviewId, threadId, thread.Kind, resolution, audit, cancellationToken);
@@ -621,7 +621,7 @@ public sealed class ThreadService
                 "finding or a question to change its first comment.");
         }
 
-        // Setting the flag to the value it has is a no-op: no acknowledgement, no audit entry
+        // Setting the flag to the value it has is a no-op: no acknowledgment, no audit entry
         if (comment.IncludeInReport == include)
         {
             return;
@@ -956,7 +956,7 @@ public sealed class ThreadService
                 : "Only the person who started the thread or the lead of the review can make a finding a question.");
         }
 
-        // A thread that already has the kind is a no-op: no acknowledgement, no audit entry
+        // A thread that already has the kind is a no-op: no acknowledgment, no audit entry
         var current = ThreadKindRules.KindOf(thread);
         if (current == target)
         {

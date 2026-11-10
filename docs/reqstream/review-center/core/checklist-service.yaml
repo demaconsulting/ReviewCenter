@@ -782,7 +782,7 @@ sections:
       - id: ReviewCenter-ChecklistService-ApprovalLock-BeforeImpact
         title: >-
           The ChecklistService class shall report the ReviewLocked rule, with no affected slots, for a change to an
-          approved review before it asks for the acknowledgement of signatures.
+          approved review before it asks for the acknowledgment of signatures.
         justification: |
           The reviewer must be told that the review is closed, not asked to acknowledge an effect on signatures that
           cannot happen.
@@ -882,8 +882,8 @@ sections:
         justification: |
           A signature covers a state of the ballots, and the person who changes it must know whom it affects.
         tests:
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
-          - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots
+          - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgment
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-Names
         title: >-
@@ -898,27 +898,27 @@ sections:
         title: >-
           The ChecklistService class shall not name in the refusal a slot that has no signature.
         justification: |
-          A slot without a signature is not affected, and naming it would ask for an acknowledgement that means nothing.
+          A slot without a signature is not affected, and naming it would ask for an acknowledgment that means nothing.
         tests:
           - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining
         title: >-
-          The ChecklistService class shall name in the refusal after an incomplete acknowledgement the slots that are
+          The ChecklistService class shall name in the refusal after an incomplete acknowledgment the slots that are
           still not acknowledged.
         justification: |
           The actor must see what is left to acknowledge.
         tests:
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining-Unrelated
         title: >-
-          The ChecklistService class shall not let the acknowledgement of a slot that has no signature suppress any of
+          The ChecklistService class shall not let the acknowledgment of a slot that has no signature suppress any of
           the slots that are still not acknowledged.
         justification: |
-          An acknowledgement of an unrelated slot must not hide a signature that is still affected.
+          An acknowledgment of an unrelated slot must not hide a signature that is still affected.
         tests:
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-Acknowledged
         title: >-
@@ -927,11 +927,11 @@ sections:
         justification: |
           An acknowledged change is allowed and its effect shows.
         tests:
-          - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
+          - ChecklistService_SetAnswerAsync_FullAcknowledgment_StoresAndSignatureOutOfDate
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-NoSignature
         title: >-
-          The ChecklistService class shall accept changes to a ballot and its hand-in without an acknowledgement while
+          The ChecklistService class shall accept changes to a ballot and its hand-in without an acknowledgment while
           no signature is current.
         justification: |
           Nobody is affected.
@@ -940,10 +940,10 @@ sections:
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-DraftChange
         title: >-
-          The ChecklistService class shall accept a change to the own ballot without an acknowledgement when the
+          The ChecklistService class shall accept a change to the own ballot without an acknowledgment when the
           handed-in ballots still agree, and keep the signature current.
         justification: |
-          A change that does not alter the record must not ask for acknowledgements.
+          A change that does not alter the record must not ask for acknowledgments.
         tests:
           - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
 
@@ -1184,12 +1184,12 @@ sections:
         justification: |
           A draft is not part of what a signature covers, so only the hand-in can affect a signature.
         tests:
-          - ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots
+          - ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgmentOfOtherSlots
 
       - id: ReviewCenter-ChecklistService-BallotImpact-NoWarning
         title: >-
           The ChecklistService class shall accept the hand-in of a ballot that agrees with the other handed-in ballots
-          without an acknowledgement and keep the signatures of the other slots current.
+          without an acknowledgment and keep the signatures of the other slots current.
         justification: |
           Nobody is affected.
         tests:
@@ -1202,7 +1202,7 @@ sections:
         justification: |
           The signer knows the own signature.
         tests:
-          - ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement
+          - ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgment
 
       # ---------------------------------------------------------------------------------------------------------------
       # Rule: the person who reopened a review does not sign it again
@@ -1383,7 +1383,7 @@ sections:
         justification: |
           The text is covered by the signatures, so the person who changes it must know whom it affects.
         tests:
-          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
+          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ChecklistService-ReviewConclusionText-Acknowledged
         title: >-
@@ -1392,7 +1392,7 @@ sections:
         justification: |
           An acknowledged change is allowed and its effect shows.
         tests:
-          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
+          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange
         title: >-
@@ -1403,9 +1403,9 @@ sections:
         tests:
           - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
 
-      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgement
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgment
         title: >-
-          The ChecklistService class shall need no acknowledgement of a signature when the review conclusion text is
+          The ChecklistService class shall need no acknowledgment of a signature when the review conclusion text is
           the same as the stored one.
         justification: |
           Nobody is affected by a change that changes nothing, so nobody needs to be asked.

@@ -596,11 +596,11 @@ public class FollowUpCarryTests
     }
 
     /// <summary>
-    ///     Test that an open thread about a check needs no acknowledgement of a dropped thread, because it is not a
+    ///     Test that an open thread about a check needs no acknowledgment of a dropped thread, because it is not a
     ///     thread on a file that left the review.
     /// </summary>
     [Fact]
-    public void FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement()
+    public void FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgment()
     {
         // Arrange: the only thread is an open one about a check, and the review has no files in common
         var record = Record(threads: [CheckThread(1)]);

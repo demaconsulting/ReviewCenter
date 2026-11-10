@@ -49,7 +49,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The service also owns the review conclusion text: the free text, in plain text, in which the reviewers write the
 ///     conclusion of the record (see <see cref="Review.ReviewConclusionText"/>; not the approved or rejected conclusion
 ///     of the ballot). It lives here because it is written to the same record as the answers and follows the same
-///     rules: it is part of the digest, so a change needs the same acknowledgement, and it is refused while the review
+///     rules: it is part of the digest, so a change needs the same acknowledgment, and it is refused while the review
 ///     is concluded.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
@@ -491,7 +491,7 @@ public sealed class ChecklistService
             SetAt = _timeProvider.GetUtcNow()
         };
 
-        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date; the
+        // A change to what the signatures cover needs the acknowledgment of every signature it makes out of date; the
         // own signature of the reviewer is the one the change withdraws and needs none
         var edited = BallotEdits.WithSectionState(CurrentBallot(snapshot, slot), slot.Id, state);
         SignatureImpact.RequireAcknowledged(
@@ -591,7 +591,7 @@ public sealed class ChecklistService
             AnsweredAt = _timeProvider.GetUtcNow()
         };
 
-        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date; the
+        // A change to what the signatures cover needs the acknowledgment of every signature it makes out of date; the
         // own signature of the reviewer is the one the change withdraws and needs none
         var edited = BallotEdits.WithAnswer(CurrentBallot(snapshot, slot), slot.Id, answer);
         SignatureImpact.RequireAcknowledged(
@@ -829,7 +829,7 @@ public sealed class ChecklistService
     /// <remarks>
     ///     The text is the free-text conclusion of the record; it is not the review conclusion of the ballot (approved or
     ///     rejected), which is a decision. It is part of the digest (the <c>conclusion-text</c> line), so changing it
-    ///     while a signature is current needs the acknowledgement of the affected reviewers. It is audited as
+    ///     while a signature is current needs the acknowledgment of the affected reviewers. It is audited as
     ///     <c>review.conclusion-changed</c> with the old and the new length only, never the text. The change is a
     ///     compare-and-set on the text this method read, stored with its audit entry in one transaction, so two people who
     ///     write at the same moment cannot silently overwrite each other. A concluded review is locked and refuses the
@@ -888,14 +888,14 @@ public sealed class ChecklistService
             throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
         }
 
-        // The same text again changes nothing: no acknowledgement, no audit entry
+        // The same text again changes nothing: no acknowledgment, no audit entry
         var previous = snapshot.Record.ReviewConclusionText;
         if (string.Equals(previous, normalized, StringComparison.Ordinal))
         {
             return false;
         }
 
-        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        // A change to what the signatures cover needs the acknowledgment of every signature it makes out of date
         SignatureImpact.RequireAcknowledged(
             snapshot,
             snapshot.Record with { ReviewConclusionText = normalized },

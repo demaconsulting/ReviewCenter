@@ -1825,7 +1825,7 @@ sections:
       - id: ReviewCenter-System-Comments-CheckThreadsRefused
         title: >-
           The tool shall refuse to start a thread about a check with an anchor that does not fit, for a user who may
-          not, in a concluded review, or without the acknowledgement that it needs.
+          not, in a concluded review, or without the acknowledgment that it needs.
         tags: [system]
         justification: |
           A thread about a check can make signatures out of date, so only a user who may do that is allowed to, and
@@ -2463,7 +2463,7 @@ sections:
 
       - id: ReviewCenter-System-Signatures-AcknowledgeNotNeeded
         title: >-
-          The tool shall ask for no acknowledgement of a change that leaves the digest of the record as it is or that
+          The tool shall ask for no acknowledgment of a change that leaves the digest of the record as it is or that
           no current signature covers, and keep the signatures current.
         tags: [system]
         justification: |
@@ -2667,7 +2667,7 @@ sections:
           alternate of a reviewer slot and as the signer of a slot.
         tags: [system]
         justification: |
-          A person outside the project must never be able to supply a signature that stands for human judgement.
+          A person outside the project must never be able to supply a signature that stands for human judgment.
           The tool does not decide who else may be named.
         children:
           - ReviewCenter-Core-Signatures-SlotUsers
@@ -2713,7 +2713,7 @@ sections:
           The tool shall never let an API token sign a review or arrange its reviewers.
         tags: [system]
         justification: |
-          A script holding a token must never be able to supply a signature that stands for human judgement.
+          A script holding a token must never be able to supply a signature that stands for human judgment.
         children:
           - ReviewCenter-Api-Isolation
           - ReviewCenter-Core-TotpSecondFactor-SignatureApiToken

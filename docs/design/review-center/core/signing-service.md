@@ -155,13 +155,13 @@ read and no trial write:
    actually signed, which is the alternate when the alternate signed.
 
 The caller passes the slot identities it acknowledges as the optional last argument `acknowledgedSlotIds` of the
-service methods (`null` means none). A partial acknowledgement leaves the others in the exception, and an identity that
+service methods (`null` means none). A partial acknowledgment leaves the others in the exception, and an identity that
 is not affected is ignored. The check sits after the lock check and after all validation of the request, and before
 anything is stored, so `ReviewLocked` and validation errors win, and a refusal changes nothing. `DomainRule` gets the
 one value `SignaturesWouldBecomeOutOfDate`, added at the end.
 
 **Ballots and the impact check**: a draft ballot never changes a digest, so saving an answer into a draft asks for no
-acknowledgement; the check names a signature only where a change of a ballot reaches the consolidated standing.
+acknowledgment; the check names a signature only where a change of a ballot reaches the consolidated standing.
 `ChecklistService` asks it on every change of the own ballot (an answer, a section decision, handing the ballot in)
 with the changed record, and passes the slot of
 that reviewer as `excludeSlotId`: the reviewer who changes the own ballot knows that the own signature goes out of
@@ -180,10 +180,10 @@ of date, as the digest rule always does, so the record stays correct, and the wa
 would need the store to repeat the check inside its transaction.
 
 **Behavior of the pages**: `ReviewPage` and `ChecklistPage` of the `Web` subsystem call the service without an
-acknowledgement. When `SignaturesWouldBecomeOutOfDate` is raised they show a warning that names the slots and signers
+acknowledgment. When `SignaturesWouldBecomeOutOfDate` is raised they show a warning that names the slots and signers
 of `AffectedSlots`, and only when the person confirms do they call the service again with those slot identities. A
 signature that appeared in the meantime is named in the next refusal, and the page asks again with the merged list.
-Cancelling stores nothing. The review page in this version posts chat only, so it never meets the refusal for a
+Canceling stores nothing. The review page in this version posts chat only, so it never meets the refusal for a
 thread.
 
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
@@ -468,7 +468,7 @@ not found.
 - *Parameters*: the actor, project identity, review identifier, slot identity, and the new user identities.
 - *Postconditions*: Nothing is stored when a rule fails; the lock and independence rules of `AddSlotAsync` apply. A
   reviewer who leaves the slot takes the own rows out of the ballot of the slot, which reverts to a draft; when that
-  changes the consolidated standing, the signatures of the other slots need acknowledgement
+  changes the consolidated standing, the signatures of the other slots need acknowledgment
   (`acknowledgedSlotIds`, `SignaturesWouldBecomeOutOfDate`).
 
 **RemoveSlotAsync**: Removes a slot that has no signature.

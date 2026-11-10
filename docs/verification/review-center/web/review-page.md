@@ -342,9 +342,9 @@ and starts a new selection on the other side. This scenario is tested by
 **ReviewPage_DiffView_ThroughLineField_ExtendsTheRange**: The "Through line" field turns the comment into a range.
 This scenario is tested by `ReviewPage_DiffView_ThroughLineField_ExtendsTheRange`.
 
-**ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled**: Cancel closes the form, and "Comment on the whole
+**ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled**: Cancel closes the form, and "Comment on the whole
 file instead" keeps the text and anchors the whole file. This scenario is tested by
-`ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled`.
+`ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled`.
 
 **ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines**: Threads of both sides are drawn under their lines,
 a resolved one collapsed, even where the lines would be collapsed. This scenario is tested by

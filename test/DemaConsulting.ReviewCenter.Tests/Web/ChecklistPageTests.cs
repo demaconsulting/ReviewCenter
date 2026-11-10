@@ -587,7 +587,7 @@ public partial class ChecklistPageTests : PageTestBase
 
     /// <summary>
     ///     Test that an answer that changes a review with a current signature is stored as a draft, that handing the
-    ///     ballot in waits for confirmation because it changes what the signature is for, that cancelling stores
+    ///     ballot in waits for confirmation because it changes what the signature is for, that canceling stores
     ///     nothing, and that confirming hands the ballot in and makes the signature out of date.
     /// </summary>
     [Fact]
@@ -700,7 +700,7 @@ public partial class ChecklistPageTests : PageTestBase
 
     /// <summary>
     ///     Test that saving the reason that makes a section not applicable is stored as a draft on a signed review,
-    ///     that handing the ballot in waits for confirmation, that cancelling keeps the switch and reason, and that
+    ///     that handing the ballot in waits for confirmation, that canceling keeps the switch and reason, and that
     ///     confirming makes the section not applicable in the record.
     /// </summary>
     [Fact]
@@ -748,7 +748,7 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that switching a not applicable section on waits for confirmation on a signed review, that cancelling
+    ///     Test that switching a not applicable section on waits for confirmation on a signed review, that canceling
     ///     puts the switch back off, and that confirming makes the section apply again.
     /// </summary>
     [Fact]

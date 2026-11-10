@@ -24,7 +24,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 
 /// <summary>
 ///     Unit tests of <see cref="SignatureImpact"/> for ballots: a change that alters the agreed standing needs the
-///     acknowledgement of the current signatures of the other slots, and a change that leaves it alone needs none.
+///     acknowledgment of the current signatures of the other slots, and a change that leaves it alone needs none.
 /// </summary>
 public class SignatureImpactBallotTests
 {
@@ -93,7 +93,7 @@ public class SignatureImpactBallotTests
     ///     Test that the slot of the person who changes the own ballot is left out when it is excluded.
     /// </summary>
     [Fact]
-    public async Task SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement()
+    public async Task SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgment()
     {
         // Arrange: rita signed, and rita's own ballot changes
         var world = await SignedReviewWorld.CreateAsync();

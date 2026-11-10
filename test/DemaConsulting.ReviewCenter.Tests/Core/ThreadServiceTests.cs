@@ -107,7 +107,7 @@ public class ThreadServiceTests
     ///     the signature out of date.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement()
+    public async Task ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment()
     {
         // Arrange: slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -115,7 +115,7 @@ public class ThreadServiceTests
         await world.SignAsync(1);
         var anchor = new ThreadAnchor("a.txt");
 
-        // Act: start an included thread without, and then with, the acknowledgement
+        // Act: start an included thread without, and then with, the acknowledgment
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
             world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken,
             includeInReport: true));
@@ -147,7 +147,7 @@ public class ThreadServiceTests
         await world.SignAsync(1);
         await world.SignAsync(2);
 
-        // Act: start an included thread without the acknowledgement
+        // Act: start an included thread without the acknowledgment
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
             world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("a.txt"), TestActors.Bob, "A remark", cancellationToken,
             includeInReport: true));
@@ -181,18 +181,18 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that a reply included in the report while a signature is current needs the acknowledgement, that a
+    ///     Test that a reply included in the report while a signature is current needs the acknowledgment, that a
     ///     reply to a thread that does not exist is still reported as not found, and that nothing is stored by a
     ///     refusal.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement()
+    public async Task ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment()
     {
         // Arrange: a resolved thread and slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
         var (world, threadId) = await CreateSignedWithResolvedThreadAsync();
 
-        // Act: reply without acknowledging, to a missing thread, and then with the acknowledgement
+        // Act: reply without acknowledging, to a missing thread, and then with the acknowledgment
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReplyAsync(
             world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken,
             includeInReport: true));
@@ -216,17 +216,17 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that reopening a resolved question and resolving a resolved thread never need an acknowledgement:
+    ///     Test that reopening a resolved question and resolving a resolved thread never need an acknowledgment:
     ///     the thread state is not part of the signed record, so the signature stays valid.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement()
+    public async Task ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgment()
     {
         // Arrange: a resolved thread and slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
         var (world, threadId) = await CreateSignedWithResolvedThreadAsync();
 
-        // Act: resolve again (a no-op), then reopen without any acknowledgement
+        // Act: resolve again (a no-op), then reopen without any acknowledgment
         await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken);
         var stillSigned = (await world.ApprovalAsync()).Slots[0].State;
         await world.Threads.ReopenAsync(

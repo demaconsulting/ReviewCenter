@@ -82,7 +82,7 @@ internal static class SignatureImpact
     /// </param>
     /// <param name="acknowledged">The slot identities the person has acknowledged, or <c>null</c> for none.</param>
     /// <param name="excludeSlotId">
-    ///     The slot whose own signature needs no acknowledgement, or <c>null</c> for none. A reviewer who changes the
+    ///     The slot whose own signature needs no acknowledgment, or <c>null</c> for none. A reviewer who changes the
     ///     ballot of the own slot knows that the own signature, which the change withdraws, is out of date; the
     ///     signatures of the other slots are still listed.
     /// </param>

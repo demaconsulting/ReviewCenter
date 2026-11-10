@@ -398,8 +398,8 @@ carried and the confirmation before open threads are dropped, passed on for both
 shown as it is, the carried badges and the earlier Fail on the checklist, and the link, the counts, the list of
 follow-ups and the carried-thread mark on the review page. They are tested by
 `NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp`,
-`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement`,
-`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement`,
+`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment`,
+`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment`,
 `ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail`, and
 `ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
 

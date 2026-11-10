@@ -1261,7 +1261,7 @@ public class CoreSubsystemTests
     ///     and that the acknowledged change then goes through and the signature is out of date.
     /// </summary>
     [Fact]
-    public async Task CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement()
+    public async Task CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment()
     {
         // Arrange: two slots, every check answered, and only the first slot signed, so the review is not locked
         var cancellationToken = TestContext.Current.CancellationToken;

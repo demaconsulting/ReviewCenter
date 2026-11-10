@@ -165,7 +165,7 @@ public class ReviewCenterSystemTests
 
     /// <summary>
     ///     Test that handing in a ballot that changes the record after a signature does not go through silently: the
-    ///     page names the signature in a warning, cancelling leaves the signature as it was, and confirming stores the
+    ///     page names the signature in a warning, canceling leaves the signature as it was, and confirming stores the
     ///     ballot and shows the signature as signed, then the review changed.
     /// </summary>
     /// <returns>A task that completes when the test has finished.</returns>
@@ -214,7 +214,7 @@ public class ReviewCenterSystemTests
         await scenario.OpenReviewAsync(reviewer);
         var statusAfterConfirm = await reviewer.TextOfAsync($"slot-status-{slot}");
 
-        // Assert: the warning names the slot and its signer, cancelling left the signature, confirming marked it as changed
+        // Assert: the warning names the slot and its signer, canceling left the signature, confirming marked it as changed
         Assert.Contains("Slot 1", warned, StringComparison.Ordinal);
         Assert.Contains("Second Reviewer", warned, StringComparison.Ordinal);
         Assert.Contains("Signed by", statusAfterCancel, StringComparison.Ordinal);

@@ -15,7 +15,7 @@ defines what a text file and a line are.
 #### Chat and report
 
 A comment is either chat or part of the report. **Chat** is the default: it is a conversation among the reviewers, it
-is not covered by the record digest, so it never makes a signature out of date and never needs an acknowledgement. A
+is not covered by the record digest, so it never makes a signature out of date and never needs an acknowledgment. A
 comment that is **included in the report** (`IncludeInReport`, default false) is part of the record that the
 signatures cover, so it is in the digest. An open thread of either kind blocks signing and the conclusion of the
 review, by a rule that is separate from the digest (see the `SigningService` unit). A thread whose starting comment is
@@ -142,7 +142,7 @@ open; a signed review with an open thread is therefore not locked, and its threa
 the `SigningService` unit). The methods that can change the digest take an optional argument
 `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the cancellation token, and call
 `SignatureImpact.RequireAcknowledged` with the snapshot that `ReviewLock.EnsureUnlockedAsync` returned. These need the
-acknowledgement when a signature is current: starting a thread or replying with `includeInReport`, setting the flag of
+acknowledgment when a signature is current: starting a thread or replying with `includeInReport`, setting the flag of
 a reply, promoting and demoting, and resolving a Finding (its resolution note is included). These never need it:
 starting a thread or replying as chat, resolving or reopening a Question, and reopening a Finding, because the state of
 a thread is not in the digest. A resolve or reopen that finds the thread already in the requested state is a no-op.
@@ -208,7 +208,7 @@ comment (`CommentTextInvalid`). Resolving a Finding without a note is refused wi
 Question needs none. A note is stored in the same transaction as a comment of the kind `Resolution`, which is included
 in the report when the thread is a Finding. The service passes the kind it saw to the store, which reads the kind again
 inside its transaction; when a promote or demote landed in between, the resolution is refused with `RecordChanged`
-(nothing is stored or audited), because the note, the acknowledgement and the report flag were decided for the other
+(nothing is stored or audited), because the note, the acknowledgment and the report flag were decided for the other
 kind. `ReopenAsync` calls the reopen-only method of the store, which cannot resolve.
 
 **PromoteAsync** and **DemoteAsync**: Turn a Question into a Finding, or a Finding into a Question, by setting the
@@ -217,12 +217,12 @@ Allowed roles are described under "Roles for the kind and the flag". A thread th
 a no-op that records nothing. A resolved Question that has no Resolution comment cannot be promoted
 (`ResolutionNoteRequired`: reopen the thread and resolve it again with a note), because the result would be a
 resolved Finding without the note its resolution needs. Each change records `thread.kind-changed` and needs the
-acknowledgement when a signature is current.
+acknowledgment when a signature is current.
 
 **SetCommentIncludedAsync**: Sets the report flag of one reply. The starting comment and the Resolution comments
 follow the thread and are refused with `CommentNotTogglable`; a comment that is not in the thread is
 `ThreadNotFound`. A flag that already has the requested value is a no-op. Each change records
-`thread.comment-report-changed` and needs the acknowledgement when a signature is current.
+`thread.comment-report-changed` and needs the acknowledgment when a signature is current.
 
 **ListAsync**: Lists all threads of a review, for every file, in creation order, each with its comments in posting
 order; the list is empty when there are none or the review does not exist.
@@ -290,7 +290,7 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 - **IProjectAccess** — requires that the actor may work in the project (injected), and decides the lead role.
 - **IUserStore** — resolves the actor to a user to find out whether the actor owns a reviewer slot (injected).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
-  concluded, and refuse one that would change the digest under a current signature without acknowledgement.
+  concluded, and refuse one that would change the digest under a current signature without acknowledgment.
 - **ThreadKindRules**, **CheckThreadRules** and **ReviewActorRoles** — the internal rules for the roles, for the
   toggling of a comment, and for who may start a check thread.
 - **TimeProvider** — supplies the creation times (injected).

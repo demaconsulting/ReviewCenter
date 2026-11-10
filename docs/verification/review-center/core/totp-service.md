@@ -133,7 +133,7 @@ This scenario is tested by `TotpService_ConfirmEnrollmentAsync_ExactlyFifteenMin
 raises `TotpNotEnrolled`. This scenario is tested by
 `TotpService_ConfirmEnrollmentAsync_NothingStarted_ThrowsTotpNotEnrolled`.
 
-**TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed**: Cancelling removes a pending
+**TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed**: Canceling removes a pending
 enrollment and leaves a confirmed one active. This scenario is tested by
 `TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed`.
 

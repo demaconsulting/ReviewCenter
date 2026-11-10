@@ -447,7 +447,7 @@ sections:
       - id: ReviewCenter-Api-LockedReview-Conflict409
         title: >-
           The Api subsystem shall report a change that the lock refuses, or that would make a signature out of date
-          without acknowledgement, or that a review rule of the project refuses, as a problem document with status 409.
+          without acknowledgment, or that a review rule of the project refuses, as a problem document with status 409.
         justification: |
           A script that tries to change an approved review must learn the reason in a form it can act on.
         children:

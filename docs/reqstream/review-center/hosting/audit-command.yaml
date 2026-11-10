@@ -36,7 +36,7 @@ sections:
           The AuditCommand class shall report the first broken entry by its sequence number and return exit code 1
           when an entry of the trail was edited.
         justification: |
-          An edit behind the back of the application must be located and signalled to scripts.
+          An edit behind the back of the application must be located and signaled to scripts.
         tests:
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
 

@@ -69,7 +69,7 @@ N/A - standard test environment.
   and needs fresh signatures; reopening a review that is not locked is refused with `ReviewNotLocked`.
 - A change of the checklist or of a thread that would change the digest while a current signature exists is refused
   with `SignaturesWouldBecomeOutOfDate`, naming the slot and its signer, and nothing is stored; with the slot
-  acknowledged it goes through and the signature is kept as out of date. Chat never needs the acknowledgement, and an
+  acknowledged it goes through and the signature is kept as out of date. Chat never needs the acknowledgment, and an
   open thread, chat or included, blocks signing and conclusion.
 - A review whose agreed ballots contain a Fail is not blocked by it: the signatures record the outcome Rejected, signing
   needs a review conclusion text (`ConclusionRequired` otherwise), and the review is concluded as rejected, and so
@@ -219,13 +219,13 @@ review is not approved, and the digest differs. The alternate signs the new reco
 with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
 
-**CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement**: A review has two slots, every check is answered, and
+**CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment**: A review has two slots, every check is answered, and
 only the first slot is signed, so the review is not locked. Changing an answer and starting a thread that is included in
 the report, without an
-acknowledgement, are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is
+acknowledgment, are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is
 stored, and the signature is still current. The same answer is then changed with slot 1 acknowledged; it is stored and
 the
-signature is out of date. This scenario is tested by `CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement`.
+signature is out of date. This scenario is tested by `CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment`.
 
 **CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
 `PersonalAccessTokenService`. The value authenticates the owner and a value with a changed ending does not; the list

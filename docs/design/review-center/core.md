@@ -170,7 +170,7 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   with the review in one transaction), marked with the review they came from, while Fail answers, resolved threads,
   reviewer slots, signatures and reopenings are not; the carried answers are review-level baseline rows that seed the
   draft ballot of every reviewer slot; a review that does not fit, and open threads that would be dropped
-  without an acknowledgement, are refused with `FollowUpInvalid`. `PreviewFollowUpAsync` tells, for the files of a new
+  without an acknowledgment, are refused with `FollowUpInvalid`. `PreviewFollowUpAsync` tells, for the files of a new
   review, what such a follow-up would carry and drop, without storing or auditing anything. `RecordDigest` calculates the
   digest of a record. Every
   operation that changes data takes

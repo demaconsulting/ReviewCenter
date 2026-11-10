@@ -39,7 +39,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </param>
 /// <param name="CheckThreadsLeftOut">
 ///     How many threads about a check (open or resolved) the earlier review has; they are never carried and need no
-///     acknowledgement, so only their number is shown. Zero by default.
+///     acknowledgment, so only their number is shown. Zero by default.
 /// </param>
 public sealed record FollowUpPreview(
     int CarriedAnswers,

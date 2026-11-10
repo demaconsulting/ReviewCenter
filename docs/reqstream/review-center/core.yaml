@@ -1420,20 +1420,20 @@ sections:
       - id: ReviewCenter-Core-Threads-CheckThreadStartAcknowledge
         title: >-
           The Core subsystem shall refuse, with the SignaturesWouldBecomeOutOfDate rule, to start a check thread that
-          is included in the report without an acknowledgement.
+          is included in the report without an acknowledgment.
         justification: |
           A new included thread changes the content that signatures were given for, so the caller must confirm it.
         children:
-          - ReviewCenter-ThreadService-CheckThreadStart-Acknowledgement
+          - ReviewCenter-ThreadService-CheckThreadStart-Acknowledgment
 
       - id: ReviewCenter-Core-Threads-CheckThreadStartChat
         title: >-
           The Core subsystem shall start a check thread that is not included in the report without an
-          acknowledgement and keep a current signature current.
+          acknowledgment and keep a current signature current.
         justification: |
           Chat does not change the content that signatures were given for, so it must not cost a signature.
         children:
-          - ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgement
+          - ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgment
           - ReviewCenter-ThreadService-CheckThreadStart-ChatKeepsSignature
 
       - id: ReviewCenter-Core-Threads-Capabilities
@@ -2767,7 +2767,7 @@ sections:
           - ReviewCenter-SigningService-SignatureImpact-Refused
           - ReviewCenter-SigningService-SignatureImpact-NothingStored
         tests:
-          - CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement
+          - CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment
 
       - id: ReviewCenter-Core-Signatures-ImpactAcknowledged
         title: >-
@@ -2780,7 +2780,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-ImpactNotNeeded
         title: >-
-          The Core subsystem shall need no acknowledgement for a change that leaves the digest of the record as it is,
+          The Core subsystem shall need no acknowledgment for a change that leaves the digest of the record as it is,
           such as chat, or for a change to a review without a current signature.
         justification: |
           Asking for a confirmation where nothing is lost would only teach callers to confirm without reading.
@@ -2791,7 +2791,7 @@ sections:
       - id: ReviewCenter-Core-Signatures-ImpactOwnSlot
         title: >-
           The Core subsystem shall leave the signature of the slot of the person who changes and hands in the own
-          ballot out of the acknowledgement.
+          ballot out of the acknowledgment.
         justification: |
           A person who changes their own ballot does not need to be warned about their own signature.
         children:
@@ -2822,10 +2822,10 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-BallotRemaining
         title: >-
-          The Core subsystem shall name in the refusal after an incomplete acknowledgement the slots that are still
-          not acknowledged, without letting the acknowledgement of a slot that has no signature suppress any of them.
+          The Core subsystem shall name in the refusal after an incomplete acknowledgment the slots that are still
+          not acknowledged, without letting the acknowledgment of a slot that has no signature suppress any of them.
         justification: |
-          An acknowledgement that is incomplete must lead to a refusal that says exactly what is missing.
+          An acknowledgment that is incomplete must lead to a refusal that says exactly what is missing.
         children:
           - ReviewCenter-ChecklistService-SignatureImpact-Remaining
           - ReviewCenter-ChecklistService-SignatureImpact-Remaining-Unrelated
@@ -2850,7 +2850,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-BallotNotNeeded
         title: >-
-          The Core subsystem shall accept changes to a ballot and its hand-in without an acknowledgement while no
+          The Core subsystem shall accept changes to a ballot and its hand-in without an acknowledgment while no
           signature is current, when the handed-in ballots still agree, and for a hand-in that agrees with the other
           handed-in ballots, and keep the signatures current.
         justification: |
@@ -2982,7 +2982,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-SlotBallotAcknowledge
         title: >-
-          The Core subsystem shall require the acknowledgement of the other signed slots, with the
+          The Core subsystem shall require the acknowledgment of the other signed slots, with the
           SignaturesWouldBecomeOutOfDate rule and before anything is stored, when removing a slot, or a reviewer
           leaving a slot, would change the consolidated standing, and so the digest.
         justification: |
@@ -2994,7 +2994,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-SlotBallotNotNeeded
         title: >-
-          The Core subsystem shall not ask for an acknowledgement when a reviewer leaves a slot, or a slot is removed,
+          The Core subsystem shall not ask for an acknowledgment when a reviewer leaves a slot, or a slot is removed,
           and the consolidated standing, and so the digest, stays as it is.
         justification: |
           Where no signature would be lost, a question would only be noise.
@@ -3151,7 +3151,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-ThreadAfterValidation
         title: >-
-          The Core subsystem shall validate a thread request before it asks for an acknowledgement, so that a request
+          The Core subsystem shall validate a thread request before it asks for an acknowledgment, so that a request
           that is not valid is reported as that error and not as the signature impact.
         justification: |
           A caller should not be asked to confirm a change that could never be made.
@@ -3169,7 +3169,7 @@ sections:
 
       - id: ReviewCenter-Core-Signatures-ThreadNotNeeded
         title: >-
-          The Core subsystem shall need no acknowledgement, and leave the signatures current, for resolving a Finding
+          The Core subsystem shall need no acknowledgment, and leave the signatures current, for resolving a Finding
           that is already resolved, for resolving a Question, for reopening a resolved thread, and for a thread or
           a reply that is not included in the report.
         justification: |
@@ -3318,12 +3318,12 @@ sections:
       - id: ReviewCenter-Core-Signatures-ConclusionTextNoChange
         title: >-
           The Core subsystem shall report that nothing changed when the review conclusion text is the same as the
-          stored one, need no acknowledgement of a signature, and keep the signatures current.
+          stored one, need no acknowledgment of a signature, and keep the signatures current.
         justification: |
           Saving the same text again changes nothing, so it must have no consequences.
         children:
           - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange
-          - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgement
+          - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgment
           - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Signature
 
       - id: ReviewCenter-Core-Signatures-ConclusionTextConcurrent
@@ -3541,7 +3541,7 @@ sections:
         title: >-
           The Core subsystem shall refuse an answer, a change of the applicability of a section in either direction,
           and the hand-in of a ballot for a review that is approved with the ReviewLocked rule, and change nothing,
-          reporting the lock before it asks for the acknowledgement of signatures.
+          reporting the lock before it asks for the acknowledgment of signatures.
         justification: |
           The checklist answers are the content that was approved, so they must not move.
         children:
@@ -7565,7 +7565,7 @@ sections:
           - ReviewCenter-ReviewService-FollowUp-DroppedMessage
           - ReviewCenter-ReviewService-FollowUpCarry-Resolved-DroppedListed
         tests:
-          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment
 
       - id: ReviewCenter-Core-FollowUp-Acknowledged
         title: >-
@@ -7717,12 +7717,12 @@ sections:
       - id: ReviewCenter-Core-FollowUp-CheckThreadsNotDropped
         title: >-
           The Core subsystem shall count threads about checks neither as resolved threads that are not carried nor as
-          threads of dropped files, and ask for no acknowledgement because of them.
+          threads of dropped files, and ask for no acknowledgment because of them.
         justification: |
           The creator is asked to confirm only a real loss; threads about checks are left out by design.
         children:
           - ReviewCenter-ReviewService-FollowUpCheckThreads-NotDropped
-          - ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgement
+          - ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgment
 
       - id: ReviewCenter-Core-FollowUp-Marks
         title: >-

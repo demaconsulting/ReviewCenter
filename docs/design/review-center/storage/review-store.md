@@ -261,7 +261,7 @@ of a thread goes through `ResolveThreadAsync` and its resolution-note rule, and 
 the state of a thread.
 
 **ResolveThreadAsync**: Resolves an open thread and, when a resolution comment is given, stores it in the same
-transaction. The caller passes the kind of the thread that it based the note, the acknowledgement of the signatures
+transaction. The caller passes the kind of the thread that it based the note, the acknowledgment of the signatures
 and the report flag on. The store reads the thread and its starting comment inside the transaction and compares the
 kind it finds there with the expected kind: a difference (a promote or demote landed in between) raises
 `RecordChanged` and stores nothing, no state, no comment and no audit entry. When the kinds agree, the comment is

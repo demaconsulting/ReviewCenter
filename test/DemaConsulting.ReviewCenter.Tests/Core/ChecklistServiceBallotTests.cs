@@ -24,7 +24,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 
 /// <summary>
 ///     Unit tests of the ballots of <see cref="ChecklistService"/>: answering into the ballot of the own slot, handing
-///     the ballot in, the acknowledgement of signatures and what a viewer is shown.
+///     the ballot in, the acknowledgment of signatures and what a viewer is shown.
 /// </summary>
 public class ChecklistServiceBallotTests
 {
@@ -198,10 +198,10 @@ public class ChecklistServiceBallotTests
     /// <summary>
     ///     Test that editing a submitted ballot makes it a draft again without touching a signature of another slot
     ///     when the other ballots still carry the same agreed standing, and that handing a differing ballot in needs the
-    ///     acknowledgement of that signature.
+    ///     acknowledgment of that signature.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots()
+    public async Task ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgmentOfOtherSlots()
     {
         // Arrange: three submitted ballots that agree, and a signature of slot 1
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -214,12 +214,12 @@ public class ChecklistServiceBallotTests
             world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", sam, cancellationToken);
         var signedAfterEdit = await world.SignedSlotIdsAsync();
 
-        // Act: handing the differing ballot in without the acknowledgement is refused
+        // Act: handing the differing ballot in without the acknowledgment is refused
         var ex = await Assert.ThrowsAsync<DomainRuleException>(
             () => world.Checklists.SubmitBallotAsync(world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken));
         var signedAfterRefusal = await world.SignedSlotIdsAsync();
 
-        // Act: with the acknowledgement it goes through and the signature is out of date
+        // Act: with the acknowledgment it goes through and the signature is out of date
         await world.Checklists.SubmitBallotAsync(
             world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken, [world.Slots[0].Id]);
         var signedAfterSubmit = await world.SignedSlotIdsAsync();
@@ -250,7 +250,7 @@ public class ChecklistServiceBallotTests
         var recorded = ex.AffectedSlots.ToArray();
         Assert.Single(recorded);
 
-        // Act: hand the ballot in with the acknowledgement, which puts the signature out of date
+        // Act: hand the ballot in with the acknowledgment, which puts the signature out of date
         await world.Checklists.SubmitBallotAsync(
             world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken, [world.Slots[0].Id]);
 
@@ -281,11 +281,11 @@ public class ChecklistServiceBallotTests
     }
 
     /// <summary>
-    ///     Test that a reviewer whose own signature is current needs no acknowledgement of that signature when changing
+    ///     Test that a reviewer whose own signature is current needs no acknowledgment of that signature when changing
     ///     the own ballot.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement()
+    public async Task ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgment()
     {
         // Arrange: rita has signed
         var cancellationToken = TestContext.Current.CancellationToken;

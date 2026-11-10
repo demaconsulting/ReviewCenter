@@ -89,7 +89,7 @@ sections:
           The RepositoriesPage unit shall offer on the add page a way back to the list without registering
           anything.
         justification: |
-          A page of its own makes cancelling obvious: the manager who changed their mind leaves without a trace.
+          A page of its own makes canceling obvious: the manager who changed their mind leaves without a trace.
         tests:
           - NewRepositoryPage_Render_FilledForm_CancelIsPlainLinkBackAndRegistersNothing
 

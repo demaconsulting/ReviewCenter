@@ -33,7 +33,7 @@ N/A - standard test environment (a temporary database and key folder are created
   for a last project administrator is 409, too many attempts 429, a required password change 403, a rejected outcome
   without a conclusion (`ConclusionRequired`) 403, and the rules for a
   locked review (`ReviewLocked`) and for a review that is not locked (`ReviewNotLocked`) are 409, and so is the rule
-  for a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`), and
+  for a change that would make a signature out of date without acknowledgment (`SignaturesWouldBecomeOutOfDate`), and
   the three rules of the project that refuse the author or the reopener (`AuthorCannotAnswer`, `ReopenerCannotSign`,
   `ReopenWouldStrandSlot`).
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint

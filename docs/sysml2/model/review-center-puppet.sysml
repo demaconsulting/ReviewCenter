@@ -1,4 +1,6 @@
 package ReviewCenterPuppet {
+    private import SoftwareItemMetadata::*;
+
     doc
     /*
      * ReviewCenterPuppet is the Puppet development tool: a small command-line program that keeps one
@@ -11,10 +13,13 @@ package ReviewCenterPuppet {
     part def ReviewCenterPuppetSystem {
         doc /* The Puppet development tool as a whole; a separate software system, not distributed. */
 
-        comment testRef /* Test: test/DemaConsulting.ReviewCenter.Puppet.Tests/PuppetEndToEndTests.cs */
-        comment designRef /* Design: docs/design/review-center-puppet.md */
-        comment verificationRef /* Verification: docs/verification/review-center-puppet.md */
-        comment reqRef /* Requirements: docs/reqstream/review-center-puppet.yaml */
+        metadata info : SoftwareInfo {
+            description = "The Puppet development tool as a whole; a separate software system, not distributed.";
+            testFiles = ("test/DemaConsulting.ReviewCenter.Puppet.Tests/PuppetEndToEndTests.cs");
+            designFiles = ("docs/design/review-center-puppet.md");
+            verificationFiles = ("docs/verification/review-center-puppet.md");
+            requirementFiles = ("docs/reqstream/review-center-puppet.yaml");
+        }
 
         part puppetProgram : PuppetProgram;
         part controlChannel : ControlChannel;

@@ -624,7 +624,7 @@ public partial class NewReviewPage : ComponentBase
     }
 
     /// <summary>
-    ///     Forgets the preview, its refusal and the acknowledgement that belonged to it.
+    ///     Forgets the preview, its refusal and the acknowledgment that belonged to it.
     /// </summary>
     private void ClearPreview()
     {

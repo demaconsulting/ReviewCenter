@@ -495,7 +495,7 @@ public partial class TotpServiceTests
     }
 
     /// <summary>
-    ///     Test that cancelling removes a pending enrollment and leaves a confirmed one alone.
+    ///     Test that canceling removes a pending enrollment and leaves a confirmed one alone.
     /// </summary>
     [Fact]
     public async Task TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed()

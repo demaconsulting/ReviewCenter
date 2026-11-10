@@ -112,7 +112,7 @@ hand in the own ballot, which never names a failed or disputed check (see `Signi
   - The optional `followsReviewId` of the request (text; missing, `null`, or blank means none) and the optional
     `acknowledgeDroppedThreads` (a boolean, default false) are passed to either creation call. The review then carries
     over what `ReviewService` says (see there); a review that does not exist in the project, does not fit, or would drop
-    open threads without the acknowledgement is the rule `FollowUpInvalid`, which `ApiProblems` maps to a 400 problem
+    open threads without the acknowledgment is the rule `FollowUpInvalid`, which `ApiProblems` maps to a 400 problem
     (the message never reveals another project), and nothing is created. The details of a review show `followsReviewId`
     (null for an ordinary review), `carriedAnswerCount` and `carriedThreadCount`; the summary shows `followsReviewId`.
   - The actor is built from the claims of the token principal, so the review records the user and that the API was used.
@@ -236,7 +236,7 @@ trail by the service (`audit.exported`, for the user, scoped to the project of t
 review identifier, an existing membership, the removal or demotion of the last project admin, a member who holds open
 review work (`MemberHasOpenReviewWork`), a disabled repository,
 a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
-a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`),
+a change that would make a signature out of date without acknowledgment (`SignaturesWouldBecomeOutOfDate`),
 a change that a project review rule refuses (`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to

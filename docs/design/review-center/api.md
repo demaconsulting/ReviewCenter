@@ -196,7 +196,7 @@ rules to 404, conflicts (including the removal of the last project admin and a c
 or failing git to 503, 502, or 504, a not allowed actor and a pending password change to 403, and every
 other rule to 400, among them `DueDateInvalid` for a due date that is not a date, is before today (UTC), or is more than
 2 years ahead, and `FollowUpInvalid` for a follow-up that names an unknown review, does not fit it, or drops open
-threads without an acknowledgement. A request body that cannot be read, or that has none or both of the sources of a
+threads without an acknowledgment. A request body that cannot be read, or that has none or both of the sources of a
 review, is a 400
 that names the field. An unexpected exception is the generic 500 of the host and shows no detail.
 

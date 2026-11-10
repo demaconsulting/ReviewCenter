@@ -1,0 +1,229 @@
+---
+# Spell-Checking with TextLint
+#
+# PURPOSE:
+# - Maintain professional documentation and code quality
+# - Catch spelling errors before publication
+# - Support consistent technical terminology usage
+# - Misspelled words should be fixed in the source
+# - NEVER add a misspelled word to the 'words' list
+# - PROPOSE only genuine technical terms/names as needed
+
+version: "0.2"
+language: en
+
+# The files to spell-check
+files:
+  - "**/*.{md,yaml,yml,json,cs,cpp,hpp,h,txt}"
+# Also check hidden paths such as .github/ and .*.yaml
+enableGlobDot: true
+
+# Project-specific technical terms and tool names
+words:
+  - ABCDEFGHJKLMNPQRSTUVWXY
+  - ABCDEFGHJKMNPQRSTVWXYZ
+  - Acro
+  - Actorless
+  - Annot
+  - Annots
+  - antiforgery
+  - Antiforgery
+  - apphost
+  - appsettings
+  - askpass
+  - ASKPASS
+  - aspnetcore
+  - ASPNETCORE
+  - aspnetcorev
+  - Blockquotes
+  - buildtransitive
+  - cacheinfo
+  - certificatestore
+  - certlm
+  - certmgr
+  - ciphertext
+  - Ciphertext
+  - codedoc
+  - CODEDOC
+  - contentfiles
+  - Contoso
+  - Cquoted
+  - Crockford
+  - dataprotection
+  - DATAPROTECTION
+  - dcterms
+  - decryptor
+  - Decryptor
+  - Dema
+  - DEMA
+  - demaconsulting
+  - doctitle
+  - docversion
+  - dpapi
+  - Dpapi
+  - DPAPI
+  - dpapiscope
+  - dstmode
+  - dstsha
+  - efgh
+  - encryptors
+  - endobj
+  - FEFF
+  - FFFD
+  - fffffff
+  - filesystemglobbing
+  - FORWARDEDHEADERS
+  - Fsecret
+  - fsmonitor
+  - gezd
+  - gezdgnbv
+  - GEZDGNBV
+  - gezdgnbvgy
+  - GEZDGNBVGY
+  - gnbv
+  - gpgsign
+  - hjkmnp
+  - HJKMNP
+  - hmacsha
+  - HMACSHA
+  - Hmmss
+  - hotp
+  - Hotp
+  - HOTP
+  - HSTS
+  - icdp
+  - Iddict
+  - inprocess
+  - isolationcontrol
+  - jkmn
+  - keyout
+  - libe
+  - localmachine
+  - magick
+  - mailkit
+  - ncipollo
+  - nendobj
+  - nendstream
+  - nestings
+  - netstandard
+  - NOCASE
+  - nosniff
+  - NOSYSTEM
+  - nstartxref
+  - offadm
+  - Oids
+  - openidconnect
+  - openiddict
+  - ordinally
+  - Ordinally
+  - otpauth
+  - Otpauth
+  - otpnet
+  - outofdate
+  - padm
+  - Padm
+  - pageerror
+  - pagetitle
+  - passout
+  - PATHEXT
+  - permissionsonly
+  - pipefail
+  - Pkce
+  - PKCE
+  - pqrs
+  - projectadmin
+  - pyhanko
+  - pypdf
+  - qojq
+  - Qube
+  - quotepath
+  - rcpat
+  - reanswer
+  - Reanswer
+  - reauth
+  - Reauth
+  - reauthentication
+  - Reauthentication
+  - regen
+  - Regen
+  - repage
+  - reprotect
+  - Reprotect
+  - reqdoc
+  - REQDOC
+  - reqimp
+  - REQIMP
+  - reqtest
+  - REQTEST
+  - requestfailed
+  - resignable
+  - Resignable
+  - reviewcenter
+  - REVIEWCENTER
+  - sarif
+  - Sarif
+  - SARIF
+  - selfsigned
+  - selftest
+  - Selftest
+  - SELFTEST
+  - seqno
+  - Setext
+  - shopt
+  - slnx
+  - snupkg
+  - sonarscanner
+  - srcmode
+  - srcsha
+  - STARTUPINFOW
+  - startxref
+  - staticwebassets
+  - SYSTEMDRIVE
+  - taskkill
+  - testhost
+  - thirdparty
+  - togglable
+  - Togglable
+  - toggleable
+  - Toggleable
+  - topk
+  - totp
+  - Totp
+  - TOTP
+  - totps
+  - Totps
+  - tqojq
+  - TQOJQ
+  - tqojqgezdgnbvgy
+  - TQOJQGEZDGNBVGY
+  - ümlaut
+  - unidirectionality
+  - Unopenable
+  - unpooled
+  - unsubmitted
+  - Unsubmitted
+  - upserted
+  - Upserted
+  - upserts
+  - Upserts
+  - venv
+  - yamldotnet
+  - yamlfix
+  - Zabcdefghijklmnopqrstuvwxyz
+  - Zabcdefghijkmnopqrstuvwxyz
+  - zhang
+
+# Exclude common build artifacts, dependencies, and vendored third-party code
+ignorePaths:
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/thirdparty/**"
+  - "**/third-party/**"
+  - "**/3rd-party/**"
+  - "**/generated/**"
+  - "**/AGENT_REPORT_*.md"
+  - "**/.agent-logs/**"
+  - "**/bin/**"
+  - "**/obj/**"
+  - package-lock.json

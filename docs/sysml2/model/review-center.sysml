@@ -1,4 +1,6 @@
 package ReviewCenter {
+    private import SoftwareItemMetadata::*;
+
     doc
     /*
      * ReviewCenter is an ASP.NET Core web service, with a companion .NET command-line
@@ -25,10 +27,13 @@ package ReviewCenter {
     part def ReviewCenterSystem {
         doc /* The ReviewCenter system as a whole. */
 
-        comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/IntegrationTests.cs */
-        comment designRef /* Design: docs/design/review-center.md */
-        comment verificationRef /* Verification: docs/verification/review-center.md */
-        comment reqRef /* Requirements: docs/reqstream/review-center.yaml */
+        metadata info : SoftwareInfo {
+            description = "The ReviewCenter system as a whole.";
+            testFiles = ("test/DemaConsulting.ReviewCenter.Tests/IntegrationTests.cs");
+            designFiles = ("docs/design/review-center.md");
+            verificationFiles = ("docs/verification/review-center.md");
+            requirementFiles = ("docs/reqstream/review-center.yaml");
+        }
 
         part program : Program;
         part cli : CliSubsystem;

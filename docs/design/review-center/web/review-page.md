@@ -460,7 +460,7 @@ A thread that no longer exists is reported inside the thread.
 
 **Signature warning**: `StartThreadAsync`, `ReplyAsync`, `ResolveThreadAsync`, `ReopenThreadAsync`,
 `PromoteThreadAsync`, `DemoteThreadAsync`, and `ToggleReplyReportAsync` call the service first without an
-acknowledgement. What is chat (a Question, a reply that is not in the report) changes nothing the digest covers and is
+acknowledgment. What is chat (a Question, a reply that is not in the report) changes nothing the digest covers and is
 stored at once; what is part of the report (a new Finding, an included reply, promote, demote, resolving a Finding) is
 refused by the service when a signature is current. When the service refuses
 with `SignaturesWouldBecomeOutOfDate`, the page
@@ -469,7 +469,7 @@ keeps the request and shows the
 of the reply, or in the head of the changed thread. The banner names every affected slot and its signer
 (`signature-warning-slots`, for example "Slot 1 (Ann)"). Nothing is stored and everything typed stays. **Confirm
 change**
-(`signature-warning-confirm`) repeats the call with the identities of the affected slots as the acknowledgement. When
+(`signature-warning-confirm`) repeats the call with the identities of the affected slots as the acknowledgment. When
 another signature appeared meanwhile, the service refuses again and the page shows the banner again with the slots of
 both refusals merged, so a person confirms only what they have been shown. **Cancel** (`signature-warning-cancel`) only
 removes the banner; the typed text and an unsaved choice stay, and so does the resolve dialog with the note typed in it
@@ -478,7 +478,7 @@ the person can resolve again without typing the note again. The page holds one b
 identifiers stay unique; a new refusal replaces the earlier banner, and a reload of a locked review removes it. Confirm
 runs the session check of the page again, so an expired session is handled like any other action. A refusal for any
 other rule is shown as before and no banner is shown. The reopen of a whole review (`ReopenReviewAsync`) is not part of
-the acknowledgement and does not show the banner.
+the acknowledgment and does not show the banner.
 
 **SetFilter**: Sets the state the thread index shows. Each index row is a button whose accessible name states the
 anchor, file, state, comment count, first author, and last activity, so a screen-reader user hears what a sighted
@@ -488,7 +488,7 @@ thread.
 **Check discussions**: when the review has threads about a check, a card with the heading "Check discussions"
 (`check-discussions`) lists them with the same thread card as the threads of a file (the card is one render fragment
 that both places use), with the anchor worded `Check {id}`, the state, and the comments as plain text. Replying and
-resolving work as for any thread, with the same acknowledgement handling. The index row of such a thread shows
+resolving work as for any thread, with the same acknowledgment handling. The index row of such a thread shows
 "Check discussion" in place of a file path, and choosing it (or a deep link to it) focuses the thread without selecting
 a file (`SelectThreadAsync` and the address handling skip the file selection for a thread about a check). The page has no
 form to start one yet; the entry comes with the ballot screen. The card is absent when the review has none.
@@ -592,7 +592,7 @@ written."). **SaveConclusionAsync** (behind the form) calls `GuardAsync` and the
 `ChecklistService.SetReviewConclusionTextAsync` with the signed-in user and the typed text. A change that would make a
 current signature out of date (the text is part of the record digest) is not stored at once: Core refuses it with
 `SignaturesWouldBecomeOutOfDate`, the page shows the `SignatureWarning` confirmation inside the form with the affected
-slots, and a confirmation repeats the call with the acknowledged slots; cancelling stores nothing. Any other
+slots, and a confirmation repeats the call with the acknowledged slots; canceling stores nothing. Any other
 `DomainRuleException` is shown in `review-conclusion-error` with the typed text kept; for `RecordChanged` (someone else
 changed the text) and `ReviewLocked` the page also reloads the review so that the stored text and the lock are shown.
 Success reloads through `RefreshAsync`.
@@ -719,7 +719,7 @@ raises no other errors of its own.
 The view-only handlers (thread filter, expanding a thread, the diff, head, and baseline views, and the comment
 buttons) are wrapped at their binding by `GuardedAsync`, and expanding a collapsed run of the diff asks the same check
 through the `CanReveal` parameter of `DiffView` before it shows lines that were loaded but not yet displayed;
-cancelling a comment and copying a thread link show no project
+canceling a comment and copying a thread link show no project
 data and are not guarded. When access is lost, `ShowNoAccess` resets the component state exactly as a change of address
 does (review, project name, files, selection, threads, checklist progress, approval, candidates, and the forms), shows
 the same message as for a review that does not exist, and the handler returns without calling a service. An ended

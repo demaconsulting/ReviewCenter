@@ -101,7 +101,7 @@ public sealed class Review
     /// <remarks>
     ///     Not the review conclusion (none, approved or rejected, the enum <c>ReviewConclusion</c>): that is
     ///     a decision, this is words. The text is part of the record digest (the <c>conclusion-text</c> line, see
-    ///     <see cref="RecordDigest"/>), so changing it while a signature is current needs the acknowledgement of the
+    ///     <see cref="RecordDigest"/>), so changing it while a signature is current needs the acknowledgment of the
     ///     affected reviewers, and it is written only while the review is not concluded. It is never carried over to a
     ///     follow-up: a follow-up starts without one. The audit entry that records a change names lengths, never the text.
     /// </remarks>
