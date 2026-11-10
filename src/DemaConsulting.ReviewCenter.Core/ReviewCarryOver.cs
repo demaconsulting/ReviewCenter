@@ -40,7 +40,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </param>
 /// <param name="CheckThreadsLeftOut">
 ///     How many threads about a check (open or resolved) the source has; they are never carried, need no
-///     acknowledgement and are only counted. Zero by default.
+///     acknowledgment and are only counted. Zero by default.
 /// </param>
 public sealed record ReviewCarryOver(
     IReadOnlyList<ChecklistAnswer> Answers,

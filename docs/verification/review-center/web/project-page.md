@@ -127,7 +127,7 @@ N/A - standard test environment.
   enabled replace; a definition equal to the current one says so and disables the replace, and one with other content
   under the same label warns before the replace. Validating stores nothing. `ChecklistDiff` finds added, removed, and
   changed sections and checks by identifier and ignores case, order, and a missing hint.
-- Replace asks for a confirmation that says that existing reviews keep their checklist; cancelling changes nothing;
+- Replace asks for a confirmation that says that existing reviews keep their checklist; canceling changes nothing;
   confirming stores the definition, shows it, confirms in words, and records one audit entry
   `project.checklist-changed`; the same label with other wording is refused with the message of the service. Reset does
   the same for the built-in default.
@@ -830,7 +830,7 @@ the replace) is dropped, so the page does not offer to replace the checklist wit
 tested by `ProjectChecklistPage_Import_FileTooLarge_IsRefused`.
 
 **ProjectChecklistPage_Replace_Cancelled_ChangesNothing**: The confirmation states that existing reviews keep their
-checklist and only later reviews use the new one; cancelling stores nothing and records nothing. This scenario is
+checklist and only later reviews use the new one; canceling stores nothing and records nothing. This scenario is
 tested by `ProjectChecklistPage_Replace_Cancelled_ChangesNothing`.
 
 **ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits**: A confirmed replace stores the definition, shows the new
@@ -927,10 +927,10 @@ file threads as carried open threads. This scenario is tested by
 **NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion**: A title that was typed stays when an earlier review is
 chosen. This scenario is tested by `NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion`.
 
-**NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement**: The files lack a file that has an open thread; the
+**NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment**: The files lack a file that has an open thread; the
 page lists the file and offers the confirmation box, creating without it shows the message of the service and stores
 nothing, and with it the review is created. This scenario is tested by
-`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement`.
+`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment`.
 
 **NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal**: Files that have nothing in common with the chosen review show
 the message of the refusal as the preview error, and creating refuses with the same message and stores nothing. This
@@ -944,10 +944,10 @@ stores nothing. This scenario is tested by `NewReviewPage_FollowUp_DuplicateFile
 suggested title, and the review is created without a followed review. This scenario is tested by
 `NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview`.
 
-**NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement**: For a repository source the page shows a hint
+**NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment**: For a repository source the page shows a hint
 instead of a preview, creating without the confirmation is refused by the service when open threads would be dropped,
 and with it the review is created as a follow-up. This scenario is tested by
-`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement`.
+`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment`.
 
 **ProjectPage_Render_FollowUpReview_ShowsFollowTag**: In the list of reviews a follow-up carries a tag with a link to
 the review it follows, and a review that follows nothing carries none. This scenario is tested by

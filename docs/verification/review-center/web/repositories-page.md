@@ -30,7 +30,7 @@ N/A - standard test environment.
   location alone, stores the token only
   through the service, empties the token field, returns to the list, and the token is never in the markup; an invalid
   location is shown as an error, keeps the typed name, and creates nothing.
-- Editing changes the name, location, and user name, keeps, replaces, or clears the token as chosen, and cancelling
+- Editing changes the name, location, and user name, keeps, replaces, or clears the token as chosen, and canceling
   closes the form and changes nothing.
 - A repository can be disabled and enabled again.
 - A project administrator manages the repositories of the project; a plain member and a user who is no member see only
@@ -106,7 +106,7 @@ appears in the markup. This scenario is tested by `RepositoriesPage_Edit_Replace
 **RepositoriesPage_Edit_ClearToken_RemovesToken**: Clearing the token removes it, so the repository is shown as having no
 token. This scenario is tested by `RepositoriesPage_Edit_ClearToken_RemovesToken`.
 
-**RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing**: Cancelling an edit closes the form and changes nothing. This
+**RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing**: Canceling an edit closes the form and changes nothing. This
 scenario is tested by `RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing`.
 
 **RepositoriesPage_ToggleEnabled_Repository_DisablesAndEnablesAgain**: A repository is disabled and enabled again, and

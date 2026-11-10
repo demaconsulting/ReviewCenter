@@ -435,7 +435,7 @@ sections:
           the kind the caller expected.
         justification: |
           The check of the service is made before the write, so another request can change the thread in between.
-          The note, the acknowledgement of the signatures, and the report flag were decided for the kind the service
+          The note, the acknowledgment of the signatures, and the report flag were decided for the kind the service
           saw, so a changed kind must be refused and not accepted silently.
         tests:
           - ReviewStore_ResolveThreadAsync_KindChangedSinceRead_ThrowsRecordChangedAndStoresNothing

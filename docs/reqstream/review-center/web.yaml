@@ -1598,7 +1598,7 @@ sections:
         title: >-
           The Web subsystem shall store nothing when the person cancels that confirmation.
         justification: |
-          Cancelling the question must leave the thread and the signatures exactly as they were.
+          Canceling the question must leave the thread and the signatures exactly as they were.
         children:
           - ReviewCenter-ReviewPage-ThreadActions-CancelStoresNothing
 
@@ -2450,7 +2450,7 @@ sections:
           The Web subsystem shall leave the signatures and the record unchanged when the reviewer cancels a signature
           warning.
         justification: |
-          Cancelling must undo the attempt completely, with the page showing what is really stored.
+          Canceling must undo the attempt completely, with the page showing what is really stored.
         children:
           - ReviewCenter-ChecklistPage-SignatureWarning-Cancel
 
@@ -6397,8 +6397,8 @@ sections:
         justification: |
           Open discussion must not be lost by a single click.
         children:
-          - ReviewCenter-ProjectPage-FollowUp-Acknowledgement
-          - ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+          - ReviewCenter-ProjectPage-FollowUp-Acknowledgment
+          - ReviewCenter-ProjectPage-FollowUp-AcknowledgmentPassed
 
       - id: ReviewCenter-Web-FollowUp-CarriedMarks
         title: >-

@@ -155,7 +155,7 @@ sections:
 
       - id: ReviewCenter-ChecklistPage-Answer-Label
         title: >-
-          The ChecklistPage unit shall present the outcome buttons of each check as one group that is labelled with
+          The ChecklistPage unit shall present the outcome buttons of each check as one group that is labeled with
           the text of the check.
         justification: |
           Assistive technology must announce which check a button answers, so each group of buttons is named by the
@@ -619,7 +619,7 @@ sections:
           The ChecklistPage unit shall put the switch of a section that does not apply back to off when the reviewer
           cancels the warning for switching it on.
         justification: |
-          The page must show the stored state, and cancelling stores nothing, so the section is still not applicable.
+          The page must show the stored state, and canceling stores nothing, so the section is still not applicable.
         tests:
           - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
 

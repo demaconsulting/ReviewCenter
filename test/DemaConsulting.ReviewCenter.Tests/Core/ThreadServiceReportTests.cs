@@ -432,7 +432,7 @@ public class ThreadServiceReportTests
 
     /// <summary>
     ///     Test that a promote or a demote that lands between the snapshot of the service and the write of the store
-    ///     is not accepted silently: the note, the acknowledgement and the report flag were decided for the other
+    ///     is not accepted silently: the note, the acknowledgment and the report flag were decided for the other
     ///     kind, so the resolve fails with <see cref="DomainRule.RecordChanged"/> and stores and audits nothing.
     /// </summary>
     /// <param name="promote">
@@ -1178,10 +1178,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that a chat thread started after a signature needs no acknowledgement and keeps the signature.
+    ///     Test that a chat thread started after a signature needs no acknowledgment and keeps the signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature()
+    public async Task ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgmentAndKeepsSignature()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1198,7 +1198,7 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that a chat reply after a signature needs no acknowledgement and keeps the signature.
+    ///     Test that a chat reply after a signature needs no acknowledgment and keeps the signature.
     /// </summary>
     [Fact]
     public async Task ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature()
@@ -1243,17 +1243,17 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that a chat reply after a signature is stored as it is, without an acknowledgement, and is not
+    ///     Test that a chat reply after a signature is stored as it is, without an acknowledgment, and is not
     ///     included in the report.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement()
+    public async Task ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgment()
     {
         // Arrange: a resolved thread, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await ResolvedChatThreadSignedAsync();
 
-        // Act: reply without any acknowledgement
+        // Act: reply without any acknowledgment
         var reply = await world.World.Threads.ReplyAsync(
             world.World.ProjectId, ReviewId, world.ThreadId, TestActors.Bob, "Thanks", cancellationToken);
 
@@ -1264,7 +1264,7 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that a thread included in the report, started after a signature with the acknowledgement of the signed
+    ///     Test that a thread included in the report, started after a signature with the acknowledgment of the signed
     ///     slot, is stored with its starting comment flagged.
     /// </summary>
     [Fact]
@@ -1275,7 +1275,7 @@ public class ThreadServiceReportTests
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(1);
 
-        // Act: start an included thread with the acknowledgement of the signed slots
+        // Act: start an included thread with the acknowledgment of the signed slots
         await world.Threads.StartThreadAsync(
             world.ProjectId, ReviewId, _anchor, TestActors.Bob, "Finding", cancellationToken,
             await world.SignedSlotIdsAsync(), true);
@@ -1299,7 +1299,7 @@ public class ThreadServiceReportTests
         await world.SignAsync(1);
         var digestBefore = (await world.ApprovalAsync()).Digest;
 
-        // Act: start an included thread with the acknowledgement of the signed slots
+        // Act: start an included thread with the acknowledgment of the signed slots
         await world.Threads.StartThreadAsync(
             world.ProjectId, ReviewId, _anchor, TestActors.Bob, "Finding", cancellationToken,
             await world.SignedSlotIdsAsync(), true);
@@ -1313,10 +1313,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that a thread started with its comment in the report needs the acknowledgement of a current signature.
+    ///     Test that a thread started with its comment in the report needs the acknowledgment of a current signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgment()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1339,10 +1339,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that an included reply needs the acknowledgement of a current signature.
+    ///     Test that an included reply needs the acknowledgment of a current signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgment()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1363,10 +1363,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that promoting a thread needs the acknowledgement of a current signature.
+    ///     Test that promoting a thread needs the acknowledgment of a current signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgment()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1389,10 +1389,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that demoting a thread needs the acknowledgement of a current signature.
+    ///     Test that demoting a thread needs the acknowledgment of a current signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgment()
     {
         // Arrange: a resolved Finding, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1416,10 +1416,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that including a reply needs the acknowledgement of a current signature.
+    ///     Test that including a reply needs the acknowledgment of a current signature.
     /// </summary>
     [Fact]
-    public async Task ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgment()
     {
         // Arrange: a resolved chat thread with a chat reply, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1445,11 +1445,11 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that resolving a Finding with a note after a signature needs the acknowledgement, because the note is
+    ///     Test that resolving a Finding with a note after a signature needs the acknowledgment, because the note is
     ///     part of the report.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement()
+    public async Task ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgment()
     {
         // Arrange: a Finding that was resolved, signed and reopened (reopening needs nothing)
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1474,10 +1474,10 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that resolving a Question after a signature needs no acknowledgement, with or without a note.
+    ///     Test that resolving a Question after a signature needs no acknowledgment, with or without a note.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement()
+    public async Task ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgment()
     {
         // Arrange: a signed review and a chat thread opened afterwards, then a second one
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1499,11 +1499,11 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that resolving a Finding that is already resolved needs no acknowledgement and no note while a signature
+    ///     Test that resolving a Finding that is already resolved needs no acknowledgment and no note while a signature
     ///     is current, because it changes nothing, and that the signature stays valid.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement()
+    public async Task ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgment()
     {
         // Arrange: a Finding resolved with a note, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1515,7 +1515,7 @@ public class ThreadServiceReportTests
         await world.SignAsync(1);
         var audits = world.Store.Audits.Count;
 
-        // Act: resolve again, with a note and without the acknowledgement, and then without a note
+        // Act: resolve again, with a note and without the acknowledgment, and then without a note
         await world.Threads.ResolveAsync(project, ReviewId, thread.Id, TestActors.Ann, cancellationToken, null, "Again");
         await world.Threads.ResolveAsync(project, ReviewId, thread.Id, TestActors.Ann, cancellationToken);
 
@@ -1554,11 +1554,11 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
-    ///     Test that reopening a Finding after a signature needs no acknowledgement and keeps the signature, because
+    ///     Test that reopening a Finding after a signature needs no acknowledgment and keeps the signature, because
     ///     the state of a thread is not part of the digest.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement()
+    public async Task ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgment()
     {
         // Arrange: a resolved Finding, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1582,7 +1582,7 @@ public class ThreadServiceReportTests
     ///     promotion made out of date is current again.
     /// </summary>
     [Fact]
-    public async Task ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest()
+    public async Task ThreadService_PromoteThenDemoteWithAcknowledgment_RestoresOriginalDigest()
     {
         // Arrange: a resolved chat thread, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;

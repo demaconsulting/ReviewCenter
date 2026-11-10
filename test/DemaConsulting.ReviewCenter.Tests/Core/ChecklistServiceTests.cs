@@ -109,7 +109,7 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that a change is stored without any acknowledgement while no signature is current, and that a change to
+    ///     Test that a change is stored without any acknowledgment while no signature is current, and that a change to
     ///     a draft that leaves the consolidated record as it is does not touch a current signature.
     /// </summary>
     [Fact]
@@ -188,12 +188,12 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that an acknowledgement that does not cover every current signature is refused naming only the
-    ///     signatures that remain, that an acknowledgement of an unrelated slot suppresses nothing, and that nothing
+    ///     Test that an acknowledgment that does not cover every current signature is refused naming only the
+    ///     signatures that remain, that an acknowledgment of an unrelated slot suppresses nothing, and that nothing
     ///     is stored by a refusal.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots()
+    public async Task ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots()
     {
         // Arrange: slots 1 and 2 signed, and tess disagrees in her draft
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -222,7 +222,7 @@ public class ChecklistServiceTests
     ///     Test that a hand-in acknowledging every current signature is stored and leaves those signatures out of date.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate()
+    public async Task ChecklistService_SetAnswerAsync_FullAcknowledgment_StoresAndSignatureOutOfDate()
     {
         // Arrange: slots 1 and 2 signed, and tess disagrees in her draft
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -247,12 +247,12 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that marking a section as not applicable is a draft change that needs no acknowledgement, that handing
+    ///     Test that marking a section as not applicable is a draft change that needs no acknowledgment, that handing
     ///     the ballot in is refused while a signature is current, is stored once acknowledged, and that marking a
     ///     section applicable when it has no stored state changes nothing.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement()
+    public async Task ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgment()
     {
         // Arrange: slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;

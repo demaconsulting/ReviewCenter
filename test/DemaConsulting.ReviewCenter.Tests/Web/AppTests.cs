@@ -743,7 +743,7 @@ public class AppTests : InboxWebTestBase
         // Act: render the page
         var cut = Render<LoginPage>();
 
-        // Assert: the fields are named and labelled, the password field hides its input, and the button sends the form
+        // Assert: the fields are named and labeled, the password field hides its input, and the button sends the form
         var form = cut.Find("form[data-testid='login-form']");
         var user = form.QuerySelector("input[name='username']");
         var password = form.QuerySelector("input[name='password']");

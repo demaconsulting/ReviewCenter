@@ -878,7 +878,7 @@ sections:
         justification: |
           The reader must be able to leave the form without commenting and without a selection left over.
         tests:
-          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled
 
       - id: ReviewCenter-ReviewPage-DiffComment-WholeFile
         title: >-
@@ -887,7 +887,7 @@ sections:
         justification: |
           A reader who sees that the comment is about the file as a whole must not lose what was typed.
         tests:
-          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled
 
       - id: ReviewCenter-ReviewPage-DiffComment-Focus
         title: >-
@@ -959,7 +959,7 @@ sections:
           A thread that is drawn under its line must not be listed a second time.
         tests:
           - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
-          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled
 
       - id: ReviewCenter-ReviewPage-DiffThreads-Counts
         title: >-

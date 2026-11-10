@@ -50,7 +50,7 @@ N/A - standard test environment.
   the `otpauth` address as text, with a field for the code, and empties the password field.
 - A wrong confirmation code shows one generic message, keeps the set-up open, and turns nothing on; the right code turns
   it on, shows ten recovery codes once with a notice that they cannot be shown again, and the secret, the address, and
-  the codes are gone from the page afterwards; cancelling removes the secret and shows the start form.
+  the codes are gone from the page afterwards; canceling removes the secret and shows the start form.
 - An enrolled user sees the status On, the number of recovery codes left, the forms to turn it off and to get new
   recovery codes, and no secret; a wrong code in either form shows the generic message, keeps the state, and empties the
   fields; a recovery code or an authenticator code with the password turns it off; the right password and code show ten
@@ -185,7 +185,7 @@ field, and the user is not enrolled, which is tested by
 `AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending`. The right code shows status "On", "10 recovery codes
 left", ten distinct codes and the notice that they cannot be shown again, and no secret, no address, and no secret text
 in the page; after the box is dismissed the codes are gone; this is tested by
-`AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. Cancelling removes the secret from the page and
+`AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. Canceling removes the secret from the page and
 the user is not enrolled, which is tested by `AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm`. An
 enrolled user sees status "On", the number of codes left, the turn-off and renewal forms, and no secret, no codes, and
 no start form, which is tested by `AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft`. A wrong code when turning it

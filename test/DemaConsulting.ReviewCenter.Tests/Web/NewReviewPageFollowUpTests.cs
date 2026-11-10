@@ -30,7 +30,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
 ///     Unit tests for the "follow up on an earlier review" part of the new-review form of <see cref="NewReviewPage"/>:
-///     the selector, the preview of what is carried over, the acknowledgement of dropped threads, and the pass-through
+///     the selector, the preview of what is carried over, the acknowledgment of dropped threads, and the pass-through
 ///     to the service at both create paths.
 /// </summary>
 public class NewReviewPageFollowUpTests : PageTestBase
@@ -201,7 +201,7 @@ public class NewReviewPageFollowUpTests : PageTestBase
         await cut.Find("[data-testid='follow-source-select']").ChangeAsync("REV-1");
 
         // Assert: the preview counts the Pass answer, the two open threads and the resolved one that is not carried;
-        // every file is in the new review, so nothing is dropped and no acknowledgement is asked for
+        // every file is in the new review, so nothing is dropped and no acknowledgment is asked for
         var answers = DefaultChecklist.Current.Sections.Sum(s => s.Items.Count);
         var preview = TextOf(cut, "follow-preview");
         Assert.Contains($"{answers} Pass or N/A answers,", preview, StringComparison.Ordinal);
@@ -297,11 +297,11 @@ public class NewReviewPageFollowUpTests : PageTestBase
 
     /// <summary>
     ///     Test that open threads on files the new review does not have are listed, that creating without the
-    ///     acknowledgement is refused with the service message and creates nothing, and that the acknowledgement lets
+    ///     acknowledgment is refused with the service message and creates nothing, and that the acknowledgment lets
     ///     the creation through.
     /// </summary>
     [Fact]
-    public async Task NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement()
+    public async Task NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment()
     {
         // Arrange: the earlier review has an open thread on b.txt, and the new review has only a.txt
         var projectId = await ArrangeSourceAsync();
@@ -315,7 +315,7 @@ public class NewReviewPageFollowUpTests : PageTestBase
         Assert.Contains("1 open thread.", TextOf(cut, "follow-preview"), StringComparison.Ordinal);
         Assert.False(cut.Find("[data-testid='follow-acknowledge-checkbox']").HasAttribute("checked"));
 
-        // Act: create without the acknowledgement
+        // Act: create without the acknowledgment
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
         // Assert: the service refuses and nothing is created
@@ -418,11 +418,11 @@ public class NewReviewPageFollowUpTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that for a repository source the page passes the choice and the acknowledgement to the service: the
-    ///     creation is refused without the acknowledgement when threads would be dropped, and goes through with it.
+    ///     Test that for a repository source the page passes the choice and the acknowledgment to the service: the
+    ///     creation is refused without the acknowledgment when threads would be dropped, and goes through with it.
     /// </summary>
     [Fact]
-    public async Task NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement()
+    public async Task NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment()
     {
         // Arrange: the earlier repository review has open threads on src/a.txt and src/b.txt; the new selection has a
         var projectId = await ArrangeSourceAsync();
@@ -439,7 +439,7 @@ public class NewReviewPageFollowUpTests : PageTestBase
         Assert.NotEmpty(cut.FindAll("[data-testid='follow-preview-hint']"));
         Assert.Empty(cut.FindAll("[data-testid='follow-preview']"));
 
-        // Act: create without the acknowledgement
+        // Act: create without the acknowledgment
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
         // Assert: the service refuses with its message and nothing is created

@@ -493,7 +493,7 @@ public interface IReviewStore
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
     /// <param name="expectedKind">
-    ///     The kind of the thread the caller based the resolution on: the note, the acknowledgement of the signatures
+    ///     The kind of the thread the caller based the resolution on: the note, the acknowledgment of the signatures
     ///     and the report flag were all decided for it.
     /// </param>
     /// <param name="resolution">
@@ -510,7 +510,7 @@ public interface IReviewStore
     /// <remarks>
     ///     The kind of the thread is read again inside the transaction and compared with
     ///     <paramref name="expectedKind"/>, so a promote or demote that lands between the caller's check and the write is
-    ///     never accepted silently: the caller decided the note and the acknowledgement for the other kind.
+    ///     never accepted silently: the caller decided the note and the acknowledgment for the other kind.
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ResolutionNoteRequired"/> when the thread is a Finding and

@@ -167,7 +167,7 @@ with nothing stored:
 4. Open threads of the earlier review whose file is not in the new review are never carried. Unless
    `acknowledgeDroppedThreads` is true they refuse the creation with the message from `FollowUpCarry.DroppedMessage`,
    which lists the files (at most 10, then "and N more"). When it is true they are dropped and counted in the audit
-   text. An acknowledgement without such threads changes nothing.
+   text. An acknowledgment without such threads changes nothing.
 
 The review, the carried answers, the carried section states, and the carried threads with copies of their comments are
 then handed to `IReviewStore.AddReviewAsync` in the one call that stores the review (through `Review.CarryOver`), so the
@@ -205,7 +205,7 @@ its files, the new review's files and checklist, and the creation time, and retu
   not hand a ballot in (see `ChecklistService`).
 - *Threads*: in the order of the earlier threads. A thread about a check of the checklist, open or resolved, is never
   carried: it is counted in `CheckThreadsLeftOut`, it is neither a resolved thread that is not carried nor a thread on
-  a dropped file, and it needs no acknowledgement (the checklist of the follow-up may differ, and a thread without a
+  a dropped file, and it needs no acknowledgment (the checklist of the follow-up may differ, and a thread without a
   file must not be mistaken for one on a file that left the review). A resolved thread is counted
   (`ResolvedThreadsNotCarried`) and not
   carried. An open thread whose file is not in the new review goes to `DroppedThreadFiles` (sorted, distinct). Any
@@ -324,7 +324,7 @@ A refused creation records nothing. See the `AuditService` unit for the action c
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`; a follow-up that does not fit, whose
-source is unknown, or that would drop open threads without an acknowledgement raises `FollowUpInvalid`. A null `files`
+source is unknown, or that would drop open threads without an acknowledgment raises `FollowUpInvalid`. A null `files`
 argument, and a null
 store or clock at construction, raise `ArgumentNullException`. Store failures propagate unchanged.
 

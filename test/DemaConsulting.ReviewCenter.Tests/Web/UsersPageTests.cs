@@ -712,7 +712,7 @@ public class UsersPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that cancelling the disable confirmation closes it and changes nothing.
+    ///     Test that canceling the disable confirmation closes it and changes nothing.
     /// </summary>
     [Fact]
     public async Task UsersPage_Disable_Cancel_ClosesThePanelAndChangesNothing()
@@ -776,7 +776,7 @@ public class UsersPageTests : PageTestBase
 
     /// <summary>
     ///     Test that the two-factor reset explains the consequence first and removes nothing before the second
-    ///     click, and that cancelling keeps the enrollment.
+    ///     click, and that canceling keeps the enrollment.
     /// </summary>
     [Fact]
     public async Task UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing()
@@ -874,7 +874,7 @@ public class UsersPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that cancelling the set-password confirmation changes nothing, and that an empty field opens no
+    ///     Test that canceling the set-password confirmation changes nothing, and that an empty field opens no
     ///     confirmation and asks for a password.
     /// </summary>
     [Fact]

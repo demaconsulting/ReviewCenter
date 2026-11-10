@@ -457,10 +457,10 @@ public class CheckThreadTests
 
     /// <summary>
     ///     Test that a check thread whose starting comment is included in the report makes a current signature out of
-    ///     date, so it needs the acknowledgement of the affected slots, and a chat check thread does not.
+    ///     date, so it needs the acknowledgment of the affected slots, and a chat check thread does not.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement()
+    public async Task ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgment()
     {
         // Arrange: slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;

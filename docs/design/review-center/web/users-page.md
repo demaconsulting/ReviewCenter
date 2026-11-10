@@ -56,7 +56,7 @@ is locked when `UserService.IsLocked` says so for the time of the injected `Time
 
 **Pending**: the one open confirmation, if any: the user row, what it is about to do (disable, reset the second factor,
 or set the password), and, for disabling, the `UserImpact` that was loaded when the panel opened. Opening another
-panel, cancelling, or any finished action replaces or clears it.
+panel, canceling, or any finished action replaces or clears it.
 
 **Passwords**: the new password typed in a row, by user identity.
 

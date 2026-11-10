@@ -816,7 +816,7 @@ public class ReviewPageDiffTests : PageTestBase
     ///     that keeps the text typed so far.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled()
+    public async Task ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabeled()
     {
         // Arrange: a line selected and some text typed
         var (projectId, cut) = await OpenModAsync();

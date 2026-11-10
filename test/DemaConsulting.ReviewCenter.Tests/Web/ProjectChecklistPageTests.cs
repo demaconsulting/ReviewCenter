@@ -509,7 +509,7 @@ public class ProjectChecklistPageTests : PageTestBase
 
     /// <summary>
     ///     Test that the replace asks for a confirmation that says that existing reviews keep their checklist, and
-    ///     that cancelling changes nothing.
+    ///     that canceling changes nothing.
     /// </summary>
     [Fact]
     public async Task ProjectChecklistPage_Replace_Cancelled_ChangesNothing()
@@ -625,7 +625,7 @@ public class ProjectChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the reset asks for a confirmation, that cancelling changes nothing, and that confirming returns
+    ///     Test that the reset asks for a confirmation, that canceling changes nothing, and that confirming returns
     ///     the project to the built-in default, shows the badge, confirms in words and records the change.
     /// </summary>
     [Fact]
@@ -661,7 +661,7 @@ public class ProjectChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that cancelling the confirmation of a reset leaves the own checklist of the project in place and
+    ///     Test that canceling the confirmation of a reset leaves the own checklist of the project in place and
     ///     records no audit entry.
     /// </summary>
     [Fact]

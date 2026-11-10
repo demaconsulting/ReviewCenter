@@ -304,7 +304,7 @@ public static class FollowUpCarry
     /// <remarks>
     ///     A check thread belongs to the discussion of the review it was started in (the checklist of the new review is
     ///     answered afresh), so it is left out before any other rule: it is neither counted as a resolved thread nor
-    ///     reported as a dropped file, and it never needs the creator's acknowledgement. Its count is reported
+    ///     reported as a dropped file, and it never needs the creator's acknowledgment. Its count is reported
     ///     separately.
     /// </remarks>
     /// <param name="sourceId">The identifier of the earlier review.</param>

@@ -60,12 +60,12 @@ N/A - standard test environment.
   keeping their kinds and report flags (a Finding stays a Finding, chat stays chat, and the note about a moved anchor
   is a comment that is not included); Fail answers, resolved threads,
   slots, signatures and reopenings are not; a line anchor is kept only for identical content; an unknown or foreign
-  review, a review that does not fit, and dropped open threads without an acknowledgement are refused with
+  review, a review that does not fit, and dropped open threads without an acknowledgment are refused with
   `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged. The preview of a
   follow-up (`PreviewFollowUpAsync`) reports, for a set of files, what the creation would carry and drop, by the same
   rule, writes and audits nothing, refuses an unfit review with `FollowUpInvalid`, and is refused as a missing project
   for a user who may not see the project. Threads about a check, open or resolved, are never carried, need no
-  acknowledgement, and are only counted (`CheckThreadsLeftOut`) in the preview.
+  acknowledgment, and are only counted (`CheckThreadsLeftOut`) in the preview.
 
 #### Test Scenarios
 
@@ -544,14 +544,14 @@ is tested by `ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAncho
 in both reviews, the line anchor and the comments are kept without a note. This scenario is tested by
 `ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor`.
 
-**ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement**: Open threads on a file that is not in the new
+**ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment**: Open threads on a file that is not in the new
 review refuse the creation with `FollowUpInvalid` and a message that lists the file; with
 `acknowledgeDroppedThreads` the review is created without them and the audit detail says how many files were dropped.
-This scenario is tested by `ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement`.
+This scenario is tested by `ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment`.
 
-**ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless**: The acknowledgement changes nothing
+**ReviewService_CreateDraftAsync_AcknowledgmentWithoutDroppedThreads_IsHarmless**: The acknowledgment changes nothing
 when no thread is dropped. This scenario is tested by
-`ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless`.
+`ReviewService_CreateDraftAsync_AcknowledgmentWithoutDroppedThreads_IsHarmless`.
 
 **ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource**: An approved earlier review can be
 followed, and a follow-up of a follow-up points to the one before it, and what it carries is marked with that review.
@@ -643,12 +643,12 @@ about a check are not carried and are counted only as threads left out, neither 
 files, while the file threads next to them are handled as before. This scenario is tested by
 `FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped`.
 
-**FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement**: An open check thread leaves nothing
+**FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgment**: An open check thread leaves nothing
 to acknowledge, because it is not a thread on a file that left the review. This scenario is tested by
-`FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement`.
+`FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgment`.
 
 **ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut**: The preview and the creation leave
-the check threads out, the preview reports only how many there are, no acknowledgement is needed for them, and the file
+the check threads out, the preview reports only how many there are, no acknowledgment is needed for them, and the file
 thread next to them is carried. This scenario is tested by
 `ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut`.
 

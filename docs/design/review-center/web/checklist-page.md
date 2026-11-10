@@ -183,8 +183,8 @@ applicable). The warning appears
 when the call would change the digest while a signature of another slot is current: at **Submit ballot**, and at an
 answer or section decision that changes the standing in this way (for example, passing a check
 that the reviewer had failed in a submitted ballot, or switching a not-applicable section back to "applies"). The own
-slot's signature never needs an acknowledgement. `SaveAsync`, `SubmitBallotAsync` and the applicability saves call the
-service without an acknowledgement. When it
+slot's signature never needs an acknowledgment. `SaveAsync`, `SubmitBallotAsync` and the applicability saves call the
+service without an acknowledgment. When it
 refuses with `SignaturesWouldBecomeOutOfDate`, the page keeps the request and shows the `SignatureWarning` component
 (`signature-warning`) next to the control that was used: inside the check (after `check-error`) for an answer, under the
 ballot status line (after `ballot-error`) for a hand-in, and
@@ -193,7 +193,7 @@ the section (after the section error) for a reason saved to make a section not a
 "applies". The banner names every affected slot and its signer (`signature-warning-slots`, for example "Slot 1 (Rita)").
 Nothing is stored; an unsaved Fail, N/A, or reason stays as typed, and a section just switched to "applies" stays shown
 as switched until the person decides. **Confirm change** (`signature-warning-confirm`) repeats the call with the
-identities of the affected slots as the acknowledgement. When another signature appeared meanwhile, the service
+identities of the affected slots as the acknowledgment. When another signature appeared meanwhile, the service
 refuses again and the page shows the banner again with the slots of both refusals merged. **Cancel**
 (`signature-warning-cancel`) only removes the banner; the switch of a section to "applies" returns to its stored
 state, and the typed reason and chosen outcome stay (a ballot that was being handed in stays a draft). The page holds

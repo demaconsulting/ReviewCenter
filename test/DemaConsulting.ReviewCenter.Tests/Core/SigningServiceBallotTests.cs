@@ -328,10 +328,10 @@ public class SigningServiceBallotTests
 
     /// <summary>
     ///     Test that removing the slot whose ballot holds the only dissent changes the agreed standing, and so needs the
-    ///     acknowledgement of the signature it makes out of date.
+    ///     acknowledgment of the signature it makes out of date.
     /// </summary>
     [Fact]
-    public async Task SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement()
+    public async Task SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment()
     {
         // Arrange: sam disagrees; a signature given before that is stored straight into the store
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -340,7 +340,7 @@ public class SigningServiceBallotTests
         await world.StoreSignatureAsync(1);
         var actor = SignedReviewWorld.ActorOf("rita");
 
-        // Act: remove the slot of sam without, then with the acknowledgement
+        // Act: remove the slot of sam without, then with the acknowledgment
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RemoveSlotAsync(
             actor, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, cancellationToken));
         var stillThere = (await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Slots.Count;
@@ -377,11 +377,11 @@ public class SigningServiceBallotTests
 
     /// <summary>
     ///     Test that a reviewer leaving a slot whose submitted ballot holds the only dissent changes the agreed
-    ///     standing, and so needs the acknowledgement of the signature it makes out of date, and that a departure that
+    ///     standing, and so needs the acknowledgment of the signature it makes out of date, and that a departure that
     ///     leaves the standing as it is needs none.
     /// </summary>
     [Fact]
-    public async Task SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement()
+    public async Task SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgment()
     {
         // Arrange: alex, the alternate of slot 1, hands in a ballot that disagrees; a signature given at that
         // standing is stored straight into the store
@@ -395,7 +395,7 @@ public class SigningServiceBallotTests
         var rita = SignedReviewWorld.ActorOf("rita");
         var slot = world.Slots[0];
 
-        // Act: alex leaves the slot without, then with the acknowledgement
+        // Act: alex leaves the slot without, then with the acknowledgment
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.UpdateSlotAsync(
             rita, world.ProjectId, SignedReviewWorld.ReviewId, slot.Id, slot.PrimaryUserId, null, cancellationToken));
         var stillThere = (await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Slots[0].AlternateUserId;
@@ -411,10 +411,10 @@ public class SigningServiceBallotTests
 
     /// <summary>
     ///     Test that a reviewer leaving a slot whose submitted ballot agrees with the others leaves the digest as it is,
-    ///     so the signatures of the other slots stay current and need no acknowledgement.
+    ///     so the signatures of the other slots stay current and need no acknowledgment.
     /// </summary>
     [Fact]
-    public async Task SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement()
+    public async Task SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgment()
     {
         // Arrange: slot 2 signs while every ballot agrees
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -433,17 +433,17 @@ public class SigningServiceBallotTests
 
     /// <summary>
     ///     Test that removing a slot whose submitted ballot agrees with the others leaves the digest as it is, so the
-    ///     signatures of the other slots stay current and need no acknowledgement.
+    ///     signatures of the other slots stay current and need no acknowledgment.
     /// </summary>
     [Fact]
-    public async Task SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement()
+    public async Task SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgment()
     {
         // Arrange: slot 2 signs while every ballot agrees
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(2);
 
-        // Act: remove slot 3, whose ballot agrees, without any acknowledgement
+        // Act: remove slot 3, whose ballot agrees, without any acknowledgment
         await world.Signing.RemoveSlotAsync(
             SignedReviewWorld.ActorOf("rita"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[2].Id, cancellationToken);
 

@@ -68,7 +68,7 @@ N/A - standard test environment.
   `GetAsync` reports `AuthorBlocked` for the author only while the rule is on.
 - A hand-in that would change the record digest and make a current signature of another slot out of date is refused
   with `SignaturesWouldBecomeOutOfDate` naming each affected slot number and signer, unless the slot is acknowledged,
-  and nothing is stored; the signature of the own slot needs no acknowledgement; a draft edit, a hand-in that agrees
+  and nothing is stored; the signature of the own slot needs no acknowledgment; a draft edit, a hand-in that agrees
   with the others, another slot giving the same value, a review without a current signature, and a locked review
   (`ReviewLocked` first) behave as described.
 - Answers and not-applicable sections that a follow-up review carried count like the others (a review whose checks are
@@ -78,7 +78,7 @@ N/A - standard test environment.
   of any slot, as the primary or as the alternate reviewer, and the lead only, never by an auditor, an API token,
   another member or a person outside the project; it
   is normalized (LF, trimmed, blank means none) and limited to 4000 characters without control characters; a concluded
-  review refuses it with `ReviewLocked`; a change while a signature is current needs the acknowledgement; the same text
+  review refuses it with `ReviewLocked`; a change while a signature is current needs the acknowledgment; the same text
   again changes nothing; a change by someone else in between is refused with `RecordChanged`; and every change is
   audited as `review.conclusion-changed` with the two lengths and never the text.
 
@@ -195,23 +195,23 @@ is tested by `ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSigna
 
 **ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners**: Slots 1 (signed by its
 alternate) and 3 are signed and slot 2 is not; a reviewer who disagrees changes an answer and hands the ballot in
-without an acknowledgement; the refusal at the hand-in names slot 1 and slot 3 with the people who signed, and their
+without an acknowledgment; the refusal at the hand-in names slot 1 and slot 3 with the people who signed, and their
 identities. This
 scenario is tested by `ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`.
 
-**ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots**: Slots 1 and 2 are signed and a
+**ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots**: Slots 1 and 2 are signed and a
 reviewer disagrees in the draft; handing in with only some of the signed slots acknowledged, and with an unrelated
 slot acknowledged, is refused naming the others, and the ballot is not handed in. This scenario is tested by
-`ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots`.
+`ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots`.
 
-**ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate**: Every signed slot is acknowledged
+**ChecklistService_SetAnswerAsync_FullAcknowledgment_StoresAndSignatureOutOfDate**: Every signed slot is acknowledged
 at the hand-in; the ballot is handed in and each signature is out of date. This scenario is tested by
-`ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate`.
+`ChecklistService_SetAnswerAsync_FullAcknowledgment_StoresAndSignatureOutOfDate`.
 
-**ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement**: A section is switched to not applicable
-in the draft of a ballot on a signed review, which needs no acknowledgement; handing the ballot in is refused until the
+**ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgment**: A section is switched to not applicable
+in the draft of a ballot on a signed review, which needs no acknowledgment; handing the ballot in is refused until the
 slot is acknowledged, and then it is handed in. Marking a section applicable that has no stored state changes nothing.
-This scenario is tested by `ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement`.
+This scenario is tested by `ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgment`.
 
 **ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: In a review whose one slot is held by
 another user, a member who holds no slot answers a check; the call is refused with `NoReviewerSlot` and the review has
@@ -280,20 +280,20 @@ and bob has a draft Fail. The ballot view for bob, for a member without a slot, 
 for a user outside the project has no differing check and no failed check, and its serialized form does not contain the
 reason. This scenario is tested by `ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck`.
 
-**ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots**: Three submitted ballots
+**ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgmentOfOtherSlots**: Three submitted ballots
 agree and slot 1 has signed. A reviewer of another slot changes an answer to Fail; the edit is stored and the signature
-stays current, because the other ballots still agree. Handing the differing ballot in without an acknowledgement is
+stays current, because the other ballots still agree. Handing the differing ballot in without an acknowledgment is
 refused with `SignaturesWouldBecomeOutOfDate` and the signature stays; with slot 1 acknowledged the hand-in is stored
 and the signature is out of date. This scenario is tested by
-`ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots`.
+`ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgmentOfOtherSlots`.
 
 **ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning**: Slot 1 has signed; a reviewer of another slot saves an
-answer to the value it has and hands the ballot in without an acknowledgement; nothing is refused and the signature of
+answer to the value it has and hands the ballot in without an acknowledgment; nothing is refused and the signature of
 slot 1 is still current. This scenario is tested by `ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning`.
 
-**ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement**: The reviewer of slot 1 has signed, changes
-the own answer to Fail and hands the ballot in without any acknowledgement; nothing is refused and the own signature is
-out of date. This scenario is tested by `ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement`.
+**ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgment**: The reviewer of slot 1 has signed, changes
+the own answer to Fail and hands the ballot in without any acknowledgment; nothing is refused and the own signature is
+out of date. This scenario is tested by `ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgment`.
 
 **ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign**: Cyd, the primary of the only slot,
 reopens an approved review while the project requires that the reopener does not sign again. Cyd changes an answer and
@@ -332,8 +332,8 @@ affected slots it is given, so a later change to the caller's list does not chan
 has an empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
 
 **ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards**: With the signature of slot 1 current,
-a reviewer whose draft differs hands the ballot in without the acknowledgement; the refusal lists the affected slot and
-its list is recorded. The ballot is then handed in with the acknowledgement, which puts the signature out of date; the
+a reviewer whose draft differs hands the ballot in without the acknowledgment; the refusal lists the affected slot and
+its list is recorded. The ballot is then handed in with the acknowledgment, which puts the signature out of date; the
 list of the refusal that was caught is still the recorded one. This scenario is tested by
 `ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards`.
 
@@ -528,13 +528,13 @@ at the start, at the end, or among white space, or before a CRLF, is refused wit
 control character check runs before the trim; the text and the audit trail are unchanged. This scenario is tested by
 `ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing`.
 
-**ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement**: With slot 1 signed, a change
-without acknowledgement is refused with `SignaturesWouldBecomeOutOfDate` naming slot 1 and nothing is stored; with the
-acknowledgement the text is stored and the signature is out of date. This scenario is tested by
-`ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement`.
+**ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgment**: With slot 1 signed, a change
+without acknowledgment is refused with `SignaturesWouldBecomeOutOfDate` naming slot 1 and nothing is stored; with the
+acknowledgment the text is stored and the signature is out of date. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgment`.
 
 **ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit**: Saving the text a review already has, written
-as a browser sends it, returns `false`, needs no acknowledgement, records no entry and keeps the signature. This
+as a browser sends it, returns `false`, needs no acknowledgment, records no entry and keeps the signature. This
 scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit`.
 
 **ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly**: Setting, replacing and clearing the text

@@ -171,7 +171,7 @@ sections:
           remains in the record.
         tests:
           - SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot
-          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
+          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment
 
       - id: ReviewCenter-SigningService-SlotEdit-Signed
         title: >-
@@ -1645,8 +1645,8 @@ sections:
         justification: |
           Nobody should withdraw an approval of somebody else by accident, so the caller must say that it knows.
         tests:
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
 
       - id: ReviewCenter-SigningService-SignatureImpact-NothingStored
         title: >-
@@ -1655,33 +1655,33 @@ sections:
         justification: |
           A refused change must leave the record and its signatures as they were.
         tests:
-          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
 
       - id: ReviewCenter-SigningService-SignatureImpact-Acknowledged
         title: >-
           The SigningService class shall carry out a change that makes signatures out of date when the caller has
           acknowledged every affected slot.
         justification: |
-          The acknowledgement is the caller's informed consent, so nothing else stands in the way of the change.
+          The acknowledgment is the caller's informed consent, so nothing else stands in the way of the change.
         tests:
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
           - SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot
 
       - id: ReviewCenter-SigningService-SignatureImpact-DigestUnchanged
         title: >-
-          The SigningService class shall need no acknowledgement for a change that leaves the digest of the record as
+          The SigningService class shall need no acknowledgment for a change that leaves the digest of the record as
           it is, chat or a draft ballot that leaves the consolidated standing alone, for example.
         justification: |
           A change that leaves the digest alone makes no signature out of date, so there is nothing to acknowledge.
         tests:
           - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
-          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
+          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgmentAndKeepsSignature
           - SignatureImpact_RequireAcknowledged_SameStanding_NoWarning
 
       - id: ReviewCenter-SigningService-SignatureImpact-NoSignature
         title: >-
-          The SigningService class shall need no acknowledgement for a change to a review without a current
+          The SigningService class shall need no acknowledgment for a change to a review without a current
           signature.
         justification: |
           Without a signature there is no approval that the change could withdraw.
@@ -1695,7 +1695,7 @@ sections:
         justification: |
           A person who changes the own ballot knows about the own signature and needs no warning about it.
         tests:
-          - SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement
+          - SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgment
 
       - id: ReviewCenter-SigningService-ProgressCounts
         title: >-
@@ -1986,7 +1986,7 @@ sections:
 
       - id: ReviewCenter-SigningService-SlotBallotImpact
         title: >-
-          The SigningService class shall require the acknowledgement of the other signed slots, with the
+          The SigningService class shall require the acknowledgment of the other signed slots, with the
           SignaturesWouldBecomeOutOfDate rule and before anything is stored, when removing a slot would change the
           consolidated standing, and so the digest.
         justification: |
@@ -1994,36 +1994,36 @@ sections:
           disagreed, for example, makes the others agree and so changes the digest; the person who does it has to see
           whose signature this withdraws.
         tests:
-          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
+          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment
 
       - id: ReviewCenter-SigningService-SlotBallotImpact-Departure
         title: >-
-          The SigningService class shall require the same acknowledgement, with the same rule and before anything is
+          The SigningService class shall require the same acknowledgment, with the same rule and before anything is
           stored, when a reviewer leaves a slot and the ballot of the slot reverts to a draft without the rows of the
           departed reviewer, which would change the consolidated standing.
         justification: |
           A departing reviewer takes the own rows with them, which can change the standing as the removal of a slot
           does.
         tests:
-          - SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement
+          - SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgment
 
       - id: ReviewCenter-SigningService-SlotBallotImpact-StandingKept
         title: >-
-          The SigningService class shall not ask for an acknowledgement when a reviewer leaves a slot and the
+          The SigningService class shall not ask for an acknowledgment when a reviewer leaves a slot and the
           consolidated standing, and so the digest, stays as it is.
         justification: |
           A change that leaves the standing as it is withdraws nothing, so it needs no confirmation.
         tests:
-          - SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement
+          - SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgment
 
       - id: ReviewCenter-SigningService-SlotBallotImpact-RemoveKept
         title: >-
-          The SigningService class shall not ask for an acknowledgement when a slot is removed and the consolidated
+          The SigningService class shall not ask for an acknowledgment when a slot is removed and the consolidated
           standing, and so the digest, stays as it is.
         justification: |
           A removal that leaves the standing as it is withdraws nothing, so it needs no confirmation.
         tests:
-          - SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement
+          - SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgment
 
       - id: ReviewCenter-SigningService-Concluded
         title: >-

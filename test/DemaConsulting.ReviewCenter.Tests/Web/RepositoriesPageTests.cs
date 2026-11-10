@@ -415,7 +415,7 @@ public class RepositoriesPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that cancelling an edit closes the form and changes nothing.
+    ///     Test that canceling an edit closes the form and changes nothing.
     /// </summary>
     [Fact]
     public async Task RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing()

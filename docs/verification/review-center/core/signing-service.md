@@ -105,7 +105,7 @@ N/A - standard test environment.
 - A change of the checklist or of a thread that would change the digest while a current signature exists is refused
   with `SignaturesWouldBecomeOutOfDate` unless every affected slot is acknowledged. The refusal names each affected
   slot by its number and its signer, a change that leaves the digest of the record as it is (a draft that leaves the
-  agreed standing alone, for example), or a review without a current signature, needs no acknowledgement, and the
+  agreed standing alone, for example), or a review without a current signature, needs no acknowledgment, and the
   signature of the slot that is excluded because it belongs to the person who changes the own ballot is not named.
 - A project administrator (a system administrator, who need not be a member, or an administrator of the project) reopens
   a locked review with a
@@ -454,13 +454,13 @@ alternate). A draft ballot leaves the consolidated standing, and so the digest, 
 ballot is handed in, not when an answer is saved. They are tested by
 `ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`
 (slot numbers and the people who signed, the alternate included, refused at the hand-in of the changed ballot),
-`ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots` (only the slots that remain),
+`ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots` (only the slots that remain),
 `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow` (no signature, and a change that leaves the digest as it is),
-and `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement` (a new thread that is included in the
+and `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment` (a new thread that is included in the
 report counts, while chat does not). The unit tests of the helper itself show that a ballot that differs lists the
 signed slot of another reviewer (`SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot`), that the
 slot of the person who changes the own ballot is left out when it is excluded
-(`SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement`), and that a change that leaves the
+(`SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgment`), and that a change that leaves the
 agreed standing as it is warns nobody (`SignatureImpact_RequireAcknowledged_SameStanding_NoWarning`). The effect on
 signatures
 that already went out of date is checked by `SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable`,
@@ -758,33 +758,33 @@ is tested by `SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCh
 a reviewer signs), `ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote` and
 `ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome`.
 
-**SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement**: Sam disagrees, and a signature
+**SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment**: Sam disagrees, and a signature
 given before that is stored straight into the store. Removing the slot of sam, which holds the only dissent and so
 changes the consolidated standing, is refused with `SignaturesWouldBecomeOutOfDate` and the slot stays; with the
 signed slot acknowledged, the removal succeeds and the ballot goes with the slot. This scenario is tested by
-`SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement`.
+`SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment`.
 
 **SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot**: On a review with three slots, each with a
-submitted ballot and nothing signed, the second slot is removed without an acknowledgement. The record then holds no
+submitted ballot and nothing signed, the second slot is removed without an acknowledgment. The record then holds no
 ballot of the removed slot and still holds the ballots of the other two slots. This scenario is tested by
 `SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot`.
 
-**SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement**: Alex, the alternate of
+**SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgment**: Alex, the alternate of
 slot 1, hands in a ballot that disagrees on the first check, and a signature given at that standing is stored straight
 into the store for slot 2. Removing alex from slot 1 takes the dissenting rows out of the ballot, which becomes a draft,
 and so changes the consolidated standing. The change is refused with `SignaturesWouldBecomeOutOfDate` and the slot is
 unchanged; with slot 2 acknowledged, it succeeds and the signature of slot 2 is out of date. This scenario is tested by
-`SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement`.
+`SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgment`.
 
-**SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement**: Slot 2 signs while every ballot agrees;
+**SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgment**: Slot 2 signs while every ballot agrees;
 alex leaves slot 1, which sends its ballot back to a draft, but the other ballots still agree, so the digest is as it
-was. The change succeeds without any acknowledgement and the signature of slot 2 stays current. This scenario is tested
-by `SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement`.
+was. The change succeeds without any acknowledgment and the signature of slot 2 stays current. This scenario is tested
+by `SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgment`.
 
-**SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement**: Slot 2 signs while every ballot agrees;
-slot 3, whose submitted ballot agrees with the others, is removed without any acknowledgement. The consolidated
+**SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgment**: Slot 2 signs while every ballot agrees;
+slot 3, whose submitted ballot agrees with the others, is removed without any acknowledgment. The consolidated
 standing and the digest are as they were, so the removal succeeds and the signature of slot 2 stays current. This
-scenario is tested by `SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement`.
+scenario is tested by `SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgment`.
 
 **SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved**: Rita and sam have signed while tess holds a
 draft, so the review is not approved. Tess hands in again, with the agreed standing as it was, and signs; the review is

@@ -848,23 +848,23 @@ sections:
         tests:
           - ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked
 
-      - id: ReviewCenter-ThreadService-CheckThreadStart-Acknowledgement
+      - id: ReviewCenter-ThreadService-CheckThreadStart-Acknowledgment
         title: >-
           The ThreadService class shall refuse with the SignaturesWouldBecomeOutOfDate rule starting a check thread
           that is included in the report when a signature is current and the caller has not acknowledged it.
         justification: |
           An open thread blocks signing, so starting one is a change like any other that can outdate a signature.
         tests:
-          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement
+          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgment
 
-      - id: ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgement
+      - id: ReviewCenter-ThreadService-CheckThreadStart-ChatNoAcknowledgment
         title: >-
           The ThreadService class shall start a check thread that is not included in the report without an
-          acknowledgement.
+          acknowledgment.
         justification: |
           Chat is not part of the digest, so nobody is asked to acknowledge that a signature may go out of date.
         tests:
-          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement
+          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgment
 
       - id: ReviewCenter-ThreadService-CheckThreadStart-ChatKeepsSignature
         title: >-
@@ -1027,8 +1027,8 @@ sections:
           has signed silently withdraws that signature, so the service says which signatures would be lost and asks
           the caller to confirm.
         tests:
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
+          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Reply
         title: >-
@@ -1038,8 +1038,8 @@ sections:
         justification: |
           An included reply changes the content of the report, so it changes what the signatures cover.
         tests:
-          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment
+          - ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Promote
         title: >-
@@ -1048,7 +1048,7 @@ sections:
         justification: |
           A promoted thread joins the report, so it changes what the signatures cover.
         tests:
-          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Demote
         title: >-
@@ -1057,7 +1057,7 @@ sections:
         justification: |
           A demoted thread leaves the report, so it changes what the signatures cover.
         tests:
-          - ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-CommentToggle
         title: >-
@@ -1067,7 +1067,7 @@ sections:
         justification: |
           A reply that joins or leaves the report changes what the signatures cover.
         tests:
-          - ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Resolve
         title: >-
@@ -1076,7 +1076,7 @@ sections:
         justification: |
           The resolution note of a Finding is part of the report, so it changes what the signatures cover.
         tests:
-          - ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement
+          - ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-NamesSlots
         title: >-
@@ -1085,10 +1085,10 @@ sections:
         justification: |
           The caller must be able to tell whose signatures would be lost before confirming.
         tests:
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
           - ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot
-          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment
+          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-NamesSlots-OnlySigned
         title: >-
@@ -1125,13 +1125,13 @@ sections:
           A refusal that asks for a confirmation must not leave the thread or the reply behind, or the signatures
           would be lost without the confirmation.
         tests:
-          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment
+          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-AfterValidation
         title: >-
-          The ThreadService class shall validate the request before it asks for an acknowledgement, so that a request
+          The ThreadService class shall validate the request before it asks for an acknowledgment, so that a request
           that is not valid is reported as that error and not as the signature impact.
         justification: |
           A person who cannot go ahead anyway must not be asked to confirm the loss of signatures.
@@ -1145,15 +1145,15 @@ sections:
         justification: |
           There is nothing to change in a thread that does not exist, so no signature is at stake.
         tests:
-          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain
         title: >-
-          The ThreadService class shall need no acknowledgement for resolving a Finding that is already resolved.
+          The ThreadService class shall need no acknowledgment for resolving a Finding that is already resolved.
         justification: |
           A request that changes nothing needs no confirmation.
         tests:
-          - ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ResolvedAgain-SignaturesCurrent
         title: >-
@@ -1167,12 +1167,12 @@ sections:
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ChatThread
         title: >-
-          The ThreadService class shall need no acknowledgement for starting a thread that is not included in the
+          The ThreadService class shall need no acknowledgment for starting a thread that is not included in the
           report.
         justification: |
           Chat is not part of the digest, so starting it never calls for a confirmation.
         tests:
-          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
+          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgmentAndKeepsSignature
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ChatThread-SignaturesCurrent
         title: >-
@@ -1185,11 +1185,11 @@ sections:
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ChatReply
         title: >-
-          The ThreadService class shall need no acknowledgement for a reply that is not included in the report.
+          The ThreadService class shall need no acknowledgment for a reply that is not included in the report.
         justification: |
           A chat reply is not part of the digest, so posting it never calls for a confirmation.
         tests:
-          - ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ChatReply-SignaturesCurrent
         title: >-
@@ -1202,21 +1202,21 @@ sections:
 
       - id: ReviewCenter-ThreadService-SignatureImpact-ResolveQuestion
         title: >-
-          The ThreadService class shall need no acknowledgement for resolving a Question.
+          The ThreadService class shall need no acknowledgment for resolving a Question.
         justification: |
           A Question is chat, and the resolved state of a thread is not part of the digest.
         tests:
-          - ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Reopen
         title: >-
-          The ThreadService class shall need no acknowledgement for reopening a resolved thread.
+          The ThreadService class shall need no acknowledgment for reopening a resolved thread.
         justification: |
           The open or resolved state of a thread is not part of the digest, so reopening never invalidates a
           signature.
         tests:
-          - ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement
-          - ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement
+          - ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgment
+          - ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgment
 
       - id: ReviewCenter-ThreadService-SignatureImpact-Restored
         title: >-
@@ -1224,7 +1224,7 @@ sections:
         justification: |
           The digest covers only the content of the report, so undoing a change must undo its effect on the digest.
         tests:
-          - ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest
+          - ThreadService_PromoteThenDemoteWithAcknowledgment_RestoresOriginalDigest
 
       - id: ReviewCenter-ThreadService-IncludedComment
         title: >-
@@ -1438,7 +1438,7 @@ sections:
           The ThreadService class shall refuse with the RecordChanged rule resolving a thread that was promoted or
           demoted between its check and the write.
         justification: |
-          The note, the acknowledgement and the report flag are decided for the kind that the service saw, so a kind
+          The note, the acknowledgment and the report flag are decided for the kind that the service saw, so a kind
           that changed meanwhile must be refused and not accepted silently.
         tests:
           - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing

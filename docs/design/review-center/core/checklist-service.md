@@ -159,14 +159,14 @@ record as it would be after the change in memory (`BallotEdits`) and passes it w
 The digest decides, and it covers the agreed standing of the submitted ballots and no answerer, so:
 
 - A draft does not count. An edit of a ballot in a review with more than one slot normally changes nothing the digest
-  covers; it needs an acknowledgement only when taking a submitted ballot back to a draft changes the agreed standing.
+  covers; it needs an acknowledgment only when taking a submitted ballot back to a draft changes the agreed standing.
   The impact is therefore checked where the standing changes: at the hand-in. `SubmitBallotAsync` refuses with
   `SignaturesWouldBecomeOutOfDate` when the record with the ballot submitted has another digest and a current signature
   of another slot is not in `acknowledgedSlotIds`, and nothing is stored. A ballot that agrees with the others leaves
-  the digest alone and needs no acknowledgement.
+  the digest alone and needs no acknowledgment.
 - In a review with one slot the edit that completes the ballot hands it in, so the edit is checked as the hand-in, with
   the ballot as the store will leave it.
-- The signature of the own slot of the reviewer never needs an acknowledgement: the change is the one that withdraws
+- The signature of the own slot of the reviewer never needs an acknowledgment: the change is the one that withdraws
   it. The signatures of the other slots are listed, each by slot number and signer.
 - Another reviewer giving the same value does not change the digest (the answerer is not in it), so a signature stays.
   Marking a section applicable that has no row, or saving a ballot to the value it already has, does not either.
@@ -306,7 +306,7 @@ has no web page or API yet: it is written through the two methods below and show
   auditor); the actor is not an API token (`ActorNotAllowed`); the review exists (`ReviewNotFound`); the actor is a
   reviewer of a slot or the lead (`ActorNotAllowed`); the text is valid (`ConclusionTextInvalid`); the review is not
   concluded (`ReviewLocked`; `ReviewLock.IsConcluded` on the snapshot that was read); no current signature would become
-  out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`, naming each slot and signer, computed with
+  out of date without acknowledgment (`SignaturesWouldBecomeOutOfDate`, naming each slot and signer, computed with
   `SignatureImpact.RequireAcknowledged` on the record with the new text). Then the store applies the change as a
   compare-and-set on the text that was read; when someone changed it meanwhile the service throws `RecordChanged` and
   nothing is stored.
@@ -316,7 +316,7 @@ has no web page or API yet: it is written through the two methods below and show
   text means no text, and the text has at most 4000 characters. The stored text, its length and the digest are
   therefore the same whatever the browser sent.
 - *Digest*: the text is part of the record digest (the line `conclusion-text`; see `RecordDigest`), so a change while a
-  signature is current needs the acknowledgement, and a concluded review is locked against it. It is not carried over
+  signature is current needs the acknowledgment, and a concluded review is locked against it. It is not carried over
   to a follow-up (see `ReviewService`).
 - *Planned*: the rule that a rejected review needs a conclusion text before it can be signed, and the web pages and the
   attestation that show the text, are separate, later changes and are not part of this unit yet.
@@ -344,7 +344,7 @@ clock at construction, or a null actor, raises `ArgumentNullException`. Store fa
 - **BallotConsolidation**, **BallotProjection** and **BallotEdits** — test that a ballot is complete, build the
   consolidated or the own view, and compute the record an edit or a hand-in leads to (static, no state).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
-  approved, and refuse one that would make a current signature out of date without acknowledgement.
+  approved, and refuse one that would make a current signature out of date without acknowledgment.
 - **TimeProvider** — supplies the answer and hand-in times (injected).
 
 #### Callers

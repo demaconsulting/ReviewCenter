@@ -515,7 +515,7 @@ public sealed class ReviewService
     /// <returns>
     ///     The empty string for an ordinary review; otherwise <c>, follows 'X'; carried N answers, M threads</c> with, when
     ///     there are any, the number of resolved threads that were not carried and the number of files whose open threads
-    ///     were dropped on the creator's acknowledgement.
+    ///     were dropped on the creator's acknowledgment.
     /// </returns>
     private static string FollowText(string? follow, ReviewCarryOver? carry)
     {

@@ -239,7 +239,7 @@ public class AccountTotpPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that cancelling the set-up removes the secret from the page and leaves the user not enrolled.
+    ///     Test that canceling the set-up removes the secret from the page and leaves the user not enrolled.
     /// </summary>
     [Fact]
     public async Task AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm()

@@ -1065,7 +1065,7 @@ sections:
         justification: |
           Open discussions must not disappear without the creator knowing.
         tests:
-          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment
 
       - id: ReviewCenter-ReviewService-FollowUp-DroppedMessage
         title: >-
@@ -1074,16 +1074,16 @@ sections:
           The creator must see which discussions would be lost.
         tests:
           - FollowUpCarry_DroppedMessage_ListsFilesAndTheRest
-          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgment
 
       - id: ReviewCenter-ReviewService-FollowUp-Acknowledged
         title: >-
           The ReviewService class shall create a follow-up normally when the creator acknowledges dropped threads that
           do not exist.
         justification: |
-          An unneeded acknowledgement, for example from an API client that always sends it, must do no harm.
+          An unneeded acknowledgment, for example from an API client that always sends it, must do no harm.
         tests:
-          - ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless
+          - ReviewService_CreateDraftAsync_AcknowledgmentWithoutDroppedThreads_IsHarmless
 
       - id: ReviewCenter-ReviewService-FollowUp-Audit
         title: >-
@@ -1380,14 +1380,14 @@ sections:
         tests:
           - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
 
-      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgement
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgment
         title: >-
-          The ReviewService class shall ask for no acknowledgement of dropped threads because of an open thread about
+          The ReviewService class shall ask for no acknowledgment of dropped threads because of an open thread about
           a check.
         justification: |
           Threads that are never carried are not lost by the creator's choice.
         tests:
-          - FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement
+          - FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgment
 
       - id: ReviewCenter-ReviewService-FollowUpPreview
         title: >-

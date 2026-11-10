@@ -1,11 +1,16 @@
 package ReviewCenter {
+    private import SoftwareItemMetadata::*;
+
     part def NotificationDispatcher {
         doc /* The pass that decides, for each user with a notification mode and a confirmed address, which inbox items are new and mails them once: the inbox is read as the recipient, the backlog of a newly chosen mode is recorded without a mail, the mode Every holds items back for a batch window, the mode Daily sends one summary for each local date, a failed send is retried five times with growing waits and then given up (the items are kept apart from the delivered ones, so a later change is still mailed), the stored count of waiting replies follows a fall, mails beyond the limits of the server and of the user are deferred, each mail is reserved in the shared send log before it is sent and released when the send fails, the inbox is read only when something may have changed, and the failure of one user does not stop the others. */
 
-        comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/NotificationDispatcher.cs, NotificationRecipient.cs, NotificationDispatchState.cs, NotificationCommit.cs, NotifiedItem.cs and NotificationMode.cs */
-        comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcher*Tests.cs and NotificationDispatcherWorld.cs */
-        comment designRef /* Design: docs/design/review-center/core/notification-dispatcher.md */
-        comment verificationRef /* Verification: docs/verification/review-center/core/notification-dispatcher.md */
-        comment reqRef /* Requirements: docs/reqstream/review-center/core/notification-dispatcher.yaml */
+        metadata info : SoftwareInfo {
+            description = "The pass that decides, for each user with a notification mode and a confirmed address, which inbox items are new and mails them once: the inbox is read as the recipient, the backlog of a newly chosen mode is recorded without a mail, the mode Every holds items back for a batch window, the mode Daily sends one summary for each local date, a failed send is retried five times with growing waits and then given up (the items are kept apart from the delivered ones, so a later change is still mailed), the stored count of waiting replies follows a fall, mails beyond the limits of the server and of the user are deferred, each mail is reserved in the shared send log before it is sent and released when the send fails, the inbox is read only when something may have changed, and the failure of one user does not stop the others.";
+            sourceFiles = ("src/DemaConsulting.ReviewCenter.Core/NotificationDispatcher.cs", "src/DemaConsulting.ReviewCenter.Core/NotificationRecipient.cs", "src/DemaConsulting.ReviewCenter.Core/NotificationDispatchState.cs", "src/DemaConsulting.ReviewCenter.Core/NotificationCommit.cs", "src/DemaConsulting.ReviewCenter.Core/NotifiedItem.cs", "src/DemaConsulting.ReviewCenter.Core/NotificationMode.cs");
+            testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherBaselineTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherCapTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherDailyTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherDedupeTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherEveryTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherIdleTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherMaskingTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherRetryTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherStaleTests.cs", "test/DemaConsulting.ReviewCenter.Tests/Core/NotificationDispatcherWorld.cs");
+            designFiles = ("docs/design/review-center/core/notification-dispatcher.md");
+            verificationFiles = ("docs/verification/review-center/core/notification-dispatcher.md");
+            requirementFiles = ("docs/reqstream/review-center/core/notification-dispatcher.yaml");
+        }
     }
 }

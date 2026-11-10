@@ -342,11 +342,11 @@ public class ChecklistServiceReviewConclusionTextTests
     }
 
     /// <summary>
-    ///     Test that changing the text while a signature is current needs the acknowledgement that names the affected
+    ///     Test that changing the text while a signature is current needs the acknowledgment that names the affected
     ///     reviewer, and that the acknowledged change makes that signature out of date.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement()
+    public async Task ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgment()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -375,7 +375,7 @@ public class ChecklistServiceReviewConclusionTextTests
     }
 
     /// <summary>
-    ///     Test that writing the text it already has changes nothing: it needs no acknowledgement, keeps the
+    ///     Test that writing the text it already has changes nothing: it needs no acknowledgment, keeps the
     ///     signature and records no audit entry.
     /// </summary>
     [Fact]

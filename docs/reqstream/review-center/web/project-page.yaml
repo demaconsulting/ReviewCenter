@@ -1463,7 +1463,7 @@ sections:
         justification: |
           The creator must see which open threads are lost before confirming the loss.
         tests:
-          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment
 
       - id: ReviewCenter-ProjectPage-FollowUp-Title
         title: >-
@@ -1482,23 +1482,23 @@ sections:
         tests:
           - NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion
 
-      - id: ReviewCenter-ProjectPage-FollowUp-Acknowledgement
+      - id: ReviewCenter-ProjectPage-FollowUp-Acknowledgment
         title: >-
           The ProjectPage unit shall refuse to create a follow-up that would drop open threads until the user confirms
           that the threads were checked.
         justification: |
           Dropped threads are lost, so the creator must confirm deliberately, and the confirmation starts unchecked.
         tests:
-          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment
 
-      - id: ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+      - id: ReviewCenter-ProjectPage-FollowUp-AcknowledgmentPassed
         title: >-
           The ProjectPage unit shall pass the confirmation of dropped threads on when it creates the follow-up.
         justification: |
           The service decides what is allowed and needs the confirmation to accept the follow-up.
         tests:
-          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
-          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgment
+          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment
 
       - id: ReviewCenter-ProjectPage-FollowUp-UploadCreation
         title: >-
@@ -1514,7 +1514,7 @@ sections:
         justification: |
           The relation to the earlier review is recorded when the files come from a repository.
         tests:
-          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgment
 
       - id: ReviewCenter-ProjectPage-FollowUp-PlainReview
         title: >-
@@ -2271,7 +2271,7 @@ sections:
           The ProjectPage unit shall store and audit nothing when the administrator cancels the confirmation of a
           replacement.
         justification: |
-          Cancelling must be safe.
+          Canceling must be safe.
         tests:
           - ProjectChecklistPage_Replace_Cancelled_ChangesNothing
 
@@ -2367,7 +2367,7 @@ sections:
           The ProjectPage unit shall leave the checklist unchanged when the administrator cancels the confirmation of a
           reset.
         justification: |
-          Cancelling must be safe.
+          Canceling must be safe.
         tests:
           - ProjectChecklistPage_Reset_Cancelled_ChangesNothing
           - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits

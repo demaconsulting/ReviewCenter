@@ -3,7 +3,7 @@
 #### Verification Approach
 
 `ThreadService` is verified with unit tests defined in `ThreadServiceTests.cs`, `ThreadServiceReportTests.cs` (the
-report rules, the acknowledgements, and the audit entries), `ThreadKindRulesTests.cs` (the kind and the role rules),
+report rules, the acknowledgments, and the audit entries), `ThreadKindRulesTests.cs` (the kind and the role rules),
 and `ReviewActorRolesTests.cs` (how a person becomes the lead or a slot owner, directly and through the thread
 actions, with the real access rules), `CheckThreadTests.cs` (the threads about a check, through the service with the
 real access rules for the roles), and `CheckThreadRulesTests.cs` (the pure rule of who may start a check thread). The
@@ -64,7 +64,7 @@ N/A - standard test environment.
   the token is) are not a lead. A slot owner is the primary or the alternate reviewer of any slot, found by user
   name, also for an actor with an API token; the command line, an unknown user, and a review without slots have none.
 - A change that does not change the digest (chat, the state of a thread, the resolution of a Question, the reopening
-  of a Finding) needs no acknowledgement and leaves the signatures current; a change that does (an included start or
+  of a Finding) needs no acknowledgment and leaves the signatures current; a change that does (an included start or
   reply, a promotion, a demotion, a toggle, the resolution of a Finding) is refused with
   `SignaturesWouldBecomeOutOfDate` unless the slots are acknowledged. A reply to a thread that does not exist is
   `ThreadNotFound`, and an invalid anchor is reported before the signature impact.
@@ -74,7 +74,7 @@ N/A - standard test environment.
 - A check thread is started by an administrator, the lead, a reviewer whose ballot is submitted, and the owner of the
   only slot (with a draft); an auditor, a plain contributor, and a reviewer of one of several slots with a draft or no
   ballot are refused with `ActorNotAllowed`. A concluded review refuses it with `ReviewLocked`, a start that would
-  outdate a signature needs the acknowledgement, and the audit entry names the check and never the text.
+  outdate a signature needs the acknowledgment, and the audit entry names the check and never the text.
 - The capabilities of a viewer equal the rules that the actions enforce (promote: starter, slot owner, lead; demote:
   starter, lead; toggle: author of the reply, lead), an auditor and a concluded review allow nothing, a token gets what
   its user gets except the lead's rights, and the threads are counted by kind and state with the open ones worded by
@@ -258,49 +258,49 @@ judge the lock itself, so the test shows that the service does. This scenario is
 checklist on, the author of the review starts a thread, replies, and resolves it; none is refused, because the rule
 concerns the checklist only. This scenario is tested by `ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected`.
 
-**ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement**: A thread that is included in the report is
-started on a review with a current signature; without an acknowledgement it is refused naming slot 1 and the signer
-and nothing is stored, and with the acknowledgement it is stored and the signature is out of date. This scenario is
-tested by `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement`.
+**ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment**: A thread that is included in the report is
+started on a review with a current signature; without an acknowledgment it is refused naming slot 1 and the signer
+and nothing is stored, and with the acknowledgment it is stored and the signature is out of date. This scenario is
+tested by `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment`.
 
 **ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot**: A thread that is included in the
 report is started on a review in which slots 1 and 2 hold a current signature and slot 3 does not, without an
-acknowledgement; the refusal names exactly slots 1 and 2 with their signers, and nothing is stored. This scenario is
+acknowledgment; the refusal names exactly slots 1 and 2 with their signers, and nothing is stored. This scenario is
 tested by `ThreadService_StartThreadAsync_IncludedAndSeveralSigned_NamesEachAffectedSlot`.
 
 **ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor**: A thread on a file that is not in the
 review is started on a signed review; the refusal is `ThreadAnchorInvalid`, not the signature impact. This scenario is
 tested by `ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor`.
 
-**ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement**: A reply that is included in the report, to a
-resolved thread on a signed review, is refused without the acknowledgement and stored with it; a reply to a thread that
+**ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment**: A reply that is included in the report, to a
+resolved thread on a signed review, is refused without the acknowledgment and stored with it; a reply to a thread that
 does not exist is `ThreadNotFound`. This scenario is tested by
-`ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement`.
+`ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgment`.
 
-**ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement**: Resolving a resolved thread on a
-signed review changes nothing; reopening and resolving a chat thread need no acknowledgement and leave the signature
+**ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgment**: Resolving a resolved thread on a
+signed review changes nothing; reopening and resolving a chat thread need no acknowledgment and leave the signature
 current, because the state of a thread is not part of the record. This scenario is tested by
-`ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement`.
+`ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgment`.
 
-**ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature**: A chat thread is started
-on a review with a current signature without an acknowledgement; it is stored and the signature stays current. This
-scenario is tested by `ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature`.
+**ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgmentAndKeepsSignature**: A chat thread is started
+on a review with a current signature without an acknowledgment; it is stored and the signature stays current. This
+scenario is tested by `ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgmentAndKeepsSignature`.
 
 **ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature**: A chat reply on a signed review is stored without an
-acknowledgement and the signature stays current. This scenario is tested by
+acknowledgment and the signature stays current. This scenario is tested by
 `ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature`.
 
 **ThreadService_StartThreadAsync_ChatAfterSignature_KeepsSignature**: Slots 1 and 2 are signed and a chat thread is
 started; the record digest is the same as before and slots 1 and 2 still hold a current signature while slot 3 holds
 none. This scenario is tested by `ThreadService_StartThreadAsync_ChatAfterSignature_KeepsSignature`.
 
-**ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement**: A chat reply is posted to a thread of a review
-with a current signature without any acknowledgement; the call returns the stored reply with its text, not included in
+**ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgment**: A chat reply is posted to a thread of a review
+with a current signature without any acknowledgment; the call returns the stored reply with its text, not included in
 the report, and the reply is the last comment of the thread. This scenario is tested by
-`ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgement`.
+`ThreadService_ReplyAsync_ChatAfterSignature_NeedsNoAcknowledgment`.
 
 **ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_StoresThread**: A thread included in the report is
-started on a review with a current signature with the acknowledgement of the signed slot; the thread is stored as a
+started on a review with a current signature with the acknowledgment of the signed slot; the thread is stored as a
 Finding with its starting comment included. This scenario is tested by
 `ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_StoresThread`.
 
@@ -309,50 +309,50 @@ thread is started; the record digest changes, slot 1 is out of date and slots 2 
 signed. This scenario is tested by
 `ThreadService_StartThreadAsync_IncludedAfterSignatureAcknowledged_MakesSignatureOutOfDate`.
 
-**ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement**: An included thread after a signature
-is refused with `SignaturesWouldBecomeOutOfDate` without the acknowledgement, and stored with it. This scenario is
-tested by `ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement`.
+**ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgment**: An included thread after a signature
+is refused with `SignaturesWouldBecomeOutOfDate` without the acknowledgment, and stored with it. This scenario is
+tested by `ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement**: An included reply after a signature is
-refused without the acknowledgement and stored with it. This scenario is tested by
-`ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement`.
+**ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgment**: An included reply after a signature is
+refused without the acknowledgment and stored with it. This scenario is tested by
+`ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement**: Promoting a thread after a signature is refused
-without the acknowledgement and changes the digest with it. This scenario is tested by
-`ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement`.
+**ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgment**: Promoting a thread after a signature is refused
+without the acknowledgment and changes the digest with it. This scenario is tested by
+`ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement**: Demoting a Finding after a signature is refused
-without the acknowledgement and changes the digest with it. This scenario is tested by
-`ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement`.
+**ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgment**: Demoting a Finding after a signature is refused
+without the acknowledgment and changes the digest with it. This scenario is tested by
+`ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement**: Toggling the flag of a reply after a
-signature is refused without the acknowledgement and changes the digest with it. This scenario is tested by
-`ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement`.
+**ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgment**: Toggling the flag of a reply after a
+signature is refused without the acknowledgment and changes the digest with it. This scenario is tested by
+`ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement**: Resolving a Finding with a note after a
-signature is refused without the acknowledgement, because the included resolution note changes the record. This
-scenario is tested by `ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement`.
+**ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgment**: Resolving a Finding with a note after a
+signature is refused without the acknowledgment, because the included resolution note changes the record. This
+scenario is tested by `ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgment`.
 
-**ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement**: Resolving a Question, with or without a
-note, needs no acknowledgement and leaves the signature current. This scenario is tested by
-`ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement`.
+**ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgment**: Resolving a Question, with or without a
+note, needs no acknowledgment and leaves the signature current. This scenario is tested by
+`ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgment`.
 
-**ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement**: Reopening a resolved Finding after a
-signature needs no acknowledgement, because the earlier resolution note stays in the record. This scenario is tested by
-`ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement`.
+**ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgment**: Reopening a resolved Finding after a
+signature needs no acknowledgment, because the earlier resolution note stays in the record. This scenario is tested by
+`ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgment`.
 
-**ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement**: A Finding is resolved with a note,
-then slot 1 signs; resolving it again, with a note and then without one, needs no acknowledgement, adds no comment and
+**ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgment**: A Finding is resolved with a note,
+then slot 1 signs; resolving it again, with a note and then without one, needs no acknowledgment, adds no comment and
 no audit entry, and the signature stays current. This scenario is tested by
-`ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgement`.
+`ThreadService_ResolveAsync_ResolvedFindingAfterSignature_NeedsNoAcknowledgment`.
 
 **ThreadService_ResolveAsync_ResolvedFindingAfterSignature_KeepsSignature**: A Finding is resolved with a note, then
 slot 1 signs; resolving it again leaves the record digest as it was and slot 1 still holds a current signature. This
 scenario is tested by `ThreadService_ResolveAsync_ResolvedFindingAfterSignature_KeepsSignature`.
 
-**ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest**: A thread is promoted and demoted with
-acknowledgements; the digest after the demotion equals the digest before the promotion. This scenario is tested by
-`ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest`.
+**ThreadService_PromoteThenDemoteWithAcknowledgment_RestoresOriginalDigest**: A thread is promoted and demoted with
+acknowledgments; the digest after the demotion equals the digest before the promotion. This scenario is tested by
+`ThreadService_PromoteThenDemoteWithAcknowledgment_RestoresOriginalDigest`.
 
 **ThreadService_StartThreadAsync_IncludeInReport_StoresFindingWithFlaggedStartingComment**: A thread started with the
 flag is stored with its starting comment included, so it is a Finding. This scenario is tested by
@@ -651,10 +651,10 @@ the own ballot submitted. This scenario is tested by
 **ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked**: A concluded review refuses a new check
 thread. This scenario is tested by `ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked`.
 
-**ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement**: A check thread whose
-starting comment is included makes a current signature out of date and needs the acknowledgement; a chat check thread
+**ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgment**: A check thread whose
+starting comment is included makes a current signature out of date and needs the acknowledgment; a chat check thread
 does not. This scenario is tested by
-`ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement`.
+`ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgment`.
 
 **ThreadService_StartThreadAsync_CheckAnchorChatThread_KeepsSignatureCurrent**: A check thread whose starting comment
 is not included in the report is started while a slot is signed, and that signature is still current afterwards. This

@@ -794,7 +794,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     return (false, null);
                 }
 
-                // The kind is read again inside the transaction. The caller decided the note, the acknowledgement of
+                // The kind is read again inside the transaction. The caller decided the note, the acknowledgment of
                 // the signatures and the report flag for the expected kind, so another kind is refused, not accepted
                 var isFinding = thread.Kind == ThreadKind.Finding;
                 if (thread.Kind != expectedKind)
