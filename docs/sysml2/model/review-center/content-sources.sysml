@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Reading of the registered git repositories of the projects: a safe git child-process runner, the git implementation of the repository provider that reads a bare mirror cache without a working tree, the encryption of access tokens through Data Protection, and the reading of the review-sets of a ReviewMark configuration file. Implements the provider, protector, and parser contracts defined in the Core subsystem. */
 
         metadata info : SoftwareInfo {
-            description = "Reading of the registered git repositories of the projects: a safe git child-process runner, the git implementation of the repository provider that reads a bare mirror cache without a working tree, the encryption of access tokens through Data Protection, and the reading of the review-sets of a ReviewMark configuration file. Implements the provider, protector, and parser contracts defined in the Core subsystem.";
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/ContentSources/ContentSourcesSubsystemTests.cs");
             designFiles = ("docs/design/review-center/content-sources.md");
             verificationFiles = ("docs/verification/review-center/content-sources.md");

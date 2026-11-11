@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Shared, independently testable helper functions used by other subsystems. */
 
         metadata info : SoftwareInfo {
-            description = "Shared, independently testable helper functions used by other subsystems.";
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Utilities/UtilitiesSubsystemTests.cs");
             designFiles = ("docs/design/review-center/utilities.md");
             verificationFiles = ("docs/verification/review-center/utilities.md");

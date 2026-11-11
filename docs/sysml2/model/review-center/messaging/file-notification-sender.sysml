@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Delivery of one e-mail as a file for demonstrations, development, and tests: one .eml file for each message with a new name in the configured folder, which is created when needed, holding the message that an SMTP server would receive, never overwriting a file, and failures reported as a send error without the path. */
 
         metadata info : SoftwareInfo {
-            description = "Delivery of one e-mail as a file for demonstrations, development, and tests: one .eml file for each message with a new name in the configured folder, which is created when needed, holding the message that an SMTP server would receive, never overwriting a file, and failures reported as a send error without the path.";
             sourceFiles = ("src/DemaConsulting.ReviewCenter/Messaging/FileNotificationSender.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Messaging/FileNotificationSenderTests.cs");
             designFiles = ("docs/design/review-center/messaging/file-notification-sender.md");

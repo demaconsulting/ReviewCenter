@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Safe path-combination utility guarding against path-traversal. */
 
         metadata info : SoftwareInfo {
-            description = "Safe path-combination utility guarding against path-traversal.";
             sourceFiles = ("src/DemaConsulting.ReviewCenter/Utilities/PathHelpers.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Utilities/PathHelpersTests.cs");
             designFiles = ("docs/design/review-center/utilities/path-helpers.md");

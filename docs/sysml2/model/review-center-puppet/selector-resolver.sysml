@@ -5,7 +5,6 @@ package ReviewCenterPuppet {
         doc /* Turns user selector text into a Playwright selector; a plain name means a data-testid. */
 
         metadata info : SoftwareInfo {
-            description = "Turns user selector text into a Playwright selector; a plain name means a data-testid.";
             sourceFiles = ("tools/puppet/SelectorResolver.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Puppet.Tests/SelectorResolverTests.cs");
             designFiles = ("docs/design/review-center-puppet/selector-resolver.md");
