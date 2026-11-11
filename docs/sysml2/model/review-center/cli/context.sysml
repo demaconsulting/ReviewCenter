@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Command-line argument parser and I/O owner for one tool invocation, including the user add verb and its --system-admin switch. */
 
         metadata info : SoftwareInfo {
-            description = "Command-line argument parser and I/O owner for one tool invocation, including the user add verb and its --system-admin switch.";
             sourceFiles = ("src/DemaConsulting.ReviewCenter/Cli/Context.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Cli/ContextTests.cs");
             designFiles = ("docs/design/review-center/cli/context.md");

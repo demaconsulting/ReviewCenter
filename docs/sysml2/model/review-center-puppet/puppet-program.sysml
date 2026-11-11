@@ -5,7 +5,6 @@ package ReviewCenterPuppet {
         doc /* Entry point and client of the Puppet tool; parses one command, starts the daemon or sends the command to it, and prints the result. */
 
         metadata info : SoftwareInfo {
-            description = "Entry point and client of the Puppet tool; parses one command, starts the daemon or sends the command to it, and prints the result.";
             sourceFiles = ("tools/puppet/PuppetProgram.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Puppet.Tests/PuppetProgramTests.cs");
             designFiles = ("docs/design/review-center-puppet/puppet-program.md");

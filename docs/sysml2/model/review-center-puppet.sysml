@@ -14,7 +14,6 @@ package ReviewCenterPuppet {
         doc /* The Puppet development tool as a whole; a separate software system, not distributed. */
 
         metadata info : SoftwareInfo {
-            description = "The Puppet development tool as a whole; a separate software system, not distributed.";
             testFiles = ("test/DemaConsulting.ReviewCenter.Puppet.Tests/PuppetEndToEndTests.cs");
             designFiles = ("docs/design/review-center-puppet.md");
             verificationFiles = ("docs/verification/review-center-puppet.md");

@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Entry point and execution orchestrator. */
 
         metadata info : SoftwareInfo {
-            description = "Entry point and execution orchestrator.";
             sourceFiles = ("src/DemaConsulting.ReviewCenter/Program.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/ProgramTests.cs");
             designFiles = ("docs/design/review-center/program.md");

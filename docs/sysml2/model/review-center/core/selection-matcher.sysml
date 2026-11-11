@@ -5,7 +5,6 @@ package ReviewCenter {
         doc /* Parses include and exclude patterns for the selection of repository files and decides whether a path is selected, with a defined glob dialect. */
 
         metadata info : SoftwareInfo {
-            description = "Parses include and exclude patterns for the selection of repository files and decides whether a path is selected, with a defined glob dialect.";
             sourceFiles = ("src/DemaConsulting.ReviewCenter.Core/SelectionMatcher.cs");
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/Core/SelectionMatcherTests.cs");
             designFiles = ("docs/design/review-center/core/selection-matcher.md");

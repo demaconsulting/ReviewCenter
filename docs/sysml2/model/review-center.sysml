@@ -28,7 +28,6 @@ package ReviewCenter {
         doc /* The ReviewCenter system as a whole. */
 
         metadata info : SoftwareInfo {
-            description = "The ReviewCenter system as a whole.";
             testFiles = ("test/DemaConsulting.ReviewCenter.Tests/IntegrationTests.cs");
             designFiles = ("docs/design/review-center.md");
             verificationFiles = ("docs/verification/review-center.md");
