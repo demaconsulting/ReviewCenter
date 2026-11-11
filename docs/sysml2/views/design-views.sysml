@@ -5,7 +5,8 @@
 // 'render' - is what scopes the rendered diagram content.
 package ReviewCenter {
     view SoftwareStructureView {
-        expose ReviewCenter;
+        expose ReviewCenter::**;
+        render asInterconnectionDiagram;
     }
 
     view ReviewCenterView {
