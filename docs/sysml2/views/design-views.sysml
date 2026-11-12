@@ -4,9 +4,10 @@
 // inside a named 'view' usage (not a 'view def' definition), and it - not
 // 'render' - is what scopes the rendered diagram content.
 package ReviewCenter {
-    view SoftwareStructureView {
+    private import StandardViewDefinitions::*;
+
+    view SoftwareStructureView : InterconnectionView {
         expose ReviewCenter::**;
-        render asInterconnectionDiagram;
     }
 
     view ReviewCenterView {
