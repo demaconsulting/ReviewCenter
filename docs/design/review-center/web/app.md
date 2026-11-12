@@ -234,7 +234,7 @@ stored value. Failures in a rendered page are handled by the framework and are o
 
 Known limitations: the scroll function and the appearance script have no automated browser test. The review page tests
 assert the arguments the scroll function is called with, the shell test asserts that the appearance script is in the
-document ahead of the style sheet, and the Puppet acceptance walk exercises the real scrolling.
+document ahead of the style sheet.
 
 #### Dependencies
 

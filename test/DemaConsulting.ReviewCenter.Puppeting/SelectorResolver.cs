@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-namespace DemaConsulting.ReviewCenter.Puppet;
+namespace DemaConsulting.ReviewCenter.Puppeting;
 
 /// <summary>
 ///     Turns the selector text a user types into the selector Playwright evaluates.

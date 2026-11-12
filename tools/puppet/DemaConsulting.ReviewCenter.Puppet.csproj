@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Puppet: an in-repo developer tool that drives the ReviewCenter web UI in a headless browser.
+  <!-- Puppet: an in-repo command-line tool that lets AI agents drive the ReviewCenter web UI in a headless browser.
+       It is a thin client and daemon around the Puppeting test-support library (test/DemaConsulting.ReviewCenter.Puppeting).
        It is NOT part of the distributed ReviewCenter package: nothing here is packed or published. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -24,9 +25,8 @@
 
   <!-- Runtime Dependencies -->
   <ItemGroup>
-    <!-- Playwright drives headless Chromium. The browser binary is not part of the package; it is
-         installed once with the playwright.ps1 script that the build copies to the output folder. -->
-    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
+    <!-- The browser automation; it brings Playwright, whose playwright.ps1 the build copies to the output folder -->
+    <ProjectReference Include="..\..\test\DemaConsulting.ReviewCenter.Puppeting\DemaConsulting.ReviewCenter.Puppeting.csproj" />
   </ItemGroup>
 
   <!-- Build Tool Dependencies -->

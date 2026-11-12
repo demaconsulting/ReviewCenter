@@ -10,8 +10,8 @@ the Core services and the Storage database exactly as they do in production. Tes
 HTML. Behavior that needs a live browser connection (typing, selecting files, submitting forms, and the switch of
 the `data-interactive` marker from `false` to `true`) is outside what plain HTTP requests can exercise. It is
 verified at unit level by the component tests of the page units (see the children of the requirements in
-`web.yaml`), not by these subsystem tests; the Puppet end-to-end test drives a real browser against a real server
-over the live connection (sign in, open Projects from the header, create a project, switch the theme).
+`web.yaml`), not by these subsystem tests; the browser system tests drive a real browser against a real server over the
+live connection (sign in, open Projects from the header, create a project).
 
 ### Test Environment
 

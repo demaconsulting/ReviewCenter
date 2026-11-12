@@ -717,8 +717,7 @@ the review is locked and comments are read-only, and every line comment button i
 
 **ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton**: The new-thread field and the reply field of a thread
 carry `data-ctrl-enter-submits` with the test id of their submit button, each submit button exists, and the hints
-"Ctrl+Enter to submit" are shown next to them. The key press itself runs in the browser, so it is checked by hand there
-(Puppet `press Control+Enter`). This scenario is tested by `ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton`.
+"Ctrl+Enter to submit" are shown next to them. This scenario is tested by `ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton`.
 
 **ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField**: A click on a line comment button calls
 `reviewCenter.focusTestId` with `thread-text-input` as the last browser call. This scenario is tested by
@@ -1089,10 +1088,9 @@ tested by the test of that name.
 row with `opacity: 0`, reveals it on row hover, focus within the row, a selected row, and keyboard focus, shows it
 always under `@media (hover: none)`, and never uses `display: none` or `visibility: hidden` for it, so it stays in the tab
 order. This scenario is tested by the test of that name. A real browser has the hover state, so the reach is also proven
-end to end by the Puppet test
-`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (`hover` on a row reveals
-its `+`, a `click` on it opens the composer; see the verification of ReviewCenterPuppet), and by the acceptance
-walk-through with Puppet (`puppet hover` on a row, a screenshot, then `puppet click` on its `+`).
+end to end by the browser system test
+`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (a hover on a row reveals
+its `+`, and a click on it opens the composer).
 
 **WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill**: the stylesheet has a hover and focus rule for
 `.section-toggle` and for `.line-comment` that fills with `var(--accent-soft)` and never with `--accent-hover`, and the
@@ -1256,7 +1254,7 @@ conclusion is written; and shows only the notice to a viewer who may not see the
 the tests of the same names.
 
 **Where are we? and what changed** are verified in `ReviewStatusPanelTests.cs` and in `ReviewPageTests.cs`, which
-render the component and the page with bUnit, and in two Puppet scenarios that run the page in a browser.
+render the component and the page with bUnit, and in two browser system tests that run the page in a browser.
 
 **ReviewStatusPanel_ShowsReviewerBallotAndSignedStates**, **ReviewStatusPanel_ShowsQuestionAndFindingCounts**,
 **ReviewStatusPanel_ShowsExactlyOneNextActionButton**, and **ReviewStatusPanel_DisputedCheck_DiscussStartsThread**: The

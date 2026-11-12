@@ -65,19 +65,8 @@
 
   <!-- Project References -->
   <ItemGroup>
-    <!-- The Puppet tool under test -->
-    <ProjectReference Include="..\..\tools\puppet\DemaConsulting.ReviewCenter.Puppet.csproj" />
-
-    <!-- The end-to-end test starts the ReviewCenter server as a separate process. Referencing the project with
-         ReferenceOutputAssembly=false makes sure the server is built first without linking its assembly. -->
-    <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj"
-                      ReferenceOutputAssembly="false" />
-  </ItemGroup>
-
-  <!-- Record where the freshly built server assembly lives so the end-to-end test can start it -->
-  <ItemGroup>
-    <AssemblyMetadata Include="ServerDllPath"
-                      Value="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'src', 'DemaConsulting.ReviewCenter', 'bin', '$(Configuration)', '$(TargetFramework)', 'DemaConsulting.ReviewCenter.dll'))" />
+    <!-- The library under test -->
+    <ProjectReference Include="..\DemaConsulting.ReviewCenter.Puppeting\DemaConsulting.ReviewCenter.Puppeting.csproj" />
   </ItemGroup>
 
 </Project>

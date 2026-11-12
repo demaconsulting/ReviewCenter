@@ -4,10 +4,10 @@ This document describes the integration and usage design for the `Playwright` OT
 
 ### Purpose
 
-Playwright for .NET (`Microsoft.Playwright`) together with the Chromium browser build it downloads is the browser
-automation library used by the Puppet developer tool of the separate ReviewCenterPuppet system. It lets Puppet open
-the ReviewCenter web interface in headless Chromium and click, hover, type, read text, and take screenshots. It is
-used by the development tool and its tests only and is not part of the distributed ReviewCenter package.
+Playwright for .NET (`Microsoft.Playwright`) together with the Chromium build it downloads is the browser automation
+library that the system tests use to exercise the ReviewCenter web interface as a user does. It opens the web
+interface in headless Chromium and clicks, hovers, types, reads text, and takes screenshots. It is used by the tests
+and by the non-shipping Puppet tool only and is not part of the distributed ReviewCenter package.
 
 ### Features Used
 
@@ -20,9 +20,10 @@ used by the development tool and its tests only and is not part of the distribut
 
 ### Integration Pattern
 
-Playwright is consumed as a NuGet package reference of the `DemaConsulting.ReviewCenter.Puppet` project. The
-`PlaywrightBrowser` unit is the single place that calls the library. The unit creates one Playwright instance, one
-browser, and one page that stay open for the life of the Puppet daemon and disposes them when the daemon stops.
-Chromium must be installed once per machine with the `playwright.ps1` script that
-the build copies next to the Puppet executable; when it is missing, `puppet start` fails with a message that names the
-install command.
+Playwright is consumed as a NuGet package reference of the `DemaConsulting.ReviewCenter.Puppeting` test-support
+library (`test/DemaConsulting.ReviewCenter.Puppeting/`). Its `PuppetBrowser` class is the single place that calls the
+library: it creates one Playwright instance, one browser, and one page, offers each operation as a method, and
+disposes them when it is disposed. The system tests (`test/DemaConsulting.ReviewCenter.SystemTests/`) create it
+in-process for every browser session. Chromium must be installed once per machine with the `playwright.ps1` script
+that the build copies into the output folder of every project that references the library; when it is missing,
+starting the browser fails with a message that names the install command.

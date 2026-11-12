@@ -17,13 +17,13 @@ processes or change console state belong to the serial `Sequential` xUnit collec
 the in-memory test-server classes (which open no port and start no process) run in parallel.
 
 The review integrity, signing, evidence, and access promises are verified by the `ReviewCenterSystemTests` class of the
-`DemaConsulting.ReviewCenter.Puppet.Tests` project. Those tests start the real server of the tool on a free loopback
-port with a temporary SQLite database and a real git repository, and drive it through a real Chromium browser with the
-Puppet tool (sign-in, planning a review from the repository, naming reviewers, answering the checklist, signing) and
-through the HTTP API with a personal access token. They are skipped locally when Chromium or git is missing and fail
-in the CI pipeline, where `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the evidence cannot be skipped silently. The
-tamper detection of the audit trail is verified by a process test that edits the SQLite database behind the tool and
-runs `audit verify`.
+`DemaConsulting.ReviewCenter.SystemTests` project. Those tests start the real server of the tool on a free loopback port
+with a temporary SQLite database and a real git repository, and drive it through a real Chromium browser that runs in
+the test process through the Puppeting test-support library (sign-in, planning a review from the repository, naming
+reviewers, answering the checklist, signing) and through the HTTP API with a personal access token. They are skipped
+locally when Chromium or git is missing and fail in the CI pipeline, where `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the
+evidence cannot be skipped silently. The tamper detection of the audit trail is verified by a process test that edits
+the SQLite database behind the tool and runs `audit verify`.
 
 `Runner.Run` merges stdout and stderr into a single combined output string. Per-stream assertions
 (e.g., "standard error is empty") are not possible at this level; all assertions are made
@@ -592,8 +592,8 @@ notice of the self-signed key, and the audit trail records one `attestation.gene
 complete is not offered and is refused. These scenarios are tested by
 `EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf` and
 `EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused`. The system requirement is also traced to the HTTP test of
-the endpoint, `AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent`. The Puppet end-to-end
-test was not extended for this slice (see the verification of the `Evidence` subsystem).
+the endpoint, `AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent`. The browser system
+tests were not extended for this slice (see the verification of the `Evidence` subsystem).
 
 **Personal access tokens**: A user creates a token, a script uses it to call the API, and after the token is revoked the
 same request is refused with 401. This
@@ -621,7 +621,7 @@ address, and asks for a code. The server writes one `.eml` file into a private f
 for the code; the test reads the 6-digit code from that file, types it, and sees the confirmed address, the enabled
 selector, and the remove button. It then chooses "Every change", saves, opens the page again, and finds the mode still
 chosen, with no second mail written. The test waits on visible states and on the file, never on a fixed time, and it is
-skipped without a browser like the other Puppet scenarios. This scenario is tested by
+skipped without a browser like the other browser system tests. This scenario is tested by
 `ReviewCenter_Notifications_FileSender_ConfirmByMailedCodeAndChooseMode_ShowsConfirmedStates`.
 
 **API under /api**: With a token, a script creates a draft review from files, reads it back (it is flagged as created
@@ -629,7 +629,7 @@ through the API and is not approved), finds that the attestation of a draft is r
 attestation PDF of a complete review. This scenario is tested by
 `ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd`. A token cannot sign or change a
 reviewer slot, and cannot open a web page; this is tested by
-`ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable`. The Puppet end-to-end test was not extended, because
+`ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable`. The browser system tests were not extended, because
 the API has no page (see the verification of the `Api` subsystem).
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same

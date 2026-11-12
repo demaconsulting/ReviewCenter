@@ -2,8 +2,7 @@
 
 This document provides the verification design for the ReviewCenter, a web-based formal code
 review service with a companion .NET command-line interface. The service is an ASP.NET Core
-Blazor Server application started with the `serve` verb; the repository also holds a separate
-development tool, Puppet, that drives a persistent headless browser against the web interface.
+Blazor Server application started with the `serve` verb.
 
 ## Purpose
 
@@ -116,12 +115,6 @@ This document covers the verification design for the following software items:
     - **PathHelpers** — safe path combination utilities
     - **TemporaryDirectory** — uniquely named temporary directory that is removed on disposal
     - **SecretSource** — resolves a secret from an inline value or a file, with messages that never hold the secret
-- **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
-  - **PuppetProgram** — command-line parsing, start, and result printing
-  - **ControlChannel** — control file and loopback protocol
-  - **BrowserDaemon** — the persistent browser process
-  - **SelectorResolver** — element selector translation
-  - **PlaywrightBrowser** — headless Chromium through Playwright
 
 **OTS items:**
 
@@ -135,7 +128,7 @@ This document covers the verification design for the following software items:
 - **OpenIddict** — OpenID Connect server library used by the tests as a fake identity provider
 - **Otp.NET** — one-time password library used for the optional second factor of local accounts
 - **Pandoc** — Markdown-to-HTML conversion tool
-- **Playwright** — browser automation library used by the Puppet developer tool
+- **Playwright** — browser automation library used by the system tests
 - **ReqStream** — requirements traceability tool
 - **ReviewMark** — file review enforcement tool
 - **SarifMark** — SARIF report conversion tool
@@ -150,7 +143,9 @@ This document covers the verification design for the following software items:
 The following topics are out of scope:
 
 - Verification documents are not produced for the test projects themselves — they are the
-  means of verification, not subjects of it
+  means of verification, not subjects of it; this includes the test-support Puppeting library
+- The Puppet command-line tool (`tools/puppet/`) is a non-shipping tool that lets AI agents drive the web interface;
+  like other test tooling it is verified by its automated tests, not by this document
 - Build pipeline CI configuration is excluded
 - The internal implementation of OTS software items is excluded; only integration and usage
   are verified
@@ -173,7 +168,9 @@ test/
 │   ├── Web/                                   — Web unit and subsystem tests
 │   ├── Api/                                   — Api unit and subsystem tests
 │   └── Hosting/                               — Hosting unit and subsystem tests
-└── DemaConsulting.ReviewCenter.Puppet.Tests/  — unit, system, and end-to-end tests of ReviewCenterPuppet
+├── DemaConsulting.ReviewCenter.SystemTests/   — system tests of ReviewCenter in a real browser against the real server
+├── DemaConsulting.ReviewCenter.Puppeting/     — test-support library: the in-process browser of the system tests
+└── DemaConsulting.ReviewCenter.Puppeting.Tests/ — tests of the Puppeting library
 ```
 
 Tests that touch a database use temporary SQLite files created by a shared test helper in a private temporary
@@ -186,11 +183,10 @@ In-house items have corresponding artifacts in parallel directory trees:
 - Requirements: `docs/reqstream/{system}/.../{item}.yaml` (kebab-case)
 - Design docs: `docs/design/{system}/.../{item}.md` (kebab-case)
 - Verification design: `docs/verification/{system}/.../{item}.md` (kebab-case)
-- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#); the ReviewCenterPuppet system keeps
-  its source in `tools/puppet/`
+- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#)
 - Tests: `test/{System}.Tests/.../{Item}Tests.cs` (PascalCase for C#)
 
-The system folders are `review-center` and `review-center-puppet`.
+The system folder is `review-center`.
 
 OTS items have parallel artifacts in:
 

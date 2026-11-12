@@ -416,8 +416,8 @@ Baseline side and its baseline line number (a removed line, or the baseline copy
 of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
 that is revealed by the stylesheet when the row is hovered, has keyboard focus inside it (`:focus-within`), or is the
 selected row, and is always shown on a device without hover (`@media (hover: none)`). It is hidden with `opacity`, not
-`display` or `visibility`, so it keeps its place and its tab stop and a driver such as Puppet can still click it
-(`puppet hover diff-row-{i}`, then `puppet click diff-comment-{i}`). The Head view keeps its always visible
+`display` or `visibility`, so it keeps its place and its tab stop and a browser driver can still click it
+(hover `diff-row-{i}`, then click `diff-comment-{i}`). The Head view keeps its always visible
 `line-comment-{n}` button. A thread is drawn under the row of the last line of
 its anchor, across the full width, and the cell of its side is marked. The component holds only which collapsed runs
 the reader has expanded; every other state is the page's.

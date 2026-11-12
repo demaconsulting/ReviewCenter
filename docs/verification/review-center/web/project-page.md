@@ -23,7 +23,7 @@ that allows everything, only arranges stored checklists and the change of a chec
 an export is read from the calls that bUnit's JavaScript interop recorded for `reviewCenter.downloadText`, and the file
 input is driven with the upload helper of the test context. The whole journey in a browser (import, replace, a new
 review that has the new checklist while an older review keeps the default, and reset) is verified by the system test
-`ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault` in the `Puppet` test project.
+`ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault` in the `SystemTests` test project.
 File
 selection is simulated the
 way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their

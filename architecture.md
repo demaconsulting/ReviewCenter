@@ -51,7 +51,8 @@ Expected scale is small: under 50 users and tens of concurrent reviews per insta
 - **Git**: git CLI on the host, via a bare mirror cache.
 - **Email**: SMTP.
 - **Logging**: Microsoft.Extensions.Logging structured logging.
-- **Testing**: xUnit v3. Playwright for .NET (headless Chromium) is used for E2E tests and Puppet.
+- **Testing**: xUnit v3. Playwright for .NET (headless Chromium), wrapped by the test-support Puppeting library, is used
+  for the browser system tests and by the Puppet tool.
 - **Distribution**: self-contained, single-file executables (plus wwwroot assets) for win-x64 and linux-x64. There is
   no NuGet dotnet-tool package any more.
 - **Hosting**: single instance behind a reverse proxy (nginx/IIS/Traefik) that terminates TLS, using ASP.NET
@@ -103,8 +104,9 @@ ReviewCenter (Software Package: self-contained executables win-x64 / linux-x64)
     └── Hosting - startup, appsettings binding + startup validation, forwarded headers,
                   structured logging, CLI verbs (serve; migrate reserved for later)
 
-Development tooling (in repo, not distributed)
-└── ReviewCenter.Puppet - Playwright persistent-browser helper for AI agents
+Test support and development tooling (in repo, not distributed)
+├── ReviewCenter.Puppeting - in-process Playwright browser for the system tests (test/)
+└── ReviewCenter.Puppet - persistent-browser CLI for AI agents, built on Puppeting (tools/)
 
 OTS: ASP.NET Core, Blazor, EF Core + providers, ASP.NET Core Identity, Monaco editor, git CLI,
      Playwright, xUnit v3
@@ -177,11 +179,15 @@ follows the earlier one.
 
 ReviewCenter.Puppet is a small Playwright-based helper (`puppet start`, then one `puppet <command>` per shell call)
 that keeps one persistent headless browser open so AI agents can drive the real user interface during development.
-It is a minimal helper and is kept as small and simple as possible; see
-`tools/puppet/README.md` and `docs/design/review-center-puppet.md`.
+It is a minimal helper and is kept as small and simple as possible; see `tools/puppet/README.md`. It is not part of the
+system design: like other test tooling it has no requirements, design, or verification documents and is verified by
+its automated tests.
 
 - **Selectors**: the UI exposes stable `data-testid` attributes.
-- **Shared engine**: the same Playwright approach powers the E2E system tests.
+- **Shared engine**: the browser automation is the Puppeting test-support library
+  (`test/DemaConsulting.ReviewCenter.Puppeting`). The system tests create its `PuppetBrowser` in-process and call its
+  methods; the Puppet CLI hosts the same class in its daemon. Regulated evidence (the system tests) therefore never
+  depends on the non-regulated CLI.
 
 ## Architectural Decisions
 
@@ -190,7 +196,7 @@ It is a minimal helper and is kept as small and simple as possible; see
 2. **ReviewMark as the CLI**: there is no ReviewCenter CLI client. Reason: avoids duplicating ReviewMark's review-set
    and fingerprint knowledge.
 3. **Puppet is dev tooling**: Puppet is in-repo development tooling and is not shipped. Reason: it exists to let
-   agents and tests exercise the UI, and end users have no need for it.
+   agents exercise the UI, and end users have no need for it. The system tests use the Puppeting library, not the CLI.
 4. **Self-hosted, single organization per instance**: deployment is self-hosted with one organization per instance and
    many projects, and projects may also run separate instances. Reason: small scale, and regulated users host their
    own evidence.
@@ -429,8 +435,8 @@ from the target design, an implementation note says so:
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
   executables (see decision 21). The Core assembly is bundled into the single-file executable; the native SQLite
   library (`e_sqlite3.dll` or `libe_sqlite3.so`) stays a separate file beside the executable, next to the web assets,
-  so the archive must be kept together. CI installs Chromium so the Puppet end-to-end test runs and is linked to the
-  Puppet requirements. The release workflow attaches the archives and checksums to the GitHub release.
+  so the archive must be kept together. CI installs Chromium so the browser system tests run and are linked to their
+  requirements. The release workflow attaches the archives and checksums to the GitHub release.
 
 ## Open Concerns
 

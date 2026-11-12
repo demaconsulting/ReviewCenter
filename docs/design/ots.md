@@ -29,7 +29,7 @@ The following OTS items have integration design documentation:
 - MailKit (_mailkit.md_) — mail library used by the Messaging subsystem to send e-mail and to build the messages
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
 - System.Security.Cryptography.Pkcs (_pkcs.md_) — CMS signing library used to sign the PDF attestations
-- Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool
+- Playwright (_playwright.md_) — browser automation library used by the system tests
 - ReqStream (_reqstream.md_) — requirements traceability tool
 - ReviewMark (_reviewmark.md_) — file review enforcement tool
 - SarifMark (_sarifmark.md_) — SARIF report conversion tool

@@ -4,9 +4,15 @@
 > possible: no production-grade hardening, no process-identity/race engineering, best-effort cleanup only, few
 > tests. Do not grow it beyond what an agent needs for its look, decide, act loop.
 
-Puppet keeps ONE persistent headless Chromium open and lets you drive it one command per shell call: act, look at
-the screenshot or the page text, decide, act again. It is **not part of the distributed ReviewCenter package**; it is
-the `ReviewCenterPuppet` software system of this repository.
+Puppet keeps ONE persistent headless Chromium open and lets you drive it one command per shell call: act, look at the
+screenshot or the page text, decide, act again. It is **not part of the distributed ReviewCenter package** and not part
+of the system design: like other test tooling it has no requirements, design, or verification documents and is verified
+by its automated tests (`tools/puppet.Tests/`).
+
+The browser automation itself is the test-support library `test/DemaConsulting.ReviewCenter.Puppeting/` (class
+`PuppetBrowser`). This CLI is a thin layer around it: the daemon hosts one `PuppetBrowser` and maps each command of the
+control channel to one of its methods. The system tests (`test/DemaConsulting.ReviewCenter.SystemTests/`) use the same
+library in-process and never this CLI.
 
 ## One-time setup
 
@@ -19,7 +25,8 @@ pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
 
 If Chromium is missing, `puppet start` fails and prints this same command. CI installs Chromium and sets
-`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the end-to-end test fails instead of skipping when the browser is missing.
+`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the end-to-end test of the CLI and the system tests fail instead of skipping
+when the browser is missing.
 
 In this document `puppet` stands for `dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll`;
 define a function or alias for it in your shell if you like.

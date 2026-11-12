@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-namespace DemaConsulting.ReviewCenter.Puppet.Tests;
+namespace DemaConsulting.ReviewCenter.Puppeting.Tests;
 
 /// <summary>
 ///     Unit tests for the <see cref="SelectorResolver"/>.

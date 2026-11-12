@@ -1,17 +1,17 @@
 ## Playwright Verification
 
-This document provides the verification evidence for the Playwright OTS software item. Its requirements belong to
-the ReviewCenterPuppet system.
+This document provides the verification evidence for the Playwright OTS software item.
 
 ### Required Functionality
 
-Playwright for .NET with its Chromium build is the browser automation library used by the Puppet developer tool. The
-project needs it to drive a headless Chromium: load pages, click, hover, fill, read text, and capture screenshots.
+Playwright for .NET with its Chromium build is the browser automation library that the system tests use, through the
+Puppeting test-support library, to drive the web interface in a real browser. The system tests need it to drive a
+headless Chromium: load pages, click, hover, fill, read text, emulate the color scheme, and capture screenshots.
 
 ### Verification Approach
 
-Playwright is verified by the real-browser end-to-end test of the Puppet system, which starts Puppet and drives the
-real ReviewCenter server in headless Chromium.
+Playwright is verified by a real-browser system test that drives the real ReviewCenter server in headless Chromium
+in-process, through the same `PuppetBrowser` class that the other system tests use.
 
 ### Test Environment
 
@@ -21,23 +21,25 @@ skipping when the browser cannot be launched. Locally the test skips with a reas
 
 ### Acceptance Criteria
 
-- The end-to-end test passes on Windows and Linux in CI.
+- The real-browser system test passes on Windows and Linux in CI.
 
 ### Test Scenarios
 
-#### PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+#### ReviewCenter_RealBrowser_SignInCreateProjectAndTheme_WorksOverTheLiveConnection
 
-**Scenario**: Puppet is started, navigates to the home page, hovers the sign-in link, fails and then succeeds at
-signing in on the login page, clicks through to the projects page, creates a project, opens the account page and
-switches the theme, reads texts, changes the viewport and color scheme, takes a screenshot, and is stopped.
+**Scenario**: The browser loads the home page, hovers the sign-in link and moves the mouse away, fails and then
+succeeds at signing in on the login page, clicks through to the projects page, creates a project, emulates the dark
+and the light color scheme, takes a screenshot of the page and of one element, and clicks an element that does not
+exist.
 
-**Expected**: Every command succeeds, the hover persists, the project page appears after the project is created,
-the theme attribute of the page is `dark` after the theme button is clicked, and the screenshot is a PNG.
+**Expected**: The home page answers `HTTP 200`, the hover holds until the mouse moves, the error and the user name
+are read from the page, the project page appears after the project is created, the media query of the page follows
+the emulated scheme, both screenshots are PNG files, and the missing element fails with a message that names it.
 
-**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`,
-`ReviewCenterPuppet-OTS-Playwright-Chromium-Click`, `ReviewCenterPuppet-OTS-Playwright-Chromium-Hover`,
-`ReviewCenterPuppet-OTS-Playwright-Chromium-Fill`, `ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText`,
-`ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme`, `ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot`.
+**Requirement coverage**: `ReviewCenter-OTS-Playwright-Chromium`, `ReviewCenter-OTS-Playwright-Chromium-Click`,
+`ReviewCenter-OTS-Playwright-Chromium-Hover`, `ReviewCenter-OTS-Playwright-Chromium-Fill`,
+`ReviewCenter-OTS-Playwright-Chromium-ReadText`, `ReviewCenter-OTS-Playwright-Chromium-ColorScheme`,
+`ReviewCenter-OTS-Playwright-Chromium-Screenshot`.
 
 ### Limitations
 

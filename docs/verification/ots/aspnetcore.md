@@ -74,11 +74,11 @@ the page first and opens the live connection afterwards.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components-Events`.
 
-#### PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+#### ReviewCenter_RealBrowser_SignInCreateProjectAndTheme_WorksOverTheLiveConnection
 
-**Scenario**: The Puppet end-to-end test of the ReviewCenterPuppet system drives a real browser against a real
-server: it signs in, waits until the page is marked interactive, clicks the new project button, fills in the form,
-and submits it. The test runs on Windows and Linux in CI.
+**Scenario**: The real-browser system test drives a real browser against a real server: it signs in, waits until
+the page is marked interactive, clicks the new project button, fills in the form, and submits it. The test runs on
+Windows and Linux in CI.
 
 **Expected**: The click and the form submission are handled by the live Blazor connection, so the project page
 appears, which proves the round trip between the browser and the component model.

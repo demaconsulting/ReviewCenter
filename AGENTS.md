@@ -28,9 +28,12 @@
 │   └── DemaConsulting.ReviewCenter/
 ├── test/
 │   ├── DemaConsulting.ReviewCenter.Tests/
-│   └── DemaConsulting.ReviewCenter.Puppet.Tests/
+│   ├── DemaConsulting.ReviewCenter.SystemTests/
+│   ├── DemaConsulting.ReviewCenter.Puppeting/
+│   └── DemaConsulting.ReviewCenter.Puppeting.Tests/
 └── tools/
-    └── puppet/
+    ├── puppet/
+    └── puppet.Tests/
 ```
 
 # Puppet (Agents Working on `tools/puppet`)
@@ -39,6 +42,12 @@ The Puppet is a minimal helper that lets an AI drive and screenshot the UI. Keep
 no production-grade hardening, no process-identity/race engineering, best-effort cleanup only, few tests. Do not grow
 it beyond what an agent needs for its look, decide, act loop (one persistent browser, one command per shell call).
 See `tools/puppet/README.md`.
+
+The browser automation itself lives in the test-support library `test/DemaConsulting.ReviewCenter.Puppeting/`; the
+CLI in `tools/puppet` only adds the daemon, the control channel, and the argument parsing around it. The system tests
+(`test/DemaConsulting.ReviewCenter.SystemTests/`) are requirement evidence and must use the library in-process, never
+the CLI or anything else under `tools/`. The Puppet CLI is not part of the system design (no requirements, design, or
+verification documents); its tests live in `tools/puppet.Tests/`.
 
 # Language and Spelling (ALL Agents)
 
