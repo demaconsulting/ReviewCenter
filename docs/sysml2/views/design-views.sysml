@@ -6,10 +6,8 @@
 package ReviewCenter {
     private import StandardViewDefinitions::*;
 
-    view SoftwareStructureView : GeneralView {
+    view SoftwareStructureView : InterconnectionView {
         expose ReviewCenter::**;
-        expose ReviewCenterPuppet::**;
-        filter not @SysML::Documentation;
     }
 
     view ReviewCenterView {
