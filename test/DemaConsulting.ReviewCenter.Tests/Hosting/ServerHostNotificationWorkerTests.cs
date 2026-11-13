@@ -183,8 +183,10 @@ public class ServerHostNotificationWorkerTests
         // Act
         await app.StopAsync(TestContext.Current.CancellationToken);
 
-        // Assert: stopped without a fault
-        Assert.True(worker.ExecuteTask.IsCompletedSuccessfully);
+        // Assert: stopped without a fault. A stop that comes before the thread pool has started the worker leaves
+        // BackgroundService's Task.Run task Canceled rather than RanToCompletion; both are a clean stop.
+        Assert.True(worker.ExecuteTask.IsCompleted);
+        Assert.False(worker.ExecuteTask.IsFaulted);
     }
 
     /// <summary>
