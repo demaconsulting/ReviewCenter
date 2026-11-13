@@ -562,92 +562,83 @@ sections:
 
       - id: Quality-BrowserAutomation
         title: >-
-          The repository shall rely on Playwright to load the pages of the web interface in the Puppet developer tool.
+          The repository shall rely on Playwright to load the pages of the web interface in the system tests.
         tags: [quality]
         justification: |
-          The Puppet developer tool depends on Playwright and Chromium to open the
-          web interface. This grouping requirement links the Playwright page-loading
-          OTS requirement to the quality root so it participates in orphan
-          detection without being falsely reported as disconnected from tool
-          functionality.
+          The system tests depend on Playwright and Chromium to open the web interface as a user does. This grouping
+          requirement links the Playwright page-loading OTS requirement to the quality root so it participates in
+          orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium
+          - ReviewCenter-OTS-Playwright-Chromium
 
       - id: Quality-BrowserAutomation-Click
         title: >-
-          The repository shall rely on Playwright to click an element of the web interface in the Puppet developer
-          tool.
+          The repository shall rely on Playwright to click an element of the web interface in the system tests.
         tags: [quality]
         justification: |
-          Buttons and links are the main way that the Puppet developer tool moves through the interface, which
-          depends on the click of Playwright. This grouping requirement links that OTS requirement to the quality
-          root so it participates in orphan detection without being falsely reported as disconnected from tool
-          functionality.
+          Buttons and links are the main way that the system tests move through the interface, which depends on the
+          click of Playwright. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
+          - ReviewCenter-OTS-Playwright-Chromium-Click
 
       - id: Quality-BrowserAutomation-Hover
         title: >-
-          The repository shall rely on Playwright to hover an element of the web interface in the Puppet developer
-          tool.
+          The repository shall rely on Playwright to hover an element of the web interface in the system tests.
         tags: [quality]
         justification: |
-          Controls that only appear under the mouse can be reached by the Puppet developer tool only with the hover
-          of Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
+          Controls that only appear under the mouse can be reached by the system tests only with the hover of
+          Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
           in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+          - ReviewCenter-OTS-Playwright-Chromium-Hover
 
       - id: Quality-BrowserAutomation-Fill
         title: >-
-          The repository shall rely on Playwright to fill a form field of the web interface in the Puppet developer
-          tool.
+          The repository shall rely on Playwright to fill a form field of the web interface in the system tests.
         tags: [quality]
         justification: |
-          The Puppet developer tool fills the forms of the interface field by field, which depends on the field fill
-          of Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
+          The system tests fill the forms of the interface field by field, which depends on the field fill of
+          Playwright. This grouping requirement links that OTS requirement to the quality root so it participates
           in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+          - ReviewCenter-OTS-Playwright-Chromium-Fill
 
       - id: Quality-BrowserAutomation-ReadText
         title: >-
-          The repository shall rely on Playwright to read the text of an element of the web interface in the Puppet
-          developer tool.
+          The repository shall rely on Playwright to read the text of an element of the web interface in the system
+          tests.
         tags: [quality]
         justification: |
-          The text of an element is the cheapest way for the Puppet developer tool to report what a page says, which
-          depends on the text reading of Playwright. This grouping requirement links that OTS requirement to the
-          quality root so it participates in orphan detection without being falsely reported as disconnected from
-          tool functionality.
+          The system tests check what a page says by reading the text of its elements, which depends on the text
+          reading of Playwright. This grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
+          - ReviewCenter-OTS-Playwright-Chromium-ReadText
 
       - id: Quality-BrowserAutomation-ColorScheme
         title: >-
-          The repository shall rely on Playwright to emulate the color scheme of the web interface in the Puppet
-          developer tool.
+          The repository shall rely on Playwright to emulate the color scheme of the web interface in the system
+          tests.
         tags: [quality]
         justification: |
-          The Puppet developer tool checks both themes of the interface without changing the settings of the
-          operating system, which depends on the color scheme emulation of Playwright. This grouping requirement links
-          that OTS requirement to the quality root so it participates in orphan detection without being falsely
-          reported as disconnected from tool functionality.
+          The system tests check both themes of the interface without changing the settings of the operating
+          system, which depends on the color scheme emulation of Playwright. This grouping requirement links that
+          OTS requirement to the quality root so it participates in orphan detection without being falsely reported
+          as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+          - ReviewCenter-OTS-Playwright-Chromium-ColorScheme
 
       - id: Quality-BrowserAutomation-Screenshot
         title: >-
-          The repository shall rely on Playwright to capture a screenshot of the web interface in the Puppet developer
-          tool.
+          The repository shall rely on Playwright to capture a screenshot of the web interface in the system tests.
         tags: [quality]
         justification: |
-          A coding agent that polishes the interface judges it from screenshots, which depends on the capture of
+          The system tests record the interface as images for people to look at, which depends on the capture of
           Playwright. This grouping requirement links that OTS requirement to the quality root so it participates in
           orphan detection without being falsely reported as disconnected from tool functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
-
+          - ReviewCenter-OTS-Playwright-Chromium-Screenshot
       - id: Quality-SourceAccess
         title: >-
           The repository shall rely on the installed git program to mirror repositories into bare repository folders.

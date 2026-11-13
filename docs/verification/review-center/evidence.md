@@ -18,13 +18,12 @@ store, and the policy), `AttestationService` (the sequence and the audit event),
 and
 `EvidenceIndexService` (the entries, the identity, and the order).
 
-The Puppet end-to-end test of the browser was **not** extended for this subsystem. A fully signed review needs a large
+The browser system tests were **not** extended for this subsystem. A fully signed review needs a large
 checklist to be answered and every reviewer slot to be signed by a user who enters the password again, which is
 expensive
 to drive through a browser and adds no evidence that the in-process tests do not give: the page markup is verified by
 the
-component tests of `ReviewPage`, and the download by real HTTP requests to the real server. The screenshot of the Help
-topic was made with the Puppet by hand and is not a test.
+component tests of `ReviewPage`, and the download by real HTTP requests to the real server.
 
 ### Test Environment
 

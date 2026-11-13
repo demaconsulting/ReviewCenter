@@ -22,28 +22,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
+using DemaConsulting.ReviewCenter.Puppeting;
 
 namespace DemaConsulting.ReviewCenter.Puppet;
-
-/// <summary>
-///     A failure the user should be told about as a plain message, without a stack trace.
-/// </summary>
-/// <remarks>
-///     Used for every anticipated operational problem: a bad argument, a missing element, a timeout, a
-///     browser that cannot start. Unexpected programming errors use other exception types so they are not
-///     hidden behind a friendly message.
-/// </remarks>
-public sealed class PuppetException : Exception
-{
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="PuppetException"/> class.
-    /// </summary>
-    /// <param name="message">The message shown to the user.</param>
-    public PuppetException(string message)
-        : base(message)
-    {
-    }
-}
 
 /// <summary>
 ///     Entry point of the Puppet tool: <c>start</c> one persistent headless browser, drive it with one command
@@ -149,13 +130,13 @@ internal static class PuppetProgram
                 DaemonCommand => await BrowserDaemon.RunAsync(
                     controlFile,
                     o.GetValueOrDefault("url"),
-                    o.GetValueOrDefault(ViewportName, PlaywrightBrowser.DefaultViewport),
+                    o.GetValueOrDefault(ViewportName, PuppetBrowser.DefaultViewport),
                     o.ContainsKey("headed")),
                 "start" => await StartAsync(request, output, error, controlFile, cancellationToken),
                 _ => await SendAsync(request, output, error, controlFile, cancellationToken)
             };
         }
-        catch (PuppetException ex)
+        catch (PuppetingException ex)
         {
             await error.WriteLineAsync(ex.Message, cancellationToken);
             return 2;
@@ -167,13 +148,13 @@ internal static class PuppetProgram
     /// </summary>
     /// <param name="args">The arguments; the first is the command name.</param>
     /// <returns>The request, with file paths made absolute.</returns>
-    /// <exception cref="PuppetException">Thrown for an unknown command, a wrong argument count, or a bad value.</exception>
+    /// <exception cref="PuppetingException">Thrown for an unknown command, a wrong argument count, or a bad value.</exception>
     internal static PuppetRequest ParseCommand(string[] args)
     {
         var name = args[0];
         if (!Commands.TryGetValue(name, out var spec))
         {
-            throw new PuppetException($"Unknown command '{name}'. Run 'puppet --help' for the list.");
+            throw new PuppetingException($"Unknown command '{name}'. Run 'puppet --help' for the list.");
         }
 
         var positional = new List<string>();
@@ -189,7 +170,7 @@ internal static class PuppetProgram
             }
             else if (option != "control-file" && !spec.Options.Split(' ').Contains(option))
             {
-                throw new PuppetException($"Unknown option '{arg}' for '{name}'. Usage: puppet {name} {spec.Usage}");
+                throw new PuppetingException($"Unknown option '{arg}' for '{name}'. Usage: puppet {name} {spec.Usage}");
             }
             else if (option is "full" or "headed")
             {
@@ -197,13 +178,13 @@ internal static class PuppetProgram
             }
             else
             {
-                options[option] = rest.MoveNext() ? rest.Current : throw new PuppetException($"The option {arg} needs a value.");
+                options[option] = rest.MoveNext() ? rest.Current : throw new PuppetingException($"The option {arg} needs a value.");
             }
         }
 
         if (positional.Count < spec.Min || positional.Count > spec.Max)
         {
-            throw new PuppetException($"Usage: puppet {name} {spec.Usage}");
+            throw new PuppetingException($"Usage: puppet {name} {spec.Usage}");
         }
 
         Validate(name, positional, options);
@@ -239,7 +220,7 @@ internal static class PuppetProgram
     /// <param name="name">The command name.</param>
     /// <param name="args">The positional arguments; file paths are replaced by absolute ones.</param>
     /// <param name="options">The options; the <c>start</c> URL loses its trailing slash.</param>
-    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    /// <exception cref="PuppetingException">Thrown when a value is not valid.</exception>
     private static void Validate(string name, List<string> args, Dictionary<string, string> options)
     {
         ValidateOptions(options);
@@ -250,29 +231,29 @@ internal static class PuppetProgram
     ///     Checks the values of the options of a parsed command.
     /// </summary>
     /// <param name="options">The options; the <c>start</c> URL loses its trailing slash.</param>
-    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    /// <exception cref="PuppetingException">Thrown when a value is not valid.</exception>
     private static void ValidateOptions(Dictionary<string, string> options)
     {
         if (options.TryGetValue("control-file", out var controlFile) && string.IsNullOrWhiteSpace(controlFile))
         {
-            throw new PuppetException("--control-file must be a file path, not empty.");
+            throw new PuppetingException("--control-file must be a file path, not empty.");
         }
 
         if (options.TryGetValue("timeout", out var timeout) && !(int.TryParse(timeout, out var ms) && ms > 0))
         {
-            throw new PuppetException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");
+            throw new PuppetingException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");
         }
 
         if (options.TryGetValue(ViewportName, out var viewport))
         {
-            PlaywrightBrowser.ParseViewport(viewport);
+            _ = PuppetBrowser.ParseViewport(viewport);
         }
 
         if (options.TryGetValue("url", out var url))
         {
             options["url"] = Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
                 ? url.TrimEnd('/')
-                : throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
+                : throw new PuppetingException($"--url must be an absolute http or https URL, not '{url}'.");
         }
     }
 
@@ -281,22 +262,22 @@ internal static class PuppetProgram
     /// </summary>
     /// <param name="name">The command name.</param>
     /// <param name="args">The positional arguments; file paths are replaced by absolute ones.</param>
-    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    /// <exception cref="PuppetingException">Thrown when a value is not valid.</exception>
     private static void ValidateArguments(string name, List<string> args)
     {
         if (name is "mouse-move" or "mouse-click" && !args.All(a => float.TryParse(a, CultureInfo.InvariantCulture, out _)))
         {
-            throw new PuppetException("The mouse coordinates must be numbers.");
+            throw new PuppetingException("The mouse coordinates must be numbers.");
         }
 
         if (name == ViewportName)
         {
-            PlaywrightBrowser.ParseViewport(args[0]);
+            _ = PuppetBrowser.ParseViewport(args[0]);
         }
 
         if (name == "theme" && args[0] is not ("light" or "dark"))
         {
-            throw new PuppetException($"The theme must be light or dark, not '{args[0]}'.");
+            throw new PuppetingException($"The theme must be light or dark, not '{args[0]}'.");
         }
 
         if (name == "screenshot")
@@ -306,7 +287,7 @@ internal static class PuppetProgram
 
         if (name == "upload")
         {
-            args[1] = File.Exists(args[1]) ? Path.GetFullPath(args[1]) : throw new PuppetException($"The file '{args[1]}' does not exist.");
+            args[1] = File.Exists(args[1]) ? Path.GetFullPath(args[1]) : throw new PuppetingException($"The file '{args[1]}' does not exist.");
         }
     }
 
@@ -394,7 +375,7 @@ internal static class PuppetProgram
 
         try
         {
-            var process = Process.Start(info) ?? throw new PuppetException("Could not start the Puppet daemon.");
+            var process = Process.Start(info) ?? throw new PuppetingException("Could not start the Puppet daemon.");
             if (!windows)
             {
                 process.StandardInput.Close();
@@ -406,7 +387,7 @@ internal static class PuppetProgram
         }
         catch (Win32Exception ex)
         {
-            throw new PuppetException($"Could not start the Puppet daemon ('dotnet' not found?): {ex.Message}");
+            throw new PuppetingException($"Could not start the Puppet daemon ('dotnet' not found?): {ex.Message}");
         }
     }
 
@@ -414,7 +395,7 @@ internal static class PuppetProgram
     ///     Sends a command to the running daemon and prints the result.
     /// </summary>
     /// <returns>0 when the command succeeded; 1 when it failed.</returns>
-    /// <exception cref="PuppetException">Thrown when Puppet is not running.</exception>
+    /// <exception cref="PuppetingException">Thrown when Puppet is not running.</exception>
     private static async Task<int> SendAsync(
         PuppetRequest request,
         TextWriter output,
@@ -425,7 +406,7 @@ internal static class PuppetProgram
         const string notRunning = "puppet is not running; start it with: puppet start [--url <base-url>]";
         if (ControlChannel.Read(controlFile)?.Port is not int port)
         {
-            throw new PuppetException(notRunning);
+            throw new PuppetingException(notRunning);
         }
 
         try
@@ -434,7 +415,7 @@ internal static class PuppetProgram
         }
         catch (Exception ex) when (ex is SocketException or IOException)
         {
-            throw new PuppetException($"{notRunning} (the control file is stale)");
+            throw new PuppetingException($"{notRunning} (the control file is stale)");
         }
     }
 

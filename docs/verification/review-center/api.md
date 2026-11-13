@@ -17,7 +17,7 @@ audit record), `ApiEndpoints` (the routes, the creation of reviews, the problem 
 the
 `Storage` subsystem.
 
-The Puppet end-to-end test of the browser was **not** extended for this subsystem: the API has no page, and real HTTP
+The browser system tests were **not** extended for this subsystem: the API has no page, and real HTTP
 requests to the real server give the evidence. The token card of the account page is verified in the `Web` subsystem.
 
 ### Test Environment

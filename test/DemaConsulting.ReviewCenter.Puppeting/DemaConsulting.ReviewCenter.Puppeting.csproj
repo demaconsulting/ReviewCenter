@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Puppeting: the test-support library that drives the ReviewCenter web UI in a headless browser, as a class
+       instance in the calling process. The system tests use it directly; the Puppet CLI (tools/puppet) hosts it in
+       its daemon. It is NOT part of the distributed ReviewCenter package: nothing here is packed or published. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DemaConsulting.ReviewCenter.Puppeting</AssemblyName>
+    <RootNamespace>DemaConsulting.ReviewCenter.Puppeting</RootNamespace>
+
+    <!-- Test support only: never packed as a NuGet package -->
+    <IsPackable>false</IsPackable>
+
+    <!-- Code Quality Configuration -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Runtime Dependencies -->
+  <ItemGroup>
+    <!-- Playwright drives headless Chromium. The browser binary is not part of the package; it is
+         installed once with the playwright.ps1 script that the build copies to the output folder of
+         every project that references this library. -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
+  </ItemGroup>
+
+  <!-- Build Tool Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Polyfill" Version="11.4.5" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- Code Analysis Dependencies -->
+  <ItemGroup>
+    <!-- Child-element form configures both PrivateAssets and IncludeAssets so the analyzers are fully
+         activated during the build without becoming transitive dependencies. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.403">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Puppeting.Tests" />
+  </ItemGroup>
+
+</Project>

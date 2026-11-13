@@ -20,26 +20,26 @@
 
 using Microsoft.Playwright;
 
-namespace DemaConsulting.ReviewCenter.Puppet.Tests;
+namespace DemaConsulting.ReviewCenter.Puppeting.Tests;
 
 /// <summary>
-///     Unit tests for the launch-failure message and URL resolution of <see cref="PlaywrightBrowser"/>.
+///     Unit tests for the launch-failure message and URL resolution of <see cref="PuppetBrowser"/>.
 /// </summary>
-public class PlaywrightBrowserTests
+public class PuppetBrowserTests
 {
     /// <summary>
     ///     Test that a missing Chromium is explained with the install command and other failures with their first line.
     /// </summary>
     [Fact]
-    public void PlaywrightBrowser_DescribeLaunchFailure_ChromiumMissingOrOtherFailure_NamesFixOrFirstLine()
+    public void PuppetBrowser_DescribeLaunchFailure_ChromiumMissingOrOtherFailure_NamesFixOrFirstLine()
     {
         // Arrange: Playwright's wording for a missing browser, and an unrelated failure with several lines
         var missing = new PlaywrightException("BrowserType.LaunchAsync: Executable doesn't exist at C:\\x\\chrome.exe\nrun playwright install");
         var other = new PlaywrightException("Target closed\nmore details");
 
         // Act: describe both
-        var missingText = PlaywrightBrowser.DescribeLaunchFailure(missing);
-        var otherText = PlaywrightBrowser.DescribeLaunchFailure(other);
+        var missingText = PuppetBrowser.DescribeLaunchFailure(missing);
+        var otherText = PuppetBrowser.DescribeLaunchFailure(other);
 
         // Assert: the first names the install script and command, the second only its first line
         Assert.Contains("playwright.ps1", missingText, StringComparison.Ordinal);
@@ -51,15 +51,15 @@ public class PlaywrightBrowserTests
     ///     Test that a path is resolved against the base URL, an absolute URL is kept, and a path without a base fails.
     /// </summary>
     [Fact]
-    public void PlaywrightBrowser_ResolveUrl_PathAndAbsoluteAndMissingBase_ResolvesOrThrows()
+    public void PuppetBrowser_ResolveUrl_PathAndAbsoluteAndMissingBase_ResolvesOrThrows()
     {
         // Arrange: a base URL
         const string baseUrl = "http://127.0.0.1:5199";
 
         // Act and assert: a path is joined, an absolute URL is untouched, a path without a base is refused
-        Assert.Equal("http://127.0.0.1:5199/about", PlaywrightBrowser.ResolveUrl("/about", baseUrl));
-        Assert.Equal("http://127.0.0.1:5199/about", PlaywrightBrowser.ResolveUrl("about", baseUrl + "/"));
-        Assert.Equal("https://example.com/x", PlaywrightBrowser.ResolveUrl("https://example.com/x", baseUrl));
-        Assert.Throws<PuppetException>(() => PlaywrightBrowser.ResolveUrl("/about", null));
+        Assert.Equal("http://127.0.0.1:5199/about", PuppetBrowser.ResolveUrl("/about", baseUrl));
+        Assert.Equal("http://127.0.0.1:5199/about", PuppetBrowser.ResolveUrl("about", baseUrl + "/"));
+        Assert.Equal("https://example.com/x", PuppetBrowser.ResolveUrl("https://example.com/x", baseUrl));
+        Assert.Throws<PuppetingException>(() => PuppetBrowser.ResolveUrl("/about", null));
     }
 }

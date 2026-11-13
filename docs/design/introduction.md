@@ -2,15 +2,13 @@
 
 This document provides the detailed design for the ReviewCenter, a web-based formal code
 review service with a companion .NET command-line interface. The service is an ASP.NET Core
-Blazor Server application started with the `serve` verb; the repository also holds a separate
-development tool, Puppet, that drives a persistent headless browser against the web interface. This document
-covers local software items (systems, subsystems, and units) and the OTS software items they
-consume.
+Blazor Server application started with the `serve` verb. This document covers local software items (systems,
+subsystems, and units) and the OTS software items they consume.
 
 ## Purpose
 
 The purpose of this document is to describe the internal design of each software unit that
-comprises the ReviewCenter and the Puppet development tool. It captures data models,
+comprises the ReviewCenter. It captures data models,
 algorithms, key methods, and inter-unit interactions at a level of detail sufficient for formal
 code review, compliance verification, and future maintenance. A reviewer should be able to
 understand how each item satisfies its requirements without reading source code. The document
@@ -23,10 +21,6 @@ Local items:
 - **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
   Cli, Hosting, Identity, Web, Core, Messaging, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities
   subsystems.
-- **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
-  in this repository but is not part of the distributed ReviewCenter package. It has no
-  subsystems; its units are PuppetProgram, ControlChannel, BrowserDaemon, SelectorResolver, and
-  PlaywrightBrowser.
 
 OTS items:
 
@@ -42,7 +36,7 @@ OTS items:
 - **OpenIddict**: integration and usage design (used only by the tests as a fake identity provider).
 - **Otp.NET**: integration and usage design (used to compute and check the one-time codes of the second factor).
 - **Pandoc**: integration and usage design.
-- **Playwright**: integration and usage design (used by ReviewCenterPuppet).
+- **Playwright**: integration and usage design (used by the system tests to drive the web interface in a browser).
 - **System.Security.Cryptography.Pkcs**: integration and usage design (used to sign the PDF attestations).
 - **ReqStream**: integration and usage design.
 - **ReviewMark**: integration and usage design.
@@ -56,7 +50,10 @@ OTS items:
 
 The following topics are out of scope:
 
-- Design documents are not produced for the test projects or build pipeline CI configuration
+- Design documents are not produced for the test projects, the test-support Puppeting library, or build pipeline CI
+  configuration
+- The Puppet command-line tool (`tools/puppet/`) is a non-shipping tool that lets AI agents drive the web interface;
+  like other test tooling it is verified by its automated tests and is not part of the system design
 - Subsystems of the target architecture that are not implemented yet have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
@@ -130,12 +127,9 @@ The ReviewCenter system is divided as follows:
 - **SelfTest** (subsystem): self-validation; contains the Validation and ValidationChecks units
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers, TemporaryDirectory, and SecretSource units
 
-The ReviewCenterPuppet system is a flat set of units that drive one persistent headless browser, one command per
-invocation, against a ReviewCenter server and write screenshots.
-
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
 Cli, Hosting, Identity, Web, Core, Messaging, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities
-subsystems, and the Puppet system. The notification worker of the target architecture (`architecture.md`) is part of
+subsystems. The notification worker of the target architecture (`architecture.md`) is part of
 the Messaging subsystem; the mails about reviews are optional and off by default. Other items of the target
 architecture that are planned and deferred will be added, with their requirements and design documents, as they are
 implemented.
@@ -157,7 +151,8 @@ implemented.
     - **Utilities/** - shared utilities subsystem
   - **DemaConsulting.ReviewCenter.Core/** - source of the Core subsystem, in a project of its own (see below)
 - **tools/** - development tools that are not distributed
-  - **puppet/** - source of the ReviewCenterPuppet system
+  - **puppet/** - source of the Puppet command-line tool for AI agents (not part of the system design)
+  - **puppet.Tests/** - tests of the Puppet command-line tool
 - **docs/api/** - the committed snapshot of the OpenAPI document of the API (`openapi.json`), compared by a test
 - **docs/user_guide/** - the user guide, one Markdown file for each chapter (introduction, installation, first review,
   deployment, sign-in, identity providers, administration, reviewing, review practices, automation, reference),
@@ -165,7 +160,11 @@ implemented.
 - **test/** - test projects
   - **DemaConsulting.ReviewCenter.Tests/** - tests of the ReviewCenter system, including the Core subsystem
     (`Core/` folder) and the Storage subsystem (`Storage/` folder)
-  - **DemaConsulting.ReviewCenter.Puppet.Tests/** - tests of the ReviewCenterPuppet system
+  - **DemaConsulting.ReviewCenter.SystemTests/** - system tests of the ReviewCenter system that drive the real server
+    in a real browser
+  - **DemaConsulting.ReviewCenter.Puppeting/** - test-support library that drives the web interface in headless
+    Chromium as an object in the test process
+  - **DemaConsulting.ReviewCenter.Puppeting.Tests/** - tests of the Puppeting library
 
 The Core subsystem deliberately deviates from the rule that a subsystem lives in a folder of the main project. It is
 a separate class library (namespace `DemaConsulting.ReviewCenter.Core`) so that the domain rules and the fingerprint
@@ -193,11 +192,10 @@ Local software items have corresponding artifacts in parallel directory trees:
 - Design docs: `docs/design/{system}/.../{item}.md` (kebab-case)
 - Verification design: `docs/verification/{system}/.../{item}.md` (kebab-case)
 - Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#); the Core subsystem keeps its source in the
-  separate project `src/DemaConsulting.ReviewCenter.Core/` (see Folder Layout), and the ReviewCenterPuppet system
-  keeps its source in `tools/puppet/`
+  separate project `src/DemaConsulting.ReviewCenter.Core/` (see Folder Layout)
 - Tests: `test/{System}.Tests/.../{Item}Tests.cs` (PascalCase for C#)
 
-The system folders are `review-center` and `review-center-puppet`.
+The system folder is `review-center`.
 
 OTS items have integration/usage design documentation parallel to system folders:
 

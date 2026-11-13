@@ -105,8 +105,8 @@ summary even when the context is configured for silent operation.
 
 #### SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
 
-**Scenario**: xUnit discovers and runs this test from the Puppet test project; the test verifies that a plain
-selector name and the prefixed selector forms are converted to Playwright selectors.
+**Scenario**: xUnit discovers and runs this test from the test project of the Puppeting test-support library; the
+test verifies that a plain selector name and the prefixed selector forms are converted to Playwright selectors.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 

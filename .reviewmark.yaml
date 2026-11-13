@@ -2115,110 +2115,35 @@ reviews:
       - "src/**/Api/ApiDocument.cs"
       - "test/**/Api/ApiDocumentTests.cs"
 
-  # ReviewCenterPuppet - Specials (separate software system, development tool)
-  - id: ReviewCenterPuppet-Architecture
-    title: Review of ReviewCenterPuppet system architecture and end-to-end operation
+  # ReviewCenter - System test support (test code that produces requirement evidence; not a software item)
+  - id: ReviewCenter-SystemTests
+    title: Review of the ReviewCenter system test host and browser system tests
     context:
-      - README.md
-      - "docs/user_guide/**/*.md"
+      - docs/reqstream/review-center.yaml
+      - docs/verification/review-center.md
     paths:
-      - "docs/reqstream/review-center-puppet.yaml"
-      - "docs/design/introduction.md"
-      - "docs/design/review-center-puppet.md"
-      - "docs/verification/introduction.md"
-      - "docs/verification/review-center-puppet.md"
-      - "test/**/PuppetEndToEndTests.cs"
-      - "test/**/SequentialCollection.cs"
+      - "test/DemaConsulting.ReviewCenter.SystemTests/SystemTestHost.cs"
+      - "test/DemaConsulting.ReviewCenter.SystemTests/BrowserSystemTests.cs"
+      - "test/DemaConsulting.ReviewCenter.SystemTests/SequentialCollection.cs"
 
-  - id: ReviewCenterPuppet-Design
-    title: Review of ReviewCenterPuppet architectural and design consistency
+  - id: ReviewCenter-Puppeting
+    title: Review of the Puppeting test-support library that drives the browser of the system tests
     context:
-      - docs/reqstream/review-center-puppet.yaml
+      - docs/design/ots/playwright.md
+      - docs/verification/ots/playwright.md
     paths:
-      - "docs/design/introduction.md"
-      - "docs/design/review-center-puppet.md"
-      - "docs/design/review-center-puppet/**/*.md"
-      - "docs/design/ots.md"
+      - "test/DemaConsulting.ReviewCenter.Puppeting/**/*.cs"
+      - "test/DemaConsulting.ReviewCenter.Puppeting.Tests/**/*.cs"
 
-  - id: ReviewCenterPuppet-Verification
-    title: Review of ReviewCenterPuppet verification consistency and completeness
+  # Puppet CLI - code review only. The Puppet is a non-shipping AI agent tool: it is not part of the system design,
+  # so it has no requirements, design, or verification documents; its code and tests are still reviewed.
+  - id: Puppet-Cli
+    title: Review of the Puppet command-line tool and its tests
     context:
-      - docs/reqstream/review-center-puppet.yaml
+      - tools/puppet/README.md
     paths:
-      - "docs/verification/introduction.md"
-      - "docs/verification/review-center-puppet.md"
-      - "docs/verification/review-center-puppet/**/*.md"
-      - "docs/verification/ots.md"
-
-  - id: ReviewCenterPuppet-AllRequirements
-    title: Review of ReviewCenterPuppet requirements quality and traceability
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/**/*.yaml"
-
-  # ReviewCenterPuppet - Units
-  - id: ReviewCenterPuppet-PuppetProgram
-    title: Review of ReviewCenterPuppet PuppetProgram unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/puppet-program.yaml"
-      - "docs/design/review-center-puppet/puppet-program.md"
-      - "docs/verification/review-center-puppet/puppet-program.md"
-      - "tools/puppet/PuppetProgram.cs"
-      - "test/**/PuppetProgramTests.cs"
-
-  - id: ReviewCenterPuppet-ControlChannel
-    title: Review of ReviewCenterPuppet ControlChannel unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/control-channel.yaml"
-      - "docs/design/review-center-puppet/control-channel.md"
-      - "docs/verification/review-center-puppet/control-channel.md"
-      - "tools/puppet/ControlChannel.cs"
-      - "test/**/ControlChannelTests.cs"
-
-  - id: ReviewCenterPuppet-BrowserDaemon
-    title: Review of ReviewCenterPuppet BrowserDaemon unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/browser-daemon.yaml"
-      - "docs/design/review-center-puppet/browser-daemon.md"
-      - "docs/verification/review-center-puppet/browser-daemon.md"
-      - "tools/puppet/BrowserDaemon.cs"
-      - "test/**/BrowserDaemonTests.cs"
-
-  - id: ReviewCenterPuppet-SelectorResolver
-    title: Review of ReviewCenterPuppet SelectorResolver unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/selector-resolver.yaml"
-      - "docs/design/review-center-puppet/selector-resolver.md"
-      - "docs/verification/review-center-puppet/selector-resolver.md"
-      - "tools/puppet/SelectorResolver.cs"
-      - "test/**/SelectorResolverTests.cs"
-
-  - id: ReviewCenterPuppet-PlaywrightBrowser
-    title: Review of ReviewCenterPuppet PlaywrightBrowser unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/playwright-browser.yaml"
-      - "docs/design/review-center-puppet/playwright-browser.md"
-      - "docs/verification/review-center-puppet/playwright-browser.md"
-      - "tools/puppet/PlaywrightBrowser.cs"
-      - "test/**/PlaywrightBrowserTests.cs"
-
+      - "tools/puppet/**/*.cs"
+      - "tools/puppet.Tests/**/*.cs"
   # OTS Items
   - id: OTS-AspNetCore
     title: Review of ASP.NET Core OTS verification evidence

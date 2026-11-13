@@ -62,10 +62,3 @@ package ReviewCenter {
         expose UtilitiesSubsystem;
     }
 }
-
-// Reopens the separate ReviewCenterPuppet package (the Puppet dev tool software system).
-package ReviewCenterPuppet {
-    view ReviewCenterPuppetView {
-        expose ReviewCenterPuppetSystem;
-    }
-}

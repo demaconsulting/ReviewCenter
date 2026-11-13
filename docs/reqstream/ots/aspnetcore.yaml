@@ -42,8 +42,8 @@ sections:
             tags: [ots]
             tests:
               - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
-              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
-              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - windows@ReviewCenter_RealBrowser_SignInCreateProjectAndTheme_WorksOverTheLiveConnection
+              - ubuntu@ReviewCenter_RealBrowser_SignInCreateProjectAndTheme_WorksOverTheLiveConnection
           - id: ReviewCenter-OTS-AspNetCore-Authentication
             title: ASP.NET Core shall issue a session cookie when a user signs in with the cookie authentication.
             justification: |
