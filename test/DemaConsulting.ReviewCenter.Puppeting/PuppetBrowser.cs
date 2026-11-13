@@ -57,6 +57,12 @@ public sealed class PuppetBrowser : IAsyncDisposable
     private const int MaxText = 8000;
 
     /// <summary>
+    ///     JavaScript expression finding the first element whose test identifier equals <c>t</c>; the identifier is
+    ///     compared as data, never embedded in a selector or script.
+    /// </summary>
+    private const string FindByTestId = "[...document.querySelectorAll('[data-testid]')].find(e => e.getAttribute('data-testid') === t)";
+
+    /// <summary>
     ///     Lists the visible interactive or test-id elements, at most 200, one per line.
     /// </summary>
     private const string SnapshotScript = """
@@ -465,7 +471,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The text content, or an empty text when the page has no such element.</returns>
     public Task<string> TextOfAsync(string testId)
     {
-        return QueryAsync<string>("t => document.querySelector(`[data-testid=\"${t}\"]`)?.textContent ?? ''", testId);
+        return QueryAsync<string>($"t => {FindByTestId}?.textContent ?? ''", testId);
     }
 
     /// <summary>
@@ -475,7 +481,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns><c>true</c> when the page has the element.</returns>
     public Task<bool> ExistsAsync(string testId)
     {
-        return QueryAsync<bool>("t => !!document.querySelector(`[data-testid=\"${t}\"]`)", testId);
+        return QueryAsync<bool>($"t => !!{FindByTestId}", testId);
     }
 
     /// <summary>
@@ -485,7 +491,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns><c>true</c> when the page has the element and it is disabled.</returns>
     public Task<bool> IsDisabledAsync(string testId)
     {
-        return QueryAsync<bool>("t => document.querySelector(`[data-testid=\"${t}\"]`)?.disabled === true", testId);
+        return QueryAsync<bool>($"t => {FindByTestId}?.disabled === true", testId);
     }
 
     /// <summary>
@@ -495,7 +501,9 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The number of elements.</returns>
     public Task<int> CountAsync(string prefix)
     {
-        return QueryAsync<int>("p => document.querySelectorAll(`[data-testid^=\"${p}\"]`).length", prefix);
+        return QueryAsync<int>(
+            "p => [...document.querySelectorAll('[data-testid]')].filter(e => e.getAttribute('data-testid').startsWith(p)).length",
+            prefix);
     }
 
     /// <summary>
@@ -563,9 +571,22 @@ public sealed class PuppetBrowser : IAsyncDisposable
         return value.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    ///     Locates the elements matching a selector.
+    /// </summary>
+    /// <param name="selector">The selector, in any form <see cref="SelectorResolver"/> accepts.</param>
+    /// <returns>The locator.</returns>
+    /// <exception cref="PuppetingException">Thrown when the selector is null or blank, or names no test identifier.</exception>
     private ILocator Find(string selector)
     {
-        return _page.Locator(SelectorResolver.Resolve(selector));
+        try
+        {
+            return _page.Locator(SelectorResolver.Resolve(selector));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new PuppetingException(FirstLine(ex.Message));
+        }
     }
 
     /// <summary>
