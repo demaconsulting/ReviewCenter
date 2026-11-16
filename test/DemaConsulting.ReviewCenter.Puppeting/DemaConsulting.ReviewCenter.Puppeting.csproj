@@ -39,11 +39,11 @@
   <ItemGroup>
     <!-- Child-element form configures both PrivateAssets and IncludeAssets so the analyzers are fully
          activated during the build without becoming transitive dependencies. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.403">
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="11.0.100">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138">
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.36.0.15337">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
