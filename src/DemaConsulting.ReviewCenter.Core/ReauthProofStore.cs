@@ -59,7 +59,7 @@ public sealed class ReauthProofStore
     /// <summary>
     ///     Guards <see cref="_proofs"/>.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReauthProofStore"/> class.

@@ -73,7 +73,7 @@ internal sealed class SignInThrottle
     /// <summary>
     ///     Guards <see cref="_windows"/>, <see cref="_order"/> and <see cref="_nextGeneration"/>.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The counter of each key.

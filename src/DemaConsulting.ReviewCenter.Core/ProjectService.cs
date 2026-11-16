@@ -161,7 +161,7 @@ public sealed class ProjectService
     /// <summary>
     ///     Guards <see cref="_failures"/>; never held across an await.
     /// </summary>
-    private readonly object _failuresLock = new();
+    private readonly Lock _failuresLock = new();
 
     /// <summary>
     ///     The reserved attempts of each actor, by user name without regard to case; a reservation that is not

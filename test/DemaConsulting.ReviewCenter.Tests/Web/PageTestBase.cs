@@ -642,7 +642,7 @@ internal sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     /// <summary>
     ///     Guards <see cref="_now"/> and <see cref="_timers"/>.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The timers that have not been disposed.

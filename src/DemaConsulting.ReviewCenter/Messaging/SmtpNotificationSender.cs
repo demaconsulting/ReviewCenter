@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -79,7 +80,7 @@ internal sealed class SmtpNotificationSender(NotificationOptions options, ILogge
                 await client.AuthenticateAsync(smtp.Username, password, cancellationToken);
             }
 
-            _ = await client.SendAsync(mime, cancellationToken);
+            _ = await client.SendAsync(new SendRequest(mime), cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
         }
         catch (OperationCanceledException)

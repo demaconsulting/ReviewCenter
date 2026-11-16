@@ -99,7 +99,7 @@ public sealed class TotpChallengeStore
     /// <summary>
     ///     Guards <see cref="_challenges"/>.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     Counts the invalidations of users; a challenge records the value at <see cref="Take"/>.

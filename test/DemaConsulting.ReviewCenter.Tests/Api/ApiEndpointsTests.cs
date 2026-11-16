@@ -542,7 +542,7 @@ public class ApiEndpointsTests
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         using var client = ClientFor(app, token.Value);
         var due = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        object Body(string id, string? dueDate) => new
+        static object Body(string id, string? dueDate) => new
         {
             id,
             title = "Dated",
@@ -710,7 +710,7 @@ public class ApiEndpointsTests
         var token = await CreateTokenAsync(app);
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         using var client = ClientFor(app, token.Value);
-        object Body(string id, string? followsReviewId, string path = "a.txt") => new
+        static object Body(string id, string? followsReviewId, string path = "a.txt") => new
         {
             id,
             title = "Follow",

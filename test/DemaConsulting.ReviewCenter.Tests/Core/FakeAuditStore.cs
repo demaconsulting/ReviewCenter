@@ -42,7 +42,7 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     /// <summary>
     ///     Serializes every access to the entries and the counters.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The number of read batches requested for verification.

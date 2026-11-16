@@ -35,7 +35,7 @@ internal sealed class FakeTotpStore : ITotpStore
     /// <summary>
     ///     Serializes every access.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The enrollments by user.

@@ -38,7 +38,7 @@ internal sealed class FakeSmtpServer : IDisposable
     /// <summary>
     ///     Guards the recorded lists.
     /// </summary>
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
 
     /// <summary>
     ///     The listener on the loopback interface.
