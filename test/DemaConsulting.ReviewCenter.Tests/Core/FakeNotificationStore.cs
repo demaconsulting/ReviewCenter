@@ -39,7 +39,7 @@ internal sealed class FakeNotificationStore : INotificationStore
     /// <summary>
     ///     Serializes every access.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The preference rows by user.

@@ -152,7 +152,7 @@ public class TotpOptionsTests
     {
         // Arrange: three configurations
         using var context = Context.Create(["serve", "--silent"]);
-        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        static ServerHostOptions Options(Dictionary<string, string?> extra) => new()
         {
             MapStaticAssets = false,
             ConfigureBuilder = builder =>

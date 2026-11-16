@@ -67,7 +67,7 @@ internal sealed class AnonymousRateLimit
     /// <summary>
     ///     Guards <see cref="_windows"/> and <see cref="_order"/>, and the windows in them.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The window of each address.

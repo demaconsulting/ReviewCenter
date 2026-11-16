@@ -33,7 +33,7 @@ internal sealed partial class FakeNotificationSender : INotificationSender
     /// <summary>
     ///     Guards <see cref="_sent"/>.
     /// </summary>
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     ///     The messages handed to the sender, oldest first.

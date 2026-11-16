@@ -240,7 +240,7 @@ public class ChecklistValidatorTests
     public void ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections()
     {
         // Arrange
-        ChecklistSection[] Many(int count) =>
+        static ChecklistSection[] Many(int count) =>
             Enumerable.Range(0, count).Select(i => Section($"s{i}", new ChecklistItem($"i{i}", "Check"))).ToArray();
 
         // Act
@@ -261,7 +261,7 @@ public class ChecklistValidatorTests
     public void ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems()
     {
         // Arrange: 20 sections of 25 checks is 500; one check more is 501
-        ChecklistSection[] Build(int extra) =>
+        static ChecklistSection[] Build(int extra) =>
             Enumerable.Range(0, 20)
                 .Select(s => Section(
                     $"s{s}",
@@ -384,7 +384,7 @@ public class ChecklistValidatorTests
     public void ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence()
     {
         // Arrange
-        ChecklistSection Make(string title, string hint, string text) =>
+        static ChecklistSection Make(string title, string hint, string text) =>
             new("s", title, hint, [new ChecklistItem("a", text)]);
 
         // Act

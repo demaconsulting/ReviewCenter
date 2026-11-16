@@ -361,7 +361,7 @@ public class ReviewMarkConfigParserTests
     public void ReviewMarkConfigParser_Parse_Limits_AreEnforced()
     {
         // Arrange: files exactly at each limit, and one past it
-        string Entry(string id, string title, int paths) =>
+        static string Entry(string id, string title, int paths) =>
             $"reviews:\n  - id: {id}\n    title: {title}\n    paths: [{string.Join(", ", Enumerable.Repeat("a", paths))}]\n";
         var longPath = new string('p', SelectionMatcher.MaxPatternLength);
         var manySets = "reviews:\n" + string.Concat(Enumerable.Range(0, ReviewLimits.MaxReviewSets + 1).Select(i => $"  - {{id: s{i}, title: T}}\n"));

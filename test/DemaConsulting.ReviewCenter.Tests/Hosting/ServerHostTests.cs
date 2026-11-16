@@ -370,7 +370,7 @@ public class ServerHostTests
     {
         // Arrange: the defaults, and values that are explicit but valid
         using var context = Context.Create(["serve", "--silent"]);
-        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        static ServerHostOptions Options(Dictionary<string, string?> extra) => new()
         {
             MapStaticAssets = false,
             ConfigureBuilder = builder =>
