@@ -4,24 +4,23 @@
 
 ### Overview
 
-The `Identity` subsystem lets a person sign in to the web server and tells the rest of the system who that person is.
-It owns the connection between the local accounts of the `Core` subsystem and the ASP.NET Core authentication
-framework: how a password is hashed, how the sign-in and sign-out requests are handled, what the authentication
-cookie holds and when it is no longer accepted, and how the signed-in user is turned into the `Actor` that the Core
-services record with a comment or a checklist answer. It contains eight units: `PasswordHasher`, the implementation of
-the Core password hasher interface on top of the password hasher of the ASP.NET Core shared framework; `SignIn`,
-the cookie authentication setup, the `POST /auth/login` and `POST /auth/logout` endpoints, the return-URL check, the
-rule that decides whether a signed-in user is still valid, and the conversion between the signed-in principal and an
-`Actor`, together with its small options type `AuthOptions`, which is documented with `SignIn` as a supporting type;
-`SignInThrottle`, the in-memory limit on sign-in attempts per client address and user name, with its options type
-`SignInThrottleOptions`; `OidcSignIn`, the optional sign-in with a generic OpenID Connect provider and the
-confirmation of identity for a signature, with its options type `OidcOptions`; `TotpAlgorithm`, the implementation of the
-Core time-based one-time password port on top of the Otp.NET library; `TotpSecretProtector`, the implementation of
-the Core secret protection port on top of ASP.NET Core Data Protection; `TotpSignIn`, the second step of a sign-in
-for an account with a second factor, with its options type `TotpOptions`; and
-`RevalidatingAuthenticationStateProvider`, which applies that rule to every open
-interactive page at a fixed interval. The types of the subsystem are internal to the application.
-The rules about accounts (the password policy, the lockout, the last system administrator) are not here: they belong to
+The `Identity` subsystem lets a person sign in to the web server and tells the rest of the system who that person is. It
+owns the connection between the local accounts of the `Core` subsystem and the ASP.NET Core authentication framework:
+how a password is hashed, how the sign-in and sign-out requests are handled, what the authentication cookie holds and
+when it is no longer accepted, and how the signed-in user is turned into the `Actor` that the Core services record with
+a comment or a checklist answer. It contains eight units: `PasswordHasher`, the implementation of the Core password
+hasher interface on top of the password hasher of the ASP.NET Core shared framework; `SignIn`, the cookie authentication
+setup, the `POST /auth/login` and `POST /auth/logout` endpoints, the return-URL check, the rule that decides whether a
+signed-in user is still valid, and the conversion between the signed-in principal and an `Actor`, together with its
+small options type `AuthOptions`, which is documented with `SignIn` as a supporting type; `SignInThrottle`, the
+in-memory limit on sign-in attempts per client address and user name, with its options type `SignInThrottleOptions`;
+`OidcSignIn`, the optional sign-in with a generic OpenID Connect provider and the confirmation of identity for a
+signature, with its options type `OidcOptions`; `TotpAlgorithm`, the implementation of the Core time-based one-time
+password port on top of the Otp.NET library; `TotpSecretProtector`, the implementation of the Core secret protection
+port on top of ASP.NET Core Data Protection; `TotpSignIn`, the second step of a sign-in for an account with a second
+factor, with its options type `TotpOptions`; and `RevalidatingAuthenticationStateProvider`, which applies that rule to
+every open interactive page at a fixed interval. The types of the subsystem are internal to the application. The rules
+about accounts (the password policy, the lockout, the last system administrator) are not here: they belong to
 `UserService` in the `Core` subsystem. The rules about which project a user may see are not here either: they belong to
 `ProjectAccess` in the `Core` subsystem, which reads the memberships at every call. The cookie holds only the one right
 that does not depend on a project, the system administrator right.

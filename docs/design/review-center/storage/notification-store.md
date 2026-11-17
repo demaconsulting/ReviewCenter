@@ -40,13 +40,13 @@ because the SQLite provider cannot compare `DateTimeOffset` values in a query.
 
 **IsAvailableAsync**: Tells whether the tables and columns of notifications can be read.
 
-- *Returns*: True when they can; false when the database was created before they existed and has to be recreated, so
-  the server can switch the feature off (or refuse to start) instead of failing on each request. The check reads the
-  mode and dispatcher columns of `NotificationPreferences` (including the generation), the send log, and
-  `NotifiedItems` (including its kind and its `GaveUp` flag), so a database of
-  an earlier version of the feature, which lacks the new table and columns, is reported as old. Only the failure of a missing
-  table or column (SQLite error 1, "no such table" or "no such column") gives false; every other database failure, such
-  as a locked, read-only, or corrupt file, propagates, so a real fault is never mistaken for an old database.
+- *Returns*: True when they can; false when the database was created before they existed and has to be recreated, so the
+  server can switch the feature off (or refuse to start) instead of failing on each request. The check reads the mode
+  and dispatcher columns of `NotificationPreferences` (including the generation), the send log, and `NotifiedItems`
+  (including its kind and its `GaveUp` flag), so a database of an earlier version of the feature, which lacks the new
+  table and columns, is reported as old. Only the failure of a missing table or column (SQLite error 1, "no such table"
+  or "no such column") gives false; every other database failure, such as a locked, read-only, or corrupt file,
+  propagates, so a real fault is never mistaken for an old database.
 
 **GetAsync**: Reads the preference of a user, or null. The read is untracked and returns a new object.
 

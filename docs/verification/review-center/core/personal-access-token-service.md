@@ -37,19 +37,19 @@ answer has the name, the creation time, no revocation, and no last use, and the 
 This scenario is tested by `PersonalAccessTokenService_Create_ValidRequest_ReturnsTheTokenAndListsIt`.
 
 **PersonalAccessTokenService_Create_NewToken_HasPrefixAndHighEntropyValue**: Two tokens are created. Each value starts
-with `rcpat_`, has 43 base64url characters that decode to 32 bytes, and the two values differ. This scenario is tested by
-`PersonalAccessTokenService_Create_NewToken_HasPrefixAndHighEntropyValue`.
+with `rcpat_`, has 43 base64url characters that decode to 32 bytes, and the two values differ. This scenario is tested
+by `PersonalAccessTokenService_Create_NewToken_HasPrefixAndHighEntropyValue`.
 
-**PersonalAccessTokenService_Create_NewToken_StoresOnlyTheSha256Hash**: A token is created. The store holds the lowercase
-hexadecimal SHA-256 hash of the value and not the value. This scenario is tested by
+**PersonalAccessTokenService_Create_NewToken_StoresOnlyTheSha256Hash**: A token is created. The store holds the
+lowercase hexadecimal SHA-256 hash of the value and not the value. This scenario is tested by
 `PersonalAccessTokenService_Create_NewToken_StoresOnlyTheSha256Hash`.
 
 **PersonalAccessTokenService_Create_DisplayId_IsShortRandomAndIndependentOfTheSecret**: Several tokens are created. The
 display id is a short text of the allowed alphabet that differs between tokens and is not part of the value. This
 scenario is tested by `PersonalAccessTokenService_Create_DisplayId_IsShortRandomAndIndependentOfTheSecret`.
 
-**PersonalAccessTokenService_List_AfterCreate_NeverReturnsTheValue**: Tokens are listed after they were created. No field
-of the listed tokens holds the value. This scenario is tested by
+**PersonalAccessTokenService_List_AfterCreate_NeverReturnsTheValue**: Tokens are listed after they were created. No
+field of the listed tokens holds the value. This scenario is tested by
 `PersonalAccessTokenService_List_AfterCreate_NeverReturnsTheValue`.
 
 **PersonalAccessTokenService_Create_NameWithSurroundingSpaces_StoresItTrimmed**: A token is created with a name that has
@@ -60,8 +60,8 @@ spaces around it. The answer and the store hold the name without them. This scen
 control-character name are each refused with `TokenNameInvalid`, and nothing is stored. This scenario is tested by
 `PersonalAccessTokenService_Create_InvalidName_ThrowsTokenNameInvalid`.
 
-**PersonalAccessTokenService_Create_NameLength_HasInclusiveLimit**: A name over the limit is refused and one at the limit
-is accepted. This scenario is tested by `PersonalAccessTokenService_Create_NameLength_HasInclusiveLimit`.
+**PersonalAccessTokenService_Create_NameLength_HasInclusiveLimit**: A name over the limit is refused and one at the
+limit is accepted. This scenario is tested by `PersonalAccessTokenService_Create_NameLength_HasInclusiveLimit`.
 
 **PersonalAccessTokenService_Create_UnknownOwner_IsRefused**: A user who does not exist creates a token. It is refused
 with `ActorNotAllowed`, and nothing is stored or audited. This scenario is tested by
@@ -82,16 +82,16 @@ many days after the creation, in the answer and in the store. This scenario is t
 each refused with `TokenExpiryInvalid`, and nothing is stored. This scenario is tested by
 `PersonalAccessTokenService_Create_InvalidExpiry_ThrowsTokenExpiryInvalid`.
 
-**PersonalAccessTokenService_Authenticate_AfterExpiry_IsRejected**: A token is accepted before its expiry and refused when
-the clock reaches it. This scenario is tested by `PersonalAccessTokenService_Authenticate_AfterExpiry_IsRejected`.
+**PersonalAccessTokenService_Authenticate_AfterExpiry_IsRejected**: A token is accepted before its expiry and refused
+when the clock reaches it. This scenario is tested by `PersonalAccessTokenService_Authenticate_AfterExpiry_IsRejected`.
 
 **PersonalAccessTokenService_Create_TwentyActive_RejectsTheTwentyFirst**: Twenty tokens are created and the twenty-first
 is refused with `TokenLimitReached`. This scenario is tested by
 `PersonalAccessTokenService_Create_TwentyActive_RejectsTheTwentyFirst`.
 
-**PersonalAccessTokenService_Create_RevokedTokens_DoNotCount**: Twenty tokens are active and one is revoked. A replacement
-is accepted, twenty tokens are active, and one more is refused with `TokenLimitReached`. This scenario is tested by
-`PersonalAccessTokenService_Create_RevokedTokens_DoNotCount`.
+**PersonalAccessTokenService_Create_RevokedTokens_DoNotCount**: Twenty tokens are active and one is revoked. A
+replacement is accepted, twenty tokens are active, and one more is refused with `TokenLimitReached`. This scenario is
+tested by `PersonalAccessTokenService_Create_RevokedTokens_DoNotCount`.
 
 **PersonalAccessTokenService_Create_ExpiredTokens_DoNotCount**: Ten tokens expire, then twenty new tokens are created.
 All are accepted, twenty are active, and one more is refused with `TokenLimitReached`. This scenario is tested by
@@ -102,16 +102,16 @@ owner; a wrong value does not. This scenario is tested by
 `PersonalAccessTokenService_Authenticate_RightAndWrongValue_OnlyRightSucceeds`.
 
 **PersonalAccessTokenService_Authenticate_StoreReturnsRowWithOtherHash_IsRejected**: The fake store returns a row whose
-hash differs from the hash of the presented value. The service refuses it, because it compares the hash again in constant
-time. This scenario is tested by
+hash differs from the hash of the presented value. The service refuses it, because it compares the hash again in
+constant time. This scenario is tested by
 `PersonalAccessTokenService_Authenticate_StoreReturnsRowWithOtherHash_IsRejected`.
 
 **PersonalAccessTokenService_Authenticate_DisabledOrLockedOwner_IsRejected**: The token of a disabled owner and of a
 locked-out owner is refused, and works again when the owner does. This scenario is tested by
 `PersonalAccessTokenService_Authenticate_DisabledOrLockedOwner_IsRejected`.
 
-**PersonalAccessTokenService_Authenticate_Malformed_IsRejected**: Values of the wrong shape are refused without asking the
-store. This scenario is tested by `PersonalAccessTokenService_Authenticate_Malformed_IsRejected`.
+**PersonalAccessTokenService_Authenticate_Malformed_IsRejected**: Values of the wrong shape are refused without asking
+the store. This scenario is tested by `PersonalAccessTokenService_Authenticate_Malformed_IsRejected`.
 
 **PersonalAccessTokenService_Authenticate_FirstUse_RecordsTheTime**: A token that was never used is used a minute after
 its creation. The use succeeds and the store holds the time of the use, written once. This scenario is tested by
@@ -121,13 +121,13 @@ its creation. The use succeeds and the store holds the time of the use, written 
 minutes and then after five minutes. The last-used time is written once for the first use and again only after the five
 minutes. This scenario is tested by `PersonalAccessTokenService_Authenticate_Touch_AtMostOncePerFiveMinutes`.
 
-**PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce**: Four requests run in parallel and all read the same
-snapshot of a token that was never used. All are accepted and the store is written once, because the store applies the
-update only to the last-used time that was read. This scenario is tested by
+**PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce**: Four requests run in parallel and all read the
+same snapshot of a token that was never used. All are accepted and the store is written once, because the store applies
+the update only to the last-used time that was read. This scenario is tested by
 `PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce`.
 
-**PersonalAccessTokenService_Revoke_OwnToken_StopsWorkingAndIsAudited**: A user revokes their own token. It stops working
-at once and the revocation is recorded. This scenario is tested by
+**PersonalAccessTokenService_Revoke_OwnToken_StopsWorkingAndIsAudited**: A user revokes their own token. It stops
+working at once and the revocation is recorded. This scenario is tested by
 `PersonalAccessTokenService_Revoke_OwnToken_StopsWorkingAndIsAudited`.
 
 **PersonalAccessTokenService_Revoke_OtherUsersToken_IsRefused**: A user revokes the token of somebody else, a token that
@@ -144,9 +144,9 @@ create and to revoke a token. Both are refused with `ActorNotAllowed`, no token 
 and still authenticates. This scenario is tested by
 `PersonalAccessTokenService_CreateAndRevoke_ApiTokenActor_IsRefused`.
 
-**PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue**: A token is created and revoked. The audit
-trail has `token.created` and `token.revoked` with the display id, and no entry has the value or its hash. This scenario
-is tested by `PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue`.
+**PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue**: A token is created and revoked. The
+audit trail has `token.created` and `token.revoked` with the display id, and no entry has the value or its hash. This
+scenario is tested by `PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue`.
 
 **PersonalAccessTokenService_TemporaryPasswordCleared_AllowsEveryUse**: An owner with a token is flagged to change the
 password and refused. When the flag is cleared, creating, listing, authenticating, and revoking succeed. The scenario

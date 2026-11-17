@@ -7,8 +7,8 @@ are defined in the OpenIddict OTS Software Requirements document.
 
 OpenIddict is used only by the tests, as a fake identity provider. It serves the discovery document and the signing keys
 and issues identity tokens, with the authentication time of the login, that are signed with its keys in the
-authorization code flow with a proof key. A passing test confirms that the tests that rely on it test the product against
-a real provider and not against a mock.
+authorization code flow with a proof key. A passing test confirms that the tests that rely on it test the product
+against a real provider and not against a mock.
 
 ### Verification Approach
 

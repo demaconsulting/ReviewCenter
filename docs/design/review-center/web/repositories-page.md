@@ -115,7 +115,8 @@ set to keep (after the same guard as `RunAsync`), and close it without a change.
 **SaveEditAsync**: Updates the repository with `RepositoryService.UpdateAsync` and a `TokenChange` built from the chosen
 action. The token field is cleared before the call, and the form is closed on success and stays open on a refusal.
 
-**ToggleEnabledAsync**: Enables a disabled repository or disables an enabled one with `RepositoryService.SetEnabledAsync`.
+**ToggleEnabledAsync**: Enables a disabled repository or disables an enabled one with
+`RepositoryService.SetEnabledAsync`.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 

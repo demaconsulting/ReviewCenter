@@ -54,9 +54,9 @@ subsystem): `history-page` (root), `breadcrumb-projects-link`, `project-link`, `
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
-Paging: **Older** links to `?before={sequence of the last entry}` and **Newer** to `?after={sequence of the first entry}`;
-each is shown only when the service says there is something behind it. With no entries the page says "No history has
-been recorded for this review."
+Paging: **Older** links to `?before={sequence of the last entry}` and **Newer** to
+`?after={sequence of the first entry}`; each is shown only when the service says there is something behind it. With no
+entries the page says "No history has been recorded for this review."
 
 #### Error Handling
 
@@ -65,10 +65,10 @@ database during loading surfaces as a failed connection like for the other pages
 returns; it cannot show a text that was never stored, and in particular never any comment text.
 
 **Access on an open page**: `OnParametersSetAsync` is the only place where the page reads data, and the page has no
-handler of its own, so it needs no `ProjectViewGuard`. The page that is already open is read again, with the actor
-from the authentication state, whenever the address (its position) changes; a user whose membership was removed meanwhile
-gets the not-found message and no entries at that point. The entries already on screen stay until the next change of
-the address, as nothing is pushed.
+handler of its own, so it needs no `ProjectViewGuard`. The page that is already open is read again, with the actor from
+the authentication state, whenever the address (its position) changes; a user whose membership was removed meanwhile
+gets the not-found message and no entries at that point. The entries already on screen stay until the next change of the
+address, as nothing is pushed.
 
 #### Dependencies
 

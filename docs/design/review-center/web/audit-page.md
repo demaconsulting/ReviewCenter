@@ -5,27 +5,25 @@
 #### Purpose
 
 The `AuditPage` unit consists of two pages, a form, and a shared component. `AuditPage` is the page at `/audit`. Its
-responsibilities are to show the whole audit trail of the system, newest first, 25, 50 (the default) or 100 entries to
-a page, to let a system administrator narrow it with the filter form, and to let a system administrator verify the hash
-chain with the *Verify chain* button and read the
-result, including the head hash. It requires the `SystemAdmin` role: a signed-in user without it is shown the
-access denied message of the router instead of the page, and an anonymous visitor is sent to the login page. It
-changes nothing. `ProjectAuditPage` is the page at `/projects/{id}/audit`: it shows the audit entries of one project,
-newest first, to the project administrators, the system administrators, and the Auditors of the project (the page asks
-the audit-read access of `ProjectViewGuard`, `GuardAuditAsync`, and not the administer right),
-with the same filter form (without the project selector) and paging, and it has no verification (the chain verifies as
-a whole on `/audit`; the project view is a filtered
-read of the same chain). The entries of a project are those that name the project, among them the member changes and
-`project.evidence-settings-changed`, which the evidence settings page causes through `EvidenceSettingsService`; the pages
-show every entry in the same way and know no action by name. It requires a signed-in user and shows the same "Project N
-does not exist." message as the
-other project pages to a project that does not exist, to a user who may not see it, and to a user who sees it but may
-not read its audit trail. `AuditFilterForm` is the form that both pages use to narrow the entries, and
-`AuditFilterState` is the parsed and cleaned filter that the address carries. `AuditEntryTable` is the component that
-both pages use to show one page of entries with the paging
-buttons; it holds no state and no access rule, because its parent decides who sees the entries and clears them when the
-right is lost. Each is a Razor component split into presentation (`AuditPage.razor`, `ProjectAuditPage.razor`,
-`AuditFilterForm.razor`, `AuditEntryTable.razor`) and behavior (the matching `.razor.cs` files).
+responsibilities are to show the whole audit trail of the system, newest first, 25, 50 (the default) or 100 entries to a
+page, to let a system administrator narrow it with the filter form, and to let a system administrator verify the hash
+chain with the *Verify chain* button and read the result, including the head hash. It requires the `SystemAdmin` role: a
+signed-in user without it is shown the access denied message of the router instead of the page, and an anonymous visitor
+is sent to the login page. It changes nothing. `ProjectAuditPage` is the page at `/projects/{id}/audit`: it shows the
+audit entries of one project, newest first, to the project administrators, the system administrators, and the Auditors
+of the project (the page asks the audit-read access of `ProjectViewGuard`, `GuardAuditAsync`, and not the administer
+right), with the same filter form (without the project selector) and paging, and it has no verification (the chain
+verifies as a whole on `/audit`; the project view is a filtered read of the same chain). The entries of a project are
+those that name the project, among them the member changes and `project.evidence-settings-changed`, which the evidence
+settings page causes through `EvidenceSettingsService`; the pages show every entry in the same way and know no action by
+name. It requires a signed-in user and shows the same "Project N does not exist." message as the other project pages to
+a project that does not exist, to a user who may not see it, and to a user who sees it but may not read its audit trail.
+`AuditFilterForm` is the form that both pages use to narrow the entries, and `AuditFilterState` is the parsed and
+cleaned filter that the address carries. `AuditEntryTable` is the component that both pages use to show one page of
+entries with the paging buttons; it holds no state and no access rule, because its parent decides who sees the entries
+and clears them when the right is lost. Each is a Razor component split into presentation (`AuditPage.razor`,
+`ProjectAuditPage.razor`, `AuditFilterForm.razor`, `AuditEntryTable.razor`) and behavior (the matching `.razor.cs`
+files).
 
 #### Data Model
 
@@ -46,8 +44,8 @@ as `yyyy-MM-dd` in the invariant culture, the project only as a positive integer
 so (`audit-filter-message`). `ToFilter` builds the `AuditFilter`, and `ToQuery` writes the state and a position back
 into a query string, escaped, so the Older and Newer links keep the filter.
 
-**Loaded**, **Page**: whether the lookup has finished and the `AuditEntryPage` shown (`null` while not loaded, or when the
-user is refused), on both pages.
+**Loaded**, **Page**: whether the lookup has finished and the `AuditEntryPage` shown (`null` while not loaded, or when
+the user is refused), on both pages.
 
 **Result** (`AuditPage`): the `AuditVerificationResult` of the last verification (`null` when none was run).
 **ErrorMessage** (`AuditPage`): the
@@ -128,20 +126,17 @@ may read the audit trail of the project only.
   reads nothing. Otherwise `AuditService.VerifyAsync` runs and its result is shown. The verification is a click on the
   live connection and not a form post, so the framework's circuit protection applies instead of an antiforgery token.
 
-**RequireAdministratorAsync**: Reads the signed-in user from the authentication state (through the `Identity` helper that
-turns it into an `Actor`) and looks the user up in the user store; unless that user is enabled and is a system
-administrator, the action is refused. The check is kept on load and on every verification although the route is
-limited to
-system administrators and the page is replaced when the sign-in state ends (see `SessionGate`), because an open page
-can keep
-its state for up to one revalidation interval after the user was demoted or disabled. A state that has already ended is
-shown with the message of the refusal.
+**RequireAdministratorAsync**: Reads the signed-in user from the authentication state (through the `Identity` helper
+that turns it into an `Actor`) and looks the user up in the user store; unless that user is enabled and is a system
+administrator, the action is refused. The check is kept on load and on every verification although the route is limited
+to system administrators and the page is replaced when the sign-in state ends (see `SessionGate`), because an open page
+can keep its state for up to one revalidation interval after the user was demoted or disabled. A state that has already
+ended is shown with the message of the refusal.
 
-**DetailContent** (private, `AuditEntryTable`): Builds the content of the detail cell from `SplitDetail`, which splits the
-detail into plain
-text parts and runs of 24 or more hexadecimal characters. A run is written as a `span` with the class `audit-hash`, the
-full value as its `title`, and `ShortHash` of it as the content; text parts are added as content, so Razor encodes them.
-The concatenated text of the parts is the original detail.
+**DetailContent** (private, `AuditEntryTable`): Builds the content of the detail cell from `SplitDetail`, which splits
+the detail into plain text parts and runs of 24 or more hexadecimal characters. A run is written as a `span` with the
+class `audit-hash`, the full value as its `title`, and `ShortHash` of it as the content; text parts are added as
+content, so Razor encodes them. The concatenated text of the parts is the original detail.
 
 **OnAfterRender** (both pages): Marks the page interactive after the first render on a live connection.
 

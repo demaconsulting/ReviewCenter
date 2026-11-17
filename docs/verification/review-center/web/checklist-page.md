@@ -87,8 +87,8 @@ N/A - standard test environment.
   leaves the ballot handed in and explains, a change by another reviewer between the hand-in and the signature leaves
   the ballot handed in, signs nothing and says that something changed, Submit ballot alone does not sign, and an
   account of an identity provider is handed in and then asked to confirm at the provider.
-- Assign me as reviewer adds a new slot for a member without one and keeps the existing slots; it is offered to a project
-  administrator without a slot, and to nobody who holds a slot or is no member.
+- Assign me as reviewer adds a new slot for a member without one and keeps the existing slots; it is offered to a
+  project administrator without a slot, and to nobody who holds a slot or is no member.
 - `SignConfirm` hands the password (and the code) over once and clears the password field, and draws no field for an
   account of an identity provider.
 
@@ -202,8 +202,8 @@ scenario is tested by `ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDi
 
 **ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist**: The author of a review, who
 answered everything while the project let authors answer (a Fail with a justification, and the design section as not
-applicable with a reason), opens the page after the rule was switched on; the answer buttons, the justification field and
-its save button, the switch of the sections, and the reason field and its save button are all disabled, while the
+applicable with a reason), opens the page after the rule was switched on; the answer buttons, the justification field
+and its save button, the switch of the sections, and the reason field and its save button are all disabled, while the
 sections can still be opened. This scenario is tested by
 `ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist`.
 

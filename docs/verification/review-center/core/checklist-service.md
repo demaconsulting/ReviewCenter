@@ -2,17 +2,16 @@
 
 #### Verification Approach
 
-`ChecklistService`, the `DefaultChecklist` definition, and the progress rules of `ChecklistState` are verified with
-unit tests defined in `ChecklistServiceTests.cs`, the ballot rules (slot, hand-in, own view, impact of a hand-in) in
-`ChecklistServiceBallotTests.cs`, and the strict validation of a definition (`ChecklistValidator`) with
-the unit tests in `ChecklistValidatorTests.cs`, which need no store. The service is exercised over an in-memory fake
-store and the project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
-unit), so each
-test creates its own review, seats the reviewers in slots and reads the stored result back. The tests of the refusal of
-a person outside the project, of an auditor, and of the alternate reviewer of a slot use the real project access rules
-instead, and the tests of the signature impact and of the conclusion text use the signed-review world of the tests.
-The freeze at review creation is verified by the review service, which is a different unit. The real database is
-covered by the `Storage` subsystem.
+`ChecklistService`, the `DefaultChecklist` definition, and the progress rules of `ChecklistState` are verified with unit
+tests defined in `ChecklistServiceTests.cs`, the ballot rules (slot, hand-in, own view, impact of a hand-in) in
+`ChecklistServiceBallotTests.cs`, and the strict validation of a definition (`ChecklistValidator`) with the unit tests
+in `ChecklistValidatorTests.cs`, which need no store. The service is exercised over an in-memory fake store and the
+project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess` unit), so
+each test creates its own review, seats the reviewers in slots and reads the stored result back. The tests of the
+refusal of a person outside the project, of an auditor, and of the alternate reviewer of a slot use the real project
+access rules instead, and the tests of the signature impact and of the conclusion text use the signed-review world of
+the tests. The freeze at review creation is verified by the review service, which is a different unit. The real database
+is covered by the `Storage` subsystem.
 
 #### Test Environment
 
@@ -102,14 +101,16 @@ unchanged. This scenario is tested by `ChecklistService_DefaultChecklist_RoundTr
 **ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException**: A theory over JSON that parses but is not a
 complete definition (`null`, `{}`, missing or null sections, a null section, a section without id, title or items, a
 null item, an item without id or text, no version): `ChecklistDefinition.FromJson` and `ReviewChecklist.Parse` both
-raise a `JsonException`. This scenario is tested by `ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException`.
+raise a `JsonException`. This scenario is tested by
+`ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException`.
 
 **ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot**: A review holds a snapshot that differs from the
 current default; the service returns the snapshot. This scenario is tested by
 `ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot`.
 
 **ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull**: A review that exists but holds no checklist copy is
-read; no checklist is returned. This scenario is tested by `ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull`.
+read; no checklist is returned. This scenario is tested by
+`ChecklistService_Get_ReviewWithoutChecklistCopy_ReturnsNull`.
 
 **ChecklistService_Get_UnknownReview_ReturnsNull**: The checklist of an unknown review is requested; nothing is
 returned. This scenario is tested by `ChecklistService_Get_UnknownReview_ReturnsNull`.
@@ -218,9 +219,9 @@ another user, a member who holds no slot answers a check; the call is refused wi
 no ballot. This scenario is tested by `ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`, which is
 defined in `ChecklistServiceBallotTests.cs`, like the scenarios below up to the hand-in impact.
 
-**ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot marks
-a section as not applicable; the call is refused with `NoReviewerSlot` and nothing is stored. This scenario is tested by
-`ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`.
+**ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot
+marks a section as not applicable; the call is refused with `NoReviewerSlot` and nothing is stored. This scenario is
+tested by `ChecklistService_SetSectionApplicabilityAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`.
 
 **ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot hands a ballot
 in; the call is refused with `NoReviewerSlot`. This scenario is tested by
@@ -327,9 +328,9 @@ the author reports `AuthorBlocked` while the rule is on, and does not for anothe
 the rule is off. This scenario is tested by
 `ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn`.
 
-**ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource**: The exception copies the list of
-affected slots it is given, so a later change to the caller's list does not change it, and an exception without slots
-has an empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
+**ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource**: The exception copies the list of affected
+slots it is given, so a later change to the caller's list does not change it, and an exception without slots has an
+empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
 
 **ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards**: With the signature of slot 1 current,
 a reviewer whose draft differs hands the ballot in without the acknowledgment; the refusal lists the affected slot and
@@ -346,9 +347,9 @@ outside the project answers an unknown check; the call is refused with `ProjectN
 check, and nothing is stored. This scenario is tested by
 `ChecklistService_SetAnswer_NonMember_ThrowsProjectNotFoundAndStoresNothing`.
 
-**ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing**: With the real access rules,
-a person outside the project changes a section; the call is refused with `ProjectNotFound` and nothing is stored. This
-scenario is tested by `ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing`.
+**ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing**: With the real access
+rules, a person outside the project changes a section; the call is refused with `ProjectNotFound` and nothing is stored.
+This scenario is tested by `ChecklistService_SetSectionApplicability_NonMember_ThrowsProjectNotFoundAndStoresNothing`.
 
 **ChecklistService_SetAnswer_CarriedAnswer_StoredWithoutTheCarriedMark**: In a follow-up review a carried answer is
 answered again; the stored row has no carried mark, while the other carried answer keeps it. This scenario is tested by
@@ -413,7 +414,8 @@ This scenario is tested by `ChecklistValidator_Validate_DefaultChecklist_IsValid
 This scenario is tested by `ChecklistValidator_Validate_SmallDefinition_IsValid`.
 
 **ChecklistValidator_Validate_EmptyText_GivesOneError**: A theory over a missing, an empty, and a white-space text; each
-gives one error for the text as a whole. This scenario is tested by `ChecklistValidator_Validate_EmptyText_GivesOneError`.
+gives one error for the text as a whole. This scenario is tested by
+`ChecklistValidator_Validate_EmptyText_GivesOneError`.
 
 **ChecklistValidator_Validate_BadJson_GivesOneError**: A theory over text that is not JSON or not a definition; each
 gives one error and no exception. This scenario is tested by `ChecklistValidator_Validate_BadJson_GivesOneError`.
@@ -443,26 +445,26 @@ and one are refused. This scenario is tested by `ChecklistValidator_Validate_Ite
 **ChecklistValidator_Validate_EmptySection_IsRefused**: A section without checks is refused at the path of its items.
 This scenario is tested by `ChecklistValidator_Validate_EmptySection_IsRefused`.
 
-**ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters**: A theory over identifiers, each used as a section
-identifier and as a check identifier: letters, digits, dots, underscores, and hyphens that start with a letter or digit
-are accepted; a leading hyphen, dot, or underscore, a space, a slash, a colon, a non-ASCII letter, and a line break are
-refused. This scenario is tested by
-`ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters`.
+**ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters**: A theory over identifiers, each used as a
+section identifier and as a check identifier: letters, digits, dots, underscores, and hyphens that start with a letter
+or digit are accepted; a leading hyphen, dot, or underscore, a space, a slash, a colon, a non-ASCII letter, and a line
+break are refused. This scenario is tested by `ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters`.
 
 **ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength**: An identifier of 32 characters is accepted; one of 33
-characters and a missing identifier are refused. This scenario is tested by `ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength`.
+characters and a missing identifier are refused. This scenario is tested by
+`ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength`.
 
 **ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse**: A check identifier repeated in another section or
 in the same section, a check that repeats a section identifier, a repeated section identifier, and an identifier that
 differs only in case are each reported at the later use, with the path of that value. This scenario is tested by
 `ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse`.
 
-**ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence**: Titles of 200, check wording of 1000, and a hint
-of 500 characters are accepted; one more character, an empty value, or a missing value is refused, each with its path.
-This scenario is tested by `ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence`.
+**ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence**: Titles of 200, check wording of 1000, and a
+hint of 500 characters are accepted; one more character, an empty value, or a missing value is refused, each with its
+path. This scenario is tested by `ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence`.
 
-**ChecklistValidator_Validate_NullEntries_AreReported**: A missing section entry, a missing list of checks, and a missing
-check entry are each reported with their path instead of failing. This scenario is tested by
+**ChecklistValidator_Validate_NullEntries_AreReported**: A missing section entry, a missing list of checks, and a
+missing check entry are each reported with their path instead of failing. This scenario is tested by
 `ChecklistValidator_Validate_NullEntries_AreReported`.
 
 **ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether**: A definition with several different problems is

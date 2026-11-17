@@ -3,18 +3,16 @@
 #### Verification Approach
 
 `ReviewPlanner` is verified with two groups of tests. The unit tests in `ReviewPlannerTests.cs` use the real
-`ReviewPlanner`, `ReviewService`, `RepositoryService`, and `SigningService` over in-memory fakes of the review store, the
-repository store, the git provider, and the review-set parser, and over the project-access double
-`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit; only the tests that show that an actor
-without access is refused before git is reached use the real `ProjectAccess`), so every branch of the baseline
-choice and of the
-classification is reached with exact commits and files, and the number of sessions that git opened can be counted. The
-integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser` over real git
-repositories that the tests create with the installed git (through `GitTestSupport`), and a real SQLite database, so
-that the plan is computed from real history: the baseline since the last approved review, the fallback when that
-commit is
-not an ancestor, the detection of a review that was already filed, and the skipping of a set without changes. The tests
-that need git skip themselves when it is not installed.
+`ReviewPlanner`, `ReviewService`, `RepositoryService`, and `SigningService` over in-memory fakes of the review store,
+the repository store, the git provider, and the review-set parser, and over the project-access double
+`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit; only the tests that show that an
+actor without access is refused before git is reached use the real `ProjectAccess`), so every branch of the baseline
+choice and of the classification is reached with exact commits and files, and the number of sessions that git opened can
+be counted. The integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser`
+over real git repositories that the tests create with the installed git (through `GitTestSupport`), and a real SQLite
+database, so that the plan is computed from real history: the baseline since the last approved review, the fallback when
+that commit is not an ancestor, the detection of a review that was already filed, and the skipping of a set without
+changes. The tests that need git skip themselves when it is not installed.
 
 #### Test Environment
 
@@ -25,8 +23,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - All tests pass with zero failures (or skip because git is not installed).
 - A plan has one row per review-set in file order, is made with one session, and counts the added, modified, and deleted
   files of each selection.
-- A missing, oversized, or refused configuration file, an unknown revision, and an unknown project or repository stop the
-  plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
+- A missing, oversized, or refused configuration file, an unknown revision, and an unknown project or repository stop
+  the plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
   unusable set is only a `CannotPlan` row.
 - An actor who cannot see the project, or may only read it, is refused a plan or a batch before git is reached, and a
   missing actor is refused.
@@ -123,8 +121,8 @@ stops the plan with `ReviewSetConfigInvalid`, and its bytes were never read. Thi
 **ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid**: The rule of the parser reaches the caller. This
 scenario is tested by `ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid`.
 
-**ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules**: An unknown head, an invalid head, an unknown project, an unknown
-repository, and a disabled repository stop the plan with their own rules. This scenario is tested by
+**ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules**: An unknown head, an invalid head, an unknown project, an
+unknown repository, and a disabled repository stop the plan with their own rules. This scenario is tested by
 `ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules`.
 
 **ReviewPlanner_PlanAsync_ActorWithoutAccess_IsRefusedBeforeGit**: With a planner over the real project access, a user
@@ -163,10 +161,12 @@ nothing is stored for it, the earlier result is intact, and creating it again af
 tested by `ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence`.
 
 **ReviewPlanner_CreateAsync_Cancellation_Propagates**: A cancellation raised while a request is created is not turned
-into a failed result; it reaches the caller. This scenario is tested by `ReviewPlanner_CreateAsync_Cancellation_Propagates`.
+into a failed result; it reaches the caller. This scenario is tested by
+`ReviewPlanner_CreateAsync_Cancellation_Propagates`.
 
 **ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled**: Creating the same range again gives `AlreadyFiled`
-with the existing identifier. This scenario is tested by `ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled`.
+with the existing identifier. This scenario is tested by
+`ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled`.
 
 **ReviewPlanner_CreateAsync_IdTaken_UsesSuffix**: A set identifier that is already a review identifier gets the next
 free number. This scenario is tested by `ReviewPlanner_CreateAsync_IdTaken_UsesSuffix`.
@@ -179,8 +179,8 @@ by `ReviewPlanner_CreateAsync_IdTakenDuringCreate_RetriesWithNextSuffix`.
 and a set identifier over the limit fail one by one, each with a plain message that names its own problem, and nothing
 is stored. This scenario is tested by `ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest`.
 
-**ReviewPlanner_CreateAsync_BadBatch_Throws**: A head that is not a commit, too many requests, a null list, a null actor,
-and an unknown project are refused for the whole batch, and git is never opened. This scenario is tested by
+**ReviewPlanner_CreateAsync_BadBatch_Throws**: A head that is not a commit, too many requests, a null list, a null
+actor, and an unknown project are refused for the whole batch, and git is never opened. This scenario is tested by
 `ReviewPlanner_CreateAsync_BadBatch_Throws`.
 
 **ReviewPlanner_CreateAsync_ActorWithoutAccess_IsRefusedBeforeGit**: With a planner over the real project access, a
@@ -199,8 +199,8 @@ names the due date, nothing is stored for it), and the row with a valid date of 
 tested by `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
 
 **ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A project has a checklist of its own (the version
-`plan-1` with one check). A review is filed for a review-set from a plan; the review that the planner creates carries the
-checklist of the project, with its version and its definition text. This scenario is tested by
+`plan-1` with one check). A review is filed for a review-set from a plan; the review that the planner creates carries
+the checklist of the project, with its version and its definition text. This scenario is tested by
 `ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`.
 
 **ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId**: Unsafe characters, runs, leading and trailing punctuation, empty
@@ -212,27 +212,28 @@ identifier of exactly the limit, and with the first suffix and with a five chara
 the base is cut so that the identifier stays valid, unique, and within the limit. This scenario is tested by
 `ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit`.
 
-**ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange**: A long set title is cut so that the range and the whole
-title fit. This scenario is tested by `ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange`.
+**ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange**: A long set title is cut so that the range and the
+whole title fit. This scenario is tested by `ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange`.
 
 **ReviewPlanner_Constructor_NullArgument_Throws**: Every dependency of the constructor, including the project access, is
 checked for null. This
 scenario is tested by `ReviewPlanner_Constructor_NullArgument_Throws`.
 
-**ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline**: On a real repository with a configuration file, a plan
-with no baseline lists the files of each set as added, a set without matching files is `NothingToReview` (with the note
-that no file matches), and a plan with an explicit baseline counts the changes since it. This scenario is tested by
+**ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline**: On a real repository with a configuration file, a
+plan with no baseline lists the files of each set as added, a set without matching files is `NothingToReview` (with the
+note that no file matches), and a plan with an explicit baseline counts the changes since it. This scenario is tested by
 `ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline`.
 
-**ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled**: On a real repository, reviews of two sets are
-created at a tag and one is signed. The plan of the branch head in last reviewed mode gives the signed set a delta whose
-baseline is the head of that review, and the unsigned set a full review; the rows are created under new identifiers,
-frozen with the baseline and the set, and a second plan then shows both as already filed. This scenario is tested by
-`ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled`.
+**ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled**: On a real repository, reviews of two sets
+are created at a tag and one is signed. The plan of the branch head in last reviewed mode gives the signed set a delta
+whose baseline is the head of that review, and the unsigned set a full review; the rows are created under new
+identifiers, frozen with the baseline and the set, and a second plan then shows both as already filed. This scenario is
+tested by `ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled`.
 
 **ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview**: On a real repository, a review of a set is signed
 at the head of a side branch that the main branch does not contain; the real ancestor check says no, and the set gets a
-full review with the note. This scenario is tested by `ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview`.
+full review with the note. This scenario is tested by
+`ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview`.
 
 **ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview**: On a real repository, the paths of a set
 changed after its last approved review, so the set gets a full review with the note, although the old head is an

@@ -370,17 +370,17 @@ digest; and that a second ballot that agrees leaves the digest as it was while t
 
 - *Parameters*: `ReviewRecord record` — the record.
 - *Returns*: `string` — the header `ReviewCenter ballots v1` (the constant `BallotsHeader`), and for each submitted
-  ballot, in the order of the slot (the storage identity of the slot decides the order, but only its ordinal counted from
-  1 is written), the line `ballot {n} submitted {ticks} by {username}`, then one `answer` line per answered check sorted
-  by check identifier (identifier, outcome, justification, user name of the answerer, UTC ticks, and the review it was
-  carried from or `-`), and one `section` line per section state sorted by section identifier (identifier, `applicable`
-  or `not-applicable`, reason, user name of who set it, UTC ticks, carried-from or `-`). Strings are written with the same
-  escaping as the digest, so a delimiter inside a text cannot be mistaken for the separator. When a check was answered
-  more than once in a ballot, the last row counts. The store keeps one current row per section of a slot (the key is
-  the project, review, slot and section, and a write replaces the row), so a section state is never repeated and needs
-  no such reduction; grouping the answers is a defensive step, and a repeated section id, which the store cannot
-  produce, would be written in the order it was given. A record with no submitted ballot gives only the header. A
-  draft ballot never takes part, and display names are not written.
+  ballot, in the order of the slot (the storage identity of the slot decides the order, but only its ordinal counted
+  from 1 is written), the line `ballot {n} submitted {ticks} by {username}`, then one `answer` line per answered check
+  sorted by check identifier (identifier, outcome, justification, user name of the answerer, UTC ticks, and the review
+  it was carried from or `-`), and one `section` line per section state sorted by section identifier (identifier,
+  `applicable` or `not-applicable`, reason, user name of who set it, UTC ticks, carried-from or `-`). Strings are
+  written with the same escaping as the digest, so a delimiter inside a text cannot be mistaken for the separator. When
+  a check was answered more than once in a ballot, the last row counts. The store keeps one current row per section of a
+  slot (the key is the project, review, slot and section, and a write replaces the row), so a section state is never
+  repeated and needs no such reduction; grouping the answers is a defensive step, and a repeated section id, which the
+  store cannot produce, would be written in the order it was given. A record with no submitted ballot gives only the
+  header. A draft ballot never takes part, and display names are not written.
 - *Preconditions*: The record is not null.
 
 **ComputeBallotFingerprint**: Calculates the fingerprint of the submitted ballots.
@@ -388,9 +388,9 @@ digest; and that a second ballot that agrees leaves the digest as it was while t
 - *Parameters*: `ReviewRecord record` — the record.
 - *Returns*: `string` — the SHA-256 of the UTF-8 bytes of `CanonicalizeBallots(record)`, as 64 lowercase hexadecimal
   characters. It is **not** part of `Compute` and is stored nowhere: it identifies how each slot answered (which the
-  digest, which binds only the agreed standing, does not), is printed in the ballots appendix of an attestation, and lets
-  a reader tell that two copies describe the same ballots. A concluded review is locked, so the value can be computed
-  again at any time.
+  digest, which binds only the agreed standing, does not), is printed in the ballots appendix of an attestation, and
+  lets a reader tell that two copies describe the same ballots. A concluded review is locked, so the value can be
+  computed again at any time.
 - *Preconditions*: The record is not null.
 
 **Compute**: Calculates the digest of a record.

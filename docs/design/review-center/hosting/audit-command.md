@@ -17,8 +17,9 @@ Database settings: the database it reads is chosen the same way as for the serve
 **Output**: an intact chain prints `Audit chain intact: N entries` (N is the number of entries) through
 `Context.WriteLine` and the exit code stays 0. A broken chain prints `Audit chain BROKEN at entry N` (N is the first bad
 entry) through `Context.WriteError`, which makes the exit code 1. A database that cannot be read prints
-`Failed to read the audit trail: {detail}` through `Context.WriteError`, exit code 1. A database file that does not exist
-prints `The database file does not exist: {path}` through `Context.WriteError`, exit code 1, and nothing is created.
+`Failed to read the audit trail: {detail}` through `Context.WriteError`, exit code 1. A database file that does not
+exist prints `The database file does not exist: {path}` through `Context.WriteError`, exit code 1, and nothing is
+created.
 
 The command prints the number of entries but, unlike the `Audit` page, **not** the head hash. Scripts that anchor the
 head hash outside the database should read it from the page or from a database query; this slice does not record it
@@ -32,7 +33,8 @@ anywhere.
   adjusts the configuration before the services are built (tests use it to select a temporary database).
 - *Returns*: `void`.
 - *Preconditions*: `context` is not null.
-- *Postconditions*: One line is written, as described above; the exit code of the context says whether the chain is intact.
+- *Postconditions*: One line is written, as described above; the exit code of the context says whether the chain is
+  intact.
 
 The command builds its configuration and services the same way the server and `user add` do: the same `appsettings.json`
 and environment variables (for example `Database__ConnectionString`) and the same registration

@@ -15,15 +15,15 @@ what is decided by `ProjectAccess`; this unit only asks.
 
 #### Data Model
 
-**Project**: a data class (init-only properties) of `Id` (`int`, assigned by the store), `Name` (`string`), `Description`
-(`string`, may be empty), `Created` (`DateTimeOffset`, from the injected clock), `Evidence` (the evidence settings), and
-`RequireIndependentReviewers` (`bool`, default `true`): whether the person who created a review is kept out of its
-reviewer slots and cannot sign it (see the `SigningService` unit, which enforces it). Review Center only knows who
-created the review in the tool; the authors of git commits are not matched. Two further review rules are stored with
-the project and are on by default: `RequireNonAuthorChecklistAnswers` (`bool`): whether the author of a review may not
-answer the checklist of that review, and `RequireNonReopenerSigning` (`bool`): whether the person who reopened a
-review may not sign it again. Both are enforced (`ChecklistService` and `SigningService`; see those units) and, as
-the stored columns default to on, they apply to every project, also one that existed before they were enforced.
+**Project**: a data class (init-only properties) of `Id` (`int`, assigned by the store), `Name` (`string`),
+`Description` (`string`, may be empty), `Created` (`DateTimeOffset`, from the injected clock), `Evidence` (the evidence
+settings), and `RequireIndependentReviewers` (`bool`, default `true`): whether the person who created a review is kept
+out of its reviewer slots and cannot sign it (see the `SigningService` unit, which enforces it). Review Center only
+knows who created the review in the tool; the authors of git commits are not matched. Two further review rules are
+stored with the project and are on by default: `RequireNonAuthorChecklistAnswers` (`bool`): whether the author of a
+review may not answer the checklist of that review, and `RequireNonReopenerSigning` (`bool`): whether the person who
+reopened a review may not sign it again. Both are enforced (`ChecklistService` and `SigningService`; see those units)
+and, as the stored columns default to on, they apply to every project, also one that existed before they were enforced.
 
 **ReviewRule**: an enumeration of the rules of a project that an administrator can switch: `IndependentReviewers`,
 `NonAuthorChecklistAnswers`, and `NonReopenerSigning`.
@@ -32,7 +32,7 @@ the stored columns default to on, they apply to every project, also one that exi
 storage agree:
 
 | Constant | Value | Meaning |
-| ---------- | ------- | --------- |
+| --- | --- | --- |
 | `MaxFileSizeBytes` | 2 MiB | largest size of one uploaded file |
 | `MaxFileCount` | 200 | most files in one review |
 | `MaxTotalSizeBytes` | 20 MiB | largest total size of the files of one review |
@@ -199,7 +199,7 @@ then simply cannot sign it (`SigningService` refuses), so the review shows that 
   above and nothing is stored.
 
 | Rule | Audit action | Property named in the detail |
-| ------ | -------------- | -------------- |
+| --- | --- | --- |
 | `IndependentReviewers` | `project.independent-reviewers-changed` | `RequireIndependentReviewers` |
 | `NonAuthorChecklistAnswers` | `project.review-rule-changed` | `RequireNonAuthorChecklistAnswers` |
 | `NonReopenerSigning` | `project.review-rule-changed` | `RequireNonReopenerSigning` |

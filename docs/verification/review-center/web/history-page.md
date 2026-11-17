@@ -6,9 +6,9 @@
 render the real component over a real `AuditService`, `ReviewService`, and `ProjectService` with the in-memory fakes
 (`FakeAuditStore` and the fake review store). The signed-in user is set by the test authentication state of the shared
 helper `PageTestBase`. Tests locate elements by their `data-testid` attributes. The route-level behavior for a visitor
-who is not signed in is verified through the router test `Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries`
-in the same file. The History link on the review page is verified by `ReviewPageTests.cs`. The real database and the
-store are covered by the `Storage` subsystem.
+who is not signed in is verified through the router test
+`Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries` in the same file. The History link on the review page
+is verified by `ReviewPageTests.cs`. The real database and the store are covered by the `Storage` subsystem.
 
 #### Test Environment
 
@@ -45,8 +45,8 @@ as stored, and only the detail is replaced by the hidden note. This scenario is 
 **HistoryPage_Administrator_SeesFullAnswerDetails**: An administrator sees the full detail of the same entries. This
 scenario is tested by `HistoryPage_Administrator_SeesFullAnswerDetails`.
 
-**HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst**: The trail holds entries of two reviews; the page
-of one review lists its entries only, newest first. This scenario is tested by
+**HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst**: The trail holds entries of two reviews; the
+page of one review lists its entries only, newest first. This scenario is tested by
 `HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst`.
 
 **HistoryPage_Render_NoEntries_ShowsEmptyMessage**: A review without entries shows the empty message. This scenario is

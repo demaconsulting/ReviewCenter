@@ -19,10 +19,10 @@ service: they are recorded by the store in the same transaction as the change (s
 A change of data and its audit entry must exist together or not at all, and the chain must never fork. The design that
 achieves this is:
 
-1. **One writer at a time.** The `AuditAppender` (see the `AuditStore` unit) owns one process-wide gate, a semaphore with
-   a single slot, shared by *all* stores (`ReviewStore`, `UserStore`, and `AuditStore`). Every transaction that writes an
-   audit entry holds the gate, so two entries are never appended at the same time within the process, whichever store
-   they come from.
+1. **One writer at a time.** The `AuditAppender` (see the `AuditStore` unit) owns one process-wide gate, a semaphore
+   with a single slot, shared by *all* stores (`ReviewStore`, `UserStore`, and `AuditStore`). Every transaction that
+   writes an audit entry holds the gate, so two entries are never appended at the same time within the process,
+   whichever store they come from.
 2. **One transaction per mutation.** Inside the gate each audited store method opens a *Serializable* transaction (for
    SQLite this is `BEGIN IMMEDIATE`, which takes the database write lock when the transaction begins, so another
    process, for example the command line, is serialized by the database as well). The method makes the change,
@@ -65,8 +65,8 @@ keys were suppressed because the table was full.
 **ExportedAction**: `string` (constant) — `audit.exported`; the action of the entry that records an export.
 
 **AuditEntryPage**: the entries of one page, newest first, `HasOlder` and `HasNewer` (whether more entries lie beyond
-either end), and the cursors `OlderBefore` (the sequence of the last entry of the page) and `NewerAfter` (the sequence of
-the first entry), each `null` for an empty page.
+either end), and the cursors `OlderBefore` (the sequence of the last entry of the page) and `NewerAfter` (the sequence
+of the first entry), each `null` for an empty page.
 
 **IAuditStore**: the contract the Storage subsystem implements. It has three operations: `AppendAsync` (one entry in its
 own transaction), `ListAsync` (newest first, narrowed by an `AuditFilter`, before or after a sequence, with a size
@@ -84,7 +84,7 @@ sign-in; the number of such entries one actor can cause is bounded by the thrott
 administrator is not throttled but is a trusted actor).
 
 | Action | Detail |
-| ------ | ------ |
+| --- | --- |
 | `project.created` | `project 'Name'` |
 | `project.member-added` | `user 'bob', role ProjectAdmin` (the project identifier is in its own field) |
 | `project.member-role-changed` | `user 'bob', role User` (the new role; the project identifier is in its own field) |
@@ -347,9 +347,9 @@ because a spreadsheet does not interpret it, and is the form to use when the exa
 
 #### Error Handling
 
-`RecordAsync` lets store failures propagate. `TryRecordAsync` swallows everything except cancellation, as described above;
-this is a deliberate choice, because a failing trail must not disable sign-in, and the failure is logged. This means a
-sign-in event can be missing from the trail when the write fails. Null arguments are rejected with
+`RecordAsync` lets store failures propagate. `TryRecordAsync` swallows everything except cancellation, as described
+above; this is a deliberate choice, because a failing trail must not disable sign-in, and the failure is logged. This
+means a sign-in event can be missing from the trail when the write fails. Null arguments are rejected with
 `ArgumentNullException`.
 
 #### Known Limitations

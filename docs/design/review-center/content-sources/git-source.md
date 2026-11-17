@@ -16,11 +16,11 @@ returns, a private class `Session`, implements `IGitRepository`.
 **State**: a dictionary of semaphores, one for each repository identity, created on first use and kept for the life of
 the process. The semaphore has one slot and is the lock of that repository.
 
-**Layout of the cache**: `<CachePath>/repo-<id>` is the bare mirror of the repository with that identity. A mirror in the
-process of being cloned is in `<CachePath>/repo-<id>.tmp` and is moved into place when complete.
+**Layout of the cache**: `<CachePath>/repo-<id>` is the bare mirror of the repository with that identity. A mirror in
+the process of being cloned is in `<CachePath>/repo-<id>.tmp` and is moved into place when complete.
 
-**Limits**: a change listing is read up to 64 MiB; a blob up to the limit given by the caller; a revision or object id as
-described below.
+**Limits**: a change listing is read up to 64 MiB; a blob up to the limit given by the caller; a revision or object id
+as described below.
 
 **Types of the contract used here**: `RepositoryAccess` (the input), `GitChange`, `ChangeKind`, `SkippedEntry`, and
 `GitChangeSet` (the result), all defined in `Core`.
@@ -57,11 +57,11 @@ described below.
 - *Returns*: `GitChangeSet` — the changes and the skipped entries, both ordered by path (ordinal).
 - *Preconditions*: Both ids are valid object ids, otherwise `ArgumentException`.
 - *Algorithm*: Without a baseline, run `git ls-tree -r -z --full-tree <head>`; every regular file is Added. With a
-  baseline, run `git diff-tree -r -z --raw --no-renames --no-abbrev <baseline> <head> --`; the status letter gives Added,
-  Deleted, or (for any other letter) Modified. Entries with the mode of a symbolic link or a submodule, paths longer than
-  `ReviewLimits.MaxPathLength`, and paths with control or replacement characters are not changes; they become skipped
-  entries with a reason ("symbolic links are not reviewed", "submodules are not reviewed", and so on). A change whose
-  two blobs are the same (only the mode changed) is dropped.
+  baseline, run `git diff-tree -r -z --raw --no-renames --no-abbrev <baseline> <head> --`; the status letter gives
+  Added, Deleted, or (for any other letter) Modified. Entries with the mode of a symbolic link or a submodule, paths
+  longer than `ReviewLimits.MaxPathLength`, and paths with control or replacement characters are not changes; they
+  become skipped entries with a reason ("symbolic links are not reviewed", "submodules are not reviewed", and so on). A
+  change whose two blobs are the same (only the mode changed) is dropped.
 
 **IsAncestorAsync** (session): Tells whether one commit is an ancestor of another.
 

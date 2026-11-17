@@ -41,8 +41,8 @@ N/A - standard test environment.
 - The page shows a card of personal access tokens with the name field, the choices of 30, 90 (selected), and 365 days,
   the list (or a note that it is empty), and a link to the help topic; creating a token shows its value once with a copy
   button and lists the token without the value; an empty name and the twenty-first active token are each shown as an
-  error and create nothing; the copy button hands the value to the browser and shows a hint when the browser refuses; and
-  an active token is revoked from the list while an expired one has no revoke button.
+  error and create nothing; the copy button hands the value to the browser and shows a hint when the browser refuses;
+  and an active token is revoked from the list while an expired one has no revoke button.
 - When the feature is on, a local user (without a temporary password) sees a card for the second factor with the
   status Off and a start form with a password field and a link to the help topic; the card is absent when the feature is
   off or the password is temporary, and an account of an identity provider sees only a note that names the provider.
@@ -135,9 +135,9 @@ shown, no value box is shown, and the store holds no token. This scenario is tes
 error names the limit of 20, no value box is shown, and the store still holds twenty tokens. This scenario is tested by
 `AccountPage_CreateToken_TwentyActive_ShowsLimitError`.
 
-**AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript**: The browser script `reviewCenter.copyText` reports success;
-after a token is created and the copy button is pressed, the script received exactly the value and the page shows
-"Copied.". This scenario is tested by `AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript`.
+**AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript**: The browser script `reviewCenter.copyText` reports
+success; after a token is created and the copy button is pressed, the script received exactly the value and the page
+shows "Copied.". This scenario is tested by `AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript`.
 
 **AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken**: The script reports that the copy failed; the page shows
 the hint to copy the value by hand and the value stays on the page. This scenario is tested by
@@ -168,14 +168,14 @@ the provider is on (in `OidcPageTests.cs`); the page shows the sentence that nam
 password field and no change button. This scenario is tested by
 `AccountPage_Render_ExternalUser_ShowsNoPasswordForm`.
 
-**AccountPage second factor scenarios**: The tests of the card are in `AccountTotpPageTests.cs`, rendered with bUnit over
-the real `TotpService` of `TotpTestWorld`-style in-memory stores, with codes computed by the independent `TotpOracle`.
-A local user without two-factor sign-in sees status "Off", the password field and button of the start form, and the
-link `/help/two-factor`, and no secret and no turn-off form; this is tested by
+**AccountPage second factor scenarios**: The tests of the card are in `AccountTotpPageTests.cs`, rendered with bUnit
+over the real `TotpService` of `TotpTestWorld`-style in-memory stores, with codes computed by the independent
+`TotpOracle`. A local user without two-factor sign-in sees status "Off", the password field and button of the start
+form, and the link `/help/two-factor`, and no secret and no turn-off form; this is tested by
 `AccountPage_Render_LocalUserNotEnrolled_ShowsStatusOffAndStartForm`. With the feature off the card is absent, which is
 tested by `AccountPage_Render_FeatureDisabled_HidesCard`. An account of an identity provider sees a note that names the
-provider and no start form and no status, which is tested by `AccountPage_Render_ExternalUser_ShowsNoteAndNoControls`.
-A user who signed in with a temporary password does not see the card, which is tested by
+provider and no start form and no status, which is tested by `AccountPage_Render_ExternalUser_ShowsNoteAndNoControls`. A
+user who signed in with a temporary password does not see the card, which is tested by
 `AccountPage_Render_TemporaryPassword_HidesCard`. A wrong password shows an error, no secret, and an empty password
 field, which is tested by `AccountPage_Start_WrongPassword_ShowsErrorAndNoSecret`. The right password shows a secret of
 32 characters and an address that starts with `otpauth://totp/` and holds the secret, the field for the code, and no
@@ -185,16 +185,16 @@ field, and the user is not enrolled, which is tested by
 `AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending`. The right code shows status "On", "10 recovery codes
 left", ten distinct codes and the notice that they cannot be shown again, and no secret, no address, and no secret text
 in the page; after the box is dismissed the codes are gone; this is tested by
-`AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. Canceling removes the secret from the page and
-the user is not enrolled, which is tested by `AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm`. An
+`AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. Canceling removes the secret from the page and the
+user is not enrolled, which is tested by `AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm`. An
 enrolled user sees status "On", the number of codes left, the turn-off and renewal forms, and no secret, no codes, and
-no start form, which is tested by `AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft`. A wrong code when turning it
-off shows the generic message, keeps the status "On", empties both fields, and the user stays enrolled, which is tested
-by `AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields`. A recovery code and the password turn it
-off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The password and a fresh authenticator code turn
-it off as well and bring the start form back, which is tested by `AccountPage_Disable_RightPasswordAndCode_TurnsItOff`.
-The right password and code show ten new codes
-that differ from the old ones, empty the fields, and the codes are gone after dismissal, which is tested by
+no start form, which is tested by `AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft`. A wrong code when turning
+it off shows the generic message, keeps the status "On", empties both fields, and the user stays enrolled, which is
+tested by `AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields`. A recovery code and the password
+turn it off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The password and a fresh authenticator
+code turn it off as well and bring the start form back, which is tested by
+`AccountPage_Disable_RightPasswordAndCode_TurnsItOff`. The right password and code show ten new codes that differ from
+the old ones, empty the fields, and the codes are gone after dismissal, which is tested by
 `AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce`. A wrong code shows the generic message and no codes,
 which is tested by `AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes`.
 
@@ -228,21 +228,21 @@ sees the address form, which is tested by `AccountPage_Render_ExternalUser_Shows
 rendered with the same real service and stand-ins. Once an address is confirmed, the selector and its save button are
 shown, which is tested by `AccountPage_Render_ConfirmedAddress_ShowsModeSelector`; it offers exactly the modes `None`,
 `Daily`, and `Every`, which is tested by `AccountPage_Render_ModeSelector_OffersThreeModes`; the stored mode is
-preselected, and a user without a stored mode sees `None`, which are tested by `AccountPage_Render_StoredEvery_EverySelected`
-and `AccountPage_Render_NoMode_NoneSelected`. Without a confirmed address the selector is disabled, has no save button,
-and a hint explains that an address has to be confirmed first, which is tested by
-`AccountPage_Render_NoConfirmedAddress_SelectorDisabled`, `AccountPage_Render_NoConfirmedAddress_NoSaveButton`, and
-`AccountPage_Render_NoConfirmedAddress_ExplainsNeed`. While
-notifications are not set up there is no selector, which is tested by `AccountPage_Render_NotificationsNotSetUp_NoModeSelector`.
-Saving calls the service with the chosen mode and shows the notice "Your e-mail setting was saved." once, which is
-tested by `AccountPage_SaveMode_Daily_CallsService`, `AccountPage_SaveMode_Success_ShowsSavedMessage`, and
-`AccountPage_SaveMode_Success_ShowsNoError`; a refusal of the service is shown and no saved notice appears, which is
-tested by `AccountPage_SaveMode_Refused_ShowsMessage` and `AccountPage_SaveMode_Refused_ShowsNoSavedMessage`.
-Removing the address shows `None` again, which is tested by `AccountPage_RemoveAddress_AfterMode_ShowsNone`. The
-explanation says what a mail contains, what is never mailed, and what the three modes do, which is tested by
-`AccountPage_Render_Card_ExplainsWhatIsMailed`, `AccountPage_Render_Card_ExplainsProjectAndReview`,
-`AccountPage_Render_Card_ExplainsLinkToReview`, `AccountPage_Render_Card_ExplainsWhatIsNotMailed`, and
-`AccountPage_Render_Card_ExplainsModes`.
+preselected, and a user without a stored mode sees `None`, which are tested by
+`AccountPage_Render_StoredEvery_EverySelected` and `AccountPage_Render_NoMode_NoneSelected`. Without a confirmed address
+the selector is disabled, has no save button, and a hint explains that an address has to be confirmed first, which is
+tested by `AccountPage_Render_NoConfirmedAddress_SelectorDisabled`,
+`AccountPage_Render_NoConfirmedAddress_NoSaveButton`, and `AccountPage_Render_NoConfirmedAddress_ExplainsNeed`. While
+notifications are not set up there is no selector, which is tested by
+`AccountPage_Render_NotificationsNotSetUp_NoModeSelector`. Saving calls the service with the chosen mode and shows the
+notice "Your e-mail setting was saved." once, which is tested by `AccountPage_SaveMode_Daily_CallsService`,
+`AccountPage_SaveMode_Success_ShowsSavedMessage`, and `AccountPage_SaveMode_Success_ShowsNoError`; a refusal of the
+service is shown and no saved notice appears, which is tested by `AccountPage_SaveMode_Refused_ShowsMessage` and
+`AccountPage_SaveMode_Refused_ShowsNoSavedMessage`. Removing the address shows `None` again, which is tested by
+`AccountPage_RemoveAddress_AfterMode_ShowsNone`. The explanation says what a mail contains, what is never mailed, and
+what the three modes do, which is tested by `AccountPage_Render_Card_ExplainsWhatIsMailed`,
+`AccountPage_Render_Card_ExplainsProjectAndReview`, `AccountPage_Render_Card_ExplainsLinkToReview`,
+`AccountPage_Render_Card_ExplainsWhatIsNotMailed`, and `AccountPage_Render_Card_ExplainsModes`.
 
 **AccountPage_Render_NotificationCard_LinksToEmailNotificationsTopic**: With notifications set up, the page is
 rendered; the card contains a link with the text "About e-mail notifications" that points to

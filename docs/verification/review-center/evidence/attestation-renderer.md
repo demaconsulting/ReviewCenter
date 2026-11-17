@@ -40,9 +40,10 @@ N/A - standard test environment (everything runs in memory).
 
 #### Test Scenarios
 
-**AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint**: A review of a repository is rendered.
-The text has the project, the review identifier and title, the repository and both commits, and the content
-fingerprint. This scenario is tested by `AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint`.
+**AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint**: A review of a repository is
+rendered. The text has the project, the review identifier and title, the repository and both commits, and the content
+fingerprint. This scenario is tested by
+`AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint`.
 
 **AttestationRenderer_Render_UploadedReview_SaysFilesWereUploaded**: A review without a repository is rendered. The text
 says that the files were uploaded. This scenario is tested by
@@ -125,8 +126,8 @@ approval in full, and no text for a blank one. This scenario is tested by
 
 **AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint**: A rejected document with a ballots
 appendix of two slots is rendered. Each slot is named with its reviewer and the submission time, each answer has its
-outcome, justification and answerer, a section that a slot marked not applicable shows its reason, and the fingerprint is
-printed with the version header of the ballots. This scenario is tested by
+outcome, justification and answerer, a section that a slot marked not applicable shows its reason, and the fingerprint
+is printed with the version header of the ballots. This scenario is tested by
 `AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint`.
 
 **AttestationRenderer_Render_NoBallotAppendix_OmitsTheSection**: A document without a ballots appendix (for example a
@@ -145,23 +146,22 @@ slot shows its signer, the time, and the digest it covers. This scenario is test
 digest. The digest is a single line and is not wrapped. This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine`.
 
-**AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds**: A document with the reviewer names turned
-off is rendered, with slots that hold the labels `Reviewer 1` and `Reviewer 2` instead of names. The labels and the
-signer with the role are printed as they are, and the names of the sample are not in the text. This scenario is tested
-by `AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds`.
+**AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds**: A document with the reviewer names
+turned off is rendered, with slots that hold the labels `Reviewer 1` and `Reviewer 2` instead of names. The labels and
+the signer with the role are printed as they are, and the names of the sample are not in the text. This scenario is
+tested by `AttestationRenderer_Render_ReviewerNamesOff_PrintsTheNamesTheDocumentHolds`.
 
 **AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion**: The audit anchor and the tool version are
 rendered. The text has the head hash, the number of entries, and the version. This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion`.
 
-**AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId**: A document is rendered. The properties of
-the PDF hold the fingerprint and the review identifier. This scenario is tested by
+**AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId**: A document is rendered. The properties
+of the PDF hold the fingerprint and the review identifier. This scenario is tested by
 `AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId`.
 
-**AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice**: A document with a self-signed key is rendered. The text has
-the notice that the key is self-signed and not an organization key, with the advice that it is for development and test
-only. This scenario is tested by
-`AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice`.
+**AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice**: A document with a self-signed key is rendered. The text
+has the notice that the key is self-signed and not an organization key, with the advice that it is for development and
+test only. This scenario is tested by `AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice`.
 
 **AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice**: A document with an organization key is
 rendered. The text has the subject and the issuer and does not have the notice. This scenario is tested by

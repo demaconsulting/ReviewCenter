@@ -212,14 +212,14 @@ scenario is tested by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsCl
 
 **ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in on and valid settings (an https
 authority and the largest age), the application is created. The name of the test is kept from the time when it also
-covered sign-in off, which is now tested by `ServerHost_CreateApplication_OidcOff_BuildsTheApplication`. This scenario is
-tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+covered sign-in off, which is now tested by `ServerHost_CreateApplication_OidcOff_BuildsTheApplication`. This scenario
+is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
 
 **OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause**: After a refused confirmation the review page names the
 cause when the provider sent no usable `auth_time` (absent, or present but negative): the text says the provider did not
-report a usable sign-in time, names `auth_time`, a whole number of seconds since 1970 and the administrator; and when the
-sign-in was too old it says it was not recent enough and does not name `auth_time`. In neither case is the general text
-"We could not confirm your identity" shown. This scenario is tested by
+report a usable sign-in time, names `auth_time`, a whole number of seconds since 1970 and the administrator; and when
+the sign-in was too old it says it was not recent enough and does not name `auth_time`. In neither case is the general
+text "We could not confirm your identity" shown. This scenario is tested by
 `OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause`.
 
 **OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly**: With a fixed clock, an `auth_time` exactly
@@ -233,9 +233,9 @@ is refused with the reason class `other` recorded for the user of the session, n
 not replaced. This scenario is tested by `OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof`.
 
 **OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled**: A post to the confirmation form without
-an antiforgery token, and one with a token that is not valid, from a signed-in user who may confirm the slot, is answered
-with 400, the provider sees no request, no cookie is set, no proof is issued and nothing is recorded. This scenario is
-tested by `OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled`.
+an antiforgery token, and one with a token that is not valid, from a signed-in user who may confirm the slot, is
+answered with 400, the provider sees no request, no cookie is set, no proof is issued and nothing is recorded. This
+scenario is tested by `OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled`.
 
 **OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature**: The provider is asked with `prompt=login` and
 `max_age=0`, a proof is issued, one signature without a password uses it up, and the slot is signed. This scenario is
@@ -294,4 +294,5 @@ is tested by `OidcReauth_ReviewPage_OffersConfirmationThenSigning`.
 `OidcReauth_VerifyReauth_ComparesIssuerAndSubjectOfTheAccount`.
 
 **OidcReauth_VerifyReauth_WrongBinding_IsRefusedAsOther**: A confirmation started for another user, without a binding,
-or without claims is refused as `other`. This scenario is tested by `OidcReauth_VerifyReauth_WrongBinding_IsRefusedAsOther`.
+or without claims is refused as `other`. This scenario is tested by
+`OidcReauth_VerifyReauth_WrongBinding_IsRefusedAsOther`.

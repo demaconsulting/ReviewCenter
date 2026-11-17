@@ -146,8 +146,8 @@ N/A - standard test environment.
   change that would make a signature out of date asks for a confirmation that names the slot first. A member who owns
   no slot, and every user of a concluded review, sees the text without an editor.
 - When the checks of the ballots agree on a Fail, the sign form of a slot owner shows the outcome (Rejected) and the
-  matching meaning text; without a conclusion text the blocker names the conclusion, and no sign form is offered. Signing
-  the rejection with the right password concludes and locks the review.
+  matching meaning text; without a conclusion text the blocker names the conclusion, and no sign form is offered.
+  Signing the rejection with the right password concludes and locks the review.
 - A thread started on a review with a current signature is stored by the page as chat that is not part of the report,
   without a warning, and the signature stays current; the page resolves a thread without a resolution note, and a
   refusal for another reason is shown as the normal error message.
@@ -459,7 +459,8 @@ the date as history, shows no Overdue badge, and offers no edit form. This scena
 
 **ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone**: The review is approved by someone
 else while the form is open; saving is refused as locked. The form is gone, but the refusal message, the stored date and
-the lock notice stay. This scenario is tested by `ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone`.
+the lock notice stay. This scenario is tested by
+`ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone`.
 
 **ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity**: With no threads the index
 says there are no open threads; with an open thread (with a reply) and a resolved thread, the default shows only
@@ -717,7 +718,8 @@ the review is locked and comments are read-only, and every line comment button i
 
 **ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton**: The new-thread field and the reply field of a thread
 carry `data-ctrl-enter-submits` with the test id of their submit button, each submit button exists, and the hints
-"Ctrl+Enter to submit" are shown next to them. This scenario is tested by `ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton`.
+"Ctrl+Enter to submit" are shown next to them. This scenario is tested by
+`ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton`.
 
 **ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField**: A click on a line comment button calls
 `reviewCenter.focusTestId` with `thread-text-input` as the last browser call. This scenario is tested by
@@ -1000,8 +1002,8 @@ content, comments, reviewer name, checklist progress) remains in the markup. Thi
 chosen; the result is the not-found page without data. This scenario is tested by
 `ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData`.
 
-**ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and the thread index filter is
-changed, an action that reads no service; the access check still runs and the result is the not-found page without
+**ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and the thread index filter
+is changed, an action that reads no service; the access check still runs and the result is the not-found page without
 data. This scenario is tested by `ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData`.
 
 **ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing**: A member has a file selected and a reply typed,
@@ -1025,17 +1027,17 @@ the review address, file paths with spaces, `#`, `?`, `%`, `+`, `&`, non-ASCII l
 segment escaped once, the separators kept), a line with a side, a thread, null arguments, and the check that every
 address is a local path that `SignIn.SafeReturnUrl` keeps. These scenarios are tested by the tests of those names.
 
-**ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff**, **ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow**,
+**ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff**,
+**ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow**,
 **ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell**,
 **ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted**,
-**ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow**,
-**ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine** and
-**ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo**: the file address opens the file in the Diff view with
-no message and no highlight, and the review address still opens no file; a line address highlights the cell of the
-right side and asks the browser to scroll to its row (the baseline copy of an unchanged line for a baseline line, a
-line inside a collapsed run is shown); a line of an added file of a review with a baseline highlights its diff row; a
-file without a diff (an upload) highlights the line in the numbered text; a deleted file
-has baseline lines but no head lines. These scenarios are tested by the tests of those names.
+**ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow**, **ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine**
+and **ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo**: the file address opens the file in the Diff view
+with no message and no highlight, and the review address still opens no file; a line address highlights the cell of the
+right side and asks the browser to scroll to its row (the baseline copy of an unchanged line for a baseline line, a line
+inside a collapsed run is shown); a line of an added file of a review with a baseline highlights its diff row; a file
+without a diff (an upload) highlights the line in the numbered text; a deleted file has baseline lines but no head
+lines. These scenarios are tested by the tests of those names.
 
 **ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread**,
 **ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow**,
@@ -1086,11 +1088,11 @@ tested by the test of that name.
 
 **WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: the stylesheet hides the `+` control of a diff
 row with `opacity: 0`, reveals it on row hover, focus within the row, a selected row, and keyboard focus, shows it
-always under `@media (hover: none)`, and never uses `display: none` or `visibility: hidden` for it, so it stays in the tab
-order. This scenario is tested by the test of that name. A real browser has the hover state, so the reach is also proven
-end to end by the browser system test
-`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (a hover on a row reveals
-its `+`, and a click on it opens the composer).
+always under `@media (hover: none)`, and never uses `display: none` or `visibility: hidden` for it, so it stays in the
+tab order. This scenario is tested by the test of that name. A real browser has the hover state, so the reach is also
+proven end to end by the browser system test
+`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (a hover on a row
+reveals its `+`, and a click on it opens the composer).
 
 **WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill**: the stylesheet has a hover and focus rule for
 `.section-toggle` and for `.line-comment` that fills with `var(--accent-soft)` and never with `--accent-hover`, and the
@@ -1108,9 +1110,9 @@ attestation line nor the download button is present. This scenario is tested by 
 **ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote**: A complete review is
 rendered with the default key, which is self-signed. The button reads "Download attestation (PDF)", its `href` is the
 address from `ReviewLinks.ForAttestation`, its `download` file name is `attestation-{project}-REV-1.pdf`, it has the
-button style `action`, the note says the key is self-signed, generated by this server (the `SelfSigned` provider) and not
-an organization key, the help link points to `/help/signed-attestation`, and no key problem is shown. This scenario is
-tested by the test of that name.
+button style `action`, the note says the key is self-signed, generated by this server (the `SelfSigned` provider) and
+not an organization key, the help link points to `/help/signed-attestation`, and no key problem is shown. This scenario
+is tested by the test of that name.
 
 **ReviewPage_Render_ReviewApprovedWithSelfSignedCertificateFromStore_NoteSaysAdministratorSuppliedIt**: A complete
 review is rendered with a self-signed key reported by the `CertificateStore` provider. The note says that it is a
@@ -1129,7 +1131,8 @@ no download button. This scenario is tested by the test of that name.
 
 **ReviewPage_Render_KeyStatusWithExpiryWarning_ShowsTheWarningNextToTheDownload**: A complete review is rendered with a
 key whose status holds an expiry warning. An element with the role `status` and the test id `attestation-key-warning`
-holds the text of the warning, and the download button is still offered. This scenario is tested by the test of that name.
+holds the text of the warning, and the download button is still offered. This scenario is tested by the test of that
+name.
 
 **ReviewPage_Render_KeyStatusWithoutWarnings_ShowsNoWarning**: A key whose status has no warnings gives no element with
 the test id `attestation-key-warning`. This scenario is tested by the test of that name.
@@ -1159,7 +1162,8 @@ place of the code is refused with the same message and nothing is signed, which 
 
 **ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark**: A review that follows another shows a link to
 it and "0 answers and 1 thread carried"; the carried thread is marked with a link to the earlier review and a thread of
-the review's own is not. This scenario is tested by `ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
+the review's own is not. This scenario is tested by
+`ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
 
 **ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine**: The followed review lists its follow-ups with
 links and shows no follows line, and a follow-up that nothing follows shows no list. This scenario is tested by
@@ -1233,7 +1237,8 @@ of date, and is audited as `thread.kind-changed`. These scenarios are tested by 
 
 **ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote**: Resolving a Finding with a note after a slot has
 signed shows the confirmation, stores nothing and keeps the resolve dialog open when the person cancels, and resolving
-again stores the note typed first. This scenario is tested by `ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote`.
+again stores the note typed first. This scenario is tested by
+`ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote`.
 
 **ReviewPage_ReplyReportToggle_AddsAndRemovesReplyFromReport**, **ReviewPage_Concluded_ThreadActionsAbsent**,
 **ReviewPage_Auditor_SeesKindsButNoThreadActions**, and **ReviewPage_CheckThread_ShowsKindBadgeAndPromote**: The lead
@@ -1278,18 +1283,20 @@ the warning and keeps the form with its text. This scenario is tested by
 
 **ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification**: A disputed check lists who answered
 what, marks the viewer, and shows the justification the other reviewer wrote as plain text (markup in it stays text) and
-not the viewer's own. This scenario is tested by `ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification`.
+not the viewer's own. This scenario is tested by
+`ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification`.
 
 **ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution**: A viewer who has not handed in sees no answer, no
 justification, no outcome note, no caution, no signature note, no word of failed checks or Rejected in the panel, and no
-failed count in the Checklist card. This scenario is tested by `ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution`.
+failed count in the Checklist card. This scenario is tested by
+`ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution`.
 
 **ReviewStatusPanel_BothFailed_NamesTheOutcome**: A viewer who handed in, where both reviewers failed a check, reads the
 outcome note with the check and the word Rejected, and the Checklist card reads "Checklist complete, 1 check failed".
 This scenario is tested by `ReviewStatusPanel_BothFailed_NamesTheOutcome`.
 
-**ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer**: A reviewer who could sign while the other has not
-handed in reads a caution that names the other reviewer; the other reviewer reads none. This scenario is tested by
+**ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer**: A reviewer who could sign while the other has
+not handed in reads a caution that names the other reviewer; the other reviewer reads none. This scenario is tested by
 `ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer`.
 
 **ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers**: The viewer who asked the open question reads "Waiting

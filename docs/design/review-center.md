@@ -513,8 +513,8 @@ changed through the API: there is no route for them, and `SigningService` refuse
 as a second line of defense. `ApiDocument` serves the OpenAPI description of the API at `/api/openapi.json`, which
 `Microsoft.AspNetCore.OpenApi` generates and a test compares with the snapshot `docs/api/openapi.json`.
 
-The system is a single process with one database; there is no separate service tier. Users are local accounts
-with a user name, a display name, a system administrator flag, and a password that is stored only as a hash. When an
+The system is a single process with one database; there is no separate service tier. Users are local accounts with a
+user name, a display name, a system administrator flag, and a password that is stored only as a hash. When an
 administrator turns it on (settings `Identity:Oidc`, off by default), a user can instead sign in with a generic OpenID
 Connect provider: the account is matched only by the issuer and the subject of the provider, created on the first
 sign-in without any project membership or administrator right, and has no password at all. Such a user confirms their
@@ -523,70 +523,64 @@ memory by `ReauthProofStore`, bound to the user, the slot, and a short time, and
 with a local password can also turn on an optional second factor, a time-based one-time code from an authenticator app
 (`TotpService`, with its secret encrypted and its state in `TotpStore`): the sign-in then takes a second step and every
 signature needs a current code in addition to the password; ten single-use recovery codes cover a lost phone, and a
-system administrator can reset the factor of a user. A user
-signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
-requires a signed-in user, and the users page, the new project page, and the audit page require a system
-administrator. Project access is by membership: a user sees a project only as a member (with the project role `User`
-or `ProjectAdmin`), a system administrator sees every project, and a project that a user may not see does not exist for
-that user. The repositories of a project are registered by its administrators (project administrators and system
-administrators) on the repositories page of the project, and the members of a project are managed on the project page by
-the same administrators. A project administrator adds an existing user by typing the exact user name (there is no list
-of users to browse, one generic failure message, and failed attempts are throttled in memory and audited), or creates a
-local account only as part of adding it to the project: the application generates a temporary password that is shown
-once, and the new user must choose a new password at the first sign-in before anything else is allowed (no project
-access, no API token, no signature). A project always keeps at least one project administrator: removing or demoting
-the last one is refused for a project administrator, themselves included, and allowed for a system administrator. The
-first system administrator is created with the `user add --system-admin` verb. A review can be created (in
-the Draft state) from uploaded files or from a registered git repository; a review from a repository covers the files
-that changed between a baseline and a head revision that match a selection,
-with their baseline and head content frozen, and its record digest binds to the repository, both commits, the
-selection, and every change. Review comments are implemented
-(threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
-checks (Pass, Fail, or N/A, with a justification where required) that is frozen when the review is created. The author
-of a comment and the person who saved a checklist answer are the signed-in user (user name and display name at
-that time); the checklist has no thread links, and the review page shows a file of a review with a baseline as a diff
-against its baseline (a Diff / Head / Baseline choice where the file has those versions, with the baseline and the
-head side by side in the Diff, the unchanged lines collapsed, and comments on lines of either
-version), and gives every file, line and thread a stable link (the address bar always holds one). Reviewers are named
-for a review in
-slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
-password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
-and a review is concluded only while every slot has handed in its ballot, the ballots agree, and every slot has a
-current signature of the agreed outcome: Approved, or Rejected when the ballots agree on a Fail answer (a Fail
-answer does not block signing, but a rejection is signed only with a review conclusion text that states the reasons).
-A review without a slot is In review. An
-Approved or Rejected review is locked: its comments, checklist, and reviewer slots can no longer change, and only a project
-administrator or a system administrator can reopen it, with a recorded reason; the earlier signatures then stay as
-history, are out of date, and the review needs new signatures. While the project rule "Require independent reviewers"
-is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
-it; the authors of git commits are not matched. Two further project rules, on by default and switched by the same
-administrators, keep the review author from answering the checklist of the review and the person who reopened a review
-from signing it again; both are enforced by the services for every project, also a project that existed before they
-were, and an administrator of the project can switch each off with an audited change. The author of a review cannot
-answer a check or change the applicability of a section of it, and the person who reopened a review cannot sign it
-again, and an administrator cannot reopen a review in a way that leaves a slot with nobody who may sign it. A review
-can have an optional due date, a UTC
-calendar day that cannot
-be before today (UTC) or more than 2 years ahead when the review is created (the planner can give a default date). A
-review that is not concluded and whose due date has passed is shown as Overdue. The date can be set or cleared later,
-also to a past day, by a project administrator, a system administrator, or the creator of the review, never with an API
-token, and not while the review is concluded (locked). The change is audited, and the date is not part of the record
-digest, so it does not make a signature out of date. A review can be created as a follow-up of an earlier review of the
-same project (typically after a review had a Fail): the Pass and N/A answers of checks whose wording is unchanged, the
-not-applicable sections with the same title, and the open threads on files that are in the new review are carried over
-and marked with the review they came from, while Fail answers, resolved threads, reviewer slots, signatures and reopenings
-are not (only what the submitted ballots of the earlier review agree on is carried, never a draft or a disputed check);
-the person who creates the follow-up does not become the answerer of what was carried over, so the
+system administrator can reset the factor of a user. A user signs in on the login page and stays signed in through a
+cookie; every page except the home page and the login page requires a signed-in user, and the users page, the new
+project page, and the audit page require a system administrator. Project access is by membership: a user sees a project
+only as a member (with the project role `User` or `ProjectAdmin`), a system administrator sees every project, and a
+project that a user may not see does not exist for that user. The repositories of a project are registered by its
+administrators (project administrators and system administrators) on the repositories page of the project, and the
+members of a project are managed on the project page by the same administrators. A project administrator adds an
+existing user by typing the exact user name (there is no list of users to browse, one generic failure message, and
+failed attempts are throttled in memory and audited), or creates a local account only as part of adding it to the
+project: the application generates a temporary password that is shown once, and the new user must choose a new password
+at the first sign-in before anything else is allowed (no project access, no API token, no signature). A project always
+keeps at least one project administrator: removing or demoting the last one is refused for a project administrator,
+themselves included, and allowed for a system administrator. The first system administrator is created with the
+`user add --system-admin` verb. A review can be created (in the Draft state) from uploaded files or from a registered
+git repository; a review from a repository covers the files that changed between a baseline and a head revision that
+match a selection, with their baseline and head content frozen, and its record digest binds to the repository, both
+commits, the selection, and every change. Review comments are implemented (threads anchored to a file or line range,
+with replies, resolve, and reopen), and every review has a checklist of checks (Pass, Fail, or N/A, with a justification
+where required) that is frozen when the review is created. The author of a comment and the person who saved a checklist
+answer are the signed-in user (user name and display name at that time); the checklist has no thread links, and the
+review page shows a file of a review with a baseline as a diff against its baseline (a Diff / Head / Baseline choice
+where the file has those versions, with the baseline and the head side by side in the Diff, the unchanged lines
+collapsed, and comments on lines of either version), and gives every file, line and thread a stable link (the address
+bar always holds one). Reviewers are named for a review in slots (a primary reviewer and an optional alternate), and a
+named reviewer signs the review after confirming the password again; a signature is bound to a digest of the review
+record, so it goes out of date when the record changes, and a review is concluded only while every slot has handed in
+its ballot, the ballots agree, and every slot has a current signature of the agreed outcome: Approved, or Rejected when
+the ballots agree on a Fail answer (a Fail answer does not block signing, but a rejection is signed only with a review
+conclusion text that states the reasons). A review without a slot is In review. An Approved or Rejected review is
+locked: its comments, checklist, and reviewer slots can no longer change, and only a project administrator or a system
+administrator can reopen it, with a recorded reason; the earlier signatures then stay as history, are out of date, and
+the review needs new signatures. While the project rule "Require independent reviewers" is on (the default), the person
+who created the review in ReviewCenter cannot be one of its reviewers and cannot sign it; the authors of git commits are
+not matched. Two further project rules, on by default and switched by the same administrators, keep the review author
+from answering the checklist of the review and the person who reopened a review from signing it again; both are enforced
+by the services for every project, also a project that existed before they were, and an administrator of the project can
+switch each off with an audited change. The author of a review cannot answer a check or change the applicability of a
+section of it, and the person who reopened a review cannot sign it again, and an administrator cannot reopen a review in
+a way that leaves a slot with nobody who may sign it. A review can have an optional due date, a UTC calendar day that
+cannot be before today (UTC) or more than 2 years ahead when the review is created (the planner can give a default
+date). A review that is not concluded and whose due date has passed is shown as Overdue. The date can be set or cleared
+later, also to a past day, by a project administrator, a system administrator, or the creator of the review, never with
+an API token, and not while the review is concluded (locked). The change is audited, and the date is not part of the
+record digest, so it does not make a signature out of date. A review can be created as a follow-up of an earlier review
+of the same project (typically after a review had a Fail): the Pass and N/A answers of checks whose wording is
+unchanged, the not-applicable sections with the same title, and the open threads on files that are in the new review are
+carried over and marked with the review they came from, while Fail answers, resolved threads, reviewer slots, signatures
+and reopenings are not (only what the submitted ballots of the earlier review agree on is carried, never a draft or a
+disputed check); the person who creates the follow-up does not become the answerer of what was carried over, so the
 independence rules are unchanged, a carried answer only seeds the draft ballot of each reviewer slot (it counts when a
-reviewer hands in the ballot), and a carried open thread blocks approval until it is resolved. The record digest
-binds to which review is followed and to which threads were carried (and is unchanged for every review that is not a
+reviewer hands in the ballot), and a carried open thread blocks approval until it is resolved. The record digest binds
+to which review is followed and to which threads were carried (and is unchanged for every review that is not a
 follow-up). The form for a new review offers the choice of the earlier review with a preview of what is carried, and the
-checklist and review pages mark what was carried and from which review. An Approved review
-can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
-(a self-signed key by default, a certificate from a certificate store, or a certificate file), proves that the
-document is unchanged and
-comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
-identified by the signatures in the record, and there is no time stamp authority in this version).
+checklist and review pages mark what was carried and from which review. An Approved review can be downloaded as a
+digitally signed PDF attestation; the signature is made with a key of the server (a self-signed key by default, a
+certificate from a certificate store, or a certificate file), proves that the document is unchanged and comes from the
+holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are identified by the
+signatures in the record, and there is no time stamp authority in this version).
 
 Everything that changes data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an append-only
 audit trail. Each entry carries the hash of the entry before it, so the entries form a hash chain. The change and its
@@ -601,40 +595,36 @@ rewrite of the chain by someone with write access to the database, unless the he
 verification show, was recorded somewhere else. There is no external anchoring in this version. The design of the unit
 `AuditChain` states this in full.
 
-Rejecting or withdrawing a signature and a second
-factor are deferred to later slices; a signed slot cannot be reassigned.
-The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone who
-knows a user name can lock that account for a few minutes at a time, also from an address that the sign-in throttle
-allows; the response time of a failed sign-in can differ slightly between a known and an unknown user, so timing can
-in principle reveal which user names exist; the client address that the throttle sees comes from `X-Forwarded-For`
-when the forwarded headers are enabled, and the server does not restrict which proxies it trusts, so keeping that
-header trustworthy is the responsibility of the deployment; a user who is disabled, removed, or changed can keep a
-page that is already
-open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by default), after which the page is
-replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
-password change does not end other sessions of the user; and a database that was created
-before the identity slice, before the signature slice (it has no reviewer slot and signature tables), before the
+Rejecting or withdrawing a signature and a second factor are deferred to later slices; a signed slot cannot be
+reassigned. The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so
+anyone who knows a user name can lock that account for a few minutes at a time, also from an address that the sign-in
+throttle allows; the response time of a failed sign-in can differ slightly between a known and an unknown user, so
+timing can in principle reveal which user names exist; the client address that the throttle sees comes from
+`X-Forwarded-For` when the forwarded headers are enabled, and the server does not restrict which proxies it trusts, so
+keeping that header trustworthy is the responsibility of the deployment; a user who is disabled, removed, or changed can
+keep a page that is already open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by
+default), after which the page is replaced by a "Session ended" message, while the page header keeps the old name until
+the next navigation or reload; a password change does not end other sessions of the user; and a database that was
+created before the identity slice, before the signature slice (it has no reviewer slot and signature tables), before the
 audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), before reviews
-from a repository (its reviews have no source columns), before personal access tokens (it has no token table and
-its reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its
-users have no system administrator flag, and its repositories have no project), or before project members management (its
-users have no `MustChangePassword` column), or before the approval lock (its projects have no
-`RequireIndependentReviewers` column and it has no `ReviewReopens` table), or before the review rule switches (its projects
-have no `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its
-reviews have no `DueDate` column), or before the follow-up review (its reviews, answers, section states and threads lack
-the follow-up columns) must be
-deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
-development database must be deleted and recreated whenever the schema changes).
-The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
-(one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
-start again at a restart, and the count of the last window of a key is lost when the key does not recur; when the
-coalescing table (500 keys) is full of live keys, events of new keys are not recorded and the trail shows one
-`audit.events-suppressed` entry per minute instead; the typed
-name of an unknown user is recorded, cleaned and cut to 50 characters, but the address of the client is not recorded
-in the trail (only the web server log has it); a wrong current password on the account page appears as
-`auth.sign-in-failed`, and an attempt there on a locked account is not recorded; recording of
-sign-in, sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no
-retention or archiving of the trail (an export is available, see the AuditService unit).
+from a repository (its reviews have no source columns), before personal access tokens (it has no token table and its
+reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its users have
+no system administrator flag, and its repositories have no project), or before project members management (its users
+have no `MustChangePassword` column), or before the approval lock (its projects have no `RequireIndependentReviewers`
+column and it has no `ReviewReopens` table), or before the review rule switches (its projects have no
+`RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its reviews
+have no `DueDate` column), or before the follow-up review (its reviews, answers, section states and threads lack the
+follow-up columns) must be deleted and created again, because there are no migrations (the schema is created with
+`EnsureCreated`, so a development database must be deleted and recreated whenever the schema changes). The limitations
+of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries (one entry per key
+and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and start again at a
+restart, and the count of the last window of a key is lost when the key does not recur; when the coalescing table (500
+keys) is full of live keys, events of new keys are not recorded and the trail shows one `audit.events-suppressed` entry
+per minute instead; the typed name of an unknown user is recorded, cleaned and cut to 50 characters, but the address of
+the client is not recorded in the trail (only the web server log has it); a wrong current password on the account page
+appears as `auth.sign-in-failed`, and an attempt there on a locked account is not recorded; recording of sign-in,
+sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no retention or
+archiving of the trail (an export is available, see the AuditService unit).
 
 ## External Interfaces
 

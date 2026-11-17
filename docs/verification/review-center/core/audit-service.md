@@ -174,8 +174,8 @@ identity that nobody has lists nothing. This scenario is tested by
 that is too long, are refused with `AuditFilterInvalid`. This scenario is tested by
 `AuditService_ListAsync_InvalidFilter_IsRefused`.
 
-**AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull**: The texts of a filter are trimmed and an empty text becomes
-`null`. This scenario is tested by `AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull` and
+**AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull**: The texts of a filter are trimmed and an empty text
+becomes `null`. This scenario is tested by `AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull` and
 `AuditFilter_None_ValidatesToItself`.
 
 **AuditFilter_Validated_TextTooLong_IsRefused**: A text longer than the field it is matched with is refused. This
@@ -185,8 +185,8 @@ scenario is tested by `AuditFilter_Validated_TextTooLong_IsRefused`.
 day (From equal to To) is accepted. This scenario is tested by
 `AuditFilter_Validated_ReversedRange_IsRefusedAndSingleDayAccepted`.
 
-**AuditFilter_Range_StartOfFromDayAndStartOfDayAfterTo**: The instants of the range are the start of the From day and the
-start of the day after the To day, so the end day is included. This scenario is tested by
+**AuditFilter_Range_StartOfFromDayAndStartOfDayAfterTo**: The instants of the range are the start of the From day and
+the start of the day after the To day, so the end day is included. This scenario is tested by
 `AuditFilter_Range_StartOfFromDayAndStartOfDayAfterTo`.
 
 **AuditActions_All_IsSortedUniqueAndWellFormed**: The list of actions is sorted, has no duplicate, and every action is
@@ -265,9 +265,9 @@ rethrown, and a failing append is reported to the hook. This scenario is tested 
 
 **AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf**: The CSV starts with the byte order mark and the header
 row, and every line ends with CR LF. This scenario is tested by
-`AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf`, `AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp`,
-`AuditExportWriter_Csv_NoEntries_IsHeaderOnly`, `AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty`, and
-`AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8`.
+`AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf`,
+`AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp`, `AuditExportWriter_Csv_NoEntries_IsHeaderOnly`,
+`AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty`, and `AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8`.
 
 **AuditExportWriter_Quote_SpecialCharacters_QuotedPerRfc4180**: A comma, a quote, a carriage return and a line feed make
 a quoted cell with doubled quotes, and plain text stays unquoted. This scenario is tested by

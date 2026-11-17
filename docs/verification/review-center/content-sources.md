@@ -25,9 +25,8 @@ git. No network access is needed: repositories are local, and one test starts a 
 
 - All subsystem tests pass with zero failures (or skip because git is not installed).
 - A repository that an administrator of its project registered with a token is stored with the token only encrypted, and
-  is read through
-  the real git source: its revision resolves, the change between two commits is listed, and the exact bytes of a file are
-  read.
+  is read through the real git source: its revision resolves, the change between two commits is listed, and the exact
+  bytes of a file are read.
 - A disabled repository is not available for reading.
 - The review-sets of a repository are read from the configuration file that git returns for a commit, and the history of
   its commits is answered.
@@ -74,7 +73,8 @@ tested by `ContentSourcesSubsystem_UnknownRevision_IsRefusedWithRevisionNotFound
 
 **ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid**: A local repository with one commit is
 opened through the real git source. A name that could be read as a git option (`--upload-pack=x`) is refused with
-`RevisionInvalid`. This scenario is tested by `ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid`.
+`RevisionInvalid`. This scenario is tested by
+`ContentSourcesSubsystem_OptionShapedRevision_IsRefusedWithRevisionInvalid`.
 
 **ContentSourcesSubsystem_UnreachableRepository_IsAnAccessFailureNamingTheRepository**: A repository is opened whose
 registered location does not exist. The open is refused with `GitAccessFailed`, and the message names the repository and

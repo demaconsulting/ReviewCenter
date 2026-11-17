@@ -22,19 +22,17 @@ from a broken rule to a status and the helpers that build a problem description 
 The answers carry only what a program needs: a summary has no file count and no details; the details of a review hold
 the title, state, fingerprint, creator and the flag that the review was created through the API, the optional due date
 (`dueDate`, the text `yyyy-MM-dd`, or null) and whether the review is overdue (`overdue`: the date is before today in
-UTC and the review is not concluded as approved or rejected), the source of a review
-from a repository, the approval state and record digest, the slots (the primary and alternate reviewer are user names,
-and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
-next
-step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved` (true only for a
-review concluded as approved, never for a rejected one; the shape is unchanged), `outcome` (`Approved` or `Rejected`
-once the review is concluded, otherwise null), `slotsRequired`,
-`slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest audit entry of the review, or its creation
-time). The list takes all of them from `ReviewProgressService` (the same service as the project page), which reads the
-approvals and the last activity of all reviews of the project at once; the list endpoint reads the reviews of the project
-once and hands that list to `ReviewProgressService.GetProgressAsync` (the overload that takes the list), so the reviews
-are not read a second time; the fields were added and none was changed. The
-details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over, the
+UTC and the review is not concluded as approved or rejected), the source of a review from a repository, the approval
+state and record digest, the slots (the primary and alternate reviewer are user names, and the signer is shown by
+display name), the counts of files, threads, and checklist answers, the blockers, and the next step. A summary carries
+`dueDate` and `overdue` as well, and the progress of the review: `approved` (true only for a review concluded as
+approved, never for a rejected one; the shape is unchanged), `outcome` (`Approved` or `Rejected` once the review is
+concluded, otherwise null), `slotsRequired`, `slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest
+audit entry of the review, or its creation time). The list takes all of them from `ReviewProgressService` (the same
+service as the project page), which reads the approvals and the last activity of all reviews of the project at once; the
+list endpoint reads the reviews of the project once and hands that list to `ReviewProgressService.GetProgressAsync` (the
+overload that takes the list), so the reviews are not read a second time; the fields were added and none was changed.
+The details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over, the
 `outcome`, the `conclusionText` and the flag `masked` (see Read a review). The `state` field is the stored state of the
 review, which is always `Draft` for now (it does not change when the review is signed, approved or rejected); the
 documentation of the field says so and points to `approved`, `outcome` and `slots`. The `nextStep` of the details is the
@@ -121,8 +119,8 @@ hand in the own ballot, which never names a failed or disputed check (see `Signi
 **Read a review**: Checks the project first like every route (a project that the owner may not see is a 404 as for a
 missing project), then builds the details from the services that own each part: the review from `ReviewService`, and
 then three reads that are all made **for the actor of the token and never without one**: the approval, blockers, and
-next step from `SigningService.GetApprovalAsync(actor, ...)`, the threads from `ThreadService.ListAsync(actor, ...)`, and
-the checklist counts from `ChecklistService.GetConsolidatedAsync(actor, ...)`. These reads apply `BallotVisibility`
+next step from `SigningService.GetApprovalAsync(actor, ...)`, the threads from `ThreadService.ListAsync(actor, ...)`,
+and the checklist counts from `ChecklistService.GetConsolidatedAsync(actor, ...)`. These reads apply `BallotVisibility`
 like the pages do, and a token is never the lead of a review, a system administrator or an auditor, so it sees the
 consolidated standing of a review with several slots that is not concluded only when its owner holds a slot whose ballot
 is handed in (the same as the owner on the pages), in a review with a single slot, or in a concluded review. When any of
@@ -135,13 +133,13 @@ review with a single slot counts before its hand-in), and only the items of appl
 a slot never changes them. The thread counts include the threads about a check of the checklist (open and resolved) when
 they are visible, and are also given per kind: `openFindings`, `openQuestions`, `resolvedFindings` and
 `resolvedQuestions` (a finding is a thread that is part of the report, a question is chat); the kind of a single thread
-is never exposed and there is no thread endpoint. `outcome` is `Approved` or `Rejected` only when the review is concluded
-and not masked (never the provisional outcome), and `conclusionText` is the review conclusion text, given like `outcome`
-only when the review is concluded and not masked (a text can be written earlier, but is not shown before the
-conclusion). The details never carry a ballot of a single reviewer, a per-check
-answer, or a thread text. The same details are the answer of the creation of a review, built for the same actor. The
-list endpoint adds `outcome` to each summary from `ReviewProgressService`, which masks for the token actor like for any
-viewer (there is no exception for tokens any more), so the list reveals no verdict before the conclusion.
+is never exposed and there is no thread endpoint. `outcome` is `Approved` or `Rejected` only when the review is
+concluded and not masked (never the provisional outcome), and `conclusionText` is the review conclusion text, given like
+`outcome` only when the review is concluded and not masked (a text can be written earlier, but is not shown before the
+conclusion). The details never carry a ballot of a single reviewer, a per-check answer, or a thread text. The same
+details are the answer of the creation of a review, built for the same actor. The list endpoint adds `outcome` to each
+summary from `ReviewProgressService`, which masks for the token actor like for any viewer (there is no exception for
+tokens any more), so the list reveals no verdict before the conclusion.
 
 **Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the caller
 (`ApiProblems.ActorOrAnonymous`: the actor of the token, or `null` when no token was presented, which the policy lets
@@ -159,8 +157,8 @@ PDF contains follows the evidence settings of the project (see `AttestationServi
 **Read the checklist template**: Checks the project first like every route (`ProjectService.GetAsync` with the actor of
 the token; a project that does not exist or that the owner may not see is the same 404 problem), then asks
 `ProjectChecklistService.GetAsync` and copies the result into `ProjectChecklistDto`: the version label, whether the
-built-in default is used, the SHA-256 hash of the definition text (the value the web page sends back when it replaces the
-template), the number of sections and checks, and the definition with the sections and checks in order. A stored
+built-in default is used, the SHA-256 hash of the definition text (the value the web page sends back when it replaces
+the template), the number of sections and checks, and the definition with the sections and checks in order. A stored
 definition that cannot be read is a `ChecklistDefinitionInvalid` rule exception, which `ApiProblems.StatusOf` maps
 explicitly to a 400 problem. The route only reads: no route under `/api` changes the template, and no API token can.
 

@@ -38,8 +38,8 @@ repeated at the next call.
   cases).
 - *Set by the runner*: `HOME`, `USERPROFILE`, and `XDG_CONFIG_HOME` pointing at a private `.git-home` folder under the
   cache path (the temporary folder when no cache path is set), `GIT_TERMINAL_PROMPT=0`, empty `GIT_ASKPASS` and
-  `SSH_ASKPASS`, `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` set to the null device, `GIT_ALLOW_PROTOCOL=file:http:https`,
-  `GCM_INTERACTIVE=never`, and `LC_ALL=C`.
+  `SSH_ASKPASS`, `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL` set to the null device,
+  `GIT_ALLOW_PROTOCOL=file:http:https`, `GCM_INTERACTIVE=never`, and `LC_ALL=C`.
 - *Set only for a call with credentials*: `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=http.<location>.extraHeader`, and
   `GIT_CONFIG_VALUE_0=Authorization: Basic <base64 of user:token>`. They are set only when both a user name and a token
   are present.
@@ -94,8 +94,8 @@ repeated at the next call.
 
 - *Parameters*: `string? text`, `string? username`, `string? token`, and optionally `string? location` and
   `string? name`.
-- *Returns*: `string` — the text with each secret replaced by `***` and the location replaced by the repository name; the
-  empty string for null text.
+- *Returns*: `string` — the text with each secret replaced by `***` and the location replaced by the repository name;
+  the empty string for null text.
 - *Algorithm*: Replace, in this order, the user information of any address (`://user:password@`, also in the form git
   prints with a redacted password), the location (see `ReplaceLocation`), the base64 form of `user:token`, the text
   `user:token`, the URI-escaped token, and the token itself. Nothing is replaced for a missing or empty token or user

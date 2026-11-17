@@ -230,7 +230,8 @@ with `outcome rejected`. This scenario is tested by
 
 **AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound**: The same rejected, concluded review is
 in a project that allows anonymous attestation PDFs. A request without an actor gets `NotFound`, the answer for a review
-that does not exist. This scenario is tested by `AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound`.
+that does not exist. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound`.
 
 **AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly**: A rejected review has
 an included finding that was resolved with a note, a reply that was not included, and a chat thread. The PDF prints the

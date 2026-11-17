@@ -24,7 +24,8 @@ other state.
   within a project through a unique index on `ProjectId` and `Name`.
 - `Location` — required, at most 500 characters.
 - `Username` — optional, at most 200 characters.
-- `EncryptedToken` — optional, at most 4000 characters (a named constant); the text that `ICredentialProtector` returned.
+- `EncryptedToken` — optional, at most 4000 characters (a named constant); the text that `ICredentialProtector`
+  returned.
 - `Enabled` — whether the repository can be selected.
 - `CreatedAt`, `UpdatedAt` — the times of creation and of the last change.
 
@@ -42,11 +43,11 @@ The only foreign key is the one to the project, and no other table refers to a r
   audit` — builds the audit entry from the
   stored registration, so it can name the assigned identity.
 - *Returns*: `SourceRepository`.
-- *Postconditions*: The row exists, enabled, with `CreatedAt` equal to `UpdatedAt`, and the audit entry exists, or neither.
-- *Algorithm*: Run through `AuditAppender.ExecuteAsync`: add the row, save to learn the identity, build the draft from the
-  result. A unique violation of the project and name (SQLite extended error 2067) is turned into `DomainRuleException`
-  for
-  `RepositoryNameTaken` with the message "A repository with the name 'X' already exists."
+- *Postconditions*: The row exists, enabled, with `CreatedAt` equal to `UpdatedAt`, and the audit entry exists, or
+  neither.
+- *Algorithm*: Run through `AuditAppender.ExecuteAsync`: add the row, save to learn the identity, build the draft from
+  the result. A unique violation of the project and name (SQLite extended error 2067) is turned into
+  `DomainRuleException` for `RepositoryNameTaken` with the message "A repository with the name 'X' already exists."
 
 **GetAsync**: Returns the registration of an identity, or `null`. **ListAsync(projectId)** returns the registrations of
 one project ordered by name
@@ -62,9 +63,9 @@ repository. It is the only way a token leaves the table.
 - *Returns*: `SourceRepository` — after the change.
 - *Preconditions*: The repository exists, otherwise `RepositoryNotFound` ("The repository does not exist.").
 - *Algorithm*: Through `AuditAppender.ExecuteAsync`: load the row, set name, location, user name, and enabled; apply the
-  token action (`Replace` stores the new encrypted text, `Clear` sets it to null, `Keep` leaves it); set `UpdatedAt` from
-  the clock; save; return the draft. A name clash within the project is `RepositoryNameTaken` as for adding. The project
-  of a repository never changes.
+  token action (`Replace` stores the new encrypted text, `Clear` sets it to null, `Keep` leaves it); set `UpdatedAt`
+  from the clock; save; return the draft. A name clash within the project is `RepositoryNameTaken` as for adding. The
+  project of a repository never changes.
 
 #### Error Handling
 

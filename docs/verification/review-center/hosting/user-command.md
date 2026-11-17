@@ -40,8 +40,8 @@ does not contain the password, and the user signs in afterwards with the passwor
 system administrator flag. This scenario is
 tested by `UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword`.
 
-**UserCommand_Run_NoSwitch_CreatesOrdinaryUser**: A user is added without `--system-admin`; the exit code is 0 and
-the stored user is not a system administrator. This scenario is tested by `UserCommand_Run_NoSwitch_CreatesOrdinaryUser`.
+**UserCommand_Run_NoSwitch_CreatesOrdinaryUser**: A user is added without `--system-admin`; the exit code is 0 and the
+stored user is not a system administrator. This scenario is tested by `UserCommand_Run_NoSwitch_CreatesOrdinaryUser`.
 
 **UserCommand_Run_NoSwitch_ReportsUserWithoutAdministratorMark**: A user is added without `--system-admin`; the exit
 code is 0, the output says "Created user 'ann'." and does not contain "system administrator". This scenario is tested

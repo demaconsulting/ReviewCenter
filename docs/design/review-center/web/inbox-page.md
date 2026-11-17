@@ -14,19 +14,16 @@ component split into presentation (`InboxPage.razor`) and behavior (`InboxPage.r
 #### Layout
 
 The page uses the standard page container with a heading row that holds the title and, when the inbox has rows, the
-"Mark all as read" button. Below the heading a summary line says how many reviews need action and how many updates
-there are, and, only when something waits, how many reviews wait for others. When no review needs action a muted line
-says so. Each group that has rows has a heading and a list of row
-cards (To answer, Disputed, Ready to sign, Your signature no longer counts, Replies waiting, Failed checks, Waiting for
-others, Updates, in this order).
-A row shows the review title as a link (to the checklist for the ballot rows of To answer and for Disputed, to the review
-for the others, and also for the Question for you row of To answer, which carries `OpensReview`),
-the
-project and the review identifier muted, an optional detail sentence, and on the right a "New" badge when the row is
-unread, a chip with the reason (the Updates group includes the Rejected chip for a review concluded as rejected), and,
-for the action groups, the due date, marked "Overdue" when it is past. The page shows what the service gives and
-decides nothing about masking: a user who has not handed in a ballot is only given the To answer row, which holds no
-verdict of the others.
+"Mark all as read" button. Below the heading a summary line says how many reviews need action and how many updates there
+are, and, only when something waits, how many reviews wait for others. When no review needs action a muted line says so.
+Each group that has rows has a heading and a list of row cards (To answer, Disputed, Ready to sign, Your signature no
+longer counts, Replies waiting, Failed checks, Waiting for others, Updates, in this order). A row shows the review title
+as a link (to the checklist for the ballot rows of To answer and for Disputed, to the review for the others, and also
+for the Question for you row of To answer, which carries `OpensReview`), the project and the review identifier muted, an
+optional detail sentence, and on the right a "New" badge when the row is unread, a chip with the reason (the Updates
+group includes the Rejected chip for a review concluded as rejected), and, for the action groups, the due date, marked
+"Overdue" when it is past. The page shows what the service gives and decides nothing about masking: a user who has not
+handed in a ballot is only given the To answer row, which holds no verdict of the others.
 
 #### Data Model
 

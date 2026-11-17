@@ -2,14 +2,14 @@
 
 #### Verification Approach
 
-`ReviewStatusService` is verified with tests defined in `ReviewNextActionTests.cs` and `ReviewStatusServiceTests.cs`. The
-next-action rule is pure, so its tests call `ReviewNextAction.Decide` directly with in-memory facts. The service tests
-build a review with several reviewer slots over in-memory stores and the real access rules (`BallotMaskingWorld.cs`),
-and read the status as viewers with different roles: a reviewer who has handed in, a reviewer with a draft, the lead, an
-Auditor, and an outsider. The change list is checked with audit entries that the tests write with a time before and after
-a signature. The tests check what the viewer may read, never the stored data. The page that shows the status is verified
-by the `ReviewPage` unit, and the two system scenarios that drive it in a browser are listed there and in the system
-requirements.
+`ReviewStatusService` is verified with tests defined in `ReviewNextActionTests.cs` and `ReviewStatusServiceTests.cs`.
+The next-action rule is pure, so its tests call `ReviewNextAction.Decide` directly with in-memory facts. The service
+tests build a review with several reviewer slots over in-memory stores and the real access rules
+(`BallotMaskingWorld.cs`), and read the status as viewers with different roles: a reviewer who has handed in, a reviewer
+with a draft, the lead, an Auditor, and an outsider. The change list is checked with audit entries that the tests write
+with a time before and after a signature. The tests check what the viewer may read, never the stored data. The page that
+shows the status is verified by the `ReviewPage` unit, and the two system scenarios that drive it in a browser are
+listed there and in the system requirements.
 
 #### Test Environment
 
@@ -21,7 +21,8 @@ N/A - standard test environment.
 - Exactly one next action is decided for every combination of facts, in the order of the rule: the ballot first, then
   the disagreements, the findings, the questions, the conclusion, and the signature.
 - The status lists the reviewers in slot order with the ballot state and the signature state and never the content of a
-  ballot, lists the disputed checks with whether a discussion can be started, and counts the open questions and findings.
+  ballot, lists the disputed checks with whether a discussion can be started, and counts the open questions and
+  findings.
 - A review with one slot is not masked and asks the reviewer to sign; a review with no slot asks the lead to add the
   reviewers; a viewer who may not see the project is refused; a missing review gives nothing.
 - A viewer who may not see the others yet gets no disputed check, no answer, no failed check, no outcome note, no early
@@ -141,8 +142,8 @@ viewer who handed in an outcome note with the check and the word Rejected, and a
 scenario is tested by `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`.
 
 **ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot**: A reviewer who could sign while another reviewer has
-not handed in is cautioned by name; the reviewer without a ballot and the reviewer after the ballot is in get no caution.
-This scenario is tested by `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`.
+not handed in is cautioned by name; the reviewer without a ballot and the reviewer after the ballot is in get no
+caution. This scenario is tested by `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`.
 
 **ReviewStatus_SingleSlot_NoCaution**: A review with one reviewer gives no caution. This scenario is tested by
 `ReviewStatus_SingleSlot_NoCaution`.
@@ -199,8 +200,8 @@ now because an entry of this review changed its kind from a Finding is seeded as
 before that change is listed together with the change, and one after it is not. This scenario is tested by
 `ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`.
 
-**ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed**: A carried Question resolved with a note is not
-listed, because a resolution note counts only for a Finding. This scenario is tested by
+**ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed**: A carried Question resolved with a note is
+not listed, because a resolution note counts only for a Finding. This scenario is tested by
 `ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed`.
 
 **ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed**: In a follow-up review, a reviewer signs,

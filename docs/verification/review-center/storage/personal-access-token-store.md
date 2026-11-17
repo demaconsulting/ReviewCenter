@@ -5,8 +5,8 @@
 `PersonalAccessTokenStore` is verified with unit tests defined in `PersonalAccessTokenStoreTests.cs`. The tests use the
 real store over a real SQLite database file in a temporary folder (`TestStore`), add the owners to the users table
 directly, and read the rows and the audit entries back with a second context. The test of the `ReviewCenterDbContext`
-model for the token table and the creator columns of a review is in the same file and is described in the verification of
-that unit.
+model for the token table and the creator columns of a review is in the same file and is described in the verification
+of that unit.
 
 #### Test Environment
 
@@ -18,8 +18,8 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 - A token round-trips with every field, gets a database-assigned identity, and is saved with its audit entry.
 - A hash that is already stored is refused and nothing is audited.
 - A token is found by its hash with its owner, and only the tokens of the user are listed, newest first.
-- A revocation sets the time once and audits it; a second revocation, a token of another user, and a missing token change
-  nothing and write no entry.
+- A revocation sets the time once and audits it; a second revocation, a token of another user, and a missing token
+  change nothing and write no entry.
 - A use changes only the last-used time, writes no audit entry, and does not undo a revocation.
 - Of several parallel uses that read the same last-used time exactly one writes.
 - A token is not kept and a revocation is not applied when the audit entry cannot be stored.

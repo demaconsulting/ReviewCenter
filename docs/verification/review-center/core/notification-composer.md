@@ -37,9 +37,9 @@ N/A - standard test environment (no special fixtures).
 
 **Subject**: The subject of a message about new items and of a daily summary is the fixed text with the name of the
 installation, no text of an item is in it, and a control character in the name becomes a space. These scenarios are
-tested by `NotificationComposer_Compose_Every_SubjectIsFixedText`, `NotificationComposer_Compose_Daily_SubjectIsFixedText`,
-`NotificationComposer_Compose_AnyItems_SubjectHasNoItemText`, and
-`NotificationComposer_Compose_InstanceNameWithLineBreak_SubjectSingleLine`.
+tested by `NotificationComposer_Compose_Every_SubjectIsFixedText`,
+`NotificationComposer_Compose_Daily_SubjectIsFixedText`, `NotificationComposer_Compose_AnyItems_SubjectHasNoItemText`,
+and `NotificationComposer_Compose_InstanceNameWithLineBreak_SubjectSingleLine`.
 
 **Classification of the states**: Each kind of row of the inbox gives its state: "Not started" and "Draft" the same
 state, a question, a disputed row without a count, a "Not signed" row as ready to sign, a "sign again" row, a lost
@@ -68,10 +68,11 @@ state that is not a count are not lowered. This scenario is tested by
 `NotificationComposer_IsLowered_StoredAndCurrentState_OnlyFallingReplies`.
 
 **Kind of an item**: The kind of a state is the part before the first colon, so a state with a count of waiting replies
-has the kind without the count, and a state without a colon is its own kind. A question and a standing item to answer
-of one review have different keys. These scenarios are tested by `NotificationComposer_KindOf_StateWithCount_WithoutCount`,
-`NotificationComposer_KindOf_StateWithoutCount_TheState`, `NotificationComposer_KindOf_StateWithTwoColons_PartBeforeFirstColon`,
-and `NotificationComposer_Classify_QuestionAndStanding_DifferentKeys`.
+has the kind without the count, and a state without a colon is its own kind. A question and a standing item to answer of
+one review have different keys. These scenarios are tested by `NotificationComposer_KindOf_StateWithCount_WithoutCount`,
+`NotificationComposer_KindOf_StateWithoutCount_TheState`,
+`NotificationComposer_KindOf_StateWithTwoColons_PartBeforeFirstColon`, and
+`NotificationComposer_Classify_QuestionAndStanding_DifferentKeys`.
 
 **No detail and no outcome**: A sentinel detail sentence of an inbox row is in neither part, the words Approved and
 Rejected are nowhere in a message about updates, a concluded review reads "the review was concluded", a reopened review
@@ -83,14 +84,17 @@ reads "the review was reopened", and a disputed item shows no number. These scen
 **Item content**: Waiting replies show their number, each item shows the name of its project, the title is shown when
 titles are included, and with titles left out the title is absent and the review id is shown. These scenarios are tested
 by `NotificationComposer_Compose_Replies_ShowsCount`, `NotificationComposer_Compose_Item_ShowsProjectName`,
-`NotificationComposer_Compose_IncludeTitlesTrue_ShowsTitle`, `NotificationComposer_Compose_IncludeTitlesFalse_OmitsTitle`,
-and `NotificationComposer_Compose_IncludeTitlesFalse_ShowsReviewId`.
+`NotificationComposer_Compose_IncludeTitlesTrue_ShowsTitle`,
+`NotificationComposer_Compose_IncludeTitlesFalse_OmitsTitle`, and
+`NotificationComposer_Compose_IncludeTitlesFalse_ShowsReviewId`.
 
-**Links**: The link of an item has the form of the review links of the pages, starts with the base address, has a
-single slash when the base address ends with a slash, has the review id escaped, and has no query. These scenarios are
-tested by `NotificationComposer_Compose_Item_LinkMatchesReviewLinks`,
-`NotificationComposer_Compose_Item_LinkStartsWithBaseUrl`, `NotificationComposer_Compose_BaseUrlTrailingSlash_SingleSlash`,
-`NotificationComposer_Compose_ReviewIdWithSpecialChars_LinkEscaped`, and `NotificationComposer_Compose_Item_LinkHasNoQuery`.
+**Links**: The link of an item has the form of the review links of the pages, starts with the base address, has a single
+slash when the base address ends with a slash, has the review id escaped, and has no query. These scenarios are tested
+by `NotificationComposer_Compose_Item_LinkMatchesReviewLinks`,
+`NotificationComposer_Compose_Item_LinkStartsWithBaseUrl`,
+`NotificationComposer_Compose_BaseUrlTrailingSlash_SingleSlash`,
+`NotificationComposer_Compose_ReviewIdWithSpecialChars_LinkEscaped`, and
+`NotificationComposer_Compose_Item_LinkHasNoQuery`.
 
 **Text of a user**: A title, a project name, and a review id with a line break stay on one line in the plain text part,
 the Unicode line and paragraph
@@ -113,7 +117,8 @@ tested by `NotificationComposer_Compose_MixedSections_GroupedInOrder`,
 and `NotificationComposer_Compose_Footer_SaysWhyMailWasSent`.
 
 **Largest message**: The largest message, with the most items and the longest titles, is accepted by
-`NotificationMessage`. This scenario is tested by `NotificationComposer_Compose_MaxItemsMaxLengthTitles_MessageAccepted`.
+`NotificationMessage`. This scenario is tested by
+`NotificationComposer_Compose_MaxItemsMaxLengthTitles_MessageAccepted`.
 
 **Refused input**: A message without an item raises `ArgumentException`, and an empty base address is refused. These
 scenarios are tested by `NotificationComposer_Compose_NoItems_ThrowsArgument` and

@@ -48,16 +48,16 @@ logged. They do not sign in to the web pages, and the password of a person is no
 Answers are JSON (the attestation is a PDF). Errors are problem documents (`application/problem+json`) with a title and
 status, and for a request that is not valid a list of the fields at fault.
 
-| Method | Address                                         | Purpose                                          |
-| ------ | ----------------------------------------------- | ------------------------------------------------ |
-| GET    | `/api/projects`                                 | List your projects (all for a system admin)      |
-| GET    | `/api/projects/{p}/reviews`                     | List the reviews of project `{p}`                |
-| GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
-| GET    | `/api/projects/{p}/checklist`                   | Checklist template new reviews start with        |
-| POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
-| GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | Signed attestation PDF (token or anonymous)      |
-| GET    | `/api/projects/{p}/evidence/index.json`         | Evidence index (token or anonymous)              |
-| GET    | `/api/openapi.json`                             | The OpenAPI document; open, no token needed      |
+| Method | Address | Purpose |
+| --- | --- | --- |
+| GET | `/api/projects` | List your projects (all for a system admin) |
+| GET | `/api/projects/{p}/reviews` | List the reviews of project `{p}` |
+| GET | `/api/projects/{p}/reviews/{r}` | One review: slots, approval, progress, next step |
+| GET | `/api/projects/{p}/checklist` | Checklist template new reviews start with |
+| POST | `/api/projects/{p}/reviews` | Create a draft review (201 with the review) |
+| GET | `/api/projects/{p}/reviews/{r}/attestation.pdf` | Signed attestation PDF (token or anonymous) |
+| GET | `/api/projects/{p}/evidence/index.json` | Evidence index (token or anonymous) |
+| GET | `/api/openapi.json` | The OpenAPI document; open, no token needed |
 
 In the addresses `{p}` is the project number and `{r}` the review identifier. A project that the token's owner cannot
 see is answered 404, as if it did not exist, never 403.

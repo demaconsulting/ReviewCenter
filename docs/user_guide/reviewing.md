@@ -168,7 +168,7 @@ creates the reviews you tick.
 1. Choose the **repository** (only the enabled repositories of this project are offered; a single one is already
    chosen) and enter the **head revision**, a branch,
    a tag, or a commit, for example `main`.
-1. Under **What to review** choose one of:
+2. Under **What to review** choose one of:
    - **Changes since the last approved review of each set** (the default): each set is compared with the head of its
      last approved review (one that concluded as Approved: every reviewer submitted a ballot and signed the current
      record, nothing is disputed or failing, and no thread is open; a Rejected review is not approved). A set that has
@@ -179,7 +179,7 @@ creates the reviews you tick.
    - **Changes since a branch, tag or commit**: a text box for the baseline revision appears. Every set is compared with
      that revision.
    - **All files of each set**: no baseline; every selected file counts as Added.
-1. Choose **Show plan**. Nothing is created yet.
+3. Choose **Show plan**. Nothing is created yet.
 
 The plan starts with one sentence, for example "3 sets need review, 1 already filed, 9 have nothing to review.", a
 muted line with the repository, the head, and the baseline that was used, and a sentence that says what to do next.
@@ -230,7 +230,7 @@ A review appears in the inbox only when you are named in it: as the primary or a
 author of the review. Someone who only wrote a comment in another person's review is not shown it.
 
 | Group | What it lists | Chip |
-| ----- | ------------- | ---- |
+| --- | --- | --- |
 | To answer | Ballot not handed in; or someone asked you a question | "Not started", "Draft", "Question for you" |
 | Disputed | You handed in your ballot, and the ballots differ on some checks or sections | "N disputed" |
 | Ready to sign | You handed in and a slot of yours needs signing | "Not signed", "The review changed, sign again" |
@@ -250,13 +250,12 @@ next-step line of the review page. **To answer** opens the checklist, where your
 
 ![The inbox of a reviewer, with the reviews to answer and the reviews ready to sign.](images/review-inbox.png)
 
-A **Question for you** row opens the review page, where the thread is. A thread has no addressee, so ReviewCenter guesses:
-an open question that someone else started, in which you have not written yet, is shown to every slot holder of the
-review who may take part (the author of the review is told by Replies waiting instead).
-In a review with three or more people that means more people see a question than it
-was meant for. The row names the person who asked and never quotes the question. The author's own questions to answer
-are already listed under Replies waiting, so the author gets no such row. A question on a check is never shown to a
-reviewer who may not yet see the other ballots.
+A **Question for you** row opens the review page, where the thread is. A thread has no addressee, so ReviewCenter
+guesses: an open question that someone else started, in which you have not written yet, is shown to every slot holder of
+the review who may take part (the author of the review is told by Replies waiting instead). In a review with three or
+more people that means more people see a question than it was meant for. The row names the person who asked and never
+quotes the question. The author's own questions to answer are already listed under Replies waiting, so the author gets
+no such row. A question on a check is never shown to a reviewer who may not yet see the other ballots.
 
 **Ready to sign** adds a caution when other reviewers have not handed in a ballot yet, naming them (who has handed in is
 progress, not a verdict): signing early may mean you have to sign again. **Your signature no longer counts** is shown to
@@ -320,8 +319,8 @@ It shows:
   other reviewer gets the button **Answer the open questions**), and a reviewer who signed reads "You have signed.
   Waiting for Bob to sign." A reviewer whose signature no longer counts reads "The review changed, your signature no
   longer counts." and can sign again once nothing blocks it.
-- **A caution before signing.** When you can sign while another reviewer has not handed in a ballot, a caution names that
-  reviewer: signing now may have to be repeated if that ballot changes what the signatures cover.
+- **A caution before signing.** When you can sign while another reviewer has not handed in a ballot, a caution names
+  that reviewer: signing now may have to be repeated if that ballot changes what the signatures cover.
 - **What changed since {name} signed.** For a signature that no longer fits the review, a list that opens under the
   reviewer. It lists the changes after the signature that can alter the signed report, such as a ballot handed in
   again, a conclusion edited, a Finding added, or a Finding resolved with its note, with who did it and when. It
@@ -437,7 +436,7 @@ index, changes the address without adding entries to the browser history, so the
 page you came from. Copy the address and send it to a colleague.
 
 | Link | What it opens |
-| ---- | ------------- |
+| --- | --- |
 | `/projects/{id}/reviews/{reviewId}` | The review (no file selected) |
 | `/projects/{id}/reviews/{reviewId}/files/{path}` | That file, as a diff when it can be compared |
 | `/projects/{id}/reviews/{reviewId}/files/{path}?line=12` | The same, scrolled to and highlighting head line 12 |
@@ -538,19 +537,16 @@ step of answering and shows no **Submit and sign** button.
    the totals.
    Switch it on again to answer its checks; the reason is then cleared.
 
-The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
-counts as answered, and its justification records the finding. A Fail does not block signing: when the submitted
-ballots agree on a Fail, the review is signed as **Rejected**, with a written conclusion (see
-[Review Conclusion Text](#review-conclusion-text)). The files
-of a review never change, so the usual way on after a rejection is a new review of the fixed revision (see When a Check
-Fails in the
-Review Practices chapter). Any later change to the agreed standing of the submitted ballots, such as a disagreement on a
-check, makes the
-signatures given so far no longer fit, so answer first and sign last (see Sign Last in the same chapter). When handing in
-a ballot, or an answer in a review with one slot, would do that, the page first shows a warning next to the check or the
-section that names every affected slot and signer. **Confirm change** stores the change; **Cancel** stores nothing, and
-the unsaved choice, justification, and reason stay as you typed them (a section you switched on goes back to not
-applicable).
+The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it counts
+as answered, and its justification records the finding. A Fail does not block signing: when the submitted ballots agree
+on a Fail, the review is signed as **Rejected**, with a written conclusion (see
+[Review Conclusion Text](#review-conclusion-text)). The files of a review never change, so the usual way on after a
+rejection is a new review of the fixed revision (see When a Check Fails in the Review Practices chapter). Any later
+change to the agreed standing of the submitted ballots, such as a disagreement on a check, makes the signatures given so
+far no longer fit, so answer first and sign last (see Sign Last in the same chapter). When handing in a ballot, or an
+answer in a review with one slot, would do that, the page first shows a warning next to the check or the section that
+names every affected slot and signer. **Confirm change** stores the change; **Cancel** stores nothing, and the unsaved
+choice, justification, and reason stay as you typed them (a section you switched on goes back to not applicable).
 
 The checklist of a review is fixed when the review is created: a later release with a different default checklist, or
 a project checklist that is replaced afterwards, does not change reviews that already exist. An answer is not a
@@ -902,9 +898,9 @@ project does not exist.
   follow-up names the review it follows), *Stage*, *Signatures*, *Ballots*, *Blockers*, *Waiting on*,
   *Last activity*, and *Due*.
 - **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
-  signature that no longer fits the review. **Approved** has every slot signed as approved on the current record and nothing
-  that blocks it (every slot has also handed in its ballot). **Rejected** has every slot signed as rejected on the
-  current record, no open thread, and a written conclusion; it carries a **Rejected** badge. A review that an
+  signature that no longer fits the review. **Approved** has every slot signed as approved on the current record and
+  nothing that blocks it (every slot has also handed in its ballot). **Rejected** has every slot signed as rejected on
+  the current record, no open thread, and a written conclusion; it carries a **Rejected** badge. A review that an
   administrator reopened also shows a **Reopened** badge. The stage is worked out from the signatures, not stored.
 - **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature no longer fits because
   the record changed after it was given, `1 signed, then the review changed`. A review without slots shows a dash.

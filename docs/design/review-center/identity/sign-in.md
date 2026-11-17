@@ -201,19 +201,18 @@ user. The periodic check of an open page (see the `RevalidatingAuthenticationSta
 #### Error Handling
 
 Null arguments raise `ArgumentNullException`. `GetActorAsync` raises a `DomainRuleException` with the rule
-`ActorNotAllowed` and the message "You are no longer signed in, so nothing was saved. Reload the page to sign in
-again." when the state has no authenticated user or lacks a claim. That is a rule violation, not a programming error,
-because an open page can lose its user between two clicks (the state ends when the user is disabled, removed, or
-changed), and the pages already show a rule violation as a message next to the control that was used instead of failing.
-Rule failures of the login are not errors: they are the generic failure redirect.
-An invalid `SessionHours` or `RevalidationSeconds` value, or an invalid `Identity:Throttle` value, makes the options
-validation fail, which `ServerHost` reports when the server starts. The login and logout endpoints do not log the
-password or the hash. A failure to record an audit event is logged as a warning and swallowed (see the `AuditService`
-unit for why). The throttled refusal is recorded as `auth.sign-in-throttled` through
-`AuditService.TryRecordCoalescedAsync` (actor text `not signed in`, detail `too many attempts, name '<typed>'`, the typed
-name cleaned and cut to the length of a user name, at most one entry per minute and lower-cased name); the client
-address is not recorded, because the audit entry has no place for it (adding one would change the hash chain), so the
-address is only in the web server log.
+`ActorNotAllowed` and the message "You are no longer signed in, so nothing was saved. Reload the page to sign in again."
+when the state has no authenticated user or lacks a claim. That is a rule violation, not a programming error, because an
+open page can lose its user between two clicks (the state ends when the user is disabled, removed, or changed), and the
+pages already show a rule violation as a message next to the control that was used instead of failing. Rule failures of
+the login are not errors: they are the generic failure redirect. An invalid `SessionHours` or `RevalidationSeconds`
+value, or an invalid `Identity:Throttle` value, makes the options validation fail, which `ServerHost` reports when the
+server starts. The login and logout endpoints do not log the password or the hash. A failure to record an audit event is
+logged as a warning and swallowed (see the `AuditService` unit for why). The throttled refusal is recorded as
+`auth.sign-in-throttled` through `AuditService.TryRecordCoalescedAsync` (actor text `not signed in`, detail
+`too many attempts, name '<typed>'`, the typed name cleaned and cut to the length of a user name, at most one entry per
+minute and lower-cased name); the client address is not recorded, because the audit entry has no place for it (adding
+one would change the hash chain), so the address is only in the web server log.
 
 #### Dependencies
 
@@ -238,7 +237,8 @@ address is only in the web server log.
 - **RevalidatingAuthenticationStateProvider** — calls `IsCurrent`.
 - **ApiTokenAuthentication** — reads the client address of a request with `ClientAddress` (an internal static method of
   this unit that the web login also uses), so that the attempts of the API count per address in the same way.
-- **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its message.
+- **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its
+  message.
 - **App** (`MainLayout`) — posts its logout form to `/auth/logout`, reads the signed-in user for the header, and uses
   `IsPasswordChangeRequired` and `AccountPath` to confine a user with a temporary password.
 - **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know

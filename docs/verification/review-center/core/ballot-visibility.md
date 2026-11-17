@@ -135,8 +135,8 @@ reviewer gets them. This scenario is tested by
 masked state in place of the standing. This scenario is tested by
 `ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState`.
 
-**ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked**: In a review with several slots that is not concluded, the
-viewer-requiring consolidated read (the one of the API) gives an API token a masked, empty state. This scenario is
+**ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked**: In a review with several slots that is not concluded,
+the viewer-requiring consolidated read (the one of the API) gives an API token a masked, empty state. This scenario is
 tested by `ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked`.
 
 **ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked**: The token of the lead, of an
@@ -164,9 +164,9 @@ and a viewer who may not see the project is refused like a missing project. This
 a token actor holds no failed or disputed count and no outcome before the conclusion. This scenario is tested by
 `ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`.
 
-**ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding**: The token of a reviewer who has
-handed in a ballot gets the consolidated standing in the progress (one disputed check), as its owner does on the pages,
-while the token of the lead is still masked. This scenario is tested by
+**ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding**: The token of a reviewer who
+has handed in a ballot gets the consolidated standing in the progress (one disputed check), as its owner does on the
+pages, while the token of the lead is still masked. This scenario is tested by
 `ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding`.
 
 **ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked**: The token of a reviewer whose ballot is still a
@@ -216,8 +216,9 @@ Ready to sign row; the reviewer who handed in waits for the other. This scenario
 `InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer`.
 
 **ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked**: The progress of a masked viewer shows
-how many ballots are handed in out of how many, the names of the people who have not handed in, and `IsMasked`, with
-no disputed count. This scenario is tested by `ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`.
+how many ballots are handed in out of how many, the names of the people who have not handed in, and `IsMasked`, with no
+disputed count. This scenario is tested by
+`ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`.
 
 **SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState**: The approval of a masked viewer keeps the state of
 the ballot of each slot, which is progress and not a verdict. This scenario is tested by

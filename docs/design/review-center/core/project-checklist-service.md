@@ -31,8 +31,8 @@ the `Hash`, and hands it back as `expectedHash` with its change. The service and
 **IReviewStore.UpdateChecklistDefinitionAsync**: the one store operation of the unit. It takes the project identity, the
 expected hash, the new text (`null` removes the definition), and the audit draft, and changes the definition only if the
 hash of the stored text still equals the expected hash, together with the audit entry in one transaction. It returns
-`false`, with nothing changed and nothing recorded, when the project does not exist or the stored definition is no longer
-the expected one. It is implemented by `ReviewStore` in the `Storage` subsystem.
+`false`, with nothing changed and nothing recorded, when the project does not exist or the stored definition is no
+longer the expected one. It is implemented by `ReviewStore` in the `Storage` subsystem.
 
 **Constants**: `ChangedAction` (`project.checklist-changed`) and `ChangedByOthersMessage` (the text of the conflict: the
 checklist was changed by someone else, the current checklist is shown, check it and save again). The limits of a
@@ -46,9 +46,9 @@ are.
 
 **HashOf**: Static. Gives the hash described above for a stored text or `null`.
 
-**Validate**: Static and pure. Checks the text of a definition with `ChecklistValidator` and returns every error with its
-path, or the parsed definition. Nothing is stored or recorded. It does not apply the version-label rule, which needs the
-stored definition.
+**Validate**: Static and pure. Checks the text of a definition with `ChecklistValidator` and returns every error with
+its path, or the parsed definition. Nothing is stored or recorded. It does not apply the version-label rule, which needs
+the stored definition.
 
 **GetAsync**: Reads the checklist a project gives to its new reviews.
 
@@ -66,8 +66,8 @@ stored definition.
 - *Parameters*: the `Actor`, the project identity, the `expectedHash`, the new JSON text, and a cancellation token.
 - *Returns*: `Task<bool>` — `true` when the definition was changed, `false` when the new definition has the same content
   as the current one.
-- *Preconditions*: the actor and `expectedHash` are not null (`ArgumentNullException`); the actor is a person, not an API
-  token (`ActorNotAllowed`); the actor is a system administrator or a project administrator of the project
+- *Preconditions*: the actor and `expectedHash` are not null (`ArgumentNullException`); the actor is a person, not an
+  API token (`ActorNotAllowed`); the actor is a system administrator or a project administrator of the project
   (`IProjectAccess.RequireAdministerAsync`), checked again at every call. The text passes `ChecklistValidator`.
 - *Postconditions*: The new definition is stored, in its normal form, for that project only, with one audit entry. When
   the stored definition no longer has `expectedHash`, nothing is stored and `RecordChanged` is raised.
@@ -75,13 +75,13 @@ stored definition.
 The service checks the right first, so a refused caller learns nothing about the validation or the current value. It
 then validates the text (all errors are reported in one `ChecklistDefinitionInvalid` exception), builds the normal form
 (`ToJson`, which can be longer than the text because it escapes characters such as `<`) and applies the size limit to
-that stored form as well, reads the project, and
-compares the hash. The normal form of the new definition (`ToJson`) is compared with the current text: equal content
-returns `false` and records nothing. Different content must carry another version label than the current definition
-(the default's label when the project has none); otherwise `ChecklistDefinitionInvalid` names the label. Then the
-service builds the audit draft and calls `UpdateChecklistDefinitionAsync`, whose compare-and-set is atomic with the
-update; when the store reports `false` the service raises `RecordChanged` with `ChangedByOthersMessage`. A caller reports
-that rule as a conflict and shows the current checklist.
+that stored form as well, reads the project, and compares the hash. The normal form of the new definition (`ToJson`) is
+compared with the current text: equal content returns `false` and records nothing. Different content must carry another
+version label than the current definition (the default's label when the project has none); otherwise
+`ChecklistDefinitionInvalid` names the label. Then the service builds the audit draft and calls
+`UpdateChecklistDefinitionAsync`, whose compare-and-set is atomic with the update; when the store reports `false` the
+service raises `RecordChanged` with `ChangedByOthersMessage`. A caller reports that rule as a conflict and shows the
+current checklist.
 
 **ResetAsync**: Removes the definition, so the new reviews of the project use the default again.
 
@@ -105,12 +105,12 @@ record digest changes when the definition of the project changes.
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` before any store change: `ProjectNotFound` (the project does not exist or the
-actor may not see it, with the same message for both), `ActorNotAllowed` (a plain member, an API token, or no actor),
-`ChecklistDefinitionInvalid` (the text is not valid, with the paths of the first ten errors in the message, or the
-version label did not change), and `RecordChanged` (the definition was changed meanwhile). Constructing the service
-with a null store or null access rules, and calling `SetAsync` or `ResetAsync` with a null actor or expected hash,
-raise `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` before any store change: `ProjectNotFound` (the project does not exist or
+the actor may not see it, with the same message for both), `ActorNotAllowed` (a plain member, an API token, or no
+actor), `ChecklistDefinitionInvalid` (the text is not valid, with the paths of the first ten errors in the message, or
+the version label did not change), and `RecordChanged` (the definition was changed meanwhile). Constructing the service
+with a null store or null access rules, and calling `SetAsync` or `ResetAsync` with a null actor or expected hash, raise
+`ArgumentNullException`. Store failures propagate unchanged.
 
 #### Known Limitations
 
@@ -134,5 +134,5 @@ raise `ArgumentNullException`. Store failures propagate unchanged.
 #### Callers
 
 - **ServerHost** — registers the service as a single instance.
-- The pages and endpoints that show and change the checklist of a project use it (added after this unit); `ReviewService`
-  does not call it and reads the definition from the project itself when it creates a review.
+- The pages and endpoints that show and change the checklist of a project use it (added after this unit);
+  `ReviewService` does not call it and reads the definition from the project itself when it creates a review.

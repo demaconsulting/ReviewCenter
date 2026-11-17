@@ -40,7 +40,7 @@ come from the reference tool and do not merely repeat this implementation.
   `57361c6e2882a06baeed989a104e01c40e5846ba7c12e044588c1deb866836b5`
 
 | File set | Fingerprint |
-| ---------- | ------------- |
+| --- | --- |
 | A | `7f39224e335994886c26ba8c241fcbe1d474aadaa2bd0a8e842983b098cea894` |
 | A, B, C | `14aff6b60cf429a3eaeb2d20b71aae5b4fba2976af21766472747e130d9b73e9` |
 | A, A | `71454b11b09343ed4b9ad176cc726f9cf9684439335436d874fdb70a026d99f5` |

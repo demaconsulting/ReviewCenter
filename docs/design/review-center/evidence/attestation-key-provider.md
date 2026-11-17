@@ -19,17 +19,17 @@ the types
 `File`), `RequireTrustedKey` (false by default), `CertificateThumbprint`, `StoreLocation` (`CurrentUser` by default or
 `LocalMachine`), `StoreName` (`My` by default), `SelfSignedFolder` (set by `ServerHost` to a folder beside the Data
 Protection keys unless the operator sets it), the settings of the File provider `CertificatePath`, `PrivateKeyPath`,
-`CertificatePassword` (the one secret setting) and `CertificatePasswordFile`, and `ExpiryWarningDays` (30 by default;
-0 turns the expiry warnings off). An `AttestationSigningKey` holds the private key as an RSA or ECDSA object
-(a handle, not key material), the signer certificate, the intermediate certificates, and an `AttestationKeyInfo` (provider,
+`CertificatePassword` (the one secret setting) and `CertificatePasswordFile`, and `ExpiryWarningDays` (30 by default; 0
+turns the expiry warnings off). An `AttestationSigningKey` holds the private key as an RSA or ECDSA object (a handle,
+not key material), the signer certificate, the intermediate certificates, and an `AttestationKeyInfo` (provider,
 subject, issuer, thumbprint, serial number, algorithm, validity, whether the certificate is self-signed, whether its key
 usage allows signing, whether the certificate is for code signing only, and whether `RequireTrustedKey` is on).
-`AttestationKeyStatus` (provider, whether a key can be
-used, the `AttestationKeyInfo`, the problem, and the list of warnings) is the answer for the review page.
+`AttestationKeyStatus` (provider, whether a key can be used, the `AttestationKeyInfo`, the problem, and the list of
+warnings) is the answer for the review page.
 
 `AttestationKeyProviderBase` loads the key once, on the first request, and keeps it; a failure is not kept, so the next
-call tries again. It logs the choice at information level and a warning for a self-signed key and for a certificate
-that is for code signing only. `AttestationKeyPolicy.Enforce` runs on every call, not only on the first, so a certificate
+call tries again. It logs the choice at information level and a warning for a self-signed key and for a certificate that
+is for code signing only. `AttestationKeyPolicy.Enforce` runs on every call, not only on the first, so a certificate
 that expires while the server runs stops the attestation and not the server.
 
 **Expiry warnings.** `AttestationKeyPolicy.ExpiryWarning(info, now, days)` returns `null` when `days` is 0 or the
@@ -47,27 +47,26 @@ attestation and logged), a **code-signing** certificate (used, with a note in th
 Adobe Acrobat will not trust it for document signatures), and a **document-signing** certificate (no note). The server
 does not check the chain or revocation for any of them; the PDF viewer does, against its own trust store.
 
-The **self-signed provider** creates, when its file is missing, an RSA key of 3072 bits with a certificate that is signed
-by itself (SHA-256, the subject "ReviewCenter self-signed attestation key (not an organization key)", ten years of
-validity that start ten minutes in the past to allow for clock differences, and the key usage for digital signatures).
-The key is saved, protected, in `attestation-selfsigned.pfx.protected` in the folder, which is created with access for its
-owner only on systems that support it. The exported PFX (without a password) is protected with an
+The **self-signed provider** creates, when its file is missing, an RSA key of 3072 bits with a certificate that is
+signed by itself (SHA-256, the subject "ReviewCenter self-signed attestation key (not an organization key)", ten years
+of validity that start ten minutes in the past to allow for clock differences, and the key usage for digital
+signatures). The key is saved, protected, in `attestation-selfsigned.pfx.protected` in the folder, which is created with
+access for its owner only on systems that support it. The exported PFX (without a password) is protected with an
 `IDataProtectionProvider`, purpose `DemaConsulting.ReviewCenter.AttestationSelfSignedKey.v1`, which is the provider of
-the server, so the file is only readable with the Data Protection key ring and is not a PFX on disk; the plaintext
-bytes are cleared after use and the certificate is loaded with an ephemeral key set. The file is written to a temporary
-name and moved into place without overwriting, so two processes that start together end with one key, and the one that
-lost loads the file of the winner. The folder is, by default, `attestation-selfsigned` in the folder of the Data
-Protection keys, so it is backed up with them and is lost with them. A plaintext `attestation-selfsigned.pfx` of an
-earlier version is **not** read or migrated: it is ignored with a warning that tells the operator to delete it (it is
-never deleted by the server), and a new key is created. A file that the ring cannot decrypt (the ring is lost or is
-another ring) is an error that names the file and says to restore the ring or delete the file; only a failure to decrypt
-or load the file is reported that way, while a cryptographic failure while a key is created is reported as a failure to
-create the key. The storage and unreadable errors also carry `MessageWithoutPath`, a message that names the setting or
-the file name but not the folder, which the configuration check prints instead of the full message. A key whose
-certificate
-has expired is moved to `attestation-selfsigned.pfx.protected.retired-<thumbprint>` and a new key is created, with a
-warning; PDFs that were signed earlier are not affected because they carry their own certificate. The replacement
-assumes one server per folder. **The key is still a self-signed key, for development and test only.**
+the server, so the file is only readable with the Data Protection key ring and is not a PFX on disk; the plaintext bytes
+are cleared after use and the certificate is loaded with an ephemeral key set. The file is written to a temporary name
+and moved into place without overwriting, so two processes that start together end with one key, and the one that lost
+loads the file of the winner. The folder is, by default, `attestation-selfsigned` in the folder of the Data Protection
+keys, so it is backed up with them and is lost with them. A plaintext `attestation-selfsigned.pfx` of an earlier version
+is **not** read or migrated: it is ignored with a warning that tells the operator to delete it (it is never deleted by
+the server), and a new key is created. A file that the ring cannot decrypt (the ring is lost or is another ring) is an
+error that names the file and says to restore the ring or delete the file; only a failure to decrypt or load the file is
+reported that way, while a cryptographic failure while a key is created is reported as a failure to create the key. The
+storage and unreadable errors also carry `MessageWithoutPath`, a message that names the setting or the file name but not
+the folder, which the configuration check prints instead of the full message. A key whose certificate has expired is
+moved to `attestation-selfsigned.pfx.protected.retired-<thumbprint>` and a new key is created, with a warning; PDFs that
+were signed earlier are not affected because they carry their own certificate. The replacement assumes one server per
+folder. **The key is still a self-signed key, for development and test only.**
 
 The factory and the provider take a flag `allowCreate`. With `false` (the mode of `--validate --check-config`) the
 provider only describes: it creates no folder and no file, does not archive an expired key, and, when no protected file
@@ -75,13 +74,13 @@ exists, throws an `AttestationKeyException` with `WillBeCreated` set, whose mess
 start". Before that, a regular file at the configured folder path is reported as an error that names
 `Attestation:SelfSignedFolder` in both modes, because the start would fail there too.
 
-The **certificate store provider** opens the configured store read-only and without creating it, finds the
-certificate by its thumbprint (the text is normalized, so a thumbprint copied from a dialog with spaces and the invisible
+The **certificate store provider** opens the configured store read-only and without creating it, finds the certificate
+by its thumbprint (the text is normalized, so a thumbprint copied from a dialog with spaces and the invisible
 left-to-right marks works), and checks that the certificate has a private key of a supported kind (RSA or ECDSA). It
 keeps the handle of the private key and **never exports** it; the key can be in the Windows key store, on a smart card,
 or in a hardware module. No test signature is made at start-up, so a card is not asked for its PIN. It builds the chain
-of the certificate with no revocation check and accepts an unknown root, and keeps the intermediate certificates only, so
-the signature carries what a reader needs to follow the chain, and the root is left to the reader to trust.
+of the certificate with no revocation check and accepts an unknown root, and keeps the intermediate certificates only,
+so the signature carries what a reader needs to follow the chain, and the root is left to the reader to trust.
 
 The **file provider** reads a certificate with its private key from a file of the server, which an administrator
 deploys (for example from a secret store). `CertificatePath` is the file; the format is detected from the content: text
@@ -128,13 +127,13 @@ for the configuration check. The provider does not create or change any file, so
   not be self-signed, its key usage (when it has one) must allow digital signatures or non-repudiation, and now must be
   within its validity period. **This is all that the rule checks: it does not check that the chain leads to a trusted
   root and does not check revocation**, because the server cannot know whom its readers trust. A warning is logged once,
-  when the key is first loaded, for a certificate that is for code signing only (`AttestationKeyPolicy.IsCodeSigningOnly`:
-  the extended key usage lists code signing and none of e-mail protection, Microsoft or Adobe document signing, or any
-  usage; a certificate without the extension is not code-signing-only). The text is
-  `AttestationKeyPolicy.CodeSigningNotice`: "This certificate is a code-signing certificate. Adobe Acrobat will not trust
-  it for document signatures; use a document-signing certificate for production." The code-signing usage is not a
-  reason to refuse the key, also not when `RequireTrustedKey` is set (a key that fails that policy for another reason,
-  such as a key usage that does not allow signing or a validity period that has ended, is still refused).
+  when the key is first loaded, for a certificate that is for code signing only
+  (`AttestationKeyPolicy.IsCodeSigningOnly`: the extended key usage lists code signing and none of e-mail protection,
+  Microsoft or Adobe document signing, or any usage; a certificate without the extension is not code-signing-only). The
+  text is `AttestationKeyPolicy.CodeSigningNotice`: "This certificate is a code-signing certificate. Adobe Acrobat will
+  not trust it for document signatures; use a document-signing certificate for production." The code-signing usage is
+  not a reason to refuse the key, also not when `RequireTrustedKey` is set (a key that fails that policy for another
+  reason, such as a key usage that does not allow signing or a validity period that has ended, is still refused).
   `AttestationKeyInfo.IsCodeSigningOnly` carries the classification to the attestation.
 
 **Describe**: Returns the status for the page.

@@ -2,13 +2,13 @@
 
 #### Verification Approach
 
-`NotificationStore` is verified with unit tests defined in `NotificationStoreTests.cs`. The tests use the real store over
-a real SQLite database file in a temporary folder (`TestStore`), add the users to the users table directly, and read
-the rows and the audit entries back with a second context. A real database is used because the reservation with its
-limits, the counting of attempts, and the confirmation must have exactly one winner, which only the database can
-show; parallel requests (eight for the reservation, ten for the attempts, and several for the confirmation) are
-released together to prove it. The tests of the `ReviewCenterDbContext` model for the two tables are in the same file
-and are described in the verification of that unit. How the service uses the store is verified by the
+`NotificationStore` is verified with unit tests defined in `NotificationStoreTests.cs`. The tests use the real store
+over a real SQLite database file in a temporary folder (`TestStore`), add the users to the users table directly, and
+read the rows and the audit entries back with a second context. A real database is used because the reservation with its
+limits, the counting of attempts, and the confirmation must have exactly one winner, which only the database can show;
+parallel requests (eight for the reservation, ten for the attempts, and several for the confirmation) are released
+together to prove it. The tests of the `ReviewCenterDbContext` model for the two tables are in the same file and are
+described in the verification of that unit. How the service uses the store is verified by the
 `NotificationPreferenceService` tests over an in-memory stand-in.
 
 #### Test Environment
@@ -101,7 +101,8 @@ give one reserved and seven too soon, with one log entry. This scenario is teste
 pending fields. This scenario is tested by `NotificationStore_AbortConfirmationAsync_RemovesLogAndPending`.
 
 **NotificationStore_AbortConfirmationAsync_OtherHash_LeavesPendingAlone**: An abort that names another hash leaves the
-pending fields in place. This scenario is tested by `NotificationStore_AbortConfirmationAsync_OtherHash_LeavesPendingAlone`.
+pending fields in place. This scenario is tested by
+`NotificationStore_AbortConfirmationAsync_OtherHash_LeavesPendingAlone`.
 
 **NotificationStore_TryCountAttemptAsync_CountsUpToTheLimitForTheCurrentCode**: Attempts for another hash are refused,
 the first two for the current hash are counted, and the third over a limit of two is refused. This scenario is tested
@@ -116,7 +117,8 @@ confirmed one, clears the pending fields, and writes one `notification.email-con
 by `NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit`.
 
 **NotificationStore_ConfirmAsync_OtherCode_ChangesNothing**: A confirmation with another hash returns false, leaves the
-address unconfirmed, and writes no entry. This scenario is tested by `NotificationStore_ConfirmAsync_OtherCode_ChangesNothing`.
+address unconfirmed, and writes no entry. This scenario is tested by
+`NotificationStore_ConfirmAsync_OtherCode_ChangesNothing`.
 
 **NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing**: With a code that lives for 30 minutes, a confirmation at
 exactly 30 minutes and one at 31 minutes (a theory with both values) return false, leave the address unconfirmed and
@@ -130,8 +132,9 @@ returns true and the address is confirmed. This scenario is tested by
 **NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner**: Parallel confirmations with the same hash give one
 success and one audit entry. This scenario is tested by `NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner`.
 
-**NotificationStore_RemoveAsync_DeletesRowWithAuditOnce**: Removing deletes the row with one `notification.email-removed`
-entry; a second removal returns false. This scenario is tested by `NotificationStore_RemoveAsync_DeletesRowWithAuditOnce`.
+**NotificationStore_RemoveAsync_DeletesRowWithAuditOnce**: Removing deletes the row with one
+`notification.email-removed` entry; a second removal returns false. This scenario is tested by
+`NotificationStore_RemoveAsync_DeletesRowWithAuditOnce`.
 
 **NotificationStore_RemoveAsync_KeepsTheSendLog**: After a removal the send log entry is still there. This scenario is
 tested by `NotificationStore_RemoveAsync_KeepsTheSendLog`.

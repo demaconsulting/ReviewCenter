@@ -4,20 +4,16 @@
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
 `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
-`RepositoryService`, `PersonalAccessTokenService`, `InboxService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`,
-`RecordDigest`, `ReviewPlanner`, and `ProjectAccess`
-together, with
-a fixed clock (a clock the test can move for the lockout and the expiry of a token) and fakes for the stores
-(`FakeReviewStore`,
-`FakeUserStore`, `FakeRepositoryStore`, `FakeInboxStore`, `FakePersonalAccessTokenStore`), a trivial password hasher
-(`FakePasswordHasher`), and a trivial token protector
-(`FakeCredentialProtector`) in place of the database and the real hasher and protector,
-because the subsystem has no dependency on a
-database; the real database is verified in the `Storage` subsystem, the real hasher in the `Identity` subsystem, and the
-real token protector and git in the `ContentSources` subsystem.
-The tests show that the units cooperate as the
-design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the thirty-one units.
+`RepositoryService`, `PersonalAccessTokenService`, `InboxService`, `SelectionMatcher`, `RevisionValidator`,
+`Fingerprint`, `RecordDigest`, `ReviewPlanner`, and `ProjectAccess` together, with a fixed clock (a clock the test can
+move for the lockout and the expiry of a token) and fakes for the stores (`FakeReviewStore`, `FakeUserStore`,
+`FakeRepositoryStore`, `FakeInboxStore`, `FakePersonalAccessTokenStore`), a trivial password hasher
+(`FakePasswordHasher`), and a trivial token protector (`FakeCredentialProtector`) in place of the database and the real
+hasher and protector, because the subsystem has no dependency on a database; the real database is verified in the
+`Storage` subsystem, the real hasher in the `Identity` subsystem, and the real token protector and git in the
+`ContentSources` subsystem. The tests show that the units cooperate as the design describes: the services create, store,
+and read back what the fingerprint algorithm and the rules require. The rules and the algorithm themselves are verified
+in detail by the unit tests of the thirty-one units.
 
 ### Test Environment
 
@@ -98,10 +94,10 @@ N/A - standard test environment.
   the record digest differs when the source, the selection, or any change differs; and a later change of the
   repository does not change the stored review (see the unit tests of `ReviewService` and `RecordDigest`).
 - The reviews that a head revision needs are planned from the review-sets in the configuration file of the repository,
-  one for each set, as a full review or as the changes since a given or since the last approved revision of that set;
-  a baseline that cannot be trusted gives a full review with a note, sets already filed or without a change are told
-  apart, and the picked reviews are created each in its own transaction, with the review-set recorded in the review
-  (see the unit tests of `ReviewPlanner`, and the real-git tests of the planner in the `ContentSources` subsystem tests).
+  one for each set, as a full review or as the changes since a given or since the last approved revision of that set; a
+  baseline that cannot be trusted gives a full review with a note, sets already filed or without a change are told
+  apart, and the picked reviews are created each in its own transaction, with the review-set recorded in the review (see
+  the unit tests of `ReviewPlanner`, and the real-git tests of the planner in the `ContentSources` subsystem tests).
 - A user creates personal access tokens, which are listed without their value; the value authenticates the owner only
   while the token is active; a revoked token and a wrong value are refused; and an actor that came through a token
   cannot create a token, name a reviewer, or sign, while it can create a review that is flagged as created through the
@@ -161,34 +157,30 @@ project from the same three file contents, the second in reverse order and under
 have the known fingerprint of the contents. This scenario is tested by
 `CoreSubsystem_Fingerprint_SameContentOtherNamesAndOrder_GivesSameFingerprint`.
 
-**CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing**: A theory over every value of
-`DomainRule`, so that a rule added later without a scenario fails the test. For each rule a request that breaks
-it is made through the services (a project with a blank name or a description that is too long; a review for a
-missing project, with an invalid or duplicate identifier, an invalid title, no files, too many files, a duplicate
-or invalid path, a file that is too large, or files that are together too large; a comment with a blank text, an
-anchor on a missing file or beyond the end of the file, or a reply to a thread that does not exist; a
-checklist answer for a missing checklist, for a check that is not in the checklist, or a failed
-check without a justification; a user with an invalid or taken user name, a blank display name, or a too short
-password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
-system administrator; a member added twice, a change of a user who is not a member, removing the last project
-administrator, a project administrator who fails ten adds in a row, and a user with a temporary password who creates a
-token (these use the real `ProjectAccess` and `PersonalAccessTokenService`, over `FakeUserStore` connected to
-`FakeReviewStore`); a slot for a missing review,
-a slot with an unknown reviewer or one that does not exist or is not a member, a change of a
-signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
-a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active
-tokens, and an actor that came through a token that signs or names a reviewer; a change of an approved review, a
-reopen without a reason, a reopen of a review that is not approved, and a reviewer who is the author of the review
-(`ReviewLocked`, `ReopenReasonInvalid`, `ReviewNotLocked`, and `ReviewerNotIndependent`); a change after a signature that
-is not acknowledged (`SignaturesWouldBecomeOutOfDate`); a repository with an invalid name,
-location, or credential, a name already used,
-an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
-selection with no valid pattern; and a selection that matches no changed file; and, over the real `TotpService` in a
-`TotpTestWorld`, the six second factor rules: not available, already enrolled, not enrolled, code incorrect, enrollment
-expired, and secret unreadable). Each
-fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
-administrator created
-first, except that the git-only rules are skipped here. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
+**CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing**: A theory over every value of `DomainRule`, so
+that a rule added later without a scenario fails the test. For each rule a request that breaks it is made through the
+services (a project with a blank name or a description that is too long; a review for a missing project, with an invalid
+or duplicate identifier, an invalid title, no files, too many files, a duplicate or invalid path, a file that is too
+large, or files that are together too large; a comment with a blank text, an anchor on a missing file or beyond the end
+of the file, or a reply to a thread that does not exist; a checklist answer for a missing checklist, for a check that is
+not in the checklist, or a failed check without a justification; a user with an invalid or taken user name, a blank
+display name, or a too short password, a wrong current password, a change of a user that does not exist, or disabling
+the last enabled system administrator; a member added twice, a change of a user who is not a member, removing the last
+project administrator, a project administrator who fails ten adds in a row, and a user with a temporary password who
+creates a token (these use the real `ProjectAccess` and `PersonalAccessTokenService`, over `FakeUserStore` connected to
+`FakeReviewStore`); a slot for a missing review, a slot with an unknown reviewer or one that does not exist or is not a
+member, a change of a signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong
+password at a signing, or a signing of a record that changed; a token with an invalid name, an invalid lifetime, or
+beyond the limit of 20 active tokens, and an actor that came through a token that signs or names a reviewer; a change of
+an approved review, a reopen without a reason, a reopen of a review that is not approved, and a reviewer who is the
+author of the review (`ReviewLocked`, `ReopenReasonInvalid`, `ReviewNotLocked`, and `ReviewerNotIndependent`); a change
+after a signature that is not acknowledged (`SignaturesWouldBecomeOutOfDate`); a repository with an invalid name,
+location, or credential, a name already used, an unknown or disabled repository, or a token that cannot be decrypted; a
+revision that is not a safe name; and a selection with no valid pattern; and a selection that matches no changed file;
+and, over the real `TotpService` in a `TotpTestWorld`, the six second factor rules: not available, already enrolled, not
+enrolled, code incorrect, enrollment expired, and secret unreadable). Each fails with a `DomainRuleException` that names
+the rule, and the store holds only the project, review, and administrator created first, except that the git-only rules
+are skipped here. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
 
 **CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder**: A thread is started on lines 1 to 2 of a
 file of a review, two replies are added, the thread is resolved and read back, then reopened and read back again.
@@ -219,18 +211,17 @@ review is not approved, and the digest differs. The alternate signs the new reco
 with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
 
-**CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment**: A review has two slots, every check is answered, and
-only the first slot is signed, so the review is not locked. Changing an answer and starting a thread that is included in
-the report, without an
-acknowledgment, are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is
-stored, and the signature is still current. The same answer is then changed with slot 1 acknowledged; it is stored and
-the
-signature is out of date. This scenario is tested by `CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment`.
+**CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment**: A review has two slots, every check is answered,
+and only the first slot is signed, so the review is not locked. Changing an answer and starting a thread that is
+included in the report, without an acknowledgment, are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1
+and its signer, nothing is stored, and the signature is still current. The same answer is then changed with slot 1
+acknowledged; it is stored and the signature is out of date. This scenario is tested by
+`CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgment`.
 
 **CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
 `PersonalAccessTokenService`. The value authenticates the owner and a value with a changed ending does not; the list
-shows the name; an actor that carries the id of the token is refused when it tries to create a token; and after the owner
-revokes the token the value is refused. This scenario is tested by
+shows the name; an actor that carries the id of the token is refused when it tries to create a token; and after the
+owner revokes the token the value is refused. This scenario is tested by
 `CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner`.
 
 **CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign**: An actor that came through a token creates a review,
@@ -270,7 +261,8 @@ refused with `ActorNotAllowed`. A system administrator switches the two further 
 of their own review, and the person who reopened a review signing it again) off, each change is audited once with
 `project.review-rule-changed` and the details `RequireNonAuthorChecklistAnswers on->off` and
 `RequireNonReopenerSigning on->off`, a repeated change from the old value is refused with `RecordChanged`, and the
-independence rule is still on. This scenario is tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`.
+independence rule is still on. This scenario is tested by
+`CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`.
 
 **CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff**: With both rules at their default, the author's answer to a
 check is refused with `AuthorCannotAnswer` and stores nothing; once the rule is switched off the same answer is
@@ -285,8 +277,8 @@ exists, and the author of the review is refused an answer with `AuthorCannotAnsw
 were stored has no column for them and must be created again, so the scenario is about the projects of the current
 database. This scenario is tested by `CoreSubsystem_ReviewRuleSwitches_ExistingProject_KeepsBothRulesOnAndEnforced`.
 
-**CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser**: A member holds an unsigned slot of a review
-that is not approved. A system administrator makes the member an auditor and is refused with
+**CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser**: A member holds an unsigned slot of a
+review that is not approved. A system administrator makes the member an auditor and is refused with
 `MemberHasOpenReviewWork`; the message names the review, the member is still a user, and no audit entry is added. This
 scenario is tested by `CoreSubsystem_AuditorRole_MemberHoldingUnsignedSlot_IsRefusedAndStaysUser`.
 
@@ -306,8 +298,8 @@ stays valid after a change. They are tested by `ReviewService_CreateDraftAsync_D
 **Review progress**: The unit tests of `ReviewProgressService`, `SigningService`, and `AuditStore` verify the subsystem
 requirement for the progress of the reviews of a project: the derived stage, the signature and blocker counts (equal to
 the blocker sentences), the people a review waits on, the overdue rule, the last activity from the audit trail (one
-grouped read), the access of members, auditors, and strangers, and the constant number of reads for 300 reviews. They are
-tested by `ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`,
+grouped read), the access of members, auditors, and strangers, and the constant number of reads for 300 reviews. They
+are tested by `ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`,
 `ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`, and
 `ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
 
@@ -428,10 +420,10 @@ real access rules, for example by `BallotVisibility_CanSeeOthers_PlainContributo
 **Rejected outcome**: The unit tests of `SigningService`, `ReviewLock`, `ReviewProgressService`, `InboxService`, and
 `ThreadService` verify the rejected conclusion. A rejection with a conclusion text is signed and stored with the outcome
 Rejected, which is tested by `SigningService_SignAsync_RejectedWithText_StoresRejectedSignature`; without the text it is
-refused with `ConclusionRequired`, which is tested by `SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired`;
-the review is concluded as rejected when every slot has signed, which is tested by
-`SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved` and
+refused with `ConclusionRequired`, which is tested by
+`SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired`; the review is concluded as rejected when every slot
+has signed, which is tested by `SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved` and
 `ReviewLock_IsConcluded_RejectedAllSignedWithText_True`; its stage is Rejected, which is tested by
-`ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked`; the inbox shows it as an update, which
-is tested by `InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction`; and the next step names disputed
-checks and the needed conclusion, which is tested by `ThreadService_NextStep_DisputedAndConclusion_AreNamed`.
+`ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked`; the inbox shows it as an update,
+which is tested by `InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction`; and the next step names
+disputed checks and the needed conclusion, which is tested by `ThreadService_NextStep_DisputedAndConclusion_AreNamed`.

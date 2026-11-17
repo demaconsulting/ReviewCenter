@@ -57,8 +57,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   `web.yaml`), together with the `Identity` subsystem test of the provider that ends the state.
 - A system administrator who opens `/projects/{id}/repositories` is shown the repositories of that project; a user who
   is no member of it receives the same not-found page as for a project that does not exist.
-- Every interactive element of every page has a `data-testid`, no identifier repeats within a page, and the breadcrumb links
-  have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-users-link`), distinct from the header tabs.
+- Every interactive element of every page has a `data-testid`, no identifier repeats within a page, and the breadcrumb
+  links have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-users-link`), distinct from the header tabs.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
   display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the requirements
@@ -98,8 +98,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   right), the link and summary on the project page, and the help topic need a live connection, so they are verified at
   unit level by the component tests of `ProjectPage` (`ProjectChecklistPageTests.cs`, `ChecklistDiffTests.cs`) and
   `HelpPage` (see the requirements `ReviewCenter-Web-ChecklistTemplate` and `ReviewCenter-Web-ChecklistTemplate-*` and
-  their children in `web.yaml`); the journey in a
-  browser is verified by the system test `ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault`.
+  their children in `web.yaml`); the journey in a browser is verified by the system test
+  `ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault`.
 - Optional sign-in with an OpenID Connect provider: the login page offers the button of the provider beside the local
   form only while it is enabled, the users and account pages show that such an account has no password, the review
   page offers the confirmation at the provider instead of the password field, and the help topics mention it; the
@@ -348,9 +348,9 @@ verified by `ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerA
 **Personal access tokens on the account page**: The token card, the creation that shows the value once, and the
 revocation are verified by the `AccountPage` unit tests, which render the page with the component test host and the real
 `PersonalAccessTokenService` over a fake store: `AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken` and
-`AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton` trace the subsystem requirement, and the help topic is
-verified by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`. The end-to-end journey from the card
-to a call of the API is verified in the `Api` subsystem.
+`AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton` trace the subsystem requirement, and the help topic
+is verified by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`. The end-to-end journey from the card to
+a call of the API is verified in the `Api` subsystem.
 
 **Evidence settings page and help**: The page, its defaults, warnings, save, audit entry, conflict, and lost right are
 verified by the `EvidenceSettingsPageTests` unit tests, which render the page with the component test host and the real
@@ -372,10 +372,10 @@ verified by `HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAn
 the project page are verified by `ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary` and
 `ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary`.
 
-**Review due date**: The unit tests of `ProjectPage` (the form for a new review), `PlanPage`, and `ReviewPage` verify the
-subsystem requirement for the optional due date: the date is offered when a review is created or planned and is shown
-with its UTC label, the Overdue badge shows only for a past date on a review that is not concluded, and the edit form is
-offered only to an administrator or the creator and never for a concluded review. They are tested by
+**Review due date**: The unit tests of `ProjectPage` (the form for a new review), `PlanPage`, and `ReviewPage` verify
+the subsystem requirement for the optional due date: the date is offered when a review is created or planned and is
+shown with its UTC label, the Overdue badge shows only for a past date on a review that is not concluded, and the edit
+form is offered only to an administrator or the creator and never for a concluded review. They are tested by
 `NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, `PlanPage_Create_DueDates_DefaultAndRowDate`,
 `ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`, and
 `ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.
@@ -425,8 +425,8 @@ tokens, project access) are verified in the `Core` and `Api` subsystems.
 **Sign-in pages served over HTTP**: Through the real server pipeline, the login page is answered with status 200 to a
 visitor who is not signed in, which is tested by `SignIn_PublicPage_Anonymous_IsServed`, and the users page is served to
 a system administrator and refused to a reviewer with an explanation, which is tested by
-`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; both tests are defined in `SignInTests.cs` and are evidence of the
-requirements `ReviewCenter-Web-SignIn-LoginPage` and `ReviewCenter-Web-SignIn-UsersPage`. The pages themselves are
+`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; both tests are defined in `SignInTests.cs` and are evidence of
+the requirements `ReviewCenter-Web-SignIn-LoginPage` and `ReviewCenter-Web-SignIn-UsersPage`. The pages themselves are
 verified in the component tests of `LoginPage` and `UsersPage`, which render them with the router.
 
 **Sign-in with an OpenID Connect provider**: With the provider on and nobody signed in, the login page shows the button
@@ -450,8 +450,8 @@ and the right code shows the confirmed address, which is tested by
 
 **Notification mode**: The account page of a user with a confirmed address offers the choice of the mode, shows the
 chosen mode, and explains what is and is not mailed, which is tested by
-`WebSubsystem_AccountPage_ChoosesNotificationMode`. The disabled selector, the refusals, and the case that the feature is
-not set up are tested in the unit tests of `AccountPage` in `AccountNotificationModeTests.cs`.
+`WebSubsystem_AccountPage_ChoosesNotificationMode`. The disabled selector, the refusals, and the case that the feature
+is not set up are tested in the unit tests of `AccountPage` in `AccountNotificationModeTests.cs`.
 
 **Notification help topic and link**: The help topic on e-mail notifications is rendered by the component tests of
 `HelpPage` (see the requirements `ReviewCenter-Web-NotificationHelpTopic` and its children in `web.yaml`), which is

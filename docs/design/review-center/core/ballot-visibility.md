@@ -59,9 +59,9 @@ not see the others, so that a page shows a note in place of the standing.
 - *Precedence*: The rule is pure and knows nothing of project access or of API tokens. "Shows everything" therefore
   means "for a viewer who may view the project": every service first checks that the viewer may view the project (a
   stranger is refused or gets nothing, whatever the rule says), and only then asks the rule. An API token is passed to
-  the rule as a viewer who does not see everything (`SeesAllInProjectAsync` and `SeesAllInReviewAsync` are false for it),
-  and `ChecklistService.GetBallotViewAsync` additionally never gives a token the differing checks or the failed count,
-  not even when its owner has handed in.
+  the rule as a viewer who does not see everything (`SeesAllInProjectAsync` and `SeesAllInReviewAsync` are false for
+  it), and `ChecklistService.GetBallotViewAsync` additionally never gives a token the differing checks or the failed
+  count, not even when its owner has handed in.
 
 **BallotVisibility.SeesAllInProjectAsync** and **SeesAllInReviewAsync**: The facts of `seesAll`. The first is true for a
 viewer who may audit the project (a system administrator, a project administrator, or an Auditor) and is not an API

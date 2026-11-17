@@ -5,78 +5,62 @@
 ### Overview
 
 The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files or of the changes in a git
-repository, comment threads on
-those files, the review checklist, local user accounts, reviewer slots with re-authenticated signatures, the rules
-that protect them, the content fingerprint that identifies a review's files and the digest of a review record, and the
-hash-chained audit trail of everything that happens. It
-is
-deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains thirty-one units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
-record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
-`AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
-decides who can see and administer which project; `ProjectService`, the rules
-for projects and their members; `EvidenceSettingsService`, the rules for the per-project evidence settings (anonymous
-access to the evidence and the content of the attestation PDFs); `ProjectChecklistService`, the rules for the checklist
-that a project gives to its new reviews; `ReviewService`, the rules for reviews;
-`ThreadService`, the rules for review comments;
-`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users, including the accounts that
-sign in with an external identity provider; `SigningService`, the
-rules for reviewer slots and signatures; `ReauthProofStore`, the in-memory, single-use proofs that a user of an
-identity provider has just confirmed their identity for one signature; `TotpService`, the rules for the optional second
-factor of local accounts (a one-time password from an authenticator app, with recovery codes); `TotpChallengeStore`,
-the in-memory challenges between the two steps of a sign-in with a second factor; `RepositoryService`, the registry of
-git
-repositories that reviews can be
-created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
-repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
-`LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
-`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository;
-`ReviewProgressService`, the stage, signatures, waiting-on names, blockers, last activity, and overdue state of every
-review of a project, for the project overview and the API list;
-`PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
-`InboxService`, the inbox of a user (the reviews that wait for the user, in eight groups, which also serves as the list
-of notifications) and the read state that marks what is new;
-`UserImpactService`, the offboarding impact of a user
-(the reviewer slots that still wait for the user and the projects the user alone administers);
-`BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to; and
-`BallotVisibility`, who may see the answers of the other reviewers of a review before the own ballot is handed in, with
-the masking of what would reveal them; and `ReviewStatusService`, where a review stands for one viewer, the one next
-action, and what changed since a reviewer signed; `NotificationAddress`, the check that a text is exactly one plain
-e-mail address; `NotificationMessage`, an e-mail message that refuses a line break in a header part, with the
-sender contract; `NotificationPreferenceService`, the confirmation of the optional e-mail address for
-notifications by a code that is mailed to it; `NotificationComposer`, the content of a notification mail and the rule
-for what is new; `DigestSchedule`, when the slot of the daily summary is due; and `NotificationDispatcher`, which
-decides which mails go to whom and sends them. The
-domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
-`UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
-`ReviewComment`,
-`ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
-`ProjectMember`, the signing types `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `ReviewRecord`, `ReviewApproval`,
-`ReviewLock`, `ReviewReopen`, and `ReopenRules`, the audit types `AuditEntry`, `AuditDraft`,
-and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
-`RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
-`ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `RepositorySource` (the
-revisions and selection a creation request names, before they are resolved), `ChangedFile`, and
-`RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
-`LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
-`PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the personal access token
-types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
-(`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
-`TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox types (`InboxSection`, `InboxItem`, `InboxView`,
-`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the notification types (`NotificationSettings`,
-`NotificationPreference`, `NotificationSendLogEntry`, `NotificationAddressStatus`, `ConfirmationRequest`, and
-`ConfirmationReservation`), the offboarding types (`UserImpact`, `UserOpenWork`,
-`SoleAdminProject`, and `UserReviewSlot`), the text and line
-definition
-(`FileText`), the limits
-(`ReviewLimits`), the rule failure type
-(`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IProjectAccess`, `IReviewStore`,
-`IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `IInboxStore`, `INotificationStore`,
-`INotificationSender`, `ITotpAlgorithm`,
-`ITotpSecretProtector`,
-`ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
-`IReviewSetParser`, and `IPasswordHasher`) are
+repository, comment threads on those files, the review checklist, local user accounts, reviewer slots with
+re-authenticated signatures, the rules that protect them, the content fingerprint that identifies a review's files and
+the digest of a review record, and the hash-chained audit trail of everything that happens. It is deliberately free of
+web and database technology so that the rules can be reviewed and tested on their own. It It contains thirty-one units:
+`Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review record that a signature binds
+to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain; `AuditService`, the recording,
+reading, and verification of the audit trail; `ProjectAccess`, the one place that decides who can see and administer
+which project; `ProjectService`, the rules for projects and their members; `EvidenceSettingsService`, the rules for the
+per-project evidence settings (anonymous access to the evidence and the content of the attestation PDFs);
+`ProjectChecklistService`, the rules for the checklist that a project gives to its new reviews; `ReviewService`, the
+rules for reviews; `ThreadService`, the rules for review comments; `ChecklistService`, the rules for the review
+checklist; `UserService`, the rules for users, including the accounts that sign in with an external identity provider;
+`SigningService`, the rules for reviewer slots and signatures; `ReauthProofStore`, the in-memory, single-use proofs that
+a user of an identity provider has just confirmed their identity for one signature; `TotpService`, the rules for the
+optional second factor of local accounts (a one-time password from an authenticator app, with recovery codes);
+`TotpChallengeStore`, the in-memory challenges between the two steps of a sign-in with a second factor;
+`RepositoryService`, the registry of git repositories that reviews can be created from, with their credentials;
+`SelectionMatcher`, the file pattern language that selects the files of a repository; `RevisionValidator`, the check
+that a revision name cannot be taken for an option or an expression; `LineDiff`, the comparison of the lines of two
+versions of a file and its division into shown and collapsed regions; `ReviewPlanner`, the planning of the reviews that
+a head revision needs from the review-sets of the repository; `ReviewProgressService`, the stage, signatures, waiting-on
+names, blockers, last activity, and overdue state of every review of a project, for the project overview and the API
+list; `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner;
+and `InboxService`, the inbox of a user (the reviews that wait for the user, in eight groups, which also serves as the
+list of notifications) and the read state that marks what is new; `UserImpactService`, the offboarding impact of a user
+(the reviewer slots that still wait for the user and the projects the user alone administers); `BallotConsolidation`,
+the agreed standing of the submitted ballots of a review and the outcome it leads to; and `BallotVisibility`, who may
+see the answers of the other reviewers of a review before the own ballot is handed in, with the masking of what would
+reveal them; and `ReviewStatusService`, where a review stands for one viewer, the one next action, and what changed
+since a reviewer signed; `NotificationAddress`, the check that a text is exactly one plain e-mail address;
+`NotificationMessage`, an e-mail message that refuses a line break in a header part, with the sender contract;
+`NotificationPreferenceService`, the confirmation of the optional e-mail address for notifications by a code that is
+mailed to it; `NotificationComposer`, the content of a notification mail and the rule for what is new; `DigestSchedule`,
+when the slot of the daily summary is due; and `NotificationDispatcher`, which decides which mails go to whom and sends
+them. The domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
+`UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`, `ReviewComment`, `ReviewThreadState`, the checklist types,
+`User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and `ProjectMember`, the signing types
+`ReviewerSlot`, `ReviewSignature`, `SlotRole`, `ReviewRecord`, `ReviewApproval`, `ReviewLock`, `ReviewReopen`, and
+`ReopenRules`, the audit types `AuditEntry`, `AuditDraft`, and `AuditVerificationResult`, and the repository types
+`SourceRepository`, `RepositorySummary`, `NewRepository`, `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the
+git contract types `RepositoryAccess`, `GitChange`, `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the
+review-source types `ReviewSource`, `RepositorySource` (the revisions and selection a creation request names, before
+they are resolved), `ChangedFile`, and `RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`,
+`DiffLine`, `DiffLineKind`, `LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`,
+`PlanRowStatus`, `PlanRow`, `ReviewPlan`, `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and
+`ReviewSetDefinition`), the personal access token types (`PersonalAccessToken`, `CreatedPersonalAccessToken`,
+`TokenFailure`, `TokenValidation`), the second factor types (`UserTotp`, `TotpRecoveryCode`, `TotpSettings`,
+`TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`, `TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox
+types (`InboxSection`, `InboxItem`, `InboxView`, `InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the
+notification types (`NotificationSettings`, `NotificationPreference`, `NotificationSendLogEntry`,
+`NotificationAddressStatus`, `ConfirmationRequest`, and `ConfirmationReservation`), the offboarding types (`UserImpact`,
+`UserOpenWork`, `SoleAdminProject`, and `UserReviewSlot`), the text and line definition (`FileText`), the limits
+(`ReviewLimits`), the rule failure type (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces
+(`IProjectAccess`, `IReviewStore`, `IUserStore`, `IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`,
+`ITotpStore`, `IInboxStore`, `INotificationStore`, `INotificationSender`, `ITotpAlgorithm`, `ITotpSecretProtector`,
+`ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`, `IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
@@ -106,53 +90,47 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 - *Type*: In-process .NET classes (`ProjectAccess` through its interface `IProjectAccess`).
 - *Role*: Provider.
 - *Contract*: Decide, for an actor and a project, whether the actor can see the project, administer it, or is a member
-  of it, and list the projects an actor can see (`ProjectAccess`); require a right and fail with
-  `DomainRuleException`, where a project the actor may not see fails exactly like a project that does not exist. Create
-  a project (system administrators only; a new project has no members); list and read the projects the actor can see;
-  list the members of a project, and add an existing user as a member by the exact user name, create a local account
-  as a member of the project (with a generated temporary password, returned once), change the role of a member, or
-  remove a member (system administrators and the project admins of that project; removing or demoting the last project
-  admin is refused for a project admin; a failed add is throttled and audited); read and change the evidence settings of
-  a project (system administrators and the project admins of that project only; a change names the settings it started
-  from and is refused with `RecordChanged` when another change came first, and is audited with its changed keys), and
-  read them without an actor for the services that apply them; read the checklist definition of a project (the built-in
-  default when it has none) and replace or reset it (system administrators and the project admins of that project only,
-  never through an API token; the text must pass the strict validation, a changed wording needs a new version label, and
-  a change names the hash it started from and is refused with `RecordChanged` when another change came first); create a
-  draft review from uploaded
-  files, or from the files
-  that changed between an optional baseline revision and a head revision of a registered repository of the same
-  project, restricted by a
-  selection (the changes are fetched once and frozen in the review; nothing reads the repository again, and a selection
-  that matches no change is refused with `NothingToReview`); list and
-  read reviews; read the exact head bytes, and the frozen baseline bytes, of one file of a review; start a comment
-  thread on a file or a line range of the head or, for a file with a baseline, of the baseline (a file deleted at
-  the head takes whole-file comments and baseline line comments only), read the line differences between the
-  baseline and the head of one file from the frozen contents (within fixed bounds on the size of the comparison),
-  reply to it, resolve and reopen it (a Finding is resolved with a note), promote a Question to a Finding or demote it,
-  include a reply in the report or take it out, and list the threads of a review with their comments; read the frozen
-  checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
-  user name and password, list and read users, enable and disable a user, make a user a system administrator or take
-  the right away, and change a
-  password (a user with a temporary password must choose a different one; it clears the flag). Find or create the
-  account of an external identity (an issuer and subject of an OpenID Connect provider; first sign-in creates an
-  enabled non-admin account with no project and no password; every password operation refuses such an account). A user
-  with a temporary
-  password has no project access, cannot sign, and cannot use personal access tokens. Posting a comment or saving a
-  checklist decision takes the signed-in user (an `Actor`), never free text.
-  Add, change, and remove a reviewer slot of a review (only for members of the project), sign a slot with the password
-  entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
-  provider (members only), tell whether such a proof exists without spending it, read the
-  approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
-  project, who can be chosen for a slot. A concluded review (every slot has handed in its ballot, the ballots agree on
-  an outcome, approved or rejected, every slot signed that outcome for the current record, a rejected outcome has a
-  review conclusion text, and no thread
-  open) is locked: every change of its threads, checklist answers,
-  section applicability, or reviewer slots, and any further signature, is refused with `ReviewLocked`, until a project
-  admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
-  earlier signatures as history and requires fresh ones. A project admin switches the project rule "require independent
-  reviewers" (`ProjectService.SetRequireIndependentReviewersAsync`; on by default): the user who created a review can then
-  neither be chosen as a reviewer of it nor sign it. The same administrators can switch two further rules
+  of it, and list the projects an actor can see (`ProjectAccess`); require a right and fail with `DomainRuleException`,
+  where a project the actor may not see fails exactly like a project that does not exist. Create a project (system
+  administrators only; a new project has no members); list and read the projects the actor can see; list the members of
+  a project, and add an existing user as a member by the exact user name, create a local account as a member of the
+  project (with a generated temporary password, returned once), change the role of a member, or remove a member (system
+  administrators and the project admins of that project; removing or demoting the last project admin is refused for a
+  project admin; a failed add is throttled and audited); read and change the evidence settings of a project (system
+  administrators and the project admins of that project only; a change names the settings it started from and is refused
+  with `RecordChanged` when another change came first, and is audited with its changed keys), and read them without an
+  actor for the services that apply them; read the checklist definition of a project (the built-in default when it has
+  none) and replace or reset it (system administrators and the project admins of that project only, never through an API
+  token; the text must pass the strict validation, a changed wording needs a new version label, and a change names the
+  hash it started from and is refused with `RecordChanged` when another change came first); create a draft review from
+  uploaded files, or from the files that changed between an optional baseline revision and a head revision of a
+  registered repository of the same project, restricted by a selection (the changes are fetched once and frozen in the
+  review; nothing reads the repository again, and a selection that matches no change is refused with `NothingToReview`);
+  list and read reviews; read the exact head bytes, and the frozen baseline bytes, of one file of a review; start a
+  comment thread on a file or a line range of the head or, for a file with a baseline, of the baseline (a file deleted
+  at the head takes whole-file comments and baseline line comments only), read the line differences between the baseline
+  and the head of one file from the frozen contents (within fixed bounds on the size of the comparison), reply to it,
+  resolve and reopen it (a Finding is resolved with a note), promote a Question to a Finding or demote it, include a
+  reply in the report or take it out, and list the threads of a review with their comments; read the frozen checklist of
+  a review with its progress, set whether a section applies, and answer a check; create a user, check a user name and
+  password, list and read users, enable and disable a user, make a user a system administrator or take the right away,
+  and change a password (a user with a temporary password must choose a different one; it clears the flag). Find or
+  create the account of an external identity (an issuer and subject of an OpenID Connect provider; first sign-in creates
+  an enabled non-admin account with no project and no password; every password operation refuses such an account). A
+  user with a temporary password has no project access, cannot sign, and cannot use personal access tokens. Posting a
+  comment or saving a checklist decision takes the signed-in user (an `Actor`), never free text. Add, change, and remove
+  a reviewer slot of a review (only for members of the project), sign a slot with the password entered again, or, for a
+  user of an identity provider, with a single-use proof of a fresh confirmation at the provider (members only), tell
+  whether such a proof exists without spending it, read the approval status of a review (its slots, blockers, record
+  digest, and next step), and list the enabled members of a project, who can be chosen for a slot. A concluded review
+  (every slot has handed in its ballot, the ballots agree on an outcome, approved or rejected, every slot signed that
+  outcome for the current record, a rejected outcome has a review conclusion text, and no thread open) is locked: every
+  change of its threads, checklist answers, section applicability, or reviewer slots, and any further signature, is
+  refused with `ReviewLocked`, until a project admin or system administrator reopens it with a reason
+  (`ReopenReviewAsync`; never with an API token), which keeps the earlier signatures as history and requires fresh ones.
+  A project admin switches the project rule "require independent reviewers"
+  (`ProjectService.SetRequireIndependentReviewersAsync`; on by default): the user who created a review can then neither
+  be chosen as a reviewer of it nor sign it. The same administrators can switch two further rules
   (`ProjectService.SetReviewRuleAsync`; on by default, also for projects that existed before they were enforced): the
   review author may not answer the checklist of the review (`ChecklistService`, refused with `AuthorCannotAnswer`), and
   the person who reopened a review may not sign it again (`SigningService`, refused with `ReopenerCannotSign`). While
@@ -165,25 +143,22 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   the review is not concluded, and an invalid due date is refused with `DueDateInvalid`. A review can be created as a
   follow-up of an earlier review of the same project (the optional `followsReviewId` of `CreateDraftAsync` and
   `CreateFromRepositoryAsync`): the Pass and N/A answers of checks that are unchanged (as the submitted ballots of the
-  earlier review agree on them), the not-applicable sections
-  with the same title, and the open threads whose file is in the new review are carried over (`FollowUpCarry`, written
-  with the review in one transaction), marked with the review they came from, while Fail answers, resolved threads,
-  reviewer slots, signatures and reopenings are not; the carried answers are review-level baseline rows that seed the
-  draft ballot of every reviewer slot; a review that does not fit, and open threads that would be dropped
-  without an acknowledgment, are refused with `FollowUpInvalid`. `PreviewFollowUpAsync` tells, for the files of a new
-  review, what such a follow-up would carry and drop, without storing or auditing anything. `RecordDigest` calculates the
-  digest of a record. Every
-  operation that changes data takes
-  the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages, narrowed
-  by an `AuditFilter`, and verifies its hash chain. Create a personal access token for the actor (the value is returned
-  once), list the
-  tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner. Set up a second
-  factor for the signed-in local user (with the password, and a first code that proves the authenticator works; ten
-  recovery codes are returned once), turn it off, issue new recovery codes, let a system administrator reset the factor
-  of another user, start and complete the second step of a sign-in, and check the code that a signature needs.
-  Posted comments are
-  immutable: there is no operation to edit or delete one. Rule violations are reported as a
-  `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
+  earlier review agree on them), the not-applicable sections with the same title, and the open threads whose file is in
+  the new review are carried over (`FollowUpCarry`, written with the review in one transaction), marked with the review
+  they came from, while Fail answers, resolved threads, reviewer slots, signatures and reopenings are not; the carried
+  answers are review-level baseline rows that seed the draft ballot of every reviewer slot; a review that does not fit,
+  and open threads that would be dropped without an acknowledgment, are refused with `FollowUpInvalid`.
+  `PreviewFollowUpAsync` tells, for the files of a new review, what such a follow-up would carry and drop, without
+  storing or auditing anything. `RecordDigest` calculates the digest of a record. Every operation that changes data
+  takes the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages,
+  narrowed by an `AuditFilter`, and verifies its hash chain. Create a personal access token for the actor (the value is
+  returned once), list the tokens of the actor, revoke one, and authenticate a presented token value into a token and
+  its owner. Set up a second factor for the signed-in local user (with the password, and a first code that proves the
+  authenticator works; ten recovery codes are returned once), turn it off, issue new recovery codes, let a system
+  administrator reset the factor of another user, start and complete the second step of a sign-in, and check the code
+  that a signature needs. Posted comments are immutable: there is no operation to edit or delete one. Rule violations
+  are reported as a `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the
+  user.
 - *Constraints*: The services hold no state that matters between calls and are safe for concurrent use if the stores
   are; `UserService` serializes the operations that change users within the process. `ProjectAccess` reads the user and
   the memberships from the stores on every call and caches nothing, so a revoked right ends with the next call.
@@ -192,27 +167,25 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `ReviewStore` in the `Storage` subsystem).
-- *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content; add a thread with
-  its first comment; add a comment to a thread of a review; set the state of a thread, storing an optional
-  resolution comment in the same operation; set the report flag of the comments of a thread (promotion and demotion)
-  or of one reply; list the threads of a review
-  with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
-  state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
-  update, and remove reviewer slots; add and list signatures; reopen a concluded review and list its reopens (the store
-  re-checks that the review is concluded inside the transaction); and add, read, list (of a project, and of a user),
-  change the role of, and remove the memberships of users in projects (removing or demoting can require that another project
-  admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
-  (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
-  and the project and its settings are read with every project), and change the "require independent reviewers" setting
-  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`; `UpdateReviewRuleAsync`
-  does the same for any named review rule), and change the checklist
-  definition of a project by compare-and-set on the hash of the stored text (`UpdateChecklistDefinitionAsync`: the new
-  text, or none for the built-in default, is stored only if the stored text still has the expected hash), and change
-  the due date of a review by compare-and-set (`UpdateDueDateAsync`: the new due date, or none, is stored only if the
-  stored one still equals the expected one). Every operation
-  that changes data takes an
-  `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
-  same transaction.
+- *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content; add a thread with its
+  first comment; add a comment to a thread of a review; set the state of a thread, storing an optional resolution
+  comment in the same operation; set the report flag of the comments of a thread (promotion and demotion) or of one
+  reply; list the threads of a review with their comments; read the checklist snapshot, the section states, and the
+  answers of a review; set the state of a section and the answer to a check; read the whole record of a review in one
+  operation; add, list, update, and remove reviewer slots; add and list signatures; reopen a concluded review and list
+  its reopens (the store re-checks that the review is concluded inside the transaction); and add, read, list (of a
+  project, and of a user), change the role of, and remove the memberships of users in projects (removing or demoting can
+  require that another project admin remains, checked inside the transaction); and change the evidence settings of a
+  project by compare-and-set (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still
+  equal the expected ones, and the project and its settings are read with every project), and change the "require
+  independent reviewers" setting of a project by compare-and-set in the same way
+  (`UpdateRequireIndependentReviewersAsync`; `UpdateReviewRuleAsync` does the same for any named review rule), and
+  change the checklist definition of a project by compare-and-set on the hash of the stored text
+  (`UpdateChecklistDefinitionAsync`: the new text, or none for the built-in default, is stored only if the stored text
+  still has the expected hash), and change the due date of a review by compare-and-set (`UpdateDueDateAsync`: the new
+  due date, or none, is stored only if the stored one still equals the expected one). Every operation that changes data
+  takes an `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail
+  in the same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, and (for a follow-up) the carried
   answers, section states and threads with their comments (`Review.CarryOver`), in one operation, and an attempt
   to add a review whose
@@ -339,9 +312,9 @@ review pages in a later slice.
 
 - *Type*: In-process .NET static class.
 - *Role*: Provider.
-- *Contract*: Give, for a checklist and the ballots of a review, the agreed, disputed, or pending standing of every check
-  and section, the outcome that the standing leads to, and whether one ballot answers every check it requires. Only
-  submitted ballots count, and only the outcome of a check is compared.
+- *Contract*: Give, for a checklist and the ballots of a review, the agreed, disputed, or pending standing of every
+  check and section, the outcome that the standing leads to, and whether one ballot answers every check it requires.
+  Only submitted ballots count, and only the outcome of a check is compared.
 - *Constraints*: Pure: nothing is read, stored, or audited, and the result does not depend on the order of the ballots.
 
 **BallotVisibility**: Who may see the answers of the other reviewers of a review, and the masking of everything that
@@ -513,7 +486,7 @@ Rule failures are reported as `DomainRuleException` rather than as return codes,
 message and keep the entered values, and there is a single, easily tested path for all rules. The rules are:
 
 | `DomainRule` | Violated when |
-| -------------- | --------------- |
+| --- | --- |
 | `ProjectNameInvalid` | The project name is empty after trimming or is too long |
 | `ProjectDescriptionTooLong` | The project description is too long |
 | `ProjectNotFound` | The project does not exist, or the actor may not see it (the two cannot be told apart) |
@@ -600,13 +573,12 @@ message and keep the entered values, and there is a single, easily tested path f
 | `NotificationTooManyAttempts` | Five codes were already typed against the current confirmation code |
 | `AuditFilterInvalid` | An audit filter has a text that is too long, or a From date after the To date |
 
-The checklist of a review is the copy of the checklist of its project (the built-in default checklist when the project has
-none) that the review received when it was created, so changing the default, or the checklist of the project, never
-changes an existing review (see `ChecklistService`, `ProjectChecklistService`, and `ReviewService`). The name saved
-with an answer or section decision is the display name of the signed-in user, saved together with the user name,
-like the author of a
-comment. The earlier rules for a free text author or name no longer exist, because nobody types an author. The
-checklist snapshot, section states, and answers are part of the record that a signature binds to, so they are read
+The checklist of a review is the copy of the checklist of its project (the built-in default checklist when the project
+has none) that the review received when it was created, so changing the default, or the checklist of the project, never
+changes an existing review (see `ChecklistService`, `ProjectChecklistService`, and `ReviewService`). The name saved with
+an answer or section decision is the display name of the signed-in user, saved together with the user name, like the
+author of a comment. The earlier rules for a free text author or name no longer exist, because nobody types an author.
+The checklist snapshot, section states, and answers are part of the record that a signature binds to, so they are read
 together with the threads (see `RecordDigest`).
 
 Signing is a second kind of record beside the discussion. A review has reviewer slots, each with a primary and an
@@ -643,12 +615,13 @@ a review is not part of the record digest, so setting or clearing it never makes
 
 The audit trail is the third kind of record: an append-only, hash-chained list of everything that happens, kept in the
 same database. A change of data and its audit entry are stored in the same transaction by the store, so the services
-decide what is recorded (they build an `AuditDraft` with the actor, the action code, and a one-line detail) and the stores
-decide when. Events that change no data (sign-in, sign-out, failed sign-in, lockout) are recorded by `AuditService` on a
-best-effort basis. The chain detects an edit, a deletion, an insertion, or a reordering of entries in the middle of the
-history. It does not detect the removal of the newest entries, or a complete rewrite by someone with write access to
-the database, unless the head hash was recorded elsewhere, and this version has no external anchoring. See the
-`AuditChain` and `AuditService` units for the encoding, the verification, the action codes, and the known limitations.
+decide what is recorded (they build an `AuditDraft` with the actor, the action code, and a one-line detail) and the
+stores decide when. Events that change no data (sign-in, sign-out, failed sign-in, lockout) are recorded by
+`AuditService` on a best-effort basis. The chain detects an edit, a deletion, an insertion, or a reordering of entries
+in the middle of the history. It does not detect the removal of the newest entries, or a complete rewrite by someone
+with write access to the database, unless the head hash was recorded elsewhere, and this version has no external
+anchoring. See the `AuditChain` and `AuditService` units for the encoding, the verification, the action codes, and the
+known limitations.
 
 The registry of git repositories is a fourth kind of record, and the first that does not describe a review. A
 repository belongs to exactly one project, and is registered by the administrator of that project (or a system
@@ -679,35 +652,34 @@ confirmation at the provider instead of a password: the `Identity` subsystem iss
 signs. The proof is held in the memory of one process and is lost on restart, which only means that the user confirms
 again. See the `UserService`, `SigningService`, and `ReauthProofStore` units.
 
-A seventh kind of fact is the optional second factor of a local account: a time-based one-time password (RFC 6238, SHA-1,
-6 digits, 30 seconds) from an authenticator app, with ten single-use recovery codes. `TotpService` owns the rules.
-The secret is encrypted before it is stored (`ITotpSecretProtector`), the algorithm is behind `ITotpAlgorithm`, and
-the state lives in tables of its own, not in the user, so a stale copy of a user can never move the replay state
+A seventh kind of fact is the optional second factor of a local account: a time-based one-time password (RFC 6238,
+SHA-1, 6 digits, 30 seconds) from an authenticator app, with ten single-use recovery codes. `TotpService` owns the
+rules. The secret is encrypted before it is stored (`ITotpSecretProtector`), the algorithm is behind `ITotpAlgorithm`,
+and the state lives in tables of its own, not in the user, so a stale copy of a user can never move the replay state
 backwards. A code is accepted once: the time step of an accepted code is stored by a compare-and-set statement, so a
 reused code and a race between two requests both fail. Recovery codes are stored as hashes and are never accepted for a
 signature. A wrong code counts toward the same lockout as a wrong password. With a second factor, the password alone
 signs nobody in: `UserService.AuthenticatePasswordAsync` reports that a code is required, the older password-only
-methods fail closed, and a signature needs the password and a current code. Changing the own password needs the code
-as well (`TotpService.ChangeOwnPasswordAsync`; the password-only overload of `UserService` fails closed), with the same
-replay rule and counter. The audited changes are stored with their
-entry by the store, which is why `TotpService` takes no `AuditService`. See the `TotpService`, `TotpChallengeStore`,
-`UserService`, and `SigningService` units.
+methods fail closed, and a signature needs the password and a current code. Changing the own password needs the code as
+well (`TotpService.ChangeOwnPasswordAsync`; the password-only overload of `UserService` fails closed), with the same
+replay rule and counter. The audited changes are stored with their entry by the store, which is why `TotpService` takes
+no `AuditService`. See the `TotpService`, `TotpChallengeStore`, `UserService`, and `SigningService` units.
 
-An eighth kind of fact is the optional e-mail address of a user for notifications. It is used only when an
-administrator has switched the feature on and a sender is configured. An address is not used until its owner proves
-it: `NotificationPreferenceService` mails a six digit code to the address and the user types it back, within 30 minutes
-and with at most five wrong codes. A new code can be requested after 60 seconds, at most three times per user and three
+An eighth kind of fact is the optional e-mail address of a user for notifications. It is used only when an administrator
+has switched the feature on and a sender is configured. An address is not used until its owner proves it:
+`NotificationPreferenceService` mails a six digit code to the address and the user types it back, within 30 minutes and
+with at most five wrong codes. A new code can be requested after 60 seconds, at most three times per user and three
 times per address in a day, and within a limit of mails per hour for the whole server (200 by default). Only a salted
-hash of the code is stored, the code appears in the confirmation mail only, the mail holds no link, and the
-confirmed address stays in use while a new address waits. An actor that signed in with an API token, a disabled or
-unknown user, and a user with a temporary password are refused. The three audited changes (`notification.settings-changed`,
+hash of the code is stored, the code appears in the confirmation mail only, the mail holds no link, and the confirmed
+address stays in use while a new address waits. An actor that signed in with an API token, a disabled or unknown user,
+and a user with a temporary password are refused. The three audited changes (`notification.settings-changed`,
 `notification.email-confirmed`, and `notification.email-removed`) carry neither the address nor the code and are stored
 with their entry by the store. A user with a confirmed address can choose a mode (`None` by default, `Daily`, or
 `Every`) with `SetModeAsync`; a mode needs a confirmed address, the audit entry (`notification.settings-changed`) names
 the mode and no address, a change into a mode from `None` marks the baseline so that no backlog is mailed, and removing
-the address resets the mode to `None`. `NotificationAddress` accepts only one plain address, and
-`NotificationMessage` refuses a line break in the recipient or the subject. See the `NotificationAddress`,
-`NotificationMessage`, and `NotificationPreferenceService` units.
+the address resets the mode to `None`. `NotificationAddress` accepts only one plain address, and `NotificationMessage`
+refuses a line break in the recipient or the subject. See the `NotificationAddress`, `NotificationMessage`, and
+`NotificationPreferenceService` units.
 
 A ninth kind of fact is the news that the same notification feature mails to a user who chose a mode (`Every` or
 `Daily`). `NotificationDispatcher` runs in passes and, for each user who has a confirmed address, reads the inbox as

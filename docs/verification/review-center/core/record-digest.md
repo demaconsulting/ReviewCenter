@@ -382,7 +382,8 @@ line and a known digest. This scenario is tested by `RecordDigest_Compute_Carrie
 
 **RecordDigest_Compute_CarriedChatThread_WritesNothing**: A carried thread that has only chat comments gives the digest
 of a record without the thread, and the canonical text does not contain `carried`. This scenario is tested by
-`RecordDigest_Compute_CarriedChatThread_WritesNothing`, and covers `ReviewCenter-RecordDigest-FollowUp-CarriedNoComment`.
+`RecordDigest_Compute_CarriedChatThread_WritesNothing`, and covers
+`ReviewCenter-RecordDigest-FollowUp-CarriedNoComment`.
 
 **RecordDigest_Compute_Reopens_MatchesKnownValueAfterReport**: A record with reopens has the `reopens` line after the
 `report` block and a known digest. This scenario is tested by

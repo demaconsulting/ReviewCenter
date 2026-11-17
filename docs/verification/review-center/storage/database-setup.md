@@ -23,8 +23,8 @@ be loadable on the test platform.
   names it, before anything is created.
 - An in-memory database setting is refused with a message that asks for a file path.
 - Creation makes the missing folder, the file, and the tables.
-- The data folder is the folder of the configured database file, or the default database folder when the setting is empty
-  or names an in-memory or `file:` data source; a null argument is refused.
+- The data folder is the folder of the configured database file, or the default database folder when the setting is
+  empty or names an in-memory or `file:` data source; a null argument is refused.
 
 #### Test Scenarios
 

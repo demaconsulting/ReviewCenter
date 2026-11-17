@@ -36,8 +36,8 @@ refused by
 a protector over another key ring with `CredentialsUnreadable`, and the message does not contain the text. This scenario
 is tested by `CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable`.
 
-**CredentialProtector_Purpose_IsolatesTokensFromOtherUses**: A protector with another purpose on the same key ring cannot
-read the text. This scenario is tested by `CredentialProtector_Purpose_IsolatesTokensFromOtherUses`.
+**CredentialProtector_Purpose_IsolatesTokensFromOtherUses**: A protector with another purpose on the same key ring
+cannot read the text. This scenario is tested by `CredentialProtector_Purpose_IsolatesTokensFromOtherUses`.
 
 **CredentialProtector_Unprotect_OtherPurpose_ThrowsCredentialsUnreadable**: Text that another purpose of the same key
 ring protected is refused by the credential protector with `CredentialsUnreadable`. This scenario is tested by

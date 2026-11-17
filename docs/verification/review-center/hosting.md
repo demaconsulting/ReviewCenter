@@ -144,14 +144,14 @@ cannot work stops the start with a message that names it, which is tested by
 provider is verified by `CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate`,
 which skips when the store is unavailable.
 
-**API registration**: The routes of the API under `/api` are mapped, the personal access token service is registered once,
-the OpenAPI document is served without a token, and an unknown address under `/api` is a JSON 404 instead of a page. This
-is verified by the unit tests of `ServerHost`, `ServerHost_CreateApplication_ApiRoutes_AreMapped`,
+**API registration**: The routes of the API under `/api` are mapped, the personal access token service is registered
+once, the OpenAPI document is served without a token, and an unknown address under `/api` is a JSON 404 instead of a
+page. This is verified by the unit tests of `ServerHost`, `ServerHost_CreateApplication_ApiRoutes_AreMapped`,
 `ServerHost_CreateApplication_ApiRegistration_RegistersTokenServiceAsSingleton`,
 `ServerHost_CreateApplication_ApiRoutes_WithoutTokenAreUnauthorized`,
 `ServerHost_CreateApplication_OpenApiDocument_IsServedWithoutToken`, and
-`ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404`; the behavior of the
-routes is verified in the `Api` subsystem.
+`ServerHost_CreateApplication_UnknownApiAddress_ReturnsJsonProblem404`; the behavior of the routes is verified in the
+`Api` subsystem.
 
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
 entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and

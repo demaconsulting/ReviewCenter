@@ -57,12 +57,12 @@ signature and another is not; only the second is listed. This scenario is tested
 `UserImpactService_GetImpactAsync_ApprovedReviewExcluded_UnlockedReviewIncluded`.
 
 **UserImpactService_GetImpactAsync_ManyReviews_AreOrderedAndReadInOneBatchPerProject**: Two reviews in Apollo, created
-in reverse order, and one in Borealis wait for `ann`. The list is Apollo/r1, Apollo/r2, Borealis/b1, and the store counted
-two batch reads and no single read. This scenario is tested by
+in reverse order, and one in Borealis wait for `ann`. The list is Apollo/r1, Apollo/r2, Borealis/b1, and the store
+counted two batch reads and no single read. This scenario is tested by
 `UserImpactService_GetImpactAsync_ManyReviews_AreOrderedAndReadInOneBatchPerProject`.
 
-**UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber**: `ann` is the alternate of slot 1 and
-the primary of slots 2 and 3 of one review (slots 2 and 3 are arranged directly in the store, because the signing
+**UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber**: `ann` is the alternate of slot 1
+and the primary of slots 2 and 3 of one review (slots 2 and 3 are arranged directly in the store, because the signing
 service allows a user in only one slot of a review). The list names the slots 1, 2, and 3 of that review in this order.
 This scenario is tested by `UserImpactService_GetImpactAsync_SeveralSlotsOfOneReview_AreOrderedBySlotNumber`.
 

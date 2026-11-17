@@ -105,8 +105,8 @@ server, or a path, because exception messages can repeat them. Cancellation is p
 **Libraries**: MailKit (with MimeKit) is the only OTS item of the subsystem (see the design of MailKit). The senders are
 the only units that reference it; the rest of the product uses the Core interface.
 
-**The worker**: `NotificationRegistration.AddNotificationWorker` registers `NotificationWorker` as a hosted service
-only when notifications are enabled and the sender is Smtp or File, and only the web host calls it, so a command-line run
+**The worker**: `NotificationRegistration.AddNotificationWorker` registers `NotificationWorker` as a hosted service only
+when notifications are enabled and the sender is Smtp or File, and only the web host calls it, so a command-line run
 never starts a background loop. The registration builds the Core `NotificationComposer`, `DigestSchedule`, and
 `NotificationDispatcher` from the settings and gives the worker the method of the dispatcher that runs one pass. The
 worker runs a pass at once, then at each polling interval (`PollSeconds`) on the clock of the host. A failed pass is

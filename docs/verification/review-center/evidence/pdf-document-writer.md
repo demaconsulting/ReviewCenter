@@ -22,8 +22,8 @@ N/A - standard test environment (everything runs in memory).
 
 #### Test Scenarios
 
-**PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming**: A document without content is built. It starts with the
-PDF header, ends with the end-of-file marker, has a cross-reference table, and has one page with the header and the
+**PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming**: A document without content is built. It starts with
+the PDF header, ends with the end-of-file marker, has a cross-reference table, and has one page with the header and the
 footer. This scenario is tested by `PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming`.
 
 **PdfDocumentWriter_Build_SameInput_ProducesIdenticalBytes**: The same calls are made twice. The bytes are equal. This

@@ -7,24 +7,24 @@ mode, logging, and error handling, followed by a note on the Puppet development 
 
 The following command-line options are supported:
 
-| Option                                | Description                                                  |
-| ------------------------------------- | ------------------------------------------------------------ |
-| `serve`                               | Run the ReviewCenter web server until stopped                |
-| `--urls <url>`                        | Listen URL for `serve` (default: `http://localhost:5000`)    |
-| `user add`                            | Create a user; password from environment, stdin, or prompt   |
-| `--username <name>`                   | User name for `user add`                                     |
-| `--display-name <text>`               | Display name for `user add`                                  |
-| `--system-admin`                      | Make the user of `user add` a system administrator           |
-| `audit verify`                        | Verify the hash chain of the audit trail (exit code 0 or 1)  |
-| `keys reprotect`                      | Roll a new Data Protection key and protect the secrets again |
-| `-v`, `--version`                     | Display version information                                  |
-| `-?`, `-h`, `--help`                  | Display help message                                         |
-| `--silent`                            | Suppress console output                                      |
-| `--validate`                          | Run self-validation                                          |
-| `--check-config`                      | With `--validate`, also check database, keys, and e-mail     |
-| `--results <file>`, `--result <file>` | Write validation results to file (TRX or JUnit format)       |
-| `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
-| `--log <file>`                        | Write output to log file                                     |
+| Option | Description |
+| --- | --- |
+| `serve` | Run the ReviewCenter web server until stopped |
+| `--urls <url>` | Listen URL for `serve` (default: `http://localhost:5000`) |
+| `user add` | Create a user; password from environment, stdin, or prompt |
+| `--username <name>` | User name for `user add` |
+| `--display-name <text>` | Display name for `user add` |
+| `--system-admin` | Make the user of `user add` a system administrator |
+| `audit verify` | Verify the hash chain of the audit trail (exit code 0 or 1) |
+| `keys reprotect` | Roll a new Data Protection key and protect the secrets again |
+| `-v`, `--version` | Display version information |
+| `-?`, `-h`, `--help` | Display help message |
+| `--silent` | Suppress console output |
+| `--validate` | Run self-validation |
+| `--check-config` | With `--validate`, also check database, keys, and e-mail |
+| `--results <file>`, `--result <file>` | Write validation results to file (TRX or JUnit format) |
+| `--depth <#>` | Set heading depth for markdown output (default: 1) |
+| `--log <file>` | Write output to log file |
 
 ## Examples
 
@@ -312,16 +312,16 @@ This section lists, in one place, the audit actions, messages, and settings of t
 rejected) review, of the ballots of the reviewers, and of the independent reviewers. The chapters Reviewing and
 Administration explain how they work.
 
-| Audit action                            | Detail                                                                    |
-| --------------------------------------- | ------------------------------------------------------------------------- |
-| `review.reopened`                       | `previous digest <digest>; reason: <reason>`                              |
-| `checklist.answered`                    | `item <id>: <outcome>`, with a hash of the justification                  |
-| `checklist.applicability-changed`       | `section <id>: applicable` or `not applicable`, with a hash of the reason |
-| `ballot.submitted`                      | `slot <n>: ballot submitted (<a> answers, <s> section states)`            |
-| `ballot.reopened`                       | `slot <n>: ballot reverted to draft by an edit`                           |
-| `ballot.reassigned`                     | `slot <n>: ballot reverted to draft after a reassignment`                 |
-| `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`)                      |
-| `project.review-rule-changed`           | `<setting> on->off` (or `off->on`)                                        |
+| Audit action | Detail |
+| --- | --- |
+| `review.reopened` | `previous digest <digest>; reason: <reason>` |
+| `checklist.answered` | `item <id>: <outcome>`, with a hash of the justification |
+| `checklist.applicability-changed` | `section <id>: applicable` or `not applicable`, with a hash of the reason |
+| `ballot.submitted` | `slot <n>: ballot submitted (<a> answers, <s> section states)` |
+| `ballot.reopened` | `slot <n>: ballot reverted to draft by an edit` |
+| `ballot.reassigned` | `slot <n>: ballot reverted to draft after a reassignment` |
+| `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`) |
+| `project.review-rule-changed` | `<setting> on->off` (or `off->on`) |
 
 For `project.review-rule-changed` the setting is `RequireNonAuthorChecklistAnswers` or `RequireNonReopenerSigning`.
 
@@ -383,7 +383,7 @@ states, and the threads.
 This section lists the rules of the inbox (see Your Inbox in the Reviewing chapter) in one place.
 
 | Group | A review is listed when | Needs action |
-| ----- | ----------------------- | ------------ |
+| --- | --- | --- |
 | To answer | You hold a slot, have not handed in your ballot, and the review is not concluded (see below) | Yes |
 | Disputed | You handed in (or are the author with no slot), may see the ballots, and checks are disputed | Yes |
 | Ready to sign | You handed in, nothing blocks signing, and a slot of yours needs signing | Yes |

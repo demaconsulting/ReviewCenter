@@ -10,8 +10,8 @@ number needed (and how many are out of date), the people the review waits on, wh
 unanswered checks, checks on which the ballots disagree, a missing conclusion text of a rejected review), how many
 checks are answered Fail (informational), when it last changed, its due date and whether it is overdue. The unit also
 owns the `ReviewStage` and `ReviewProgress` types that carry the answer. It computes everything on demand from what is
-already stored and keeps no state of its own, so the overview cannot disagree with the review page. Who may see a project
-is decided by `ProjectAccess`; this unit only asks.
+already stored and keeps no state of its own, so the overview cannot disagree with the review page. Who may see a
+project is decided by `ProjectAccess`; this unit only asks.
 
 #### Data Model
 
@@ -84,12 +84,12 @@ The service holds the injected collaborators and no other state, so it is safe f
   auditor, a project administrator, a system administrator, and an actor that came through an API token. A project the
   actor may not see, a project that does not exist, a disabled or unknown user, and a missing actor give
   `ProjectNotFound`, with the same message for each.
-- *Postconditions*: nothing is changed and nothing is recorded. The standing is masked for the actor by the same rule
-  as the pages (`BallotVisibility`), also for an actor that came through an API token: a token is never the lead, an
+- *Postconditions*: nothing is changed and nothing is recorded. The standing is masked for the actor by the same rule as
+  the pages (`BallotVisibility`), also for an actor that came through an API token: a token is never the lead, an
   administrator or an auditor, so a review with several slots that is not concluded shows no failed or disputed count,
   no blocker wording and no outcome to it until its owner has handed in a ballot, and then only to that owner. The token
-  is the viewer with the slot of its owner, as on the pages; the progress carries only the consolidated counts, never the
-  answers or reasons of a reviewer.
+  is the viewer with the slot of its owner, as on the pages; the progress carries only the consolidated counts, never
+  the answers or reasons of a reviewer.
 
 **GetProgressAsync (with the list of reviews)**: The same answer for a caller that already holds the review list, such
 as the API list, which needs the list itself for the review fields. The caller passes the list that
@@ -106,13 +106,11 @@ not list the reviews a second time for a viewer who has to be masked.
   empty list.
 
 The number of reads does not depend on the number of reviews: one read of the reviews (`ReviewService.ListAsync`, made
-by the caller that passes the list in), one
-batch read of the approval statuses (`SigningService.GetApprovalsAsync`, given the reviews that are already in hand, which
-itself takes one set-based read of the
-snapshots of all the reviews, `IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were
-reopened), and one read of the last activity. A review
-that is removed between the first two reads is left out. The page that lists the reviews of a project used to ask for the
-approval of each review on its own; it now uses this one call.
+by the caller that passes the list in), one batch read of the approval statuses (`SigningService.GetApprovalsAsync`,
+given the reviews that are already in hand, which itself takes one set-based read of the snapshots of all the reviews,
+`IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were reopened), and one read of the
+last activity. A review that is removed between the first two reads is left out. The page that lists the reviews of a
+project used to ask for the approval of each review on its own; it now uses this one call.
 
 **Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved`, a rejected review gives `Rejected`, and
 every other `InReview`. A review whose slots are all signed but that has an open thread, a pending or disputed check, or
@@ -130,8 +128,8 @@ review is concluded), so the overview and the review page agree.
 
 #### Error Handling
 
-`DomainRuleException` with `ProjectNotFound` when the actor may not see the project. Constructing the service with a null
-argument raises `ArgumentNullException`. Failures of the stores propagate unchanged.
+`DomainRuleException` with `ProjectNotFound` when the actor may not see the project. Constructing the service with a
+null argument raises `ArgumentNullException`. Failures of the stores propagate unchanged.
 
 #### Known Limitations
 

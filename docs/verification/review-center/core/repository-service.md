@@ -45,8 +45,9 @@ N/A - standard test environment.
 registered enabled; the stored token is the encrypted text, and no read model or listing holds the token. This scenario
 is tested by `RepositoryService_CreateAsync_WithToken_StoresItEncryptedAndWriteOnly`.
 
-**RepositoryService_CreateAsync_AllowedLocation_Registers**: An anonymous repository registers with each allowed location
-form (`https`, `http`, and `file` addresses). This scenario is tested by `RepositoryService_CreateAsync_AllowedLocation_Registers`.
+**RepositoryService_CreateAsync_AllowedLocation_Registers**: An anonymous repository registers with each allowed
+location form (`https`, `http`, and `file` addresses). This scenario is tested by
+`RepositoryService_CreateAsync_AllowedLocation_Registers`.
 
 **RepositoryService_CreateAsync_AbsoluteLocalPath_Registers**: A fully qualified local path is a valid location. This
 scenario is tested by `RepositoryService_CreateAsync_AbsoluteLocalPath_Registers`.
@@ -63,8 +64,8 @@ That the same name is accepted in a second project is part of
 
 **RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid**: Locations that are empty, too long,
 start with `-`, hold control characters or white space, carry user information or a query string or fragment, lack a
-host, use an unsupported scheme, or
-are SSH or scp-style addresses or relative paths are refused with `RepositoryLocationInvalid`. This scenario is tested by
+host, use an unsupported scheme, or are SSH or scp-style addresses or relative paths are refused with
+`RepositoryLocationInvalid`. This scenario is tested by
 `RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid`.
 
 **RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted**: An `http://` location whose host is `localhost`
@@ -166,7 +167,8 @@ disabling are recorded with their actions and the names of the changed fields, a
 token. This scenario is tested by `RepositoryService_Changes_AreAuditedWithoutSecrets`.
 
 **RepositoryService_NoOpChanges_AreNotAudited**: Keeping the token leaves the stored token alone; an update that changes
-nothing and a repeated enable make no audit entry. This scenario is tested by `RepositoryService_NoOpChanges_AreNotAudited`.
+nothing and a repeated enable make no audit entry. This scenario is tested by
+`RepositoryService_NoOpChanges_AreNotAudited`.
 
 **RepositoryService_UpdateAsync_InvalidRequests_ThrowRules**: A `Replace` without a token, an update of an unknown
 repository, and a change that would leave a user name on a repository without a token are handled by the rules. This
@@ -178,13 +180,13 @@ enabled repositories, and a disabled repository is neither listed nor available 
 scenario is tested by `RepositoryService_DisabledRepository_IsNotSelectable`.
 
 **RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable**: A token that can no longer be
-decrypted is
-reported as `CredentialsUnreadable` with the repository name and without the stored text, and an unknown repository is
-`RepositoryNotFound`. This scenario is tested by `RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable`.
+decrypted is reported as `CredentialsUnreadable` with the repository name and without the stored text, and an unknown
+repository is `RepositoryNotFound`. This scenario is tested by
+`RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable`.
 
-**RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair**: A fake store starts an administrator's update
-at the moment between the read of the registration and the read of the token; the update waits for the service lock,
-so the access data has the location and token of one version, and a later read has the location and token of the
+**RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair**: A fake store starts an administrator's
+update at the moment between the read of the registration and the read of the token; the update waits for the service
+lock, so the access data has the location and token of one version, and a later read has the location and token of the
 updated one. This scenario is tested by `RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair`.
 
 **RepositoryService_TokenTypes_ToStringHidesToken**: The text forms of the token change and of the access data never

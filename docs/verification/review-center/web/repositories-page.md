@@ -2,17 +2,15 @@
 
 #### Verification Approach
 
-`RepositoriesPage` and `NewRepositoryPage` are verified with component tests defined in `RepositoriesPageTests.cs`, which
-use the bUnit test context to render the real components over a real `RepositoryService` with the in-memory fake
-repository store
-(`FakeRepositoryStore`), a fake token protector (`FakeCredentialProtector`), and a real `UserService` with an in-memory
-fake user store. The signed-in user of the tests is set by the test authentication state of the shared helper
-`PageTestBase`; the tests sign in as a system administrator, or as a project member of a given role, stored in the fake
-user store, because the page re-checks the stored user. The restriction of the route to the people who manage the
-project is verified by the component tests below, and through the real server pipeline in the `SignInTests` of the
-`Identity` subsystem. Tests locate elements by their `data-testid` attributes, and check that a token never
-appears in the markup
-by searching the rendered text for the token that the test typed.
+`RepositoriesPage` and `NewRepositoryPage` are verified with component tests defined in `RepositoriesPageTests.cs`,
+which use the bUnit test context to render the real components over a real `RepositoryService` with the in-memory fake
+repository store (`FakeRepositoryStore`), a fake token protector (`FakeCredentialProtector`), and a real `UserService`
+with an in-memory fake user store. The signed-in user of the tests is set by the test authentication state of the shared
+helper `PageTestBase`; the tests sign in as a system administrator, or as a project member of a given role, stored in
+the fake user store, because the page re-checks the stored user. The restriction of the route to the people who manage
+the project is verified by the component tests below, and through the real server pipeline in the `SignInTests` of the
+`Identity` subsystem. Tests locate elements by their `data-testid` attributes, and check that a token never appears in
+the markup by searching the rendered text for the token that the test typed.
 
 #### Test Environment
 
@@ -103,11 +101,11 @@ tested by `RepositoriesPage_Edit_NameAndLocation_ShowsChangedValues`.
 **RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly**: Replacing the token stores the new one, which never
 appears in the markup. This scenario is tested by `RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly`.
 
-**RepositoriesPage_Edit_ClearToken_RemovesToken**: Clearing the token removes it, so the repository is shown as having no
-token. This scenario is tested by `RepositoriesPage_Edit_ClearToken_RemovesToken`.
+**RepositoriesPage_Edit_ClearToken_RemovesToken**: Clearing the token removes it, so the repository is shown as having
+no token. This scenario is tested by `RepositoriesPage_Edit_ClearToken_RemovesToken`.
 
-**RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing**: Canceling an edit closes the form and changes nothing. This
-scenario is tested by `RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing`.
+**RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing**: Canceling an edit closes the form and changes nothing.
+This scenario is tested by `RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing`.
 
 **RepositoriesPage_ToggleEnabled_Repository_DisablesAndEnablesAgain**: A repository is disabled and enabled again, and
 disabling is the only way to retire it. This scenario is tested by
@@ -152,5 +150,6 @@ by `RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesN
 
 **Route restriction**: Through the real server pipeline, a user who is no member of a project requests
 `/projects/{id}/repositories` and receives a page that says the project does not exist, while a system administrator
-receives the page with HTTP status 200, which is tested by `SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed`;
-an anonymous visitor is sent to the login page, which is tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin`.
+receives the page with HTTP status 200, which is tested by
+`SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed`; an anonymous visitor is sent to the login page,
+which is tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin`.

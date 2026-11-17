@@ -42,12 +42,12 @@ A provider works with ReviewCenter when it gives the first four items below; the
 
 ## Providers at a Glance
 
-| Provider      | `auth_time` default | What to set                 | `max_age=0`    | `prompt=login` | Status     |
-| ------------- | ------------------- | --------------------------- | -------------- | -------------- | ---------- |
-| Entra ID      | No, optional claim  | Optional claim `auth_time`  | Not documented | Documented     | Unverified |
-| AD FS (2019+) | Believed yes        | Check the token, add a rule | Believed       | Believed       | Unverified |
-| Okta          | Documented, ID open | Nothing expected            | Documented     | Supported      | Unverified |
-| Keycloak      | Believed yes        | Keep the `basic` scope      | Documented     | Documented     | Unverified |
+| Provider | `auth_time` default | What to set | `max_age=0` | `prompt=login` | Status |
+| --- | --- | --- | --- | --- | --- |
+| Entra ID | No, optional claim | Optional claim `auth_time` | Not documented | Documented | Unverified |
+| AD FS (2019+) | Believed yes | Check the token, add a rule | Believed | Believed | Unverified |
+| Okta | Documented, ID open | Nothing expected | Documented | Supported | Unverified |
+| Keycloak | Believed yes | Keep the `basic` scope | Documented | Documented | Unverified |
 
 "Documented" means that the vendor documentation says so. "Believed" means that the author expects it but could not
 confirm it. "ID open" means that the claim is documented but its presence in the identity token is not

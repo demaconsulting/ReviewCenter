@@ -17,8 +17,9 @@ The unit also owns the settings of the `DataProtection` section (`KeyRingSetting
 
 #### Data Model
 
-All types are `internal`; the static class has no state and is thread-safe. The decorator `KeyFileRestrictingXmlRepository`
-is a small type of the unit that lives in the same file, like the settings and the plan.
+All types are `internal`; the static class has no state and is thread-safe. The decorator
+`KeyFileRestrictingXmlRepository` is a small type of the unit that lives in the same file, like the settings and the
+plan.
 
 **KeyRingSettings** (section `DataProtection`): `KeysPath` — the folder of the ring; `Protection` — `Auto` (the
 default), `Dpapi`, `Certificate`, or `PermissionsOnly`, in any case; `DpapiScope` — `CurrentUser` (the default) or

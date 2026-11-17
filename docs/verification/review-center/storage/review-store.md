@@ -186,13 +186,13 @@ record equals the digest stored in the signature. This scenario is tested by
 **ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull**: The snapshot of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull`.
 
-**ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory**: One project holds an approved review,
-a review reopened twice, a review whose signature a reopening made out of date and that then got a thread, a review with
-two threads, three comments, two ballots (one with two answers and a section state, one with an answer), a checklist
-and two slots, a review without slots, a review
-from a repository with an added, a modified, and a deleted file, and a same-named review of another project. The batch
-read returns every review, each part of each snapshot equals the single read, the interesting parts are present, and the
-batch of reopens equals the single reads and leaves out the reviews that were never reopened. This scenario is tested by
+**ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory**: One project holds an approved
+review, a review reopened twice, a review whose signature a reopening made out of date and that then got a thread, a
+review with two threads, three comments, two ballots (one with two answers and a section state, one with an answer), a
+checklist and two slots, a review without slots, a review from a repository with an added, a modified, and a deleted
+file, and a same-named review of another project. The batch read returns every review, each part of each snapshot equals
+the single read, the interesting parts are present, and the batch of reopens equals the single reads and leaves out the
+reviews that were never reopened. This scenario is tested by
 `ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory`.
 
 **ReviewStore_ListSnapshotsAsync_EmptyUnknownDuplicateAndForeignIds_AreAbsentOrReadOnce**: An empty input gives an empty
@@ -527,9 +527,10 @@ list. This scenario is tested by `ReviewStore_ListSoleAdminProjectsAsync_Disable
 
 **DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes**: A new database has the indexes on the
 primary and the alternate user of the reviewer slots that the read of the slots of a user relies on. This scenario is
-defined in the `DatabaseSetup` unit and is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`;
-it supports the read of the slots of a user but is not linked to a `ReviewStore` requirement, because the existence of an
-index is a property of the `DatabaseSetup` unit.
+defined in the `DatabaseSetup` unit and is tested by
+`DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`; it supports the read of the slots of a user
+but is not linked to a `ReviewStore` requirement, because the existence of an index is a property of the `DatabaseSetup`
+unit.
 
 **ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings**: A project is stored without other settings; it
 is read back with the default evidence settings (the two anonymous switches off and the five content switches on). This
@@ -555,11 +556,11 @@ tested by `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothin
 **ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction**: A review is signed in every slot, so
 that it is approved, with the store called directly (the services and their lock check are not involved). Adding a
 thread, adding a comment, changing the state of a thread, answering a check, changing the applicability of a section,
-changing the due date, and adding, updating, and removing a slot are each refused with `ReviewLocked`; the digest of
-the record, the slot, and the thread with its comment and state are as they were, no answer or section state exists,
-and the number of audit
-entries is unchanged. After the review is reopened, the same answer is stored. This scenario is defined in
-`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
+changing the due date, and adding, updating, and removing a slot are each refused with `ReviewLocked`; the digest of the
+record, the slot, and the thread with its comment and state are as they were, no answer or section state exists, and the
+number of audit entries is unchanged. After the review is reopened, the same answer is stored. This scenario is defined
+in `ReviewStoreSigningTests.cs` and is tested by
+`ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
 
 **ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked**: Each of the same writes is made for a review that
 does not exist. None is refused with `ReviewLocked` (a not-found result or a refusal by the relationships of the
@@ -592,11 +593,11 @@ entry and an approved review is reopened. The call fails, no reopen row exists, 
 This scenario is tested by `ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen`.
 
 **ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder**: Three approved reviews are made:
-`REV-1` and `REV-2` in one project and `REV-1` in another. They are reopened in an interleaved order, and `REV-1` of
-the first project is approved again and reopened two more times. The listing of each review holds only the reopens of
-that review (the other review of the same project and the same identifier of the other project do not appear), in the
-order in which they were made, with growing identities, and the reopen count of the record is 3 for the review reopened
-three times. This scenario is tested by `ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder`.
+`REV-1` and `REV-2` in one project and `REV-1` in another. They are reopened in an interleaved order, and `REV-1` of the
+first project is approved again and reopened two more times. The listing of each review holds only the reopens of that
+review (the other review of the same project and the same identifier of the other project do not appear), in the order
+in which they were made, with growing identities, and the reopen count of the record is 3 for the review reopened three
+times. This scenario is tested by `ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder`.
 
 **ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds**: Two reopens of one approved review are made at the same
 time; one succeeds and the other throws `ReviewNotLocked`; one row and one audit entry exist, the reopen count is 1, and
@@ -618,19 +619,21 @@ off and another without saying; the read and the listing return false for both r
 rules of the second, and the independence rule of the first is still true. This scenario is tested by
 `ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned`.
 
-**ReviewStore_UpdateReviewRuleAsync_CompareAndSet**: For each of the three rules, a new project has the rule on. The rule
-is switched off with the expected value `true`; the call reports `true`, the new value is read back, and one audit entry
-is stored. A second call that still names `true` as the expected value, and a call for a project that does not exist,
-report `false` and change nothing, and the audit chain verifies. This scenario is defined in
+**ReviewStore_UpdateReviewRuleAsync_CompareAndSet**: For each of the three rules, a new project has the rule on. The
+rule is switched off with the expected value `true`; the call reports `true`, the new value is read back, and one audit
+entry is stored. A second call that still names `true` as the expected value, and a call for a project that does not
+exist, report `false` and change nothing, and the audit chain verifies. This scenario is defined in
 `ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_CompareAndSet`.
 
 **ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule**: The three rules of a new project are switched off one
-after the other; after each call exactly the rules switched off so far read back false and the others true. This scenario
-is defined in `ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule`.
+after the other; after each call exactly the rules switched off so far read back false and the others true. This
+scenario is defined in `ReviewStoreSigningTests.cs` and is tested by
+`ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule`.
 
 **ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange**: A rule that is not a defined value is
 rejected with `ArgumentOutOfRangeException` and no audit entry is stored. This scenario is defined in
-`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange`.
+`ReviewStoreSigningTests.cs` and is tested by
+`ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange`.
 
 **ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven**: A project added without a
 checklist definition reads back with none; a project added with one reads back with it unchanged. This scenario is
@@ -648,8 +651,8 @@ replaced with the expected hash of the default and then reset with the hash of t
 verifies. This scenario is defined in `ProjectChecklistStoreTests.cs` and is tested by
 `ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited`.
 
-**ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing**: A change that names a hash that is no longer
-the stored one, one that names a made-up hash, and one for an unknown project report `false`, leave the stored
+**ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing**: A change that names a hash that is no
+longer the stored one, one that names a made-up hash, and one for an unknown project report `false`, leave the stored
 definition as it was, write no entry, and leave the chain intact. This scenario is defined in
 `ProjectChecklistStoreTests.cs` and is tested by
 `ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing`.
@@ -818,8 +821,8 @@ ballot. This scenario is tested by `ReviewStore_AddSlotAsync_NoBaseline_CreatesN
 rows along, a handed-in ballot becomes a draft, and `ballot.reassigned` records the counts only. This scenario is
 tested by `ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft`.
 
-**ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept**: The rows carried from an earlier review stay when the
-reviewer named on them leaves. This scenario is tested by
+**ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept**: The rows carried from an earlier review stay when
+the reviewer named on them leaves. This scenario is tested by
 `ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept`.
 
 **ReviewStore_UpdateSlotAsync_RoleSwapOnly_KeepsBallot**: A role swap keeps a handed-in ballot and records no ballot
@@ -833,8 +836,9 @@ and status and leaves the other slots alone. This scenario is tested by
 the refusal rolls the deletion of the rows back. This scenario is tested by
 `ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedAndKeepsBallotRows`.
 
-**ReviewStore_BallotTransitions_KeepTheAuditChainIntact**: A run of edits, hand-ins, reopens, reassignments, and removals
-keeps the audit chain verifiable. This scenario is tested by `ReviewStore_BallotTransitions_KeepTheAuditChainIntact`.
+**ReviewStore_BallotTransitions_KeepTheAuditChainIntact**: A run of edits, hand-ins, reopens, reassignments, and
+removals keeps the audit chain verifiable. This scenario is tested by
+`ReviewStore_BallotTransitions_KeepTheAuditChainIntact`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

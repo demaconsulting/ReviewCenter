@@ -151,9 +151,10 @@ the user add verb is required. This scenario is tested by
 requires the add action. This scenario is tested by
 `CliSubsystem_UserAddFlow_ContextAndProgram_WrongAction_RejectsAndExitsNonZero`.
 
-**CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser**: Arguments `["user", "add", "--username",
-"ann", "--display-name", "Ann"]` are parsed by `Context.Create`; the verb is recorded and `SystemAdmin` is false, so an
-ordinary user is requested. This scenario is tested by `CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser`.
+**CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser**: Arguments
+`["user", "add", "--username", "ann", "--display-name", "Ann"]` are parsed by `Context.Create`; the verb is recorded and
+`SystemAdmin` is false, so an ordinary user is requested. This scenario is tested by
+`CliSubsystem_UserAddFlow_Context_WithoutSwitch_RequestsOrdinaryUser`.
 
 **CliSubsystem_UserAddFlow_ContextAndProgram_PasswordOption_IsRejected**: Arguments `["user", "add", "--username",
 "ann", "--display-name", "Ann", "--password", "secret-value"]` are passed directly to `Program.Main`; exit code is 1,

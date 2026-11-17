@@ -4,16 +4,16 @@
 
 #### Purpose
 
-`RevisionValidator` decides whether text is acceptable as the name of a branch, tag, or commit. Its single responsibility
-is to refuse everything that git could read as an option, a range, or a revision expression, before the text is passed
-to git. It is a pure, static unit.
+`RevisionValidator` decides whether text is acceptable as the name of a branch, tag, or commit. Its single
+responsibility is to refuse everything that git could read as an option, a range, or a revision expression, before the
+text is passed to git. It is a pure, static unit.
 
 #### Data Model
 
 **MaxLength**: `int` — 200, the longest accepted revision.
 
-The accepted alphabet: the first character is an ASCII letter or digit; the others are ASCII letters or digits, or one of
-`.`, `_`, `/`, `+`, `@`, `#`, `-`.
+The accepted alphabet: the first character is an ASCII letter or digit; the others are ASCII letters or digits, or one
+of `.`, `_`, `/`, `+`, `@`, `#`, `-`.
 
 #### Key Methods
 
@@ -36,7 +36,8 @@ The accepted alphabet: the first character is an ASCII letter or digit; the othe
 
 An invalid revision, including a null or empty one, raises `DomainRuleException` for `RevisionInvalid` with one message
 that states the rule: 1 to 200 characters, a branch, tag, or commit name made of letters, digits, and `. _ / + @ # -`,
-starting with a letter or digit. Whether the revision exists is not decided here; `GitSource` reports `RevisionNotFound`.
+starting with a letter or digit. Whether the revision exists is not decided here; `GitSource` reports
+`RevisionNotFound`.
 
 #### Dependencies
 

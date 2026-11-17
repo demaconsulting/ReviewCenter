@@ -23,11 +23,11 @@ lower-cased with the invariant culture and cut to 64 characters, so a long name 
 `a|{address}` counts all attempts of one client address. A missing or empty address is counted as the single address
 `unknown`. An IPv6 address is one address as a whole (there is no grouping by prefix).
 
-**Order**: a linked list of the keys in the order their windows were created, oldest first. Windows have a fixed
-length. While the clock only moves forward the expired windows are a prefix of the list, and removing that prefix (or
-the oldest ones) costs O(1) per removed key. A clock that steps backwards breaks this, because the creation order is then
-not the order of the start times; so the prefix is only a cheap first step, and the whole table is scanned only when
-it is full (see the table cap below).
+**Order**: a linked list of the keys in the order their windows were created, oldest first. Windows have a fixed length.
+While the clock only moves forward the expired windows are a prefix of the list, and removing that prefix (or the oldest
+ones) costs O(1) per removed key. A clock that steps backwards breaks this, because the creation order is then not the
+order of the start times; so the prefix is only a cheap first step, and the whole table is scanned only when it is full
+(see the table cap below).
 
 **Generation**: a `long` taken from a counter that only grows (not even `Reset` restarts it). A window gets a new
 generation when it is created, keeps it while it is counted in, and a window that replaces an expired one of the same

@@ -31,15 +31,13 @@ sign-in; `UpdateAsync` replaces it with the rest of the state, with no audit dra
 
 #### Key Methods
 
-**AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of
-the argument (including the must-change-password flag, the last sign-in, and the external issuer and subject) into a new
-entity through
-the private `InsertAsync`, so an
-identity supplied by the caller is ignored and can neither be persisted nor
-collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user (so
-it can name the assigned identity) and saved in the same transaction. A user name that already exists, in any
-capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored. A second user with the
-same issuer and subject violates the unique index of the pair and is reported the same way.
+**AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of the
+argument (including the must-change-password flag, the last sign-in, and the external issuer and subject) into a new
+entity through the private `InsertAsync`, so an identity supplied by the caller is ignored and can neither be persisted
+nor collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user
+(so it can name the assigned identity) and saved in the same transaction. A user name that already exists, in any
+capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored. A second user with
+the same issuer and subject violates the unique index of the pair and is reported the same way.
 
 **AddToProjectAsync**: Stores a user and the membership of that user in a project, with the audit entry built from the
 stored user, in one audit transaction: the user is inserted and saved (so the identity is known), the membership is

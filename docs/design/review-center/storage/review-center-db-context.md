@@ -20,13 +20,13 @@ repository registry is the one exception, see `Repositories`).
   `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`, and
   `EvidenceIncludeGitContext`. The column defaults are the default settings: the two anonymous switches are false and
   the five content switches are true, so a project that was never given other settings reads back with
-  `EvidenceSettings.Default`. `RequireIndependentReviewers` is a required boolean column of the same table. No
-  database default is declared for it: the value always comes from the entity, whose initializer is `true`, so a
-  project that was never given another value requires independent reviewers (this avoids the pitfall where Entity
-  Framework treats the CLR default of a boolean as "not set" and substitutes the database default). The two further
-  review rules, `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning`, are required boolean columns of the
-  same table that are declared the same way (no database default; the entity initializer is `true`). `ChecklistDefinition`
-  is a nullable text column with no length limit: the JSON of the checklist the project gives to its new reviews (a
+  `EvidenceSettings.Default`. `RequireIndependentReviewers` is a required boolean column of the same table. No database
+  default is declared for it: the value always comes from the entity, whose initializer is `true`, so a project that was
+  never given another value requires independent reviewers (this avoids the pitfall where Entity Framework treats the
+  CLR default of a boolean as "not set" and substitutes the database default). The two further review rules,
+  `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning`, are required boolean columns of the same table
+  that are declared the same way (no database default; the entity initializer is `true`). `ChecklistDefinition` is a
+  nullable text column with no length limit: the JSON of the checklist the project gives to its new reviews (a
   definition is up to `ReviewLimits.MaxChecklistBytes`, 256 KiB), and `NULL` stands for the built-in default checklist.
   There is no version column; the version label is part of the JSON.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
@@ -77,12 +77,11 @@ repository registry is the one exception, see `Repositories`).
 - **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, `SlotId`, and `SectionId` (at most
   32), so a review has at most one state per section and slot. `SlotId` is the identity of a reviewer slot for the rows
   of its ballot (the record is built from `ReviewRecord.Ballots`), or 0 (`ChecklistAnswer.BaselineSlotId`) for the
-  baseline that a follow-up review carries: such a row belongs to no ballot and is no part of the record or the
-  digest. It is a plain column without a foreign key, so the store deletes the rows of a removed slot itself. `Applicable`;
-  `Reason` at most 2000; `SetBy` (the display name) is
-  required, at most 100; `SetByUsername` is required, at most 50; `SetAt`; `CarriedFromReviewId` (at most 100, null
-  unless the state was carried into a follow-up review). It belongs to a review and is deleted
-  with it.
+  baseline that a follow-up review carries: such a row belongs to no ballot and is no part of the record or the digest.
+  It is a plain column without a foreign key, so the store deletes the rows of a removed slot itself. `Applicable`;
+  `Reason` at most 2000; `SetBy` (the display name) is required, at most 100; `SetByUsername` is required, at most 50;
+  `SetAt`; `CarriedFromReviewId` (at most 100, null unless the state was carried into a follow-up review). It belongs to
+  a review and is deleted with it.
 - **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, `SlotId`, and `ItemId` (at most 32), so a check
   has at most one answer per slot (`SlotId` as for the section states). `Outcome` is stored as text, at most 32;
   `Justification` at most 2000; `AnsweredBy` (the display
@@ -109,12 +108,12 @@ repository registry is the one exception, see `Repositories`).
   per project and the database refuses a second. Both columns are foreign keys, to `Users` and to `Projects`, and a
   membership is deleted with its user or its project. `Role` (the project role, `ProjectAdmin` or `User`) is stored as
   text, at most 32. An index on `ProjectId` serves the list of the members of a project.
-- **PersonalAccessTokens** (`PersonalAccessToken`): key `Id`, assigned by the database. `UserId` relates the token to its
-  owner, and a token is deleted with its user (an index on `UserId` serves the list of a user). `Name` is required, at
-  most 100; `DisplayId` is required, at most 16 (the stored text has 8 characters; the column is wider); `TokenHash` is
-  required, at most 64 (a SHA-256 value written in hexadecimal), with a unique index, which is what makes a hash unique
-  in the database and what the lookup of a presented token uses; `Created`, `Expires`, `LastUsed` and `Revoked` (the
-  last two are null until they happen). The value of a token is never a column.
+- **PersonalAccessTokens** (`PersonalAccessToken`): key `Id`, assigned by the database. `UserId` relates the token to
+  its owner, and a token is deleted with its user (an index on `UserId` serves the list of a user). `Name` is required,
+  at most 100; `DisplayId` is required, at most 16 (the stored text has 8 characters; the column is wider); `TokenHash`
+  is required, at most 64 (a SHA-256 value written in hexadecimal), with a unique index, which is what makes a hash
+  unique in the database and what the lookup of a presented token uses; `Created`, `Expires`, `LastUsed` and `Revoked`
+  (the last two are null until they happen). The value of a token is never a column.
 - **UserTotps** (`UserTotp`): key `UserId`, never generated by the database (`ValueGeneratedNever`), so a user has at
   most one second factor enrollment and a second row is impossible. `ProtectedSecret` is required, at most the width of
   an encrypted value (the output of the secret protector, never the secret); `Created`; `ConfirmedAt` (null while the
@@ -304,14 +303,13 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 
 #### Dependencies
 
-- **Core domain types** — `Project`, `EvidenceSettings`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
-  `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
-  `ProjectMembership`, `ProjectRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewReopen`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`,
-  `UserTotp`, `TotpRecoveryCode`, `NotificationPreference`, `NotifiedItem`, `NotificationMode`,
-  `NotificationSendLogEntry`, `NotificationAddress` (the
-  address column limit), `ReviewUserState`, `AuditText` (the column
-  limits), and
-  `ReviewLimits`, and `RepositoryService` (the length limits of the repository columns).
+- **Core domain types** — `Project`, `EvidenceSettings`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`,
+  `ReviewComment`, `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`,
+  `ChecklistOutcome`, `User`, `ProjectMembership`, `ProjectRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewReopen`,
+  `SlotRole`, `AuditEntry`, `PersonalAccessToken`, `UserTotp`, `TotpRecoveryCode`, `NotificationPreference`,
+  `NotifiedItem`, `NotificationMode`, `NotificationSendLogEntry`, `NotificationAddress` (the address column limit),
+  `ReviewUserState`, `AuditText` (the column limits), and `ReviewLimits`, and `RepositoryService` (the length limits of
+  the repository columns).
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers

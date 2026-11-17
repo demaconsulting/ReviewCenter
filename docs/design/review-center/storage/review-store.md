@@ -76,7 +76,8 @@ order by a `DateTimeOffset`, so the creation time is not used for ordering.
 **UpdateEvidenceSettingsAsync**: Changes the seven evidence settings of one project if they still hold the values the
 caller started from (compare-and-set).
 
-- *Parameters*: the project identity, the `expected` settings, the `updated` settings, and the audit draft of the change.
+- *Parameters*: the project identity, the `expected` settings, the `updated` settings, and the audit draft of the
+  change.
 - *Returns*: `Task<bool>` — `true` when the settings were changed; `false` when the project does not exist or its
   settings are no longer `expected`.
 - *Preconditions*: `expected`, `updated`, and the audit draft are not null (`ArgumentNullException` otherwise).
@@ -210,10 +211,10 @@ demoting the user with the check required would be refused.
 **AddReviewAsync**: Stores a review, all its files, and its checklist snapshot (when it has one) in one save, which
 is one transaction.
 
-- *Postconditions*: Either the review, all its files, and its snapshot are stored, or nothing is. An identifier that already
-  exists in the project, whether found by an earlier check or by a race, is reported as a `DomainRuleException`
-  for `ReviewIdDuplicate`. A review for a project that does not exist is not stored; the relationship constraint
-  of the database refuses it.
+- *Postconditions*: Either the review, all its files, and its snapshot are stored, or nothing is. An identifier that
+  already exists in the project, whether found by an earlier check or by a race, is reported as a `DomainRuleException`
+  for `ReviewIdDuplicate`. A review for a project that does not exist is not stored; the relationship constraint of the
+  database refuses it.
 
 A follow-up review arrives with `Review.CarryOver` (the carried answers, section states and threads with their
 comments). The store adds those rows to the same context before the one save, so they are part of the same
@@ -237,18 +238,18 @@ review with large files does not load them; null when absent.
 absent or the file has no baseline.
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
-entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
-them; the thread keeps its side, its check identifier, and the comment keeps the display name and the user name of its
-author, its kind, and its report flag. A thread has exactly one anchor: a file (`FilePath` set, `CheckItemId` null) or a
-check of the frozen checklist (`CheckItemId` set, empty `FilePath`, no lines, the `Head` side); any other shape is a
-caller error and raises `ArgumentException` before the database is touched. The database has no foreign key from a
-thread to a file, because a thread about a check has no file row, so the store checks inside the transaction that a
-file thread names a file of its review and otherwise raises `InvalidOperationException` and stores nothing. The foreign
-key of a thread points at its review, so a thread for a review that does not exist is refused by the database. A new
-thread is stored open and with at least its first comment (the state of the entity is always `Open`); a thread that is
-not open, or that has no comment, is a caller error and raises `ArgumentException` before the database is touched, with
-nothing saved and no audit entry, because a thread is resolved only through `ResolveThreadAsync`, which applies the rules
-of resolving.
+entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns them;
+the thread keeps its side, its check identifier, and the comment keeps the display name and the user name of its author,
+its kind, and its report flag. A thread has exactly one anchor: a file (`FilePath` set, `CheckItemId` null) or a check
+of the frozen checklist (`CheckItemId` set, empty `FilePath`, no lines, the `Head` side); any other shape is a caller
+error and raises `ArgumentException` before the database is touched. The database has no foreign key from a thread to a
+file, because a thread about a check has no file row, so the store checks inside the transaction that a file thread
+names a file of its review and otherwise raises `InvalidOperationException` and stores nothing. The foreign key of a
+thread points at its review, so a thread for a review that does not exist is refused by the database. A new thread is
+stored open and with at least its first comment (the state of the entity is always `Open`); a thread that is not open,
+or that has no comment, is a caller error and raises `ArgumentException` before the database is touched, with nothing
+saved and no audit entry, because a thread is resolved only through `ResolveThreadAsync`, which applies the rules of
+resolving.
 
 **AddCommentAsync**: Appends a comment to a thread, with the display name, the user name of its author, and its report
 flag. It first
@@ -302,34 +303,33 @@ marker, because the row of the ballot is written from the incoming entity, which
 identity 0 is the baseline, the review-level rows that the legacy readers above list; it is never a ballot, and
 no status row exists for it. The record, the digest and the services read the ballots, not the baseline.
 
-- **ListBallotsAsync** and **GetBallotAsync** read the ballots of a review (ordered by slot identity) or of one slot inside
-  one read transaction, with the rows of each slot only; a slot without a status row has no ballot (null).
-- **SetBallotAnswerAsync** and **SetBallotSectionStateAsync** refuse the identity 0 (`ArgumentOutOfRangeException`), then
-  in one transaction check the approval lock (`ReviewLocked`), check that the slot belongs to the review
+- **ListBallotsAsync** and **GetBallotAsync** read the ballots of a review (ordered by slot identity) or of one slot
+  inside one read transaction, with the rows of each slot only; a slot without a status row has no ballot (null).
+- **SetBallotAnswerAsync** and **SetBallotSectionStateAsync** refuse the identity 0 (`ArgumentOutOfRangeException`),
+  then in one transaction check the approval lock (`ReviewLocked`), check that the slot belongs to the review
   (`SlotNotFound`), replace the row of the slot, so that there is one row for each slot and check or section, make the
-  ballot a draft (a submitted ballot is reopened by the edit),
-  and, when the review has exactly one slot and the caller's completeness test accepts the rows of the transaction, hand
-  the ballot in at once with the time and user name of the edit. The audit draft of the edit is stored first; when the
-  status changed in the net, a second entry follows: `ballot.reopened` or `ballot.submitted`. The second entry is saved
-  before the transaction ends and the last entry is the audit of the transaction, so the chain stays intact. Each first
-  tries to overwrite the existing row with one update statement and adds a row only when there was none; if two
-  requests add the same row at the same moment, the loser of the race overwrites instead, so there is always exactly
-  one row and neither request fails.
+  ballot a draft (a submitted ballot is reopened by the edit), and, when the review has exactly one slot and the
+  caller's completeness test accepts the rows of the transaction, hand the ballot in at once with the time and user name
+  of the edit. The audit draft of the edit is stored first; when the status changed in the net, a second entry follows:
+  `ballot.reopened` or `ballot.submitted`. The second entry is saved before the transaction ends and the last entry is
+  the audit of the transaction, so the chain stays intact. Each first tries to overwrite the existing row with one
+  update statement and adds a row only when there was none; if two requests add the same row at the same moment, the
+  loser of the race overwrites instead, so there is always exactly one row and neither request fails.
 - **SubmitBallotAsync** is a compare-and-set from draft to submitted: a ballot that is already submitted is returned
   as it is, with no write and no entry; otherwise the completeness test is asked about the rows of the same
   transaction, an
   incomplete ballot raises `BallotIncomplete` and stores nothing, and a complete one is stored with the time and user
   name, the audit draft of the caller (`ballot.submitted`). A slot without any row counts as an empty ballot.
-- **AddSlotAsync** copies the carried review-level rows (those with `CarriedFromReviewId`) of a follow-up review into rows
-  of the new slot and stores a draft ballot for it; a review without carried rows gets no ballot. A carried answer never
-  submits the ballot, and no extra entry is written.
+- **AddSlotAsync** copies the carried review-level rows (those with `CarriedFromReviewId`) of a follow-up review into
+  rows of the new slot and stores a draft ballot for it; a review without carried rows gets no ballot. A carried answer
+  never submits the ballot, and no extra entry is written.
 - **UpdateSlotAsync** works out which reviewers leave the slot (old primary or alternate that is neither of the new
   ones; a role swap or an added alternate leaves nobody). Their own rows (not the carried ones) are deleted, a submitted
   ballot becomes a draft (a draft stays a draft, also when the slots drop to one), and `ballot.reassigned` is the
   audit of the transaction when a row was removed or the status changed.
-- **RemoveSlotAsync** deletes the answers and the section states of the slot explicitly, because their key holds the slot
-  identity without a foreign key, and the status row by cascade; a signed slot is still refused by the database, which
-  rolls the deletes back.
+- **RemoveSlotAsync** deletes the answers and the section states of the slot explicitly, because their key holds the
+  slot identity without a foreign key, and the status row by cascade; a signed slot is still refused by the database,
+  which rolls the deletes back.
 
 **Signature rule of the own ballot**: `AddSignatureAsync` loads the record inside its write transaction, with the same
 loader as `GetRecordAsync`, and, for a review that has a checklist, refuses a signature with `BallotNotSubmitted` and

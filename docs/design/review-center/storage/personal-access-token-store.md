@@ -11,10 +11,10 @@ with the audit entry of every change stored in the same transaction.
 #### Data Model
 
 The unit is stateless apart from the injected context factory and the shared `AuditAppender`. Every read creates its own
-short-lived context from the factory and disposes it before returning. A change goes through `AuditAppender.ExecuteAsync`,
-so it is serialized by the process-wide audit gate and stored in a `Serializable` transaction together with its audit
-entry. The table has a unique index on the hash, an index on the owner, and a foreign key to the user with cascade
-delete (see `ReviewCenterDbContext`).
+short-lived context from the factory and disposes it before returning. A change goes through
+`AuditAppender.ExecuteAsync`, so it is serialized by the process-wide audit gate and stored in a `Serializable`
+transaction together with its audit entry. The table has a unique index on the hash, an index on the owner, and a
+foreign key to the user with cascade delete (see `ReviewCenterDbContext`).
 
 #### Key Methods
 
@@ -45,15 +45,15 @@ by the creation time and then the identity, because SQLite cannot order a time w
 - *Parameters*: The identity of the token, the last-used time the caller read (null for a token never used), the new
   time, and a cancellation token.
 - *Returns*: True when the time was stored, false when another caller changed it first.
-- *Postconditions*: One conditional update statement (`WHERE Id = @id AND LastUsed = @expected`) changes that column only,
-  so of several concurrent callers that read the same value exactly one writes, and a revocation that happens at the
-  same time is never overwritten. The condition is an equality because the SQLite provider cannot compare
+- *Postconditions*: One conditional update statement (`WHERE Id = @id AND LastUsed = @expected`) changes that column
+  only, so of several concurrent callers that read the same value exactly one writes, and a revocation that happens at
+  the same time is never overwritten. The condition is an equality because the SQLite provider cannot compare
   `DateTimeOffset` values with `<` or `>`. It is not audited and does not use the audit gate.
 
 #### Error Handling
 
-Any database failure propagates unchanged to the caller. Null arguments raise `ArgumentNullException`. The hash is stored
-and read but never logged, and the value of a token never reaches this unit.
+Any database failure propagates unchanged to the caller. Null arguments raise `ArgumentNullException`. The hash is
+stored and read but never logged, and the value of a token never reaches this unit.
 
 #### Dependencies
 

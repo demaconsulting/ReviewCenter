@@ -272,8 +272,8 @@ throws the rule `PasswordInvalid` and the stored password hash stays as it was. 
 **UserService_SetPasswordAsync_LockedUser_EndsTheLockout**: Setting a password ends the lockout of the user and
 clears the failure count. This scenario is tested by `UserService_SetPasswordAsync_LockedUser_EndsTheLockout`.
 
-**UserService_Changes_UnknownUser_ThrowUserNotFound**: A theory over enabling, disabling, changing the role, changing the
-system administrator right, changing the own password, and setting a password for a user that does not exist; each
+**UserService_Changes_UnknownUser_ThrowUserNotFound**: A theory over enabling, disabling, changing the role, changing
+the system administrator right, changing the own password, and setting a password for a user that does not exist; each
 throws the rule `UserNotFound`. This scenario is tested by `UserService_Changes_UnknownUser_ThrowUserNotFound`.
 
 ##### Administration Audit

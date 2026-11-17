@@ -182,11 +182,12 @@ whose submitted ballot agrees on a Fail, is stored and read back as a rejection 
 the outcome column of the signatures table. This scenario is tested by
 `ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
 
-**Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository round-trips
-with every field, which is tested by `RepositoryStore_AddAsync_Repository_RoundTripsAndAudits`, the encrypted token is
-stored and read back, which is tested by `RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText`, and the unique index
-on the project and the name ignores case, which is tested by `RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken`
-and `RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject`.
+**Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository
+round-trips with every field, which is tested by `RepositoryStore_AddAsync_Repository_RoundTripsAndAudits`, the
+encrypted token is stored and read back, which is tested by `RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText`,
+and the unique index on the project and the name ignores case, which is tested by
+`RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken` and
+`RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject`.
 
 **ProjectMemberships table**: The `ProjectMemberships` table is exercised by the tests of `ReviewStore`: a membership
 round-trips, which is tested by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed`, the composite key
@@ -200,17 +201,18 @@ project, which is tested by `ReviewStore_AddMembershipAsync_UnknownProject_IsRef
 and read back with the project, while the other projects keep the defaults, which is tested by
 `ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`.
 
-**Review reopens table and independent reviewers column**: The `ReviewReopens` table and the `RequireIndependentReviewers`
-column of the `Projects` table are exercised by the tests of `ReviewStore` in `ReviewStoreSigningTests.cs`: a reopen is
-stored with the administrator, the time, the reason, and the previous digest and is listed in the order of the reopens,
-which is tested by `ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`, and a new project reads back with the
-requirement on, a change is stored in the column by a compare-and-set and read back with the project, which is tested
-by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`. The new table and column mean that a database
-that was created before them must be deleted and recreated (see the design of this unit).
+**Review reopens table and independent reviewers column**: The `ReviewReopens` table and the
+`RequireIndependentReviewers` column of the `Projects` table are exercised by the tests of `ReviewStore` in
+`ReviewStoreSigningTests.cs`: a reopen is stored with the administrator, the time, the reason, and the previous digest
+and is listed in the order of the reopens, which is tested by `ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`,
+and a new project reads back with the requirement on, a change is stored in the column by a compare-and-set and read
+back with the project, which is tested by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`. The new
+table and column mean that a database that was created before them must be deleted and recreated (see the design of this
+unit).
 
-**Review rule columns**: The `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns of the `Projects`
-table are exercised by the tests of `ReviewStore`: a new project reads back with both rules on, and a project added with
-both rules off reads back that way from the read and from the listing, which is tested by
+**Review rule columns**: The `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns of the
+`Projects` table are exercised by the tests of `ReviewStore`: a new project reads back with both rules on, and a project
+added with both rules off reads back that way from the read and from the listing, which is tested by
 `ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned` in `ReviewStoreTests.cs`; a change of each rule is
 stored in its own column by a compare-and-set and read back with the project, which is tested by
 `ReviewStore_UpdateReviewRuleAsync_CompareAndSet` in `ReviewStoreSigningTests.cs`. The new columns mean that a database
@@ -242,8 +244,9 @@ back with none, which is tested by `ReviewStore_AddReviewAsync_DueDate_RoundTrip
 `ReviewDueDateStoreTests.cs` and described with the `ReviewStore` unit.
 
 **Review conclusion text column**: The model has the `ReviewConclusionText` column of a review as optional with a
-maximum length of 4000, which is tested by `ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional`,
-defined in `ReviewStoreReviewConclusionTextTests.cs` and described with the `ReviewStore` unit.
+maximum length of 4000, which is tested by
+`ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional`, defined in
+`ReviewStoreReviewConclusionTextTests.cs` and described with the `ReviewStore` unit.
 
 **Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
 `TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a
@@ -262,20 +265,20 @@ unit.
 **Notification mode and notified items**: The mode and the dispatch state are columns of the `NotificationPreferences`
 table, and `NotifiedItems` is a table with a unique key on the user, the project, the review, the section, and the kind,
 deleted with the user and with the review. They are exercised over a real database file by
-`NotificationStoreModeTests.cs`: a new row reads as the
-mode `None` (`NotificationStore_Get_NewRow_ModeNone`), the dispatch state and its timestamps round-trip
-(`NotificationStore_ListRecipients_State_RoundTrips` and `NotificationStore_Apply_State_TimestampsRoundTrip`), the
-generation of the preference rises with a change of the mode (`NotificationStore_SetMode_Changed_RaisesGeneration`), a
-new database has the table (`NotificationStore_Create_Database_HasNotifiedItems`), the database refuses a second row
-for the same key (`NotificationStore_Create_Database_NotifiedItemsKeyUnique`), deleting a user removes the items
+`NotificationStoreModeTests.cs`: a new row reads as the mode `None` (`NotificationStore_Get_NewRow_ModeNone`), the
+dispatch state and its timestamps round-trip (`NotificationStore_ListRecipients_State_RoundTrips` and
+`NotificationStore_Apply_State_TimestampsRoundTrip`), the generation of the preference rises with a change of the mode
+(`NotificationStore_SetMode_Changed_RaisesGeneration`), a new database has the table
+(`NotificationStore_Create_Database_HasNotifiedItems`), the database refuses a second row for the same key
+(`NotificationStore_Create_Database_NotifiedItemsKeyUnique`), deleting a user removes the items
 (`NotificationStore_Delete_User_CascadesNotifiedItems`), and deleting a review removes the items, so that a review that
 is created again under the same identifier has none (`NotificationStore_Delete_Review_CascadesNotifiedItems` and
 `NotificationStore_Delete_ReviewRecreated_HasNoNotifiedItems`). A database of an earlier version of the notifications
-has neither the table nor the columns and is reported as not available (`NotificationStore_IsAvailable_NoNotifiedItems_False`,
-`NotificationStore_IsAvailable_NoModeColumn_False`, `NotificationStore_IsAvailable_NoGenerationColumn_False`, and
-`NotificationStore_IsAvailable_NoGaveUpColumn_False` for the give-up column of `NotifiedItems`, which defaults to false).
-These
-tests are described with the `NotificationStore` unit.
+has neither the table nor the columns and is reported as not available
+(`NotificationStore_IsAvailable_NoNotifiedItems_False`, `NotificationStore_IsAvailable_NoModeColumn_False`,
+`NotificationStore_IsAvailable_NoGenerationColumn_False`, and `NotificationStore_IsAvailable_NoGaveUpColumn_False` for
+the give-up column of `NotifiedItems`, which defaults to false). These tests are described with the `NotificationStore`
+unit.
 
 **The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.
 

@@ -5,9 +5,9 @@ This document describes the integration and usage design for the `OpenIddict` OT
 
 ### Purpose
 
-OpenIddict is an OpenID Connect server library for ASP.NET Core. ReviewCenter uses it only in the test project, as a fake
-identity provider, so that the sign-in with a provider can be verified against a real protocol implementation that signs
-real identity tokens, without an external service. It is not referenced by the product and is not shipped.
+OpenIddict is an OpenID Connect server library for ASP.NET Core. ReviewCenter uses it only in the test project, as a
+fake identity provider, so that the sign-in with a provider can be verified against a real protocol implementation that
+signs real identity tokens, without an external service. It is not referenced by the product and is not shipped.
 
 ### Features Used
 

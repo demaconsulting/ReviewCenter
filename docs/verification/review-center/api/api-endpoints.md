@@ -206,10 +206,11 @@ scenario is tested by `ApiEndpoints_ListReviews_TokenActor_OutcomeShownOnlyWhenC
 
 **ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields**: The names of the fields of the details are exactly the
 documented ones (an allow list), so no field of the ballot of a single reviewer, no per-reviewer answer, and no dispute
-can appear without a deliberate change. This scenario is tested by `ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields`.
+can appear without a deliberate change. This scenario is tested by
+`ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields`.
 
-**ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged**: A request without a token is a 401 and the token of a user who
-is no member of the project is a 404, as before. This scenario is tested by
+**ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged**: A request without a token is a 401 and the token of a user
+who is no member of the project is a 404, as before. This scenario is tested by
 `ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged`.
 
 **ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail**: An allow-list scan of the source of the endpoints finds
@@ -220,9 +221,9 @@ read without an actor could not mask. This scenario is tested by
 
 **ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote**: Both ballots fail the first check. The
 token of a member who has not handed in a ballot gets a body with no check identifier and no word "Rejected", a next
-step that starts with the request to hand in the ballot, and the stored `state` Draft; the token of a reviewer who handed
-in gets the named rejection ("Both reviewers failed {id}, so this review will be Rejected. Write the review conclusion,
-then sign.") and the state is still Draft. This scenario is tested by
+step that starts with the request to hand in the ballot, and the stored `state` Draft; the token of a reviewer who
+handed in gets the named rejection ("Both reviewers failed {id}, so this review will be Rejected. Write the review
+conclusion, then sign.") and the state is still Draft. This scenario is tested by
 `ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote`.
 
 **ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly**: When one reviewer has signed, the token
@@ -381,8 +382,8 @@ header. The attestation address of the entry names that host. This scenario is t
 checklist of a project with a bearer token and with Basic credentials. At first the answer is 200 `application/json`
 with the built-in default (version `default-1`, `isDefault` true, 14 sections, 58 checks, the hash of the default, and
 the sections with their titles, hints, and checks); after the template is replaced the answer shows the custom version
-label, `isDefault` false, another 64-character hash, and the counts and checks of the custom definition. This scenario is
-tested by `ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition`.
+label, `isDefault` false, another 64-character hash, and the counts and checks of the custom definition. This scenario
+is tested by `ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition`.
 
 **ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint**: A project's own checklist has a section without the
 hint member (which the validator accepts); the answer has the field `applicabilityHint` as an empty string, not null.

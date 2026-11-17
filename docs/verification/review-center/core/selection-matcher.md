@@ -17,8 +17,8 @@ N/A - standard test environment (the globbing library is a package of the test p
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- The last matching pattern decides; an exclusion removes a path and a later include adds it back; a path that no pattern
-  matches is not selected.
+- The last matching pattern decides; an exclusion removes a path and a later include adds it back; a path that no
+  pattern matches is not selected.
 - A trailing `**` needs at least one more segment, and a trailing `/` selects a folder.
 - `*` does not cross `/`, `**` as a segment does, and `?` matches exactly one character; matching is case-sensitive.
 - A pattern with many `**` segments is matched in bounded time.
@@ -30,14 +30,14 @@ N/A - standard test environment (the globbing library is a package of the test p
 
 #### Test Scenarios
 
-**SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths**: Literals, folders, wildcards, and exclusions select the expected
-paths. This scenario is tested by `SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths`.
+**SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths**: Literals, folders, wildcards, and exclusions select the
+expected paths. This scenario is tested by `SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths`.
 
 **SelectionMatcher_IsMatch_TrailingDoubleStar_NeedsAtLeastOneSegment**: `docs/**` does not select the path `docs`, but
 selects `docs/a`. This scenario is tested by `SelectionMatcher_IsMatch_TrailingDoubleStar_NeedsAtLeastOneSegment`.
 
-**SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators**: `*` matches within one segment only. This scenario is tested by
-`SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators`.
+**SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators**: `*` matches within one segment only. This scenario is tested
+by `SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators`.
 
 **SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly**: A pattern with many `**` segments against a long path that
 does not match returns within the time limit of the test. This scenario is tested by
@@ -48,8 +48,8 @@ dropped, and a trailing `/` turned into a folder prefix; writing the patterns ba
 pattern with `!` before an exclusion, and parsing that text again gives the same text. This scenario is tested by
 `SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized`.
 
-**SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid**: Invalid selections are refused with `SelectionInvalid`. This
-scenario is tested by `SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid`.
+**SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid**: Invalid selections are refused with `SelectionInvalid`.
+This scenario is tested by `SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid`.
 
 **SelectionMatcher_Parse_Limits_AreInclusive**: Exactly 100 patterns and exactly 400 characters in a line are accepted,
 and
@@ -58,6 +58,6 @@ one more is refused. This scenario is tested by `SelectionMatcher_Parse_Limits_A
 **SelectionMatcher_NullArguments_ThrowArgumentNull**: Null arguments raise `ArgumentNullException`. This scenario is
 tested by `SelectionMatcher_NullArguments_ThrowArgumentNull`.
 
-**SelectionMatcher_IsMatch_CommonSyntax_AgreesWithFileSystemGlobbing**: Include patterns followed by exclusions select the
-same paths as the globbing library for the syntax both support (literals, `*`, and `**`). This scenario is tested by
+**SelectionMatcher_IsMatch_CommonSyntax_AgreesWithFileSystemGlobbing**: Include patterns followed by exclusions select
+the same paths as the globbing library for the syntax both support (literals, `*`, and `**`). This scenario is tested by
 `SelectionMatcher_IsMatch_CommonSyntax_AgreesWithFileSystemGlobbing`.

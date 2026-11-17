@@ -34,11 +34,11 @@ outlet, the `Routes` component, a second small inline script, and a script refer
   itself), `window.reviewCenter.copyText` (the review page calls it for the "Copy link" button: it returns a promise of
   true when the text reached the clipboard, using `navigator.clipboard.writeText` in a secure context and otherwise, or
   when that is refused, a hidden text area with `document.execCommand('copy')`; it never rejects) and
-  `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen file or thread in
-  the address bar with `history.replaceState`, which adds no history entry and does not run the router; it accepts only
-  a path that starts with a single `/`), `window.reviewCenter.focusTestId` (the review page calls it to move the focus to
-  the comment field that was just opened, without scrolling again), and a document-level `keydown` listener: when Ctrl
-  or Cmd and Enter are pressed in an element with the attribute `data-ctrl-enter-submits`, it presses the enabled button
+  `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen file or thread in the address
+  bar with `history.replaceState`, which adds no history entry and does not run the router; it accepts only a path that
+  starts with a single `/`), `window.reviewCenter.focusTestId` (the review page calls it to move the focus to the
+  comment field that was just opened, without scrolling again), and a document-level `keydown` listener: when Ctrl or
+  Cmd and Enter are pressed in an element with the attribute `data-ctrl-enter-submits`, it presses the enabled button
   whose `data-testid` is the attribute value, so Ctrl+Enter submits a comment without a server round trip per key.
 
 **Routes component**: A router that searches the application assembly for page components. For a matched URL it
@@ -58,10 +58,10 @@ react when the state of an open page ends (see `SessionGate`).
 **NotFoundPage component**: The page at `/not-found`, open to everyone and rendered inside `MainLayout` like every page,
 so it has the header and the footer. It shows the heading "Page not found", a short explanation, and a "Back to
 projects" button. The elements have `data-testid` values `not-found` and `not-found-projects-link`. A request to the
-server for an address that no page handles never reaches the router, because it matches no endpoint; the `UseNotFoundPage`
-middleware of `ServerHost` therefore re-executes such a page request against `/not-found` and keeps the 404 status
-(see the Hosting subsystem), so the browser receives this page with status 404. The same page is the router's answer for
-an address that matches no page. Opening `/not-found` itself answers with status 200.
+server for an address that no page handles never reaches the router, because it matches no endpoint; the
+`UseNotFoundPage` middleware of `ServerHost` therefore re-executes such a page request against `/not-found` and keeps
+the 404 status (see the Hosting subsystem), so the browser receives this page with status 404. The same page is the
+router's answer for an address that matches no page. Opening `/not-found` itself answers with status 200.
 
 **MainLayout component**: The page frame, rendered as static server-side markup (it needs no live connection). It
 reads the authentication state of the request once, so it keeps showing the name that was current when the page was

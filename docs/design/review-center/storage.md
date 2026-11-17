@@ -130,8 +130,8 @@ application; the rest of the system sees only the Core store interfaces.
 - *Role*: Provider.
 - *Contract*: Reads an enrollment, lists the users with a confirmed one, saves a pending enrollment, confirms it with
   its recovery code hashes, advances the replay step, spends a recovery code, replaces the recovery codes, counts the
-  unused ones, and removes an enrollment or a pending one. Confirming, spending a code, replacing the codes, and removing
-  are stored together with their audit entry; advancing the step is not audited.
+  unused ones, and removes an enrollment or a pending one. Confirming, spending a code, replacing the codes, and
+  removing are stored together with their audit entry; advancing the step is not audited.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. Each
   decision with one winner is one conditional update. The store holds only the encrypted secret and the hashes of the
   recovery codes; a plain secret or a plain code never reaches it.
@@ -284,10 +284,10 @@ collation of the user name. The columns are never changed after the account is c
 
 **Personal access tokens**: The `PersonalAccessTokens` table holds the tokens of the users. Only the lowercase
 hexadecimal SHA-256 hash of a token value is stored, with a unique index that serves the lookup of every request to the
-API; the value is never stored. A token has a separate, random display id for the list of the Account page, so no part of
-the value is stored. The use of a token is recorded with a single-column update that is not audited, because it happens
-on every request and the audit trail records only changes that matter. The `Reviews` table gains the creator columns
-(`CreatedBy` and `CreatedViaApi`).
+API; the value is never stored. A token has a separate, random display id for the list of the Account page, so no part
+of the value is stored. The use of a token is recorded with a single-column update that is not audited, because it
+happens on every request and the audit trail records only changes that matter. The `Reviews` table gains the creator
+columns (`CreatedBy` and `CreatedViaApi`).
 
 **Second factor**: The `UserTotps` table holds one enrollment per user (the secret encrypted by the Identity subsystem,
 never in plain text) and the `TotpRecoveryCodes` table holds the SHA-256 hashes of the recovery codes; both are deleted
@@ -301,10 +301,10 @@ migration: a development database that was created before them is recreated.
 **Inbox read state**: The `ReviewUserStates` table holds one row per user and review with the highest comment identity
 the user has seen and the time of the last visit; it is deleted with the user and with the review. It is the only
 storage of the inbox, which is also the notification list: there is no table of inbox notifications, because every row
-of the inbox is computed from the review data. The reviews of a user are found through indexes on the users of the reviewer
-slots and on the case-insensitive creator column of the reviews. The rows are not audited and are not part of the
-record digest, because what a person has seen is not a change of a review. The table and the indexes have no migration:
-a development database that was created before them is recreated.
+of the inbox is computed from the review data. The reviews of a user are found through indexes on the users of the
+reviewer slots and on the case-insensitive creator column of the reviews. The rows are not audited and are not part of
+the record digest, because what a person has seen is not a change of a review. The table and the indexes have no
+migration: a development database that was created before them is recreated.
 
 **E-mail notification address**: The `NotificationPreferences` table holds one row per user with the confirmed address,
 the pending address, the salted hash of its code, the expiry, the count of attempts, the notification mode, and the

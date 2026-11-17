@@ -28,16 +28,14 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Type*: HTTP endpoint, `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
 - *Role*: Provider.
 - *Contract*: A signed-in user who may view the project (a member, or a system administrator) gets the signed PDF of a
-  concluded review, approved or rejected
-  (`application/pdf`, file name
-  `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 (empty
-  on this route) for a review that does not exist and for a project that the user may not view, 409 (a problem
-  description, "The review is not complete") for a review that is not
-  concluded, and 409 ("The review changed during generation") for a review that changed while the
-  document was being
-  prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
-  be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme; anonymous
-  access, when a project allows it, exists only on the API route of the `Api` subsystem, never on this page route.
+  concluded review, approved or rejected (`application/pdf`, file name `attestation-{projectId}-{reviewId}.pdf`,
+  `Cache-Control: no-store`). The statuses are 200 for the document, 404 (empty on this route) for a review that does
+  not exist and for a project that the user may not view, 409 (a problem description, "The review is not complete") for
+  a review that is not concluded, and 409 ("The review changed during generation") for a review that changed while the
+  document was being prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason)
+  when the key cannot be used. A visitor who is not signed in is redirected to the sign-in page by the authentication
+  scheme; anonymous access, when a project allows it, exists only on the API route of the `Api` subsystem, never on this
+  page route.
 - *Constraints*: The attestation is made for every request and is stored nowhere; every successful request adds an
   `attestation.generated` event to the audit trail. The route includes the project number because reviews are
   addressed by project everywhere else in the system. What the document contains follows the evidence settings of the
@@ -129,33 +127,30 @@ that no changes are permitted. The space for the signature is reserved
 before the signature is known, so a certificate chain that does not fit is reported and no broken document is produced.
 The signer works only with a document that has the layout of its own writer.
 
-**The keys**: Three providers exist. The **self-signed provider** is the default, so that a new installation works without
-configuration. It creates an RSA key and a self-signed certificate on first use, in a file in a folder beside the Data
-Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or
-`Attestation:SelfSignedFolder`),
-and loads the same file afterwards, so that the key persists across restarts. The file
+**The keys**: Three providers exist. The **self-signed provider** is the default, so that a new installation works
+without configuration. It creates an RSA key and a self-signed certificate on first use, in a file in a folder beside
+the Data Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or
+`Attestation:SelfSignedFolder`), and loads the same file afterwards, so that the key persists across restarts. The file
 (`attestation-selfsigned.pfx.protected`) holds the PFX protected by the Data Protection key ring of the server, so a
 copy of the file is useless without the ring, and the file is restricted to its owner on systems that support it. The
-key is **for development and test only**. The key says so in its certificate subject, in
-the log, in the user interface, in the document, and in the Help. A PDF reader reports the signer of a self-signed
-document as not trusted, which is correct. The **certificate store provider** uses the certificate with a configured
-thumbprint from a certificate store of the server account. It never exports the key: it keeps the handle of the private
-key (a key of the Windows key store, a smart card, or a hardware module) and signs through it, so the key never reaches
-the memory of the server in a form that could be copied. The server account needs access to the key. The provider
-supports RSA and ECDSA keys, and keeps the intermediate certificates of the chain (without revocation checks) so that
-the signature carries them. It does not sign a test value at start-up, so a smart card is not asked for its PIN just
-because the server
-started. The **file provider** reads a certificate with its private key from a PFX or PEM file that an administrator
-deploys, with the password from a setting or from a password file, keeps the key in memory only, and takes the other
-certificates of the file as the chain; a key without a password is a warning, or an error when
-`DataProtection:RequireEncryptedKeys` is set. For the certificate store and file providers the server warns, at start
-and on the review page, when the certificate ends within `ExpiryWarningDays` or has ended; the self-signed key renews
-itself. A certificate that is meant for code signing only is not suited to signing a PDF: Adobe Acrobat will not trust
-it for document signatures.
-Use a document-signing certificate (an internal certification authority is fine, if its root is distributed to
-the readers). The provider logs a warning at start-up for such a certificate, and the attestation prints a one-line
-note in its signing-key section; it does not refuse the certificate. The server does not check the certificate chain
-or revocation; the PDF viewer does.
+key is **for development and test only**. The key says so in its certificate subject, in the log, in the user interface,
+in the document, and in the Help. A PDF reader reports the signer of a self-signed document as not trusted, which is
+correct. The **certificate store provider** uses the certificate with a configured thumbprint from a certificate store
+of the server account. It never exports the key: it keeps the handle of the private key (a key of the Windows key store,
+a smart card, or a hardware module) and signs through it, so the key never reaches the memory of the server in a form
+that could be copied. The server account needs access to the key. The provider supports RSA and ECDSA keys, and keeps
+the intermediate certificates of the chain (without revocation checks) so that the signature carries them. It does not
+sign a test value at start-up, so a smart card is not asked for its PIN just because the server started. The **file
+provider** reads a certificate with its private key from a PFX or PEM file that an administrator deploys, with the
+password from a setting or from a password file, keeps the key in memory only, and takes the other certificates of the
+file as the chain; a key without a password is a warning, or an error when `DataProtection:RequireEncryptedKeys` is set.
+For the certificate store and file providers the server warns, at start and on the review page, when the certificate
+ends within `ExpiryWarningDays` or has ended; the self-signed key renews itself. A certificate that is meant for code
+signing only is not suited to signing a PDF: Adobe Acrobat will not trust it for document signatures. Use a
+document-signing certificate (an internal certification authority is fine, if its root is distributed to the readers).
+The provider logs a warning at start-up for such a certificate, and the attestation prints a one-line note in its
+signing-key section; it does not refuse the certificate. The server does not check the certificate chain or revocation;
+the PDF viewer does.
 
 **RequireTrustedKey**: When this setting is on, the server refuses a key that is self-signed, a certificate whose key
 usage does not allow digital signatures or non-repudiation, and a certificate that is not within its validity period. It
@@ -203,10 +198,10 @@ document never shows a viewer the ballot or the dispute of a slot while the revi
 **Approval lock, reopen, and the evidence**: A concluded review is locked in `Core`, so the record that an attestation
 describes cannot change after the approval, and the "changed during generation" window that this subsystem checks is
 only left for a reopen or a stale signature. Reading, the attestation, and the evidence index keep working on a locked
-review. When an administrator reopens a review, the review is no longer complete: the attestation endpoint answers as for
-a review that is not approved, and the review leaves the evidence index, until the review is signed again. The earlier
-approval stays visible as the reopen history of the next attestation, which lists each reopen with its time, who reopened
-it (a name or a label, as the reviewer names switch decides), the reason, and the digest of the record that was
+review. When an administrator reopens a review, the review is no longer complete: the attestation endpoint answers as
+for a review that is not approved, and the review leaves the evidence index, until the review is signed again. The
+earlier approval stays visible as the reopen history of the next attestation, which lists each reopen with its time, who
+reopened it (a name or a label, as the reviewer names switch decides), the reason, and the digest of the record that was
 reopened. The attestation of an earlier approval that was downloaded before the reopen is a signed document of that
 earlier record and is not invalidated.
 

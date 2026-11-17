@@ -127,9 +127,9 @@ of a disabled user are refused with the same rule and the same message, which do
 partial name finds nothing; the exact name in another letter case, with surrounding white space, is added. This
 scenario is tested by `ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable`.
 
-**ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable**: Removing and changing the role of an unknown
-name and a user who is no member of the project are all refused with `MembershipNotFound` and one single message.
-This scenario is tested by `ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable`.
+**ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable**: Removing and changing the role of an
+unknown name and a user who is no member of the project are all refused with `MembershipNotFound` and one single
+message. This scenario is tested by `ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable`.
 
 **ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds**: A project administrator fails
 ten times; the eleventh add (even of an existing name) and an account creation are refused with `TooManyAttempts`; a
@@ -302,7 +302,8 @@ all get null; the project list of the member holds only the own project. This sc
 `ProjectService_GetAsync_HiddenProject_ReadsAsMissing`.
 
 **ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn**: A project that is created through the service
-requires independent reviewers. This scenario is tested by `ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn`.
+requires independent reviewers. This scenario is tested by
+`ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn`.
 
 **ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits**: An administrator switches the rule off
 and on again; the project reads back each value, the call returns `true`, and the audit trail holds an entry
@@ -317,10 +318,11 @@ no entry is audited. This scenario is tested by
 
 **ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged**: A change whose expected value
 is no longer the stored one is refused with `RecordChanged`, does not overwrite the newer value, and adds no audit
-entry. This scenario is tested by `ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged`.
+entry. This scenario is tested by
+`ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged`.
 
-**ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn**: A project created through the service has all three rules
-on, in the returned project and in the stored one. This scenario is tested by
+**ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn**: A project created through the service has all three
+rules on, in the returned project and in the stored one. This scenario is tested by
 `ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn`.
 
 **ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn**: A project exists in the store with
@@ -330,17 +332,16 @@ created again, so the scenario is about the projects of the current database. Th
 `ProjectService_SetReviewRuleAsync_ExistingProjectNeverChanged_KeepsBothRulesOn`.
 
 **ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail**: For each of the two further rules,
-an
-administrator switches the rule off, repeats the same change (which returns `false` and records nothing), and switches it
-on again. Exactly two entries `project.review-rule-changed` are audited with the project and the details
+an administrator switches the rule off, repeats the same change (which returns `false` and records nothing), and
+switches it on again. Exactly two entries `project.review-rule-changed` are audited with the project and the details
 `<Property> on->off` and `<Property> off->on`, where the property is `RequireNonAuthorChecklistAnswers` or
 `RequireNonReopenerSigning`, and no other rule changes. This scenario is tested by
 `ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail`.
 
 **ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction**: Switching the independence rule
 with `SetReviewRuleAsync` and with `SetRequireIndependentReviewersAsync` records `project.independent-reviewers-changed`
-with the details `RequireIndependentReviewers on->off` and `RequireIndependentReviewers off->on`. This scenario is tested
-by `ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction`.
+with the details `RequireIndependentReviewers on->off` and `RequireIndependentReviewers off->on`. This scenario is
+tested by `ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction`.
 
 **ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused**: For each of the three rules, a plain member and an
 administrator whose identity arrives through a token are refused with `ActorNotAllowed` and a stranger with
