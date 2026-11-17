@@ -35,8 +35,9 @@ input-files:
   - docs/verification/review-center/hosting/server-host.md
   - docs/verification/review-center/hosting/key-ring-protection.md
   - docs/verification/review-center/hosting/secret-scan.md
-  - docs/verification/review-center/hosting/keys-command.md
   - docs/verification/review-center/hosting/user-command.md
+  - docs/verification/review-center/hosting/audit-command.md
+  - docs/verification/review-center/hosting/keys-command.md
   - docs/verification/review-center/identity.md
   - docs/verification/review-center/identity/password-hasher.md
   - docs/verification/review-center/identity/sign-in.md
@@ -45,9 +46,12 @@ input-files:
   - docs/verification/review-center/identity/totp-algorithm.md
   - docs/verification/review-center/identity/totp-secret-protector.md
   - docs/verification/review-center/identity/totp-sign-in.md
+  - docs/verification/review-center/identity/revalidating-authentication-state-provider.md
   - docs/verification/review-center/web.md
   - docs/verification/review-center/web/app.md
   - docs/verification/review-center/web/home-page.md
+  - docs/verification/review-center/web/about-page.md
+  - docs/verification/review-center/web/help-page.md
   - docs/verification/review-center/web/projects-page.md
   - docs/verification/review-center/web/project-page.md
   - docs/verification/review-center/web/plan-page.md
@@ -57,6 +61,8 @@ input-files:
   - docs/verification/review-center/web/totp-login-page.md
   - docs/verification/review-center/web/account-page.md
   - docs/verification/review-center/web/users-page.md
+  - docs/verification/review-center/web/history-page.md
+  - docs/verification/review-center/web/audit-page.md
   - docs/verification/review-center/web/repositories-page.md
   - docs/verification/review-center/web/inbox-page.md
   - docs/verification/review-center/core.md
@@ -72,6 +78,8 @@ input-files:
   - docs/verification/review-center/core/user-service.md
   - docs/verification/review-center/core/personal-access-token-service.md
   - docs/verification/review-center/core/record-digest.md
+  - docs/verification/review-center/core/audit-chain.md
+  - docs/verification/review-center/core/audit-service.md
   - docs/verification/review-center/core/signing-service.md
   - docs/verification/review-center/core/reauth-proof-store.md
   - docs/verification/review-center/core/totp-service.md
@@ -101,6 +109,7 @@ input-files:
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md
   - docs/verification/review-center/storage/user-store.md
+  - docs/verification/review-center/storage/audit-store.md
   - docs/verification/review-center/storage/personal-access-token-store.md
   - docs/verification/review-center/storage/totp-store.md
   - docs/verification/review-center/storage/database-setup.md
