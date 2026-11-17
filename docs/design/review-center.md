@@ -9,7 +9,7 @@ built on .NET. It is structured as one system containing one top-level unit (`Pr
 twelve subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Messaging`, `Storage`,
 `ContentSources`, `Evidence`, `Api`):
 
-```mermaid
+```{.mermaid scale=0.5}
 flowchart TD
     Program
     subgraph Cli
