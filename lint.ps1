@@ -104,7 +104,7 @@ if (-not $skipDotnetTools) {
 Write-Host "Linting: compliance tools..."
 
 if (-not $skipDotnetTools) {
-    dotnet reqstream --lint --requirements requirements.yaml
+    dotnet reqstream --lint --enforce --requirements requirements.yaml
     if ($LASTEXITCODE -ne 0) { $lintError = $true }
 
     dotnet versionmark --lint
