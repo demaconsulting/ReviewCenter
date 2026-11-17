@@ -37,6 +37,7 @@ input-files:
   - docs/design/review-center/hosting/secret-scan.md
   - docs/design/review-center/hosting/keys-command.md
   - docs/design/review-center/hosting/user-command.md
+  - docs/design/review-center/hosting/audit-command.md
   - docs/design/review-center/identity.md
   - docs/design/review-center/identity/password-hasher.md
   - docs/design/review-center/identity/sign-in.md
@@ -45,9 +46,12 @@ input-files:
   - docs/design/review-center/identity/totp-algorithm.md
   - docs/design/review-center/identity/totp-secret-protector.md
   - docs/design/review-center/identity/totp-sign-in.md
+  - docs/design/review-center/identity/revalidating-authentication-state-provider.md
   - docs/design/review-center/web.md
   - docs/design/review-center/web/app.md
   - docs/design/review-center/web/home-page.md
+  - docs/design/review-center/web/about-page.md
+  - docs/design/review-center/web/help-page.md
   - docs/design/review-center/web/projects-page.md
   - docs/design/review-center/web/project-page.md
   - docs/design/review-center/web/plan-page.md
@@ -57,6 +61,8 @@ input-files:
   - docs/design/review-center/web/totp-login-page.md
   - docs/design/review-center/web/account-page.md
   - docs/design/review-center/web/users-page.md
+  - docs/design/review-center/web/history-page.md
+  - docs/design/review-center/web/audit-page.md
   - docs/design/review-center/web/repositories-page.md
   - docs/design/review-center/web/inbox-page.md
   - docs/design/review-center/core.md
@@ -72,6 +78,8 @@ input-files:
   - docs/design/review-center/core/user-service.md
   - docs/design/review-center/core/personal-access-token-service.md
   - docs/design/review-center/core/record-digest.md
+  - docs/design/review-center/core/audit-chain.md
+  - docs/design/review-center/core/audit-service.md
   - docs/design/review-center/core/signing-service.md
   - docs/design/review-center/core/reauth-proof-store.md
   - docs/design/review-center/core/totp-service.md
@@ -101,6 +109,7 @@ input-files:
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md
   - docs/design/review-center/storage/user-store.md
+  - docs/design/review-center/storage/audit-store.md
   - docs/design/review-center/storage/personal-access-token-store.md
   - docs/design/review-center/storage/totp-store.md
   - docs/design/review-center/storage/database-setup.md
