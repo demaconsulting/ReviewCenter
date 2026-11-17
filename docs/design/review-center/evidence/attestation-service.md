@@ -72,9 +72,9 @@ the renderer says that the findings were not included.
 
 The document also carries the **conclusion** of the review: the outcome (`Approved` or `Rejected`) and the conclusion
 text, and, for a rejection, the renderer marks the title and the first page. For a concluded review it also carries the
-**ballots appendix** (`BuildAppendix`): the final submitted ballot of every reviewer slot, in slot order, with the member
-who handed it in, the time, and for every section either the reason it was marked not applicable or the answer to every
-check (outcome, justification, who answered and when, or `Not answered`), and the **ballot fingerprint**
+**ballots appendix** (`BuildAppendix`): the final submitted ballot of every reviewer slot, in slot order, with the
+member who handed it in, the time, and for every section either the reason it was marked not applicable or the answer to
+every check (outcome, justification, who answered and when, or `Not answered`), and the **ballot fingerprint**
 (`RecordDigest.ComputeBallotFingerprint`). The wording of the checks is left out of the appendix when the wording switch
 is off. The appendix is built only for a concluded review, which has a submitted ballot in every slot and can no longer
 change, so it reveals nothing that a viewer could not already see once the review is concluded; for a review that is not

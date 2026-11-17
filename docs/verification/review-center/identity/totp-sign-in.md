@@ -123,7 +123,8 @@ scenario is tested by `TotpSignIn_CodeStep_Success_ResetsTheFailureCounter`.
 
 **TotpSignIn_CodeStep_TooManyAttempts_AreThrottledEvenForARightCode**: With three attempts allowed per name, wrong codes
 get the wrong-code redirect and then the `error=throttled` redirect, and a right code after that gets the throttled
-answer too, with no session. This scenario is tested by `TotpSignIn_CodeStep_TooManyAttempts_AreThrottledEvenForARightCode`.
+answer too, with no session. This scenario is tested by
+`TotpSignIn_CodeStep_TooManyAttempts_AreThrottledEvenForARightCode`.
 
 **TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota**: With an address limit of two, three enrolled
 accounts pass the password step from one address; none is throttled. This scenario is tested by
@@ -141,8 +142,8 @@ the password alone: a session and no challenge. This scenario is tested by
 database is then served with the feature off. The password signs in with a session and no challenge, and a post to the
 code endpoint answers 404. This scenario is tested by `TotpSignIn_FeatureDisabled_NoEndpointAndPasswordOnlySignIn`.
 
-**TotpSignIn_PersonalAccessToken_EnrolledAccount_IsUnaffected**: A personal access token of an enrolled account calls the
-API without a code and is accepted. This scenario is tested by
+**TotpSignIn_PersonalAccessToken_EnrolledAccount_IsUnaffected**: A personal access token of an enrolled account calls
+the API without a code and is accepted. This scenario is tested by
 `TotpSignIn_PersonalAccessToken_EnrolledAccount_IsUnaffected`.
 
 **TotpSignIn_FullLifeCycle_NeverRecordsSecretsCodesOrTheChallenge**: An enrolled account sees a wrong code, a right

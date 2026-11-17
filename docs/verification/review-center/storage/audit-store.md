@@ -138,13 +138,14 @@ indexes on project and sequence, actor and sequence, and action and sequence. Th
 `StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes` checks all four indexes of the audit table in the subsystem
 verification.
 
-**AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry of
-the project without a review, and one entry of another project are appended. The last activity of project one names the
-time of the newest entry of each of its two reviews and nothing else, a project without entries gives an empty result,
-and the chain still verifies. This scenario is tested by `AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`.
+**AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry
+of the project without a review, and one entry of another project are appended. The last activity of project one names
+the time of the newest entry of each of its two reviews and nothing else, a project without entries gives an empty
+result, and the chain still verifies. This scenario is tested by
+`AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`.
 
-**AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded**: Entries are read in batches after a sequence; each batch is
-ascending and not larger than requested. This scenario is tested by
+**AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded**: Entries are read in batches after a sequence; each batch
+is ascending and not larger than requested. This scenario is tested by
 `AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded`.
 
 **AuditStore_Verification_EditedRow_ReportsThatSequence**: A row is edited in the database; verification reports its

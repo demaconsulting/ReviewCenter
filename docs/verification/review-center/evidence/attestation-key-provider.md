@@ -4,16 +4,14 @@
 
 The `AttestationKeyProvider` unit is verified with tests defined in `AttestationKeyPolicyTests.cs` (the policy and the
 factory), `SelfSignedKeyProviderTests.cs`, `CertificateStoreKeyProviderTests.cs`, and `FileKeyProviderTests.cs`. The
-tests use the real classes
-with real temporary folders and temporary certificates made by the helper `TestKeys`; the log is captured with a
-logger of the tests so that the warning can be checked for secrets. The tests of the file provider make their
-certificates (a signer, an intermediate and a root) in the test, write them as PFX and as PEM files in a temporary
-folder, with and without a password, and use a fixed clock for the expiry warnings; they use no certificate store.
-The test of the Unix
-file permissions skips itself on Windows. The tests of the certificate store provider
-install a temporary self-signed certificate in the certificate store of the current user (`CurrentUser\My`) and remove it
-afterwards. They **skip themselves when that store is not available**. The local machine store and a key on a smart card
-or a hardware module are **not covered by automated tests** and are a manual check: configure
+tests use the real classes with real temporary folders and temporary certificates made by the helper `TestKeys`; the log
+is captured with a logger of the tests so that the warning can be checked for secrets. The tests of the file provider
+make their certificates (a signer, an intermediate and a root) in the test, write them as PFX and as PEM files in a
+temporary folder, with and without a password, and use a fixed clock for the expiry warnings; they use no certificate
+store. The test of the Unix file permissions skips itself on Windows. The tests of the certificate store provider
+install a temporary self-signed certificate in the certificate store of the current user (`CurrentUser\My`) and remove
+it afterwards. They **skip themselves when that store is not available**. The local machine store and a key on a smart
+card or a hardware module are **not covered by automated tests** and are a manual check: configure
 `Attestation:StoreLocation` and the thumbprint of such a certificate, start the server, download an attestation, and
 check the signature in a PDF reader.
 
@@ -95,16 +93,16 @@ examined. It allows signing. This scenario is tested by
 **AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates**: Certificates with several extended
 key usages, and one without the extension, are generated and classified. Only one that allows code signing and no
 document signing purpose (code signing alone, or with server authentication) is code-signing-only; document signing
-(Microsoft or Adobe), e-mail protection, any purpose, no extension, and a mix of code signing with a document purpose are
-not. The warning list agrees and holds exactly the defined text. This scenario is tested by
+(Microsoft or Adobe), e-mail protection, any purpose, no extension, and a mix of code signing with a document purpose
+are not. The warning list agrees and holds exactly the defined text. This scenario is tested by
 `AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates`.
 
 **AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording**: The notice is compared with the defined text. This
 scenario is tested by `AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording`.
 
 **AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag**: Keys are created for a code-signing-only
-certificate, a certificate without extended key usage, and the default test key. Only the first has
-`IsCodeSigningOnly` set. This scenario is tested by `AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag`.
+certificate, a certificate without extended key usage, and the default test key. Only the first has `IsCodeSigningOnly`
+set. This scenario is tested by `AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag`.
 
 **AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse**: A provider
 that returns a code-signing-only certificate issued by an authority is asked for the key twice with `RequireTrustedKey`
@@ -131,10 +129,10 @@ ring and is read with another. The error names the file and tells the operator t
 and the file is unchanged. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt`.
 
-**SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder**: A file stands where
-the folder should be, and a key file was written with another ring. The messages for the server log hold the folder
-path, while `MessageWithoutPath`, which the configuration check prints, names the setting `Attestation:SelfSignedFolder`
-or the file name and does not hold the folder. This scenario is tested by
+**SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder**: A file stands
+where the folder should be, and a key file was written with another ring. The messages for the server log hold the
+folder path, while `MessageWithoutPath`, which the configuration check prints, names the setting
+`Attestation:SelfSignedFolder` or the file name and does not hold the folder. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder`.
 
 **SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable**: The protector of the ring fails
@@ -163,9 +161,9 @@ where the folder should be, and a provider that may not create is asked for the 
 but names `Attestation:SelfSignedFolder`, the path-free message holds no path, and the file is left as it was. This
 scenario is tested by `SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting`.
 
-**SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing**: A provider that may
-not create is asked for an expired key. It describes the key as it is, and the folder holds only the original file. This
-scenario is tested by
+**SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing**: A provider that
+may not create is asked for an expired key. It describes the key as it is, and the folder holds only the original file.
+This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing`.
 
 **SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages**: A key is created with a capturing
@@ -241,16 +239,16 @@ configured. The error names the setting. This scenario is tested by
 certificate that is not in the store is configured. The error names the thumbprint and the store. This scenario is
 tested by `CertificateStoreKeyProvider_GetSigningKey_CertificateNotInStore_ThrowsNamingThumbprintAndStore`.
 
-**CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns**: A temporary certificate is in the store
-of the current user. The provider finds it by the thumbprint and the key signs. This scenario is tested by
+**CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns**: A temporary certificate is in the
+store of the current user. The provider finds it by the thumbprint and the key signs. This scenario is tested by
 `CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns`.
 
 **CertificateStoreKeyProvider_GetSigningKey_RequireTrustedKeyAndSelfSignedCertificate_Throws**: The rule is on and the
 certificate in the store is self-signed. An exception is raised. This scenario is tested by
 `CertificateStoreKeyProvider_GetSigningKey_RequireTrustedKeyAndSelfSignedCertificate_Throws`.
 
-**CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws**: A certificate without a private key is
-in the store. An exception names the problem. This scenario is tested by
+**CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws**: A certificate without a private key
+is in the store. An exception names the problem. This scenario is tested by
 `CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws`.
 
 **CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate**: The server application is
@@ -258,24 +256,24 @@ created with settings that choose the certificate store and name the temporary c
 the registered provider is the certificate store provider, and its key is that certificate. This scenario is tested by
 `CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate`.
 
-**AttestationKeyProviderFactory_Create_File_SelectsFileProvider**: `File` and `file` are configured. The file provider is
-created. This scenario is tested by `AttestationKeyProviderFactory_Create_File_SelectsFileProvider`.
+**AttestationKeyProviderFactory_Create_File_SelectsFileProvider**: `File` and `file` are configured. The file provider
+is created. This scenario is tested by `AttestationKeyProviderFactory_Create_File_SelectsFileProvider`.
 
 **AttestationKeyProviderFactory_Create_NegativeExpiryWarningDays_ThrowsNamingTheSetting**: `ExpiryWarningDays` is
 negative. An `AttestationKeyException` names `Attestation:ExpiryWarningDays`. This scenario is tested by
 `AttestationKeyProviderFactory_Create_NegativeExpiryWarningDays_ThrowsNamingTheSetting`.
 
 **FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_LoadsSignerAndKey**: A protected PFX is written to a temporary
-folder and its password is set in `CertificatePassword`. The provider returns the signer certificate and a key that signs.
-This scenario is tested by `FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_LoadsSignerAndKey`.
+folder and its password is set in `CertificatePassword`. The provider returns the signer certificate and a key that
+signs. This scenario is tested by `FileKeyProvider_GetSigningKey_PfxWithPasswordSetting_LoadsSignerAndKey`.
 
 **FileKeyProvider_GetSigningKey_PfxWithPasswordFile_LoadsSigner**: The password is in a file named by
 `CertificatePasswordFile`. The signer is loaded. This scenario is tested by
 `FileKeyProvider_GetSigningKey_PfxWithPasswordFile_LoadsSigner`.
 
 **FileKeyProvider_GetSigningKey_PfxWithIntermediateAndRoot_ChainHoldsTheIntermediateOnly**: The PFX holds the signer, an
-intermediate certificate and the root. The chain of the key is the intermediate certificate only. This scenario is tested
-by `FileKeyProvider_GetSigningKey_PfxWithIntermediateAndRoot_ChainHoldsTheIntermediateOnly`.
+intermediate certificate and the root. The chain of the key is the intermediate certificate only. This scenario is
+tested by `FileKeyProvider_GetSigningKey_PfxWithIntermediateAndRoot_ChainHoldsTheIntermediateOnly`.
 
 **FileKeyProvider_GetSigningKey_PemWithSeparateKeyAndChain_LoadsSignerAndChain**: A PEM certificate file with the
 intermediate certificate, and the key in the file named by `PrivateKeyPath`. The signer and the chain are loaded. This
@@ -303,21 +301,24 @@ file and a password. The signer is loaded. This scenario is tested by
 
 **FileKeyProvider_GetSigningKey_MissingFile_NamesTheFileAndTheCheckMessageNamesNoFolder**: The file does not exist. The
 message names the file and the setting, and the message for the configuration check holds the file name and not the
-folder. This scenario is tested by `FileKeyProvider_GetSigningKey_MissingFile_NamesTheFileAndTheCheckMessageNamesNoFolder`.
+folder. This scenario is tested by
+`FileKeyProvider_GetSigningKey_MissingFile_NamesTheFileAndTheCheckMessageNamesNoFolder`.
 
 **FileKeyProvider_GetSigningKey_MissingKeyFile_NamesTheSetting**: `PrivateKeyPath` names a file that does not exist. The
 message names `Attestation:PrivateKeyPath`. This scenario is tested by
 `FileKeyProvider_GetSigningKey_MissingKeyFile_NamesTheSetting`.
 
-**FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword**: A protected PFX and no password. The message says
-that the file needs a password and names `Attestation:CertificatePassword` and `Attestation:CertificatePasswordFile`. This
-scenario is tested by `FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword`.
+**FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword**: A protected PFX and no password. The message
+says that the file needs a password and names `Attestation:CertificatePassword` and
+`Attestation:CertificatePasswordFile`. This scenario is tested by
+`FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword`.
 
 **FileKeyProvider_GetSigningKey_EncryptedPemWithoutPassword_AsksForThePassword**: An encrypted PEM key and no password.
-The same message. This scenario is tested by `FileKeyProvider_GetSigningKey_EncryptedPemWithoutPassword_AsksForThePassword`.
+The same message. This scenario is tested by
+`FileKeyProvider_GetSigningKey_EncryptedPemWithoutPassword_AsksForThePassword`.
 
-**FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword**: Another password is set. The message says wrong
-password and holds neither password. This scenario is tested by
+**FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword**: Another password is set. The message says
+wrong password and holds neither password. This scenario is tested by
 `FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword`.
 
 **FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile**: An encrypted PEM key in a
@@ -335,13 +336,13 @@ convert the key to PKCS #8 with `openssl pkcs8 -topk8`; it does not say that the
 private key, and it holds neither the password nor, in the form for the configuration check, the folder. This scenario
 is tested by `FileKeyProvider_GetSigningKey_LegacyEncryptedPemKey_AsksToConvertToPkcs8`.
 
-**FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt**: A protected PFX is loaded with a `PrivateKeyPath` that
-names a file that does not exist. The PFX is used, the setting is ignored, and there is no warning. This scenario is
-tested by `FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt`.
+**FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt**: A protected PFX is loaded with a `PrivateKeyPath`
+that names a file that does not exist. The PFX is used, the setting is ignored, and there is no warning. This scenario
+is tested by `FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt`.
 
 **FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages**: Both password
-settings are set, and a password file does not exist. The messages of `SecretSource` are reported, and the password is not
-shown. This scenario is tested by
+settings are set, and a password file does not exist. The messages of `SecretSource` are reported, and the password is
+not shown. This scenario is tested by
 `FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages`.
 
 **FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning**: A PFX without a password and no requirement. The key
@@ -376,9 +377,9 @@ warning, because the setting is ignored for a PFX. The test skips itself on Wind
 filter. This scenario is tested by
 `FileKeyProvider_GetSigningKey_SeparateKeyOrPfxWithKeyPath_ChecksOnlyTheFileThatHoldsTheKey`.
 
-**FileKeyProvider_Describe_EndsWithinWarningDays_WarnsUnlessDisabledOrFarAway**: With the fixed clock, a certificate that
-ends in 10 days is described with the default 30 warning days, with 0 and with 5. Only the first has a warning, which
-names the thumbprint and the date and is logged once. This scenario is tested by
+**FileKeyProvider_Describe_EndsWithinWarningDays_WarnsUnlessDisabledOrFarAway**: With the fixed clock, a certificate
+that ends in 10 days is described with the default 30 warning days, with 0 and with 5. Only the first has a warning,
+which names the thumbprint and the date and is logged once. This scenario is tested by
 `FileKeyProvider_Describe_EndsWithinWarningDays_WarnsUnlessDisabledOrFarAway`.
 
 **FileKeyProvider_GetSigningKey_ExpiredWithoutRequireTrustedKey_SignsAndWarns**: The certificate has ended and the
@@ -386,7 +387,8 @@ rule is off. The key is returned and a warning that it expired is logged. This s
 `FileKeyProvider_GetSigningKey_ExpiredWithoutRequireTrustedKey_SignsAndWarns`.
 
 **FileKeyProvider_GetSigningKey_ExpiredWithRequireTrustedKey_IsRefused**: The certificate has ended and the rule is on.
-An exception is raised. This scenario is tested by `FileKeyProvider_GetSigningKey_ExpiredWithRequireTrustedKey_IsRefused`.
+An exception is raised. This scenario is tested by
+`FileKeyProvider_GetSigningKey_ExpiredWithRequireTrustedKey_IsRefused`.
 
 **FileKeyProvider_GetSigningKey_ValidOrganizationCertificateWithRequireTrustedKey_Accepts**: An organization certificate
 within its validity and the rule on. It is accepted. This scenario is tested by

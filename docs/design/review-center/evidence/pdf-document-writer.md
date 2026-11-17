@@ -28,9 +28,9 @@ no random value and no use of the clock beyond the creation time that the caller
   beside the label.
 - *Returns*: Nothing.
 - *Preconditions*: The text is not null.
-- *Postconditions*: The content is on the current page; when it does not fit, a new page is started. Lines break at
-  word boundaries within the width of the text; a word wider than a line is broken between characters; a line feed starts
-  a new line.
+- *Postconditions*: The content is on the current page; when it does not fit, a new page is started. Lines break at word
+  boundaries within the width of the text; a word wider than a line is broken between characters; a line feed starts a
+  new line.
 
 **Build**: Finishes the document.
 

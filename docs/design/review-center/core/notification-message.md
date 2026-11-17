@@ -50,9 +50,9 @@ are not configured. A null message raises `ArgumentNullException`.
 
 #### Error Handling
 
-Construction errors are `ArgumentException` with the name of the parameter, and the text never echoes the refused
-value, because the value may be attacker controlled or an address. A failed send is always a `NotificationSendException`,
-so a caller has one failure to handle and learns nothing about the mail server.
+Construction errors are `ArgumentException` with the name of the parameter, and the text never echoes the refused value,
+because the value may be attacker controlled or an address. A failed send is always a `NotificationSendException`, so a
+caller has one failure to handle and learns nothing about the mail server.
 
 #### Dependencies
 

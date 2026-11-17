@@ -201,8 +201,8 @@ and the enrollment is still pending. This scenario is tested by
 lock the account on the second code. This scenario is tested by
 `TotpService_CompleteSignInAsync_PasswordAndCodeFailures_ShareOneCounter`.
 
-**TotpService_CompleteSignInAsync_RightPasswordBetweenWrongCodes_DoesNotResetTheCounter**: After four wrong codes a right
-password only begins the second step and the next wrong code still locks the account. This scenario is tested by
+**TotpService_CompleteSignInAsync_RightPasswordBetweenWrongCodes_DoesNotResetTheCounter**: After four wrong codes a
+right password only begins the second step and the next wrong code still locks the account. This scenario is tested by
 `TotpService_CompleteSignInAsync_RightPasswordBetweenWrongCodes_DoesNotResetTheCounter`.
 
 **TotpService_CompleteSignInAsync_Success_ClearsTheCounter**: A complete sign-in after four failures clears the counter,
@@ -266,7 +266,8 @@ regeneration is audited. This scenario is tested by
 
 **TotpService_RegenerateRecoveryCodesAsync_WrongCode_ThrowsAndKeepsTheCodes**: A wrong code with the right password
 raises `TotpCodeIncorrect`; the ten old code hashes are unchanged and unused, no regeneration is audited, and one
-failure is counted. This scenario is tested by `TotpService_RegenerateRecoveryCodesAsync_WrongCode_ThrowsAndKeepsTheCodes`.
+failure is counted. This scenario is tested by
+`TotpService_RegenerateRecoveryCodesAsync_WrongCode_ThrowsAndKeepsTheCodes`.
 
 **TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns**: A system administrator resets a
 user; the enrollment is removed, the audit entry names the administrator and the target, and the pending sign-in ends

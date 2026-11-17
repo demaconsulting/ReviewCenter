@@ -24,8 +24,8 @@ API tokens, Two-factor authentication, and E-mail notifications.
 
 The page instance is created per browser connection, so its state is per user.
 
-**Theme**: the selected appearance, `system` (the default), `light`, or `dark`. It is not stored on the server and not in
-the database: the choice is kept per browser in the browser storage (`localStorage`, key `reviewcenter-theme`; the
+**Theme**: the selected appearance, `system` (the default), `light`, or `dark`. It is not stored on the server and not
+in the database: the choice is kept per browser in the browser storage (`localStorage`, key `reviewcenter-theme`; the
 system choice is represented by no entry), and the page reads it from the browser after its first render and writes it
 through the script functions `reviewCenter.getTheme` and `reviewCenter.setTheme`. These functions are defined by the
 script in the HTML head of the `App` component, which also applies the stored choice before the first paint (see the
@@ -79,13 +79,14 @@ explanation, in the same branch (so only while notifications are set up), the ca
 notifications" to the help topic at `/help/email-notifications`; the card with the sentence of the administrator has no
 link.
 
-The explanation also says what a mail contains (it names the kind of news, the project and the review, and links to
-the review), what it never contains (comments, answers, verdicts, outcomes), and what each mode does. **NotificationModeChoice**
-is the mode that the selector shows: the stored mode from `NotificationInfo.Mode` after every read, or the value the
-user picked. The selector offers "No e-mail" (`None`), "Daily summary" (`Daily`), and "Every change" (`Every`), in that
-order, and `None` is selected for a user who never chose. While the user has no confirmed address the selector is
-disabled, has no save button, and a hint says that an address has to be confirmed first. **NotificationModeSaved** is
-true after a successful save, so that the notice "Your e-mail setting was saved." is shown next to the selector.
+The explanation also says what a mail contains (it names the kind of news, the project and the review, and links to the
+review), what it never contains (comments, answers, verdicts, outcomes), and what each mode does.
+**NotificationModeChoice** is the mode that the selector shows: the stored mode from `NotificationInfo.Mode` after every
+read, or the value the user picked. The selector offers "No e-mail" (`None`), "Daily summary" (`Daily`), and "Every
+change" (`Every`), in that order, and `None` is selected for a user who never chose. While the user has no confirmed
+address the selector is disabled, has no save button, and a hint says that an address has to be confirmed first.
+**NotificationModeSaved** is true after a successful save, so that the notice "Your e-mail setting was saved." is shown
+next to the selector.
 
 **Message**: the confirmation of the last successful change; `null` when there is none.
 
@@ -104,30 +105,29 @@ expiry, and otherwise Active.
 
 Whose password changes is decided by the authentication state, never by a field on the page.
 
-Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
-subsystem): `account-page` (root), `password-change-required-banner` (only with a temporary password), `appearance-card`,
-`theme-system`, `theme-light`, `theme-dark`,
-`change-password-form`, `current-password-input`, `new-password-input`, `confirm-password-input`, `account-error`,
-`account-message`, `change-password-button`, `account-external-password` (only for a user of an identity provider,
-in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`,
-`create-token-form`, `token-name-input`, `token-expiry-{days}`, `create-token-button`, `token-error`, `token-message`,
-`new-token-box`, `new-token-value`, `copy-token-button`, `dismiss-token-button`, `token-copy-status`,
-`token-list-empty`, `token-list`, and for each token (by its identity) `token-row-{id}`, `token-name-{id}`,
-`token-display-id-{id}`, `token-status-{id}`, `token-created-{id}`, `token-expires-{id}`, `token-last-used-{id}`, and
-`revoke-token-{id}`; and for the two-factor card `totp-card`, `totp-external`, `totp-help-link`, `totp-status`,
-`totp-recovery-left`, `totp-error`, `totp-message`, the forms and buttons `totp-start-form`, `totp-start-password`,
-`totp-start-button`, `totp-pending`, `totp-secret`, `totp-uri`, `totp-confirm-form`, `totp-confirm-code`,
-`totp-confirm-button`, `totp-cancel-button`, `totp-disable-form`, `totp-disable-password`, `totp-disable-code`,
-`totp-disable-button`, `totp-regen-form`, `totp-regen-password`, `totp-regen-code`, `totp-regen-button`, and for the
-recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{index}`, `totp-recovery-copy`,
-`totp-recovery-dismiss`, and `totp-copy-status`; and for the notifications card `notifications-card`,
-`notifications-unavailable`, `notifications-explanation`, `notifications-help-link`, `notifications-error`,
-`notifications-message`,
-`notifications-confirmed-address`, `notifications-pending-address`, `notifications-address-form`,
-`notifications-address-input`, `notifications-send-code-button`, `notifications-confirm-form`,
-`notifications-code-input`, `notifications-confirm-button`, `notifications-resend-button`,
-`notifications-remove-button`, `notifications-mode-form`, `notifications-mode-select`, `notifications-mode-save`,
-`notifications-mode-saved`, and `notifications-mode-needs-address`.
+Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web subsystem):
+`account-page` (root), `password-change-required-banner` (only with a temporary password), `appearance-card`,
+`theme-system`, `theme-light`, `theme-dark`, `change-password-form`, `current-password-input`, `new-password-input`,
+`confirm-password-input`, `account-error`, `account-message`, `change-password-button`, `account-external-password`
+(only for a user of an identity provider, in place of the form), and for the tokens card `tokens-card`,
+`tokens-help-link`, `create-token-form`, `token-name-input`, `token-expiry-{days}`, `create-token-button`,
+`token-error`, `token-message`, `new-token-box`, `new-token-value`, `copy-token-button`, `dismiss-token-button`,
+`token-copy-status`, `token-list-empty`, `token-list`, and for each token (by its identity) `token-row-{id}`,
+`token-name-{id}`, `token-display-id-{id}`, `token-status-{id}`, `token-created-{id}`, `token-expires-{id}`,
+`token-last-used-{id}`, and `revoke-token-{id}`; and for the two-factor card `totp-card`, `totp-external`,
+`totp-help-link`, `totp-status`, `totp-recovery-left`, `totp-error`, `totp-message`, the forms and buttons
+`totp-start-form`, `totp-start-password`, `totp-start-button`, `totp-pending`, `totp-secret`, `totp-uri`,
+`totp-confirm-form`, `totp-confirm-code`, `totp-confirm-button`, `totp-cancel-button`, `totp-disable-form`,
+`totp-disable-password`, `totp-disable-code`, `totp-disable-button`, `totp-regen-form`, `totp-regen-password`,
+`totp-regen-code`, `totp-regen-button`, and for the recovery codes `totp-recovery-box`, `totp-recovery-codes`,
+`totp-recovery-code-{index}`, `totp-recovery-copy`, `totp-recovery-dismiss`, and `totp-copy-status`; and for the
+notifications card `notifications-card`, `notifications-unavailable`, `notifications-explanation`,
+`notifications-help-link`, `notifications-error`, `notifications-message`, `notifications-confirmed-address`,
+`notifications-pending-address`, `notifications-address-form`, `notifications-address-input`,
+`notifications-send-code-button`, `notifications-confirm-form`, `notifications-code-input`,
+`notifications-confirm-button`, `notifications-resend-button`, `notifications-remove-button`, `notifications-mode-form`,
+`notifications-mode-select`, `notifications-mode-save`, `notifications-mode-saved`, and
+`notifications-mode-needs-address`.
 
 #### Key Methods
 
@@ -232,8 +232,8 @@ mode.
 **RevokeTokenAsync**: Revokes one token of the user by its identity and shows "The token was revoked.". The revoke
 button is offered only for a token that is active; a rule violation is shown as the message of the violation.
 
-The tokens are managed on behalf of the signed-in user: the actor comes from `SignIn.GetActorAsync`, so a token cannot be
-created or revoked for anyone else, and a page can only be reached with the cookie, never with a token.
+The tokens are managed on behalf of the signed-in user: the actor comes from `SignIn.GetActorAsync`, so a token cannot
+be created or revoked for anyone else, and a page can only be reached with the cookie, never with a token.
 
 Other sessions of the user stay signed in after the change. An open page of the user that was disabled, removed, or
 changed ends at the next revalidation of the open page (see the `Identity` design).

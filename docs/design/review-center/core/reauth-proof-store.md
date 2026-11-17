@@ -18,7 +18,8 @@ process (a restart simply asks the user to confirm again). One dictionary and on
 **Proofs**: a dictionary from the binding (user identity, project identity, review identifier, slot identity) to the
 moment the proof was issued.
 
-**Lifetime**: `TimeSpan`, 5 minutes. A proof is live while it is younger than the lifetime and ended from that moment on.
+**Lifetime**: `TimeSpan`, 5 minutes. A proof is live while it is younger than the lifetime and ended from that moment
+on.
 
 **MaxEntries**: `int` (constant), 10,000; the most proofs held at the same time.
 

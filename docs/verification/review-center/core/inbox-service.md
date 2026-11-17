@@ -20,16 +20,16 @@ N/A - standard test environment.
 
 - All tests pass with zero failures.
 - A reviewer who holds a slot of a review with a checklist and has not handed in the ballot finds the review under To
-  answer, with the chip "Not started" or "Draft", the number of answered checks in the detail, the link to the checklist,
-  and no other standing row. A reviewer who is blocked as author, a review without a checklist, and a concluded review
-  give no To answer row; a ballot that goes back to a draft returns the row.
+  answer, with the chip "Not started" or "Draft", the number of answered checks in the detail, the link to the
+  checklist, and no other standing row. A reviewer who is blocked as author, a review without a checklist, and a
+  concluded review give no To answer row; a ballot that goes back to a draft returns the row.
 - A reviewer who handed in the ballot and may see the other ballots finds the review under Disputed, with the chip
   "{n} disputed", while checks or sections are disputed; the row goes away when the dispute is settled, and is unread
   after another reviewer hands in a ballot. The creator, who may see the ballots, finds it too.
 - A reviewer who has not handed in the ballot never finds a Disputed row, and no dispute count, however the others
   answered.
-- A reviewer who handed in the ballot, with nothing blocking the signature, and a slot without a current signature
-  finds the review under Ready to sign, with the chip "Not signed" or "The review changed, sign again", and a signed slot
+- A reviewer who handed in the ballot, with nothing blocking the signature, and a slot without a current signature finds
+  the review under Ready to sign, with the chip "Not signed" or "The review changed, sign again", and a signed slot
   gives no such row. An open thread, a dispute or a pending check puts the reviewer under Waiting for others instead.
 - A reviewer who has done their part finds the review under Waiting for others, with a chip and the names of the people
   who are waited for; this row is never unread and is not counted as action.
@@ -83,7 +83,8 @@ finds the review under Ready to sign with the chip "Not signed", and the row is 
 `InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem`.
 
 **InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem**: The alternate reviewer of the slot also finds the
-review under Ready to sign. This scenario is tested by `InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem`.
+review under Ready to sign. This scenario is tested by
+`InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem`.
 
 **InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip**: After a signature the record changes (a new
 answer); the signature no longer covers the record and the reviewer finds the chip "The review changed, sign again" and
@@ -179,19 +180,19 @@ any chip or detail. This scenario is tested by
 Disputed row with the count, and no Ready to sign row while the dispute stands. This scenario is tested by
 `InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount`.
 
-**InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed**: The creator of the review, who may see the ballots, finds
-the Disputed row with the text for someone who does not answer. This scenario is tested by
+**InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed**: The creator of the review, who may see the ballots,
+finds the Disputed row with the text for someone who does not answer. This scenario is tested by
 `InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed`.
 
 **InboxService_GetInboxAsync_DisputeResolved_RowDisappears**: When the reviewers agree the Disputed row goes away. This
 scenario is tested by `InboxService_GetInboxAsync_DisputeResolved_RowDisappears`.
 
-**InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission**: A Disputed row the user has seen is unread again when
-another reviewer hands in a ballot after the last seen time. This scenario is tested by
+**InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission**: A Disputed row the user has seen is unread again
+when another reviewer hands in a ballot after the last seen time. This scenario is tested by
 `InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission`.
 
-**InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign**: A reviewer who handed in, with nothing
-blocking, finds the review under Ready to sign with the chip "Not signed". This scenario is tested by
+**InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign**: A reviewer who handed in, with
+nothing blocking, finds the review under Ready to sign with the chip "Not signed". This scenario is tested by
 `InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign`.
 
 **InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign**: A reviewer who handed in and has an open thread
@@ -250,14 +251,15 @@ Waiting for others row of bob says "The signatures of Cyd and Dee no longer coun
 names Ann's signature: the alternate who signed is named, and so is the primary who signed. This scenario is tested by
 `InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner`.
 
-**InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate**: Cyd, the alternate of the slot of
-ann, signs and bob then opens a finding. The Waiting for others row of bob is the sentence of `InboxRules.WaitingForText`
-with Ann and Cyd awaited and only Cyd's signature lapsed ("Cyd's signature no longer counts, so Cyd must sign again.").
-This scenario is tested by `InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate`.
+**InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate**: Cyd, the alternate of the slot
+of ann, signs and bob then opens a finding. The Waiting for others row of bob is the sentence of
+`InboxRules.WaitingForText` with Ann and Cyd awaited and only Cyd's signature lapsed ("Cyd's signature no longer counts,
+so Cyd must sign again."). This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate`.
 
 **InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn**: With the ballots of ann and
-bob in and the one of cyd missing, the Ready to sign row of ann holds the sentence of `ReviewApproval.MissingBallotsText`
-for cyd, and holds none once cyd has handed in. This scenario is tested by
+bob in and the one of cyd missing, the Ready to sign row of ann holds the sentence of
+`ReviewApproval.MissingBallotsText` for cyd, and holds none once cyd has handed in. This scenario is tested by
 `InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn`.
 
 **InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn**: The Disputed row of ann names the disputed
@@ -273,13 +275,13 @@ not counted. This scenario is tested by `InboxService_GetInboxAsync_OwnSlotSigne
 review whose due date has passed shows no due date and no overdue mark, because the row is no work. This scenario is
 tested by `InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue`.
 
-**InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting**: The action count includes the To answer
-and the Disputed reviews and leaves out the Waiting for others and the Updates rows. This scenario is tested by
+**InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting**: The action count includes the To
+answer and the Disputed reviews and leaves out the Waiting for others and the Updates rows. This scenario is tested by
 `InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting`.
 
-**InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons**: Bob answers a check of
-the review of the author as Fail; the failed-checks row of the author has the detail "Reviewers marked 1 check as Fail so
-far. If that stands, the review will be rejected and its reasons must be written down." This scenario is tested by
+**InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons**: Bob answers a check of the review
+of the author as Fail; the failed-checks row of the author has the detail "Reviewers marked 1 check as Fail so far. If
+that stands, the review will be rejected and its reasons must be written down." This scenario is tested by
 `InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons`.
 
 **InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction**: Both slots reject and sign, ann first and
@@ -309,8 +311,8 @@ the overdue mark, and an approved review shows no due date. This scenario is tes
 **InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach**: A review with several reasons is listed once in
 each group. This scenario is tested by `InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach`.
 
-**InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread**: A user without a state row finds every comment of
-others unread, and the baseline is zero. This scenario is tested by
+**InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread**: A user without a state row finds every comment
+of others unread, and the baseline is zero. This scenario is tested by
 `InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread`.
 
 **InboxService_GetInboxAsync_OwnComments_AreNeverUnread**: A user's own comments are never unread, whatever the case of
@@ -359,8 +361,8 @@ later time, and stores nothing for a user who may not see the review. This scena
 review, including the ones that were never opened, with the highest comment; a new comment is unread again. This
 scenario is tested by `InboxService_MarkAllReadAsync_UpsertsEveryListedReview`.
 
-**InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread**: A comment written after the time the marking began is
-not stored as seen, so the review stays unread. This scenario is tested by
+**InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread**: A comment written after the time the marking began
+is not stored as seen, so the review stays unread. This scenario is tested by
 `InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread`.
 
 **InboxService_NullArguments_Throw**: Null arguments are refused where a value is required. This scenario is tested by
@@ -423,8 +425,8 @@ than the last seen one. This scenario is tested by `InboxRules_IsUnread_OtherAnd
 comments of all threads, and no comment gives zero. This scenario is tested by
 `InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted`.
 
-**InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments**: With a cutoff time, the highest comment ignores the comments
-created after it. This scenario is tested by `InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments`.
+**InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments**: With a cutoff time, the highest comment ignores the
+comments created after it. This scenario is tested by `InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments`.
 
 **InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting**: The threads that wait for the user are the open ones with
 the latest comment by someone else in which the user wrote or that belong to a review the user authored. This scenario
@@ -530,5 +532,5 @@ missing creator. This scenario is tested by `InboxRules_AuthorBlocked_ParityWith
 the chip for one other, several others and none are worded as in the help. This scenario is tested by
 `InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded`.
 
-**InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates**: Only Waiting for others and Updates are not action. This
-scenario is tested by `InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates`.
+**InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates**: Only Waiting for others and Updates are not action.
+This scenario is tested by `InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates`.

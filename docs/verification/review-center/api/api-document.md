@@ -43,7 +43,8 @@ N/A - standard test environment (a temporary database is created by each test). 
 **ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires**: The document is requested without a token and parsed.
 The `required` list of `CreateReviewRequest` holds exactly `id` and `title`, and that of `RepositorySourceDto` holds
 exactly `headRevision` and `repositoryId`, so the files, the repository, the baseline revision, and the selection are
-optional for a client generator. This scenario is tested by `ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires`.
+optional for a client generator. This scenario is tested by
+`ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires`.
 
 **ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme**: The document is requested without a token and parsed. It is
 served with 200, has the version `1`, lists no server, has an HTTP bearer and an HTTP Basic security scheme, lists the

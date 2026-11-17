@@ -4,18 +4,16 @@
 
 ### Overview
 
-The `ContentSources` subsystem reads content from outside the system. At present it reads git repositories, so that
-a review can be created from the files of a repository revision (the `ReviewService` of `Core` does that), and it
-protects the access tokens that private
-repositories need. It implements two contracts that the `Core` subsystem defines and holds no domain rule of its own: the
-repositories of each project, their names, and who may change them belong to `Core` and `Storage`. It contains four units:
-`GitRunner`, which runs the git command-line tool safely and reports its result; `GitSource`, which keeps a local
-mirror of each registered repository and answers the questions of the Core git contract; `ReviewSetParser` (the class
-`ReviewMarkConfigParser`), which reads the review-sets out of the ReviewMark configuration file of a repository; and
-`CredentialProtector`,
-which encrypts and decrypts tokens with the ASP.NET Core Data Protection system. The units are internal to the
-application, except the options type `GitOptions`, which is documented with `GitRunner`; the rest of the system sees
-only the Core interfaces.
+The `ContentSources` subsystem reads content from outside the system. At present it reads git repositories, so that a
+review can be created from the files of a repository revision (the `ReviewService` of `Core` does that), and it protects
+the access tokens that private repositories need. It implements two contracts that the `Core` subsystem defines and
+holds no domain rule of its own: the repositories of each project, their names, and who may change them belong to `Core`
+and `Storage`. It contains four units: `GitRunner`, which runs the git command-line tool safely and reports its result;
+`GitSource`, which keeps a local mirror of each registered repository and answers the questions of the Core git
+contract; `ReviewSetParser` (the class `ReviewMarkConfigParser`), which reads the review-sets out of the ReviewMark
+configuration file of a repository; and `CredentialProtector`, which encrypts and decrypts tokens with the ASP.NET Core
+Data Protection system. The units are internal to the application, except the options type `GitOptions`, which is
+documented with `GitRunner`; the rest of the system sees only the Core interfaces.
 
 ### Interfaces
 
@@ -29,9 +27,9 @@ only the Core interfaces.
   and reads the exact bytes of a blob up to a limit, and tells whether one commit is an ancestor of another. Disposing
   the session releases the repository.
 - *Constraints*: At most one session per repository is open at a time, so a second `OpenAsync` for the same repository
-  waits until the first session is disposed; sessions on different repositories run in parallel. Failures are reported as
-  a `DomainRuleException` for `GitUnavailable`, `GitAccessFailed`, `GitTimeout`, `RevisionInvalid`, or `RevisionNotFound`.
-  The token is never part of a session or of any message.
+  waits until the first session is disposed; sessions on different repositories run in parallel. Failures are reported
+  as a `DomainRuleException` for `GitUnavailable`, `GitAccessFailed`, `GitTimeout`, `RevisionInvalid`, or
+  `RevisionNotFound`. The token is never part of a session or of any message.
 
 **ReviewMarkConfigParser (as IReviewSetParser)**: The reading of the review-sets of a repository.
 
@@ -157,12 +155,12 @@ the first start with it.
 
 **Reading the review-sets**: The configuration file is the one that ReviewMark reads, so a repository defines its
 review-sets once for both tools. `ReviewMarkConfigParser` uses YamlDotNet, the library that ReviewMark uses, so quoting,
-flow style, and block scalars mean the same here. Only the top-level `reviews` list is read, and of each entry only `id`,
-`title`, and `paths`. The file comes from other people, so its size is checked before it is read, the events of the YAML
-are scanned first to refuse an alias (an alias is expanded at every use, so a small file could otherwise describe an
-enormous document), and the counts and lengths are checked after it is read. A problem of the library never reaches the
-user: it becomes a plain message that names the line and column or the position of the entry. The blob is read through
-`GitSource`, and the choice of the file and of the commit belongs to the planner in `Core`.
+flow style, and block scalars mean the same here. Only the top-level `reviews` list is read, and of each entry only
+`id`, `title`, and `paths`. The file comes from other people, so its size is checked before it is read, the events of
+the YAML are scanned first to refuse an alias (an alias is expanded at every use, so a small file could otherwise
+describe an enormous document), and the counts and lengths are checked after it is read. A problem of the library never
+reaches the user: it becomes a plain message that names the line and column or the position of the entry. The blob is
+read through `GitSource`, and the choice of the file and of the commit belongs to the planner in `Core`.
 
 **Known limitations**: The subsystem needs a usable git on the server and reads only `https`, `http`, and `file`
 locations; SSH is not supported, because no safe way is available to give it a key. The token is sent as a basic

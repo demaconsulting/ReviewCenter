@@ -20,9 +20,9 @@ thread-safe. It holds the clock (`TimeProvider`, injected so tests control time)
 by the database (`ValueGeneratedNever`), `ActorName`, `Action`, and `Detail` are required with the maximum lengths of
 `AuditText`, `PreviousHash` and `Hash` are required and 64 characters long, `TimestampUtc` is stored as fixed-width UTC
 text (see *Decision on the date range* below), and four indexes serve the reads: project, review, and sequence for the
-history of one review, and project and sequence, actor and sequence, and action and sequence for the filters of the audit
-pages. There are **no foreign keys**: an entry is a snapshot of text and must survive
-whatever happens to the rows it describes.
+history of one review, and project and sequence, actor and sequence, and action and sequence for the filters of the
+audit pages. There are **no foreign keys**: an entry is a snapshot of text and must survive whatever happens to the rows
+it describes.
 
 #### Key Methods
 
@@ -40,9 +40,9 @@ whatever happens to the rows it describes.
      transaction.
   4. When the draft is not `null`, append the entry (see `AppendAsync`).
   5. Save, commit, and release the gate in a `finally` block.
-- *Postconditions*: The change and the entry are both stored, or nothing is. A `null` draft means that the change did not
-  take effect (or is not audited), so no entry is appended. The gate is released on every path, including cancellation
-  and failure.
+- *Postconditions*: The change and the entry are both stored, or nothing is. A `null` draft means that the change did
+  not take effect (or is not audited), so no entry is appended. The gate is released on every path, including
+  cancellation and failure.
 
 **AuditAppender.AppendAsync**: Adds the next entry to the context of the open transaction (the caller saves).
 
@@ -99,11 +99,11 @@ be deleted and created again, like for every change of the schema (there are no 
 verification can stream the trail in batches.
 
 **AuditStore.ReadMatchingAsync**: The read of the export: entries that match an `AuditFilter`, in ascending sequence
-order, with `Sequence > afterSequence` and `Sequence <= upToSequence`, at most a given number (a keyset batch; the caller
-passes the last sequence it received). It applies exactly the conditions of `ListAsync` (the same private filter
+order, with `Sequence > afterSequence` and `Sequence <= upToSequence`, at most a given number (a keyset batch; the
+caller passes the last sequence it received). It applies exactly the conditions of `ListAsync` (the same private filter
 function), so the export holds what the page shows and a project filter never returns an entry without a project. The
-upper bound is the snapshot of the export: entries appended later are never read. The read is untracked, takes no
-gate, and uses the indexes of the filter ending in `Sequence`.
+upper bound is the snapshot of the export: entries appended later are never read. The read is untracked, takes no gate,
+and uses the indexes of the filter ending in `Sequence`.
 
 **AuditStore.LatestSequenceAsync**: Returns the highest sequence of the trail, or 0 for an empty trail (the maximum of
 the primary key). The export reads it to fix its snapshot before it verifies the chain.
@@ -137,7 +137,8 @@ names a review.
 A database failure inside a transaction propagates to the caller after the transaction has rolled back and the gate has
 been released; the caller (a service) lets it surface for a change of data, and the best-effort path
 (`AuditService.TryRecordAsync`) catches and logs it for events that change no data. A failure of the draft function of a
-store method also rolls everything back. Cancellation is honored while waiting for the gate and during the database calls.
+store method also rolls everything back. Cancellation is honored while waiting for the gate and during the database
+calls.
 
 #### Dependencies
 

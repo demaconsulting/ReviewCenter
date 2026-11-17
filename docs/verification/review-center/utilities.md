@@ -149,8 +149,9 @@ with a recognizable text) are each given as the secret file; every one of the fi
 `InvalidOperationException` whose message names the file setting and does not contain the recognizable text. This
 scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting`.
 
-**UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned**: Only an inline secret is given; `SecretSource.Resolve`
-returns it unchanged. This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned`.
+**UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned**: Only an inline secret is given;
+`SecretSource.Resolve` returns it unchanged. This scenario is tested by
+`UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned`.
 
 **UtilitiesSubsystem_SecretSourceWorkflow_NeitherSet_ReturnsNoSecret**: Neither the inline secret nor the file is
 given; `SecretSource.Resolve` returns no secret and throws nothing. This scenario is tested by

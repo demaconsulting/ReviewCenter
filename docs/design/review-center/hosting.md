@@ -252,15 +252,14 @@ The attestation of the `Evidence` subsystem is registered in the same place: the
 provider that the factory chooses from them, the renderer, the signer, and `AttestationService`, all singletons. The
 self-signed key is kept in `Attestation:SelfSignedFolder`, or in an `attestation-selfsigned` folder inside the folder of
 the Data Protection key ring, so that it persists and is backed up with the other keys. `CreateApplication` calls
-`ValidateAttestation` right after the key ring check: it obtains the signing key, and an `AttestationKeyException`
-(an unknown provider, a missing thumbprint, a certificate that is not in the store, `RequireTrustedKey` with a
-self-signed key or a certificate without a signing key usage, an unusable folder, or a protected key file that the key
-ring cannot decrypt, which names the file) becomes an
-`InvalidOperationException` "The attestation signing key is not
-usable: ..." that names the setting. The same reasoning applies as for the database and the key ring: an operator who
-chose a certificate must learn at the start that the choice does not work. The price is that a server whose key is in a
-hardware module that is not present does not start. The endpoint `/projects/{projectId}/reviews/{reviewId}/attestation.pdf`
-is mapped after the sign-in endpoints and requires a signed-in user.
+`ValidateAttestation` right after the key ring check: it obtains the signing key, and an `AttestationKeyException` (an
+unknown provider, a missing thumbprint, a certificate that is not in the store, `RequireTrustedKey` with a self-signed
+key or a certificate without a signing key usage, an unusable folder, or a protected key file that the key ring cannot
+decrypt, which names the file) becomes an `InvalidOperationException` "The attestation signing key is not usable: ..."
+that names the setting. The same reasoning applies as for the database and the key ring: an operator who chose a
+certificate must learn at the start that the choice does not work. The price is that a server whose key is in a hardware
+module that is not present does not start. The endpoint `/projects/{projectId}/reviews/{reviewId}/attestation.pdf` is
+mapped after the sign-in endpoints and requires a signed-in user.
 
 The `Api` subsystem is registered after the sign-in: `AddApiTokenAuthentication` adds the bearer token scheme and the
 `Api` policy, and `AddApiDocument` adds the OpenAPI document generation. `MapApi` and `MapApiDocument` come after

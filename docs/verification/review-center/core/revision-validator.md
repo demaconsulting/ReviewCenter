@@ -25,8 +25,9 @@ N/A - standard test environment.
 **RevisionValidator_Validate_ValidRevision_ReturnsIt**: Ordinary revisions are accepted and returned unchanged. This
 scenario is tested by `RevisionValidator_Validate_ValidRevision_ReturnsIt`.
 
-**RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid**: Option-like and expression-like revisions are refused
-with `RevisionInvalid`. This scenario is tested by `RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid`.
+**RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid**: Option-like and expression-like revisions are
+refused with `RevisionInvalid`. This scenario is tested by
+`RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid`.
 
-**RevisionValidator_Validate_LengthLimit_IsInclusive**: A revision of 200 characters is accepted and one of 201 is refused.
-This scenario is tested by `RevisionValidator_Validate_LengthLimit_IsInclusive`.
+**RevisionValidator_Validate_LengthLimit_IsInclusive**: A revision of 200 characters is accepted and one of 201 is
+refused. This scenario is tested by `RevisionValidator_Validate_LengthLimit_IsInclusive`.

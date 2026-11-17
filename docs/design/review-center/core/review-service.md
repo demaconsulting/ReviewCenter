@@ -162,8 +162,8 @@ with nothing stored:
    (both are the one stored state `Draft`) can be followed, and so can a follow-up (a chain). The new review always
    points to its immediate source; what it carried from older reviews keeps the mark of the immediate source.
 3. `IReviewStore.GetRecordAsync` reads the record of the earlier review, `IReviewStore.ListChecklistAnswersAsync` and
-   `ListChecklistSectionStatesAsync` read its review-level baseline rows (slot 0, what the earlier review itself carried),
-   and `FollowUpCarry.Compute` works out what is carried (below).
+   `ListChecklistSectionStatesAsync` read its review-level baseline rows (slot 0, what the earlier review itself
+   carried), and `FollowUpCarry.Compute` works out what is carried (below).
 4. Open threads of the earlier review whose file is not in the new review are never carried. Unless
    `acknowledgeDroppedThreads` is true they refuse the creation with the message from `FollowUpCarry.DroppedMessage`,
    which lists the files (at most 10, then "and N more"). When it is true they are dropped and counted in the audit
@@ -271,8 +271,9 @@ administrator or a system administrator (`IProjectAccess.CanAdministerAsync`) an
 (`Review.CreatedBy`, compared without regard to case, and only while that user can still see the project). Pages use it
 to show or hide the form; `SetDueDateAsync` repeats it, so the pages are never the only guard.
 
-**SetDueDateAsync**: `SetDueDateAsync(int projectId, string reviewId, DateOnly? dueDate, Actor actor, CancellationToken)`
-sets, changes, or clears (`null`) the due date after creation and returns whether anything changed.
+**SetDueDateAsync**:
+`SetDueDateAsync(int projectId, string reviewId, DateOnly? dueDate, Actor actor, CancellationToken)` sets, changes, or
+clears (`null`) the due date after creation and returns whether anything changed.
 
 - *Preconditions*: the actor may see the project (`ProjectNotFound` otherwise, as for every action), the review exists
   (`ReviewNotFound`), and `CanSetDueDateAsync` holds (`ActorNotAllowed` otherwise).

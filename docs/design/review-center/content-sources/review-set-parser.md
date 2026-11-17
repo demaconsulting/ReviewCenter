@@ -14,8 +14,8 @@ reused `IDeserializer` of YamlDotNet, built with the camel-case naming conventio
 **Result**: a list of `ReviewSetDefinition` (defined in `Core`) values, each with `Id`, `Title`, and `Paths` (an ordered
 list of include and exclude patterns), in the order of the file.
 
-**Shapes read**: two private shapes, a document with a `reviews` list and an entry with `id`, `title`, and `paths`. Every
-other key, at any level, is ignored.
+**Shapes read**: two private shapes, a document with a `reviews` list and an entry with `id`, `title`, and `paths`.
+Every other key, at any level, is ignored.
 
 **Limits** (`ReviewLimits` and `SelectionMatcher`): the file is at most 256 KiB, a file has at most 500 sets, an
 identifier has at most 100 characters, a title at most 200, a set at most `SelectionMatcher.MaxPatterns` paths, and a

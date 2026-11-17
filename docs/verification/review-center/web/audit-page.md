@@ -48,8 +48,8 @@ N/A - standard test environment.
   entries; a user who lost the right after the page was opened, by revoked membership, demotion, or the end of the
   session, sees the not-found message and no entries.
 - The filter form (actor, action, review, dates, page size, and the project on the whole-trail page) limits the entries
-  and shows its values again; its state is in the address; the links to the older and newer page carry the filter and the
-  page size; a filter that matches nothing says so and offers to clear it; a project page never shows another
+  and shows its values again; its state is in the address; the links to the older and newer page carry the filter and
+  the page size; a filter that matches nothing says so and offers to clear it; a project page never shows another
   project or an entry without a project, whatever the address says.
 - Hostile values in the address (markup, huge texts, negative or unknown sizes, bad dates, unknown actions, reversed
   dates) never raise and are shown, if at all, as encoded text.
@@ -60,8 +60,8 @@ N/A - standard test environment.
 
 #### Test Scenarios
 
-**AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues**: The whole-trail page is rendered with a filter, a page
-size, and a position; the CSV and JSON links point to `/audit/export` with the filter values and the project but no
+**AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues**: The whole-trail page is rendered with a filter, a
+page size, and a position; the CSV and JSON links point to `/audit/export` with the filter values and the project but no
 size, `before` or `after`. This scenario is tested by `AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues`
 and, for the query itself, `AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues`.
 
@@ -142,7 +142,8 @@ missing project each give the not-found message, no table, and no event or proje
 `ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`.
 
 **ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly**: An Auditor of the project opens the audit page and
-sees the entries of that project only. This scenario is tested by `ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly`.
+sees the entries of that project only. This scenario is tested by
+`ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly`.
 
 **ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst**: More than 50 events are recorded for the project; the
 first page shows 50 rows with the newest on top and a link to the older page, and no link to a newer one; the older
@@ -203,8 +204,8 @@ values; only the matching entries of the project are shown and the form has no p
 tested by `ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries`, and with a filter that matches nothing and
 hostile values by `ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe`.
 
-**ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries**: Even with a project in the query, the
-page shows only the entries of its own project and none without a project. This scenario is tested by
+**ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries**: Even with a project in the query,
+the page shows only the entries of its own project and none without a project. This scenario is tested by
 `ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries`.
 
 **AuditFilterState_FromQuery_NoValues_IsTheDefaultState**: Without query values the state matches everything with the

@@ -20,8 +20,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   database; a supplied identity is ignored.
 - A user name that differs from an existing one only in case is refused with the rule `UserNameTaken`, and a lookup
   by user name ignores case; an unknown user name gives no user.
-- A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout time
-  is stored.
+- A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout
+  time is stored.
 - Users are listed ordered by user name.
 - A user of an external identity provider is stored with its issuer and subject and is found by the exact pair only
   (another case or another issuer gives no user); a second user with the same pair is refused with `UserNameTaken`,

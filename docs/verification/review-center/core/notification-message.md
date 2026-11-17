@@ -69,7 +69,8 @@ each raise an exception for the matching body parameter. This scenario is tested
 `NotificationMessage_Constructor_NulInBody_Throws`.
 
 **NotificationMessage_Constructor_EmptyBody_Throws**: An empty plain text body and an empty HTML body each raise an
-exception for the matching body parameter. This scenario is tested by `NotificationMessage_Constructor_EmptyBody_Throws`.
+exception for the matching body parameter. This scenario is tested by
+`NotificationMessage_Constructor_EmptyBody_Throws`.
 
 **NotificationMessage_Constructor_BodyWithLineBreaks_Succeeds**: A body of several lines is accepted and kept. This
 scenario is tested by `NotificationMessage_Constructor_BodyWithLineBreaks_Succeeds`.

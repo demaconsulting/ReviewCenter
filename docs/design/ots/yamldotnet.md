@@ -4,8 +4,8 @@ This document describes the integration and usage design for the `YamlDotNet` OT
 
 ### Purpose
 
-YamlDotNet is a widely used library for reading and writing YAML. ReviewCenter uses it in the distributed application
-to read the review-sets out of the ReviewMark `.reviewmark.yaml` file of a registered repository. ReviewMark itself reads
+YamlDotNet is a widely used library for reading and writing YAML. ReviewCenter uses it in the distributed application to
+read the review-sets out of the ReviewMark `.reviewmark.yaml` file of a registered repository. ReviewMark itself reads
 the file with the same library, so the file means the same to both tools.
 
 ### Features Used

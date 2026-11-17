@@ -2,14 +2,14 @@
 
 #### Verification Approach
 
-`GitSource` is verified with tests defined in `GitSourceTests.cs`, against real git repositories that the tests create in
-private temporary folders with the installed git (through the helper `GitTestSupport`). An origin repository with two
-commits exercises every kind of change: a modification, an addition, a deletion, a rename, a symbolic link, a
-submodule entry, a mode-only change, and a path with spaces and a non-ASCII character. The source clones and fetches
-from that origin through the real `GitRunner` into a cache folder of the test, so the mirror, the revisions, the change
-lists, and the blobs are verified as git reports them. Serialization is verified by opening sessions on the same and on
-different repositories and observing whether the second open waits. The absence of the token from the mirror is verified
-by reading the configuration file of the mirror after an open with a token. Tests skip themselves when git is not
+`GitSource` is verified with tests defined in `GitSourceTests.cs`, against real git repositories that the tests create
+in private temporary folders with the installed git (through the helper `GitTestSupport`). An origin repository with two
+commits exercises every kind of change: a modification, an addition, a deletion, a rename, a symbolic link, a submodule
+entry, a mode-only change, and a path with spaces and a non-ASCII character. The source clones and fetches from that
+origin through the real `GitRunner` into a cache folder of the test, so the mirror, the revisions, the change lists, and
+the blobs are verified as git reports them. Serialization is verified by opening sessions on the same and on different
+repositories and observing whether the second open waits. The absence of the token from the mirror is verified by
+reading the configuration file of the mirror after an open with a token. Tests skip themselves when git is not
 installed.
 
 #### Test Environment
@@ -48,8 +48,8 @@ the modification, the addition, and the deletion with their blob ids, shows the 
 lists the symbolic link and the submodule as skipped entries with their reasons, and leaves out the mode-only change.
 This scenario is tested by `GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries`.
 
-**GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded**: Without a baseline every file of the head commit is listed as
-added. This scenario is tested by `GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded`.
+**GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded**: Without a baseline every file of the head commit is listed
+as added. This scenario is tested by `GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded`.
 
 **GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit**: The size and the exact bytes of a blob are read, and a blob
 over the limit is `GitAccessFailed`, not a truncated result. This scenario is tested by
@@ -76,12 +76,12 @@ scenario is tested by `GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentExce
 makes one bare mirror folder for each, named for the repository, with no working tree, and leaves no temporary folder.
 This scenario is tested by `GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository`.
 
-**GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches**: After a commit is added and a branch is deleted in the
-origin, opening again makes the new commit resolvable and the deleted branch unknown. This scenario is tested by
+**GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches**: After a commit is added and a branch is deleted in
+the origin, opening again makes the new commit resolvable and the deleted branch unknown. This scenario is tested by
 `GitSource_OpenAgain_FetchesNewCommitsAndPrunesDeletedBranches`.
 
-**GitSource_LocationChanged_ClonesAgain**: The same repository identity opened with another location gives the content of
-the new location and not of the old. This scenario is tested by `GitSource_LocationChanged_ClonesAgain`.
+**GitSource_LocationChanged_ClonesAgain**: The same repository identity opened with another location gives the content
+of the new location and not of the old. This scenario is tested by `GitSource_LocationChanged_ClonesAgain`.
 
 **GitSource_SecondSessionOnSameRepository_WaitsForTheFirst**: While a session is open, a second open of the same
 repository does not complete; it completes when the first session is disposed. This scenario is tested by
@@ -91,8 +91,8 @@ repository does not complete; it completes when the first session is disposed. T
 tested by `GitSource_DifferentRepositories_OpenTogether`.
 
 **GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp**: A location that does not exist gives
-`GitAccessFailed`, no temporary or half-made mirror folder remains, and the repository lock is released. This scenario is
-tested by `GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp`.
+`GitAccessFailed`, no temporary or half-made mirror folder remains, and the repository lock is released. This scenario
+is tested by `GitSource_Open_LocationMissing_ThrowsGitAccessFailedAndCleansUp`.
 
 **GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable**: A cache path below a regular file cannot be created; the
 open fails with `GitUnavailable`, the message names `Git:CachePath` but not the path, no inner exception is chained,

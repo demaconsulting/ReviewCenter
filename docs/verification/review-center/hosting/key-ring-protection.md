@@ -111,9 +111,9 @@ and the earlier one has none; there is no problem and the earlier certificate is
 password; there is no problem and the certificate has a private key. This scenario is tested by
 `KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey`.
 
-**KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey**: A PEM file that holds the certificate and its private
-key is prepared without a password; there is no problem and the certificate has a private key. This scenario is tested
-by `KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey`.
+**KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey**: A PEM file that holds the certificate and its
+private key is prepared without a password; there is no problem and the certificate has a private key. This scenario is
+tested by `KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey`.
 
 **KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey**: A PEM certificate file and the key file that
 `DataProtection:CertificateKeyPath` names are prepared without a password; there is no problem and the certificate has
@@ -185,9 +185,9 @@ For a Unix platform the new key file is restricted to 0600 and the key is read b
 Windows platform the key is stored and no mode is set. These scenarios run on every platform and are tested by the
 tests of the same names.
 
-**KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly**: On Linux and macOS only, a key
-stored through the decorator with the real call ends up with mode 0600, as the key file of a ring that rolls while the
-server runs. This scenario is tested by the test of the same name.
+**KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly**: On Linux and macOS only, a
+key stored through the decorator with the real call ends up with mode 0600, as the key file of a ring that rolls while
+the server runs. This scenario is tested by the test of the same name.
 
 **KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem**: On Windows only, in a temporary
 folder that does not exist yet, the folder is restricted twice (the second call changes nothing). It does not inherit
@@ -195,9 +195,9 @@ from its parent, it holds allow rules for the current account and the system and
 afterwards inherits exactly those rules. The current account keeps full control, so that the temporary folder can be
 deleted. This scenario is tested by the test of the same name.
 
-**KeyRingProtection_RestrictKeyFolder_WindowsDpapi_LeavesTheInheritedRules**: On Windows only, the DPAPI protection, which
-encrypts the key files, leaves the folder inheriting the rules of its parent. This scenario is tested by the test of the
-same name.
+**KeyRingProtection_RestrictKeyFolder_WindowsDpapi_LeavesTheInheritedRules**: On Windows only, the DPAPI protection,
+which encrypts the key files, leaves the folder inheriting the rules of its parent. This scenario is tested by the test
+of the same name.
 
 **KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt**: On Windows only, a real ring is protected
 with DPAPI in a temporary folder and read again by a new provider; the key file holds an encrypted secret. This

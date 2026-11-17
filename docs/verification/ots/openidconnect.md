@@ -6,9 +6,9 @@ item. Requirements for this OTS item are defined in the OpenIdConnect OTS Softwa
 ### Required Functionality
 
 Microsoft.AspNetCore.Authentication.OpenIdConnect performs the authorization code flow with a proof key, a state, and a
-nonce against the provider, accepts the identity token only when it is valid and the state is the one it issued, lets the
-application add `prompt` and `max_age` to the request, and gives the application the claims of the token. A passing test
-confirms that the `OidcSignIn` unit gets all of this from the package.
+nonce against the provider, accepts the identity token only when it is valid and the state is the one it issued, lets
+the application add `prompt` and `max_age` to the request, and gives the application the claims of the token. A passing
+test confirms that the `OidcSignIn` unit gets all of this from the package.
 
 ### Verification Approach
 

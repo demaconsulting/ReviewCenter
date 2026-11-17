@@ -32,7 +32,7 @@ ordered; `Read` sees the project, `Contribute` also works in it, and `Administer
 The rules are:
 
 | Actor | View | Contribute | Administer | Audit |
-| ----- | ---- | ---------- | ---------- | ----- |
+| --- | --- | --- | --- | --- |
 | missing, command line, unknown, disabled, or temporary-password user | nothing | nothing | nothing | nothing |
 | enabled system administrator | every project | every project | every project | every project |
 | member with role `User` | member projects | member projects | nothing | nothing |

@@ -239,20 +239,20 @@ should be deleted, and nothing is changed. This scenario is tested by the test o
 was written by another ring. The check fails with a message that names `attestation-selfsigned.pfx.protected` and the
 remedy, and holds no folder path and no key material. This scenario is tested by the test of the same name.
 
-**ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder**: The protected attestation key file
-is held open exclusively by another handle, so that reading it fails with an I/O error. The check fails with a message
-that names `Attestation:SelfSignedFolder` and neither the attestation folder nor the data folder. This scenario is
-tested by the test of the same name.
+**ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder**: The protected attestation key
+file is held open exclusively by another handle, so that reading it fails with an I/O error. The check fails with a
+message that names `Attestation:SelfSignedFolder` and neither the attestation folder nor the data folder. This scenario
+is tested by the test of the same name.
 
 **ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting**: `Attestation:Provider` has a
 value that does not exist. The check fails and names the setting and lists SelfSigned, CertificateStore and File. This
 scenario is tested by the test of the same name.
 
-**ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword**: The File provider
-is configured with a protected PFX that ends in about 30 days and its password in `Attestation__CertificatePassword`. The
-check passes and reports the subject and the thumbprint of the key and the expiry warning; the output holds neither the
-folder of the file nor the password, and the files of the installation are unchanged. This scenario is tested by the
-test of the same name.
+**ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword**: The File
+provider is configured with a protected PFX that ends in about 30 days and its password in
+`Attestation__CertificatePassword`. The check passes and reports the subject and the thumbprint of the key and the
+expiry warning; the output holds neither the folder of the file nor the password, and the files of the installation are
+unchanged. This scenario is tested by the test of the same name.
 
 **ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses**: The File provider is
 configured with a protected PFX whose validity ended yesterday and its password in `Attestation__CertificatePassword`.

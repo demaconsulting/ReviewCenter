@@ -67,19 +67,19 @@ of hours above 0; the server does not start when the value is not valid. Disabli
 user takes effect the next time that user loads a page, and on a page that is already open at its next check (see
 Session Ended on an Open Page).
 
-| Setting                    | Environment variable        | Meaning                                       |
-| -------------------------- | --------------------------- | --------------------------------------------- |
-| `Auth:SessionHours`        | `Auth__SessionHours`        | Hours of sign-in session (default 8; > 0)     |
+| Setting | Environment variable | Meaning |
+| --- | --- | --- |
+| `Auth:SessionHours` | `Auth__SessionHours` | Hours of sign-in session (default 8; > 0) |
 | `Auth:RevalidationSeconds` | `Auth__RevalidationSeconds` | Seconds between open-page checks (default 30) |
 
 The sign-in throttle (see Password Rules and Lockout) is set with the following settings; the server does not start
 when a value is not valid.
 
-| Setting                                   | Environment variable                        |
-| ----------------------------------------- | ------------------------------------------- |
-| `Identity:Throttle:MaxFailuresPerName`    | `Identity__Throttle__MaxFailuresPerName`    |
+| Setting | Environment variable |
+| --- | --- |
+| `Identity:Throttle:MaxFailuresPerName` | `Identity__Throttle__MaxFailuresPerName` |
 | `Identity:Throttle:MaxFailuresPerAddress` | `Identity__Throttle__MaxFailuresPerAddress` |
-| `Identity:Throttle:WindowSeconds`         | `Identity__Throttle__WindowSeconds`         |
+| `Identity:Throttle:WindowSeconds` | `Identity__Throttle__WindowSeconds` |
 
 `MaxFailuresPerName` is the attempts per address and user name (default 5; above 0), `MaxFailuresPerAddress` the
 attempts per address over all names (default 20; not below the per-name value), and `WindowSeconds` the length of the
@@ -132,18 +132,18 @@ ReviewCenter, followed by `/signin-oidc`). Then set the following and restart th
 a setting has two underscores in place of each colon (for example `Identity__Oidc__ClientId`). The server does not
 start when a value is not valid, and the message names the setting but never its value.
 
-| Setting                              | Meaning                                         |
-| ------------------------------------ | ----------------------------------------------- |
-| `Identity:Oidc:Enabled`              | `true` to turn it on (default `false`)          |
-| `Identity:Oidc:Authority`            | Address of the provider                         |
-| `Identity:Oidc:ClientId`             | The client id of ReviewCenter                   |
-| `Identity:Oidc:ClientSecret`         | The client secret (give this or the file below) |
-| `Identity:Oidc:ClientSecretFile`     | Path of a file that holds the client secret     |
-| `Identity:Oidc:Scopes`               | Scopes (default `openid profile email`)         |
-| `Identity:Oidc:DisplayName`          | Name on the button (default OpenID Connect)     |
-| `Identity:Oidc:UsernameClaim`        | Claim for the user name (`preferred_username`)  |
-| `Identity:Oidc:RequireEmailVerified` | Refuse an e-mail that is not verified (off)     |
-| `Identity:Oidc:ReauthMaxAgeSeconds`  | How recent a login for a signature must be      |
+| Setting | Meaning |
+| --- | --- |
+| `Identity:Oidc:Enabled` | `true` to turn it on (default `false`) |
+| `Identity:Oidc:Authority` | Address of the provider |
+| `Identity:Oidc:ClientId` | The client id of ReviewCenter |
+| `Identity:Oidc:ClientSecret` | The client secret (give this or the file below) |
+| `Identity:Oidc:ClientSecretFile` | Path of a file that holds the client secret |
+| `Identity:Oidc:Scopes` | Scopes (default `openid profile email`) |
+| `Identity:Oidc:DisplayName` | Name on the button (default OpenID Connect) |
+| `Identity:Oidc:UsernameClaim` | Claim for the user name (`preferred_username`) |
+| `Identity:Oidc:RequireEmailVerified` | Refuse an e-mail that is not verified (off) |
+| `Identity:Oidc:ReauthMaxAgeSeconds` | How recent a login for a signature must be |
 
 Keep the client secret in the environment, in a secret store, or in a file that only the service can read, never in a
 file in a repository (for example the environment variable `Identity__Oidc__ClientSecret`, or a file named by
@@ -267,10 +267,10 @@ factor here; the provider protects it (see
 changes every 30 seconds, and is accepted one step before and after the current one to allow for a clock that is a
 little off.
 
-| Setting                 | Environment variable      | Meaning                                                   |
-| ----------------------- | ------------------------- | --------------------------------------------------------- |
+| Setting | Environment variable | Meaning |
+| --- | --- | --- |
 | `Identity:Totp:Enabled` | `Identity__Totp__Enabled` | `true` (default) offers the second factor; `false` is off |
-| `Identity:Totp:Issuer`  | `Identity__Totp__Issuer`  | Name shown in the app (default `ReviewCenter`; up to 64)  |
+| `Identity:Totp:Issuer` | `Identity__Totp__Issuer` | Name shown in the app (default `ReviewCenter`; up to 64) |
 
 The server does not start when the issuer is not valid (it must not contain a colon or a control character).
 

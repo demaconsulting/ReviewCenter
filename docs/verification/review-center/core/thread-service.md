@@ -144,7 +144,8 @@ scenario is tested by `ThreadService_StartThreadAsync_BaselineRange_UsesBaseline
 
 **ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange**: A side value that no member has is refused
 with an `ArgumentOutOfRangeException` naming the anchor, before the review is looked up (the same refusal on a review
-that does not exist). This scenario is tested by `ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange`.
+that does not exist). This scenario is tested by
+`ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange`.
 
 **ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly**: The audit detail of a thread on one baseline line, on
 a baseline range, and on a head line reads `line 3 (baseline)`, `lines 2-4 (baseline)`, and `line 1` with the thread

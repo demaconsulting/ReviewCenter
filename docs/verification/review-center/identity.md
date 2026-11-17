@@ -58,13 +58,13 @@ gets it; it must be the revalidating provider. The provider is given a signed-in
 user is valid. The user is disabled through the real service, and the check is repeated: the user is no longer valid.
 This scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid`.
 
-**System administrator claim**: The users page is served only to a signed-in system administrator and is forbidden to
-an ordinary user, which is tested by `SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; the shared rule compares the
-presence of the claim with the stored flag, which is tested by `SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule`
-and, for an open page, by `RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse`; and an old
-cookie of a demoted system administrator is rejected, which is tested by
-`SignIn_Session_RoleChangedAfterLogin_IsRejected`. All are defined in the unit tests of `SignIn` and
-`RevalidatingAuthenticationStateProvider`.
+**System administrator claim**: The users page is served only to a signed-in system administrator and is forbidden to an
+ordinary user, which is tested by `SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`; the shared rule compares the
+presence of the claim with the stored flag, which is tested by
+`SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule` and, for an open page, by
+`RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse`; and an old cookie of a demoted system
+administrator is rejected, which is tested by `SignIn_Session_RoleChangedAfterLogin_IsRejected`. All are defined in the
+unit tests of `SignIn` and `RevalidatingAuthenticationStateProvider`.
 
 **Sign-in audit**: On the real pipeline a user signs in with a wrong password, then with the right one, and signs
 out; the audit trail holds the failed sign-in, the sign-in, and the sign-out in this order, and its chain is intact.

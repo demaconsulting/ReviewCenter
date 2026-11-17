@@ -4,41 +4,32 @@
 
 ### Overview
 
-The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains seventeen units: `App`, the HTML shell with the stored-theme
-script, the URL router, the page frame (the menu bar with the product name, the primary navigation, the Help link
-and the sign-in controls, and the footer with the version and the link to the About page), and the `SessionGate`
-that replaces an open page when its user is no longer signed in; `HomePage`, the landing page served at the root URL,
-with a Get started section for signed-in users that starts with the inbox and its count; `AboutPage` and `HelpPage`,
-the pages that describe the product and
-explain how to use it (`HelpPage` includes the index, a page for each topic, and the topic list `HelpTopics`);
-`ProjectsPage`,
-`ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
-the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
-`ProjectPage` includes `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage`, the pages that hold the creation
-and member forms;
-`LoginPage`, `TotpLoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in (with a password, and, when an
-administrator has
-turned it on, with an OpenID Connect provider; `TotpLoginPage` is the second step for an account with a second factor),
-changing one's own password (the only page a
-user with a temporary password may use), choosing the
-appearance and managing one's personal access tokens, and managing users and who is a system administrator
-(`UsersPage` includes `NewUserPage`);
-`HistoryPage` and `AuditPage`, the pages that
-show the history of a review and let a system administrator
-verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the audit view of one project for those who may read
-its audit trail, `AuditFilterForm`, the filter both audit pages offer, `AuditFilterState`, the cleaned filter of the
-address, and `AuditEntryTable`, the table both audit pages share); `RepositoriesPage`, the page where whoever manages a
-project registers the git
-repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`); and `InboxPage`,
-the page that lists the reviews that wait for the signed-in user, which is also the list of notifications. Which projects
-a user sees is decided by project membership: a system administrator sees every project and any other user the
-projects of which the user is a member, and the pages ask the `Core` access service instead of deciding for
-themselves. The subsystem
-does not start or configure the server; the `Hosting` subsystem maps `App` as the root
-component of the server and supplies the endpoints around it, and the `Identity` subsystem supplies the sign-in and
-the authorization the pages rely on. The pages use the `Core` subsystem for
-all domain behavior and never access the database.
+The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser shows and how it
+responds to user actions. It contains seventeen units: `App`, the HTML shell with the stored-theme script, the URL
+router, the page frame (the menu bar with the product name, the primary navigation, the Help link and the sign-in
+controls, and the footer with the version and the link to the About page), and the `SessionGate` that replaces an open
+page when its user is no longer signed in; `HomePage`, the landing page served at the root URL, with a Get started
+section for signed-in users that starts with the inbox and its count; `AboutPage` and `HelpPage`, the pages that
+describe the product and explain how to use it (`HelpPage` includes the index, a page for each topic, and the topic list
+`HelpTopics`); `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the
+planning of reviews from the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes
+`NewProjectPage` and `ProjectPage` includes `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage`, the pages that
+hold the creation and member forms; `LoginPage`, `TotpLoginPage`, `AccountPage`, and `UsersPage`, the pages for signing
+in (with a password, and, when an administrator has turned it on, with an OpenID Connect provider; `TotpLoginPage` is
+the second step for an account with a second factor), changing one's own password (the only page a user with a temporary
+password may use), choosing the appearance and managing one's personal access tokens, and managing users and who is a
+system administrator (`UsersPage` includes `NewUserPage`); `HistoryPage` and `AuditPage`, the pages that show the
+history of a review and let a system administrator verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the
+audit view of one project for those who may read its audit trail, `AuditFilterForm`, the filter both audit pages offer,
+`AuditFilterState`, the cleaned filter of the address, and `AuditEntryTable`, the table both audit pages share);
+`RepositoriesPage`, the page where whoever manages a project registers the git repositories of that project that its
+reviews can be created from (it includes `NewRepositoryPage`); and `InboxPage`, the page that lists the reviews that
+wait for the signed-in user, which is also the list of notifications. Which projects a user sees is decided by project
+membership: a system administrator sees every project and any other user the projects of which the user is a member, and
+the pages ask the `Core` access service instead of deciding for themselves. The subsystem does not start or configure
+the server; the `Hosting` subsystem maps `App` as the root component of the server and supplies the endpoints around it,
+and the `Identity` subsystem supplies the sign-in and the authorization the pages rely on. The pages use the `Core`
+subsystem for all domain behavior and never access the database.
 
 ### Interfaces
 
@@ -284,65 +275,54 @@ address), and on the ASP.NET Core Blazor components framework.
 #### Pages and domain access
 
 `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, `RepositoriesPage`, and `InboxPage`, and the pages they include (`NewProjectPage`, `NewReviewPage`, `NewMemberPage`,
-`NewMemberAccountPage`, `ProjectAuditPage`, `NewRepositoryPage`, and `NewUserPage`), follow the pattern of
-the interactive pages: a Razor
-presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
-marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
-`ThreadService`, `ChecklistService`, `SigningService`, and `InboxService` (for the unread markers); `InboxPage` and
-`HomePage`: `InboxService`; the page frame `MainLayout` (`App` unit) also calls `InboxService` for the count on its
-Inbox tab; `ProjectPage`: also `SigningService`, `RepositoryService`,
-and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
-`ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
-`ChecklistService`; `AccountPage`: `UserService`, `NotificationPreferenceService`, and `PersonalAccessTokenService`;
-`UsersPage`:
-`UserService`, `UserImpactService`, and `TotpService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage`
-also the user store through
-`UserService`; `AuditPage` also `ProjectService` for the project selector; `ProjectAuditPage`: `AuditService`,
-`ProjectService`, and `IProjectAccess`; `RepositoriesPage`:
-`RepositoryService`, `ProjectService`, and `IProjectAccess`; each other creation page
-the service of its parent page) from the service container and call them
-from their handlers. Each page loads its data when it is created, so a connection that is
-established after the server-rendered snapshot shows current data. A rule violation reported by
-Core as a `DomainRuleException` is shown as an error message next to the form, with the entered
-values kept; the page never lets the exception escape. Forms are plain `<form>` elements handled
-by `@onsubmit`, so Enter submits them and tests can submit them without a button click.
-`LoginPage` is the exception to the pattern: it has no live connection, and its form is posted to the login endpoint.
+`AuditPage`, `RepositoriesPage`, and `InboxPage`, and the pages they include (`NewProjectPage`, `NewReviewPage`,
+`NewMemberPage`, `NewMemberAccountPage`, `ProjectAuditPage`, `NewRepositoryPage`, and `NewUserPage`), follow the pattern
+of the interactive pages: a Razor presentation file and a code-behind file, interactive server rendering, and the
+`data-interactive` marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need
+(`ReviewPage`: `ThreadService`, `ChecklistService`, `SigningService`, and `InboxService` (for the unread markers);
+`InboxPage` and `HomePage`: `InboxService`; the page frame `MainLayout` (`App` unit) also calls `InboxService` for the
+count on its Inbox tab; `ProjectPage`: also `SigningService`, `RepositoryService`, and `IProjectAccess`; `NewMemberPage`
+and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`: `ProjectService`, `RepositoryService`,
+and `ReviewPlanner`; `ChecklistPage`: `ChecklistService`; `AccountPage`: `UserService`, `NotificationPreferenceService`,
+and `PersonalAccessTokenService`; `UsersPage`: `UserService`, `UserImpactService`, and `TotpService`; `HistoryPage` and
+`AuditPage`: `AuditService`, and `AuditPage` also the user store through `UserService`; `AuditPage` also
+`ProjectService` for the project selector; `ProjectAuditPage`: `AuditService`, `ProjectService`, and `IProjectAccess`;
+`RepositoriesPage`: `RepositoryService`, `ProjectService`, and `IProjectAccess`; each other creation page the service of
+its parent page) from the service container and call them from their handlers. Each page loads its data when it is
+created, so a connection that is established after the server-rendered snapshot shows current data. A rule violation
+reported by Core as a `DomainRuleException` is shown as an error message next to the form, with the entered values kept;
+the page never lets the exception escape. Forms are plain `<form>` elements handled by `@onsubmit`, so Enter submits
+them and tests can submit them without a button click. `LoginPage` is the exception to the pattern: it has no live
+connection, and its form is posted to the login endpoint.
 
 #### Authorization and the signed-in user
 
-Every page except the home page, the login page, the About page, and the help pages requires a signed-in user,
-declared on the page with an
-authorization attribute; `UsersPage`, `AuditPage`, and `NewProjectPage`, and the creation page of the users, require
-the role `SystemAdmin`, which the `Identity` subsystem puts into the claims of a system administrator only. The
-repositories pages are open to every signed-in user by attribute, because whether a user may manage a project depends
-on the project; they ask the `Core` access service. The checks are made
-by the
-authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
-visitor. The page frame (`MainLayout` in the `App` unit) is a menu bar with the product name, which links to the home
-page, then a tab for the projects page, a tab for the inbox with the number of reviews that need the user's action
-(see the `App` unit) and, for a system administrator, the audit page and the users
-page (there is no tab for repositories, which belong to the projects), and at the right the Help link, the display
-name of the signed-in user, a link to the account page, and a logout
-button, or the Help link and a link to the login page when nobody is signed in. The tab of the section that is open
-is marked as current. A footer shows the product name, the version, the copyright holder, and a link to the About
-page. The pages that record something on behalf of a person (`ReviewPage` and
-`ChecklistPage`) get the signed-in user
-from the authentication state and pass it to Core as an `Actor`; there is no field in which a person could type
-another name. A page that is already open makes no request, so the cookie check does not reach it; the
+Every page except the home page, the login page, the About page, and the help pages requires a signed-in user, declared
+on the page with an authorization attribute; `UsersPage`, `AuditPage`, and `NewProjectPage`, and the creation page of
+the users, require the role `SystemAdmin`, which the `Identity` subsystem puts into the claims of a system administrator
+only. The repositories pages are open to every signed-in user by attribute, because whether a user may manage a project
+depends on the project; they ask the `Core` access service. The checks are made by the authorization of the `Identity`
+subsystem before the page is rendered, so a page never shows data to an anonymous visitor. The page frame (`MainLayout`
+in the `App` unit) is a menu bar with the product name, which links to the home page, then a tab for the projects page,
+a tab for the inbox with the number of reviews that need the user's action (see the `App` unit) and, for a system
+administrator, the audit page and the users page (there is no tab for repositories, which belong to the projects), and
+at the right the Help link, the display name of the signed-in user, a link to the account page, and a logout button, or
+the Help link and a link to the login page when nobody is signed in. The tab of the section that is open is marked as
+current. A footer shows the product name, the version, the copyright holder, and a link to the About page. The pages
+that record something on behalf of a person (`ReviewPage` and `ChecklistPage`) get the signed-in user from the
+authentication state and pass it to Core as an `Actor`; there is no field in which a person could type another name. A
+page that is already open makes no request, so the cookie check does not reach it; the
 `RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
 authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
 `UsersPage` also re-checks the stored user before every action, `RepositoriesPage` re-checks with the access service
-that the user still manages the project, and `AuditPage` re-checks on load and before every
-verification, so a user who is no longer an enabled
-system administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting
-for the
-original user until the next check, which is at most one revalidation interval, and what they record is attributed to
-that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
-reopening a thread, answering checklist checks, changing reviewer slots, signing, reopening a locked review, changing the
-review rules of a project, changing a password, and the user
-administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor,
-so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
+that the user still manages the project, and `AuditPage` re-checks on load and before every verification, so a user who
+is no longer an enabled system administrator is refused at once, and so does the signing of a review in Core. The other
+actions keep acting for the original user until the next check, which is at most one revalidation interval, and what
+they record is attributed to that user. Every action that changes something (creating a project or a review, starting,
+answering, resolving, and reopening a thread, answering checklist checks, changing reviewer slots, signing, reopening a
+locked review, changing the review rules of a project, changing a password, and the user administration actions) first
+asks `GetActorAsync` for the current user, even where its Core service takes no actor, so an action that meets an
+authentication state that has already ended is refused with a message and saves nothing.
 
 #### Project access
 
@@ -641,19 +621,18 @@ login page when there is none. `LoginPage` shows a notice when the challenge end
 
 The Two-factor card of `AccountPage` only collects input and shows results; the rules are in `TotpService`. The card is
 shown to a local user whose password is not temporary, and only when the feature is on (a user of an identity provider
-sees one sentence that the provider handles it). The setup asks for the password,
-then shows the secret (grouped by four characters) and the `otpauth://` address once, with no QR code; the person types
-the first code to confirm and then sees the ten recovery codes once, with a copy button and a hint to store them safely.
-The pending secret and the recovery codes are held only in the state of the open page and are never shown again. The
-card then shows how many recovery codes are left and offers new recovery codes (password and code) and turning the
-factor off (password, and a code or a recovery code). Every field is cleared after every attempt, and a refusal is shown
-as the message of the rule next to the card. `ReviewPage` asks `TotpService.IsEnrolledAsync` and shows a code field
-beside the password field for a local user with a second factor, with the hint to wait for the next code when the code
-was just used to sign in; the code is passed to `SigningService.SignWithCredentialsAsync` and cleared in the same
-`finally` block as the password. `UsersPage` lists the users with a confirmed factor (`ListEnrolledUserIdsAsync`),
-shows a badge for each,
-and offers a Reset two-factor button that calls `TotpService.ResetAsync`. The Help topic `two-factor` explains the setup,
-the sign-in, the recovery codes, and what to do after losing a phone.
+sees one sentence that the provider handles it). The setup asks for the password, then shows the secret (grouped by four
+characters) and the `otpauth://` address once, with no QR code; the person types the first code to confirm and then sees
+the ten recovery codes once, with a copy button and a hint to store them safely. The pending secret and the recovery
+codes are held only in the state of the open page and are never shown again. The card then shows how many recovery codes
+are left and offers new recovery codes (password and code) and turning the factor off (password, and a code or a
+recovery code). Every field is cleared after every attempt, and a refusal is shown as the message of the rule next to
+the card. `ReviewPage` asks `TotpService.IsEnrolledAsync` and shows a code field beside the password field for a local
+user with a second factor, with the hint to wait for the next code when the code was just used to sign in; the code is
+passed to `SigningService.SignWithCredentialsAsync` and cleared in the same `finally` block as the password. `UsersPage`
+lists the users with a confirmed factor (`ListEnrolledUserIdsAsync`), shows a badge for each, and offers a Reset
+two-factor button that calls `TotpService.ResetAsync`. The Help topic `two-factor` explains the setup, the sign-in, the
+recovery codes, and what to do after losing a phone.
 
 #### E-mail notification address
 

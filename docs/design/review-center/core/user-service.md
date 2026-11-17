@@ -27,14 +27,14 @@ a copy it has read and give it back to the store. The password hash is never sho
 the password itself is never stored.
 
 **External account**: an account with `ExternalIssuer` and `ExternalSubject` belongs to an external identity provider
-(see _OidcSignIn_). The pair is the only key: the account is never found or linked by user name, display name, or
+(see *OidcSignIn*). The pair is the only key: the account is never found or linked by user name, display name, or
 e-mail address, so a provider cannot take over a local account or the account of another provider. The account has no
 password (the stored hash is empty) and every password path refuses it: `AuthenticateAsync` and `ReauthenticateAsync`
 return `null` (after a dummy verification, recorded coalesced with the reason `external account has no password`),
 `ChangeOwnPasswordAsync` reports `CurrentPasswordIncorrect`, and `SetPasswordAsync` reports `PasswordInvalid`. It
-confirms a signature by signing in again at the provider (see _SigningService_ and _ReauthProofStore_).
+confirms a signature by signing in again at the provider (see *SigningService* and *ReauthProofStore*).
 
-**Second factor**: a local account can have a confirmed one-time password enrollment (see _TotpService_). The service
+**Second factor**: a local account can have a confirmed one-time password enrollment (see *TotpService*). The service
 only asks whether one applies: it holds an optional `ITotpStore` and the optional `TotpSettings` (both `null` in a
 deployment without the feature, where no account ever requires a second factor) and, after a right password, reads the
 enrollment of the user. The feature switched off counts as no second factor.
@@ -46,10 +46,10 @@ password alone is not enough). **PasswordCheckPurpose** (internal enumeration): 
 
 **Must change password**: `MustChangePassword` is set on an account that a project administrator created
 (`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and on an account whose password a
-system administrator sets for somebody else (`SetPasswordAsync`), and is cleared when the user changes the
-own password or an administrator sets the own password (`SetPasswordAsync` writes `!ownPassword`, so setting the own
-password also ends a pending change). While it is set the user can sign in but is confined to the password change (see _SignIn_,
-_ProjectAccess_, _PersonalAccessTokenService_, and _SigningService_ for what each refuses); the rules owned by this unit
+system administrator sets for somebody else (`SetPasswordAsync`), and is cleared when the user changes the own password
+or an administrator sets the own password (`SetPasswordAsync` writes `!ownPassword`, so setting the own password also
+ends a pending change). While it is set the user can sign in but is confined to the password change (see *SignIn*,
+*ProjectAccess*, *PersonalAccessTokenService*, and *SigningService* for what each refuses); the rules owned by this unit
 are the re-authentication refusal and the password change described below.
 
 **Last sign-in**: `LastSignInUtc` is stored when a sign-in succeeds and opens a session: a password sign-in of an
@@ -134,11 +134,11 @@ lockout settings (5 failures, 5 minutes) are private constants of the service.
 
 **CreateAsync**: Creates an enabled user.
 
-- _Parameters_: `string? username`, `string? displayName`, `bool isSystemAdmin`, `string? password`, the `Actor`, and a
+- *Parameters*: `string? username`, `string? displayName`, `bool isSystemAdmin`, `string? password`, the `Actor`, and a
   cancellation token.
-- _Returns_: `Task<User>` — the stored user with its assigned identity and the creation time from the clock; only the
+- *Returns*: `Task<User>` — the stored user with its assigned identity and the creation time from the clock; only the
   hash of the password is kept.
-- _Postconditions_: Nothing is stored when a rule fails.
+- *Postconditions*: Nothing is stored when a rule fails.
 
 The rules are checked in this order, and the first violation is reported: the user name (`UserNameInvalid`); the
 display name (`DisplayNameInvalid`); the password (`PasswordInvalid`); and then the store, which refuses a name that
@@ -147,10 +147,10 @@ is hashed only after the input is valid.
 
 **AuthenticateAsync**: Checks a user name and password for sign-in.
 
-- _Parameters_: `string? username`, `string? password`, and a cancellation token.
-- _Returns_: `Task<User?>` — the user when the account exists, is not locked out, is enabled, and the password is
+- *Parameters*: `string? username`, `string? password`, and a cancellation token.
+- *Returns*: `Task<User?>` — the user when the account exists, is not locked out, is enabled, and the password is
   right; otherwise `null`.
-- _Postconditions_: A right password resets the failure counter and, for an account without a second factor, stores
+- *Postconditions*: A right password resets the failure counter and, for an account without a second factor, stores
   the time of the sign-in. A wrong password counts as a failure and may start the
   lockout.
 
@@ -166,11 +166,11 @@ can only check a password can never let such an account in with the password alo
 
 **AuthenticatePasswordAsync**: Checks a user name and password for sign-in when a second factor may follow.
 
-- _Parameters_: `string? username`, `string? password`, and a cancellation token.
-- _Returns_: `Task<PasswordStep>` — `User` is `null` for every failure, exactly as for `AuthenticateAsync`, so a wrong
+- *Parameters*: `string? username`, `string? password`, and a cancellation token.
+- *Returns*: `Task<PasswordStep>` — `User` is `null` for every failure, exactly as for `AuthenticateAsync`, so a wrong
   password looks the same for an account with and without a second factor. When the password is right and a confirmed
   enrollment applies, `SecondFactorRequired` is set.
-- _Postconditions_: The checks, the counting, the lockout, and the dummy hash are those of `AuthenticateAsync`. With a
+- *Postconditions*: The checks, the counting, the lockout, and the dummy hash are those of `AuthenticateAsync`. With a
   second factor required the failure counter is deliberately not reset: only a complete sign-in resets it, so a person
   who knows the password still runs into the lockout while guessing codes. Without a second factor a right password
   resets the counter as before and stores the time of the sign-in.
@@ -181,21 +181,21 @@ of `ReauthenticateAsync` (own action code, the refusal of a temporary password) 
 
 **ConfirmPasswordAsync**: Checks the password of a signed-in user before a change of the second factor.
 
-- _Parameters_: `string? username`, `string? password`, and a cancellation token.
-- _Returns_: `Task<User?>` — the user when the account is local, enabled, not locked out, and the password is right;
+- *Parameters*: `string? username`, `string? password`, and a cancellation token.
+- *Returns*: `Task<User?>` — the user when the account is local, enabled, not locked out, and the password is right;
   otherwise `null`.
-- _Postconditions_: A wrong password counts toward the lockout like at sign-in. Unlike sign-in, a right password does not
-  reset the counter, it never asks for a code, and a temporary password is accepted (the caller, `TotpService`, decides
-  whether the account may use the feature).
+- *Postconditions*: A wrong password counts toward the lockout like at sign-in. Unlike sign-in, a right password does
+  not reset the counter, it never asks for a code, and a temporary password is accepted (the caller, `TotpService`,
+  decides whether the account may use the feature).
 
 **RegisterSecondFactorFailureAsync**, **ClearFailuresAsync**, **IsLockedOutAsync** (internal, used by `TotpService`):
 count a wrong code toward the lockout, clear the counter after a complete sign-in, and tell whether an account is locked
 out.
 
-- `RegisterSecondFactorFailureAsync(username, action, detail)` reads the user again under the semaphore, so a counter that
-  changed meanwhile is never overwritten with a stale copy, counts the failure exactly like a wrong password, records the
-  failure under the given action code with a fixed detail (never a code), records the lockout entry when this failure
-  starts it, and returns `true` when it did. An unknown or external account is ignored.
+- `RegisterSecondFactorFailureAsync(username, action, detail)` reads the user again under the semaphore, so a counter
+  that changed meanwhile is never overwritten with a stale copy, counts the failure exactly like a wrong password,
+  records the failure under the given action code with a fixed detail (never a code), records the lockout entry when
+  this failure starts it, and returns `true` when it did. An unknown or external account is ignored.
 - `ClearFailuresAsync(username)` clears the failure counter and the lockout under the semaphore; an unknown user is
   ignored.
 - `IsLockedOutAsync(username)` returns `true` while the lockout lasts and records the refusal (coalesced, as
@@ -203,26 +203,26 @@ out.
 
 **ReauthenticateAsync**: Checks a user name and password for the re-authentication of a signature.
 
-- _Parameters_, _Returns_, _Postconditions_: as for `AuthenticateAsync`.
+- *Parameters*, *Returns*, *Postconditions*: as for `AuthenticateAsync`.
 
 It is the same check, including the failure counter, the lockout, and the dummy hash, so guessing the password at
-signing time is as limited as at sign-in. It is a separate method only so that its failures are recorded under their
-own action code, `signature.reauth-failed`, and not as `auth.sign-in-failed`. Both methods share one private routine.
-One difference: an account with a temporary password (`MustChangePassword`) is refused even with the right password,
-with the reason `password change pending` recorded (coalesced) under `signature.reauth-failed`, because the temporary
-password proves identity only well enough to reach the password change, and cannot confirm a signature. `AuthenticateAsync`
-still accepts the account, so that the user can sign in and change the password. Like `AuthenticateAsync` it is the
-fail-closed form: an account whose second factor is required is refused (recorded coalesced under
-`signature.reauth-failed`, reason `second factor required`); `SigningService` uses `ReauthenticatePasswordAsync` and
-checks the code itself.
+signing time is as limited as at sign-in. It is a separate method only so that its failures are recorded under their own
+action code, `signature.reauth-failed`, and not as `auth.sign-in-failed`. Both methods share one private routine. One
+difference: an account with a temporary password (`MustChangePassword`) is refused even with the right password, with
+the reason `password change pending` recorded (coalesced) under `signature.reauth-failed`, because the temporary
+password proves identity only well enough to reach the password change, and cannot confirm a signature.
+`AuthenticateAsync` still accepts the account, so that the user can sign in and change the password. Like
+`AuthenticateAsync` it is the fail-closed form: an account whose second factor is required is refused (recorded
+coalesced under `signature.reauth-failed`, reason `second factor required`); `SigningService` uses
+`ReauthenticatePasswordAsync` and checks the code itself.
 
 **SignInExternalAsync**: Signs in a person who proved their identity at an external provider, creating the account on
 the first sign-in.
 
-- _Parameters_: `string? issuer`, `string? subject`, `string? usernameCandidate`, `string? displayName`, and a
+- *Parameters*: `string? issuer`, `string? subject`, `string? usernameCandidate`, `string? displayName`, and a
   cancellation token.
-- _Returns_: `Task<ExternalSignInResult>` — the account when accepted; otherwise no account and the refusal.
-- _Postconditions_: An accepted sign-in is recorded as `auth.oidc-sign-in` and a created account as
+- *Returns*: `Task<ExternalSignInResult>` — the account when accepted; otherwise no account and the refusal.
+- *Postconditions*: An accepted sign-in is recorded as `auth.oidc-sign-in` and a created account as
   `account.oidc-created`, with only the host of the issuer as detail. Later sign-ins change no stored name.
 
 A missing issuer or subject, or one longer than the limits, is refused as `Invalid`. The account is found by the exact
@@ -250,17 +250,17 @@ of an error.
 
 **SetEnabledAsync**: Enables or disables a user.
 
-- _Parameters_: `string username`, `bool enabled`, and a cancellation token.
-- _Returns_: `Task`.
-- _Postconditions_: The enabled flag is stored. Disabling stops sign-in; the work already recorded by the user is kept.
+- *Parameters*: `string username`, `bool enabled`, and a cancellation token.
+- *Returns*: `Task`.
+- *Postconditions*: The enabled flag is stored. Disabling stops sign-in; the work already recorded by the user is kept.
 
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would disable the last enabled
 system administrator.
 
 **SetSystemAdminAsync**: Gives a user the system administrator right or takes it away.
 
-- _Parameters_: `string username`, `bool isSystemAdmin`, the `Actor`, and a cancellation token.
-- _Postconditions_: The flag is stored with the audit entry `user.admin-changed`, whose detail names the user and the
+- *Parameters*: `string username`, `bool isSystemAdmin`, the `Actor`, and a cancellation token.
+- *Postconditions*: The flag is stored with the audit entry `user.admin-changed`, whose detail names the user and the
   change, for example `user 'ann': system administrator False -> True`.
 
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would remove the right from the last
@@ -270,9 +270,9 @@ enabled system administrator.
 needs the proof of it too; the public overload cannot give it and fails closed for such a user, and
 `TotpService.ChangeOwnPasswordAsync` is the way in with a code.
 
-- _Parameters_: `string username`, `string? currentPassword`, `string? newPassword`, and a cancellation token.
-- _Returns_: `Task`.
-- _Postconditions_: The new hash is stored and the failure counter and lockout are cleared. Nothing is stored when a
+- *Parameters*: `string username`, `string? currentPassword`, `string? newPassword`, and a cancellation token.
+- *Returns*: `Task`.
+- *Postconditions*: The new hash is stored and the failure counter and lockout are cleared. Nothing is stored when a
   rule fails.
 
 The new password is checked first (`PasswordInvalid`); then the user must exist (`UserNotFound`). A locked-out account
@@ -299,9 +299,9 @@ line does not use this method: `UserCommand` only creates users.
 
 **UnlockAsync**: Ends the lockout of a user, by the identifier of the user.
 
-- _Parameters_: the `Actor`, `int userId`, and a cancellation token.
-- _Returns_: `Task`.
-- _Postconditions_: The failure counter is 0 and the lockout is cleared, with the audit entry `user.unlocked` (detail
+- *Parameters*: the `Actor`, `int userId`, and a cancellation token.
+- *Returns*: `Task`.
+- *Postconditions*: The failure counter is 0 and the lockout is cleared, with the audit entry `user.unlocked` (detail
   `user 'x'`); the password, the second factor, and the enabled flag are not touched.
 
 Only an enabled system administrator without a temporary password, not through an API token, may do it

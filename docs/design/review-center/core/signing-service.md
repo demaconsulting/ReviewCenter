@@ -189,26 +189,26 @@ thread.
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
 administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after
 trimming (`ReopenReasonInvalid`). It works only on a concluded (approved or rejected) review (`ReviewNotLocked`: "The
-review is not locked, so
-there is nothing to reopen."). The reopen is stored as a `ReviewReopen` with the previous digest, and the number of reopens
-becomes part of the record digest (see `RecordDigest`). Consequently the earlier signatures are kept as history but are
-out of date and can never be current again, not even when the content is changed back; the review is "In review" and
-needs fresh signatures from the reviewers (each slot signed before is `OutOfDate`, and a slot with an out-of-date
-signature cannot be edited, as before). The ballots are not touched by a reopen: a submitted ballot stays submitted,
-so the consolidated standing is what it was and only the reopen count differs in the digest.
+review is not locked, so there is nothing to reopen."). The reopen is stored as a `ReviewReopen` with the previous
+digest, and the number of reopens becomes part of the record digest (see `RecordDigest`). Consequently the earlier
+signatures are kept as history but are out of date and can never be current again, not even when the content is changed
+back; the review is "In review" and needs fresh signatures from the reviewers (each slot signed before is `OutOfDate`,
+and a slot with an out-of-date signature cannot be edited, as before). The ballots are not touched by a reopen: a
+submitted ballot stays submitted, so the consolidated standing is what it was and only the reopen count differs in the
+digest.
 
 **Independent reviewers**: when the project's `RequireIndependentReviewers` setting is on (the default; see
 `ProjectService`), the author of the review cannot be the primary or the alternate reviewer of a slot
 (`ReviewerNotIndependent` when a slot is added or changed: "{name} created this review and cannot be one of its
 reviewers while independent reviewers are required.") and cannot sign it (`ReviewerNotIndependent`: "You created this
-review, so you cannot be a reviewer of it. A different project member must review and sign it, or a project administrator
-can switch off 'Require independent reviewers'."). The author is the `Review.CreatedBy` user name (compared ignoring case);
-for a review created with an API token that is the token's owner, and a review without an author (created from the
-command line) is not restricted. The signing check is repeated at signing time, so a slot that was filled while the
-setting was off cannot be signed by the author once it is on. The rule is not retroactive: it runs when a reviewer
-is chosen and when a review is signed, and existing signatures stay valid. Limitation: the authors of the git commits of
-the reviewed files are not known to Review Center and are not matched; only the user who created the review in the tool
-is.
+review, so you cannot be a reviewer of it. A different project member must review and sign it, or a project
+administrator can switch off 'Require independent reviewers'."). The author is the `Review.CreatedBy` user name
+(compared ignoring case); for a review created with an API token that is the token's owner, and a review without an
+author (created from the command line) is not restricted. The signing check is repeated at signing time, so a slot that
+was filled while the setting was off cannot be signed by the author once it is on. The rule is not retroactive: it runs
+when a reviewer is chosen and when a review is signed, and existing signatures stay valid. Limitation: the authors of
+the git commits of the reviewed files are not known to Review Center and are not matched; only the user who created the
+review in the tool is.
 
 **Reopener rule**: when the project's `RequireNonReopenerSigning` setting is on (the default, also for projects that
 existed before the rule was enforced; see `ProjectService`), a person who reopened the review, now or earlier, cannot
@@ -294,14 +294,14 @@ primaries of the slots that have no current signature. When nobody has signed: "
 
 **Failed check identifiers and the rejection note**: `ReviewApproval.FailedCheckIds` lists the checks that the submitted
 ballots agree on as Fail, in checklist order (null or empty when there is none). `ReviewApproval.RejectionNote` is a
-computed sentence naming the provisional rejection: it is non-null only when the status is not masked, the review is
-not concluded, the outcome is `Rejected` and `FailedCheckIds` is not empty. The wording is "The reviewer failed X, so
-this review will be Rejected." for one slot, "Both reviewers failed ..." for two, "All N reviewers failed ..." for more,
-and "The reviewers who handed in a ballot failed ..." while a ballot is missing; the identifiers are listed as "A", "A
-and B", "A, B and C", and at most five are named, followed by "and N more". **`ReviewApproval.Masked()` always empties
+computed sentence naming the provisional rejection: it is non-null only when the status is not masked, the review is not
+concluded, the outcome is `Rejected` and `FailedCheckIds` is not empty. The wording is "The reviewer failed X, so this
+review will be Rejected." for one slot, "Both reviewers failed ..." for two, "All N reviewers failed ..." for more, and
+"The reviewers who handed in a ballot failed ..." while a ballot is missing; the identifiers are listed as "A", "A and
+B", "A, B and C", and at most five are named, followed by "and N more". **`ReviewApproval.Masked()` always empties
 `FailedCheckIds`**, so a masked status (a viewer who has not handed in a ballot, an API token, a stranger, or a
-viewer-less system read where the policy masks) never carries a failed check, the provisional rejection or the note.
-The masked next step starts with "Hand in your ballot to see the other reviewers' answers." and the sentence about the open
+viewer-less system read where the policy masks) never carries a failed check, the provisional rejection or the note. The
+masked next step starts with "Hand in your ballot to see the other reviewers' answers." and the sentence about the open
 threads (if any) follows it. `ReviewApproval.MissingBallotsText(names)` is the one wording of "{names} has/have not
 handed in a ballot yet. If you sign now, you may have to sign again.", shared by the readers of the status.
 
@@ -437,13 +437,13 @@ not found.
   identifier; a review that does not exist is absent. Each status equals the one `GetApprovalAsync` gives.
 - *Postconditions*: The user list and the identities of the current project members are loaded once for the whole batch,
   not once for each review, and not at all when there are no review identifiers. The snapshots of all the reviews come
-  from one `IReviewStore.ListSnapshotsAsync` call (a set-based read; no snapshot read per review), and the reopen history
-  of the reviews whose record counts a reopen from one `ListReopensAsync` call for those reviews. The status of each
-  review is built by the same private step (`BuildApproval`) as the single read, so the two cannot differ. A duplicated
-  identifier is read once.
+  from one `IReviewStore.ListSnapshotsAsync` call (a set-based read; no snapshot read per review), and the reopen
+  history of the reviews whose record counts a reopen from one `ListReopensAsync` call for those reviews. The status of
+  each review is built by the same private step (`BuildApproval`) as the single read, so the two cannot differ. A
+  duplicated identifier is read once.
 - *Viewer-aware form*: the overload that is given the viewer takes, as an optional last argument, the reviews of the
-  project when the caller already holds them. They serve to find the creator of a review that has to be masked, so no list
-  of the reviews is read for it; the masking rules are those of `BallotVisibility`.
+  project when the caller already holds them. They serve to find the creator of a review that has to be masked, so no
+  list of the reviews is read for it; the masking rules are those of `BallotVisibility`.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 
@@ -512,14 +512,13 @@ factor; never stored, logged, or put into a message). `SignAsync` calls it with 
 - *Preconditions*: The actor, the expected digest and the credentials are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
 
-**API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, and `ReopenReviewAsync` refuses an actor that came in with a personal access token
-(`Actor.ViaApiToken`) with
-`ActorNotAllowed` and the message that reviewer slots and signatures cannot be changed with an API token. The check comes
-before the gate, the password check, and any read of the store, so a refused call has no effect and costs nothing. A
-signature records that a named person confirmed the review with the password, which a script holding a token cannot do.
-The API has no route for these operations, so this check is the second, independent line of defense: it protects against
-a route that is added later without the rule. Reading the approval is not restricted.
+**API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
+and `ReopenReviewAsync` refuses an actor that came in with a personal access token (`Actor.ViaApiToken`) with
+`ActorNotAllowed` and the message that reviewer slots and signatures cannot be changed with an API token. The check
+comes before the gate, the password check, and any read of the store, so a refused call has no effect and costs nothing.
+A signature records that a named person confirmed the review with the password, which a script holding a token cannot
+do. The API has no route for these operations, so this check is the second, independent line of defense: it protects
+against a route that is added later without the rule. Reading the approval is not restricted.
 
 **Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
 records `signature.added` with the slot, the role, the outcome (`Approved` or `Rejected`), and the record digest the
@@ -553,10 +552,10 @@ never contain a password or a hash. An infrastructure failure of the store passe
 - **BallotVisibility** — decides whether the viewer of an approval may see the dispute counts, the outcome, and the
   conclusion text; for a viewer who may not, the blockers carry one fixed sentence instead. The signing rules themselves
   always use the true standing.
-- **IProjectAccess** — requires that the actor may work in the project, that the signer and the reviewers are members, and
-  (for a reopen) that the actor administers the project.
-- **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticatePasswordAsync`),
-  and records a refused confirmation of an external user.
+- **IProjectAccess** — requires that the actor may work in the project, that the signer and the reviewers are members,
+  and (for a reopen) that the actor administers the project.
+- **UserService** — looks up users, describes the reviewers, re-authenticates the signer
+  (`ReauthenticatePasswordAsync`), and records a refused confirmation of an external user.
 - **ReauthProofStore** — holds the single-use proofs of external users (optional, injected; without it an external
   user cannot sign).
 - **TotpService** — tells whether the signer has a second factor and checks the code (optional, injected; without it a
@@ -580,6 +579,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
 - **ReviewStore** (`Storage` subsystem) — calls `ReviewLock.IsConcluded` inside its write transactions.
 - **AttestationService** (`Evidence` subsystem) — reads the approval, including the reopen history.
 - **ReviewWorkflowCheck** (`SelfTest` subsystem) — signs, shows the lock, and reopens.
-- **OidcSignIn** (`Identity` subsystem) — asks `RequireConfirmableAsync` before it starts a confirmation at the provider.
+- **OidcSignIn** (`Identity` subsystem) — asks `RequireConfirmableAsync` before it starts a confirmation at the
+  provider.
 - **ApiEndpoints** (`Api` subsystem) — reads the approval of a review; it cannot change slots or signatures.
 - **ServerHost** (`Hosting` subsystem) — registers the service as a singleton.

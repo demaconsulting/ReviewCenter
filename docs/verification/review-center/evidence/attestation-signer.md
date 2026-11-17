@@ -50,8 +50,8 @@ signs the document. The signature verifies. This scenario is tested by
 **AttestationSigner_Sign_Output_StartsWithTheOriginalBytes**: A document is signed. The first bytes of the result are
 the original document. This scenario is tested by `AttestationSigner_Sign_Output_StartsWithTheOriginalBytes`.
 
-**AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter**: A document is signed. The result declares
-the form, the signature field, and the `adbe.pkcs7.detached` sub-filter. This scenario is tested by
+**AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter**: A document is signed. The result
+declares the form, the signature field, and the `adbe.pkcs7.detached` sub-filter. This scenario is tested by
 `AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter`.
 
 **AttestationSigner_Sign_ByteRange_CoversEverythingExceptTheContentsHex**: The byte range of a signed document is read.
@@ -83,8 +83,8 @@ The byte range no longer reaches the end of the file, which is how a reader dete
 document. The signature holds the certificate of the signer and the intermediate certificates. This scenario is tested
 by `AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates`.
 
-**AttestationSigner_Sign_SameInputAndRsaKey_ProducesIdenticalBytes**: The same document is signed twice with the same RSA
-key and time. The bytes are equal. This scenario is tested by
+**AttestationSigner_Sign_SameInputAndRsaKey_ProducesIdenticalBytes**: The same document is signed twice with the same
+RSA key and time. The bytes are equal. This scenario is tested by
 `AttestationSigner_Sign_SameInputAndRsaKey_ProducesIdenticalBytes`.
 
 **AttestationSigner_Sign_AlreadySignedPdf_Throws**: A signed document is signed again. An exception is raised. This

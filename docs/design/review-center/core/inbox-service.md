@@ -147,8 +147,8 @@ user for the review, zero when there is no row or the user is not a known user. 
 
 **MarkAllReadAsync**: Marks every review of the inbox as seen.
 
-- *Postconditions*: The clock is read before the inbox is loaded, so a change that happens while the inbox is built stays
-  new. One `MarkSeenManyAsync` call stores the highest comment identity of each review, counting only the comments
+- *Postconditions*: The clock is read before the inbox is loaded, so a change that happens while the inbox is built
+  stays new. One `MarkSeenManyAsync` call stores the highest comment identity of each review, counting only the comments
   written at or before that time, and the time, so a comment posted while the inbox is built is not stored as seen.
   Returns the number of reviews marked.
 
@@ -160,8 +160,8 @@ a cutoff time that ignores the comments created after the cutoff; it is the wate
 #### Error Handling
 
 Failures of the stores propagate unchanged. A null actor is not an error: the inbox is empty and nothing is stored. Null
-arguments of the other methods raise `ArgumentNullException`. The unit never writes an audit entry, and nothing it stores
-enters the record digest.
+arguments of the other methods raise `ArgumentNullException`. The unit never writes an audit entry, and nothing it
+stores enters the record digest.
 
 #### Dependencies
 

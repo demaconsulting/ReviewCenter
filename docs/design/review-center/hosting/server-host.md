@@ -261,15 +261,15 @@ before the probe round trip because the round trip creates a key when there is n
 - *Postconditions*: `SecretScan` reads the key files and unprotects the stored repository tokens and second-factor
   secrets with the production protectors (a read-only scan; nothing is written and no key is created). With no key file
   and at least one protected secret, an `InvalidOperationException` "Key ring '{folder}' is empty but the database holds
-  {N} protected secrets. Restore the keys folder that belongs to this database, or set DataProtection:AllowNewKeyRing=true
-  for one start to accept that they become unreadable." is thrown, unless `DataProtection:AllowNewKeyRing` is true, in
-  which case a warning with the count is logged and the start goes on. With keys in the ring but some secrets that cannot
-  be decrypted, an error is logged with the counts per kind, the ids of the repositories and users, and the remedy
-  (enter the repository tokens again; an administrator resets the two-factor secret), and the start goes on. When the
-  scan cannot complete because the database cannot be read (a `SqliteException` after the database was prepared, for
-  example a lock or a table that cannot be read; a file that is not a database fails earlier, in `InitializeDatabase`, with
-  "Failed to prepare the database", which creates no key either)
-  and the folder holds no key file, an `InvalidOperationException` "Key ring '{folder}' is empty and the database
+  {N} protected secrets. Restore the keys folder that belongs to this database, or set
+  DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable." is thrown, unless
+  `DataProtection:AllowNewKeyRing` is true, in which case a warning with the count is logged and the start goes on. With
+  keys in the ring but some secrets that cannot be decrypted, an error is logged with the counts per kind, the ids of
+  the repositories and users, and the remedy (enter the repository tokens again; an administrator resets the two-factor
+  secret), and the start goes on. When the scan cannot complete because the database cannot be read (a `SqliteException`
+  after the database was prepared, for example a lock or a table that cannot be read; a file that is not a database
+  fails earlier, in `InitializeDatabase`, with "Failed to prepare the database", which creates no key either) and the
+  folder holds no key file, an `InvalidOperationException` "Key ring '{folder}' is empty and the database
   (Database:ConnectionString) could not be read to check whether it holds protected secrets, so no key was created. Fix
   the access to the database and start again; run 'reviewcenter --validate --check-config' for the details." is thrown,
   whatever `DataProtection:AllowNewKeyRing` says: that setting accepts the loss of secrets that are known to exist, and
@@ -294,13 +294,13 @@ before the probe round trip because the round trip creates a key when there is n
   protected self-signed key file that the key ring cannot
   decrypt, the file and the remedy (restore the ring or delete the file). With the default self-signed provider the
   protected key file is created here on the first start. An expiry warning of the key is logged here as well.
-- *Notes*: The server never deletes or replaces a signing key, so `DataProtection:AllowNewKeyRing` does not help here: it
-  only accepts the loss of stored secrets (`GuardLostRing`). A start with a lost ring and a surviving protected key
-  file therefore fails here, with or without that setting. In the edge case of an empty ring, no database secrets,
-  and a surviving protected attestation file, the lost-ring probe (`ValidateDataProtection`) has already created a new
-  Data Protection key before this check refuses; the attestation file is left untouched, and the operator deletes it
-  (the next start then creates a new signing key) or restores the ring that protected it. `GuardLostRing` does not
-  look at the attestation file.
+- *Notes*: The server never deletes or replaces a signing key, so `DataProtection:AllowNewKeyRing` does not help here:
+  it only accepts the loss of stored secrets (`GuardLostRing`). A start with a lost ring and a surviving protected key
+  file therefore fails here, with or without that setting. In the edge case of an empty ring, no database secrets, and a
+  surviving protected attestation file, the lost-ring probe (`ValidateDataProtection`) has already created a new Data
+  Protection key before this check refuses; the attestation file is left untouched, and the operator deletes it (the
+  next start then creates a new signing key) or restores the ring that protected it. `GuardLostRing` does not look at
+  the attestation file.
 
 Runs after `ValidateDataProtection` in `CreateApplication`, so it applies to the `serve` verb only. It does not sign a
 test value, so a smart card is not asked for its PIN at the start. The consequence of failing fast is that a server
@@ -362,7 +362,8 @@ always disposed.
 - **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
   singleton for the services, the pages, and the API.
 - **ApiTokenAuthentication**, **ApiEndpoints**, **ApiDocument** — the `Api` subsystem, which is registered and mapped.
-- **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token protector.
+- **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token
+  protector.
 - **AttestationOptions**, **AttestationKeyProviderFactory**, **AttestationKeyException**, **AttestationRenderer**,
   **AttestationSigner**, **AttestationService**, **AttestationEndpoint** — the signed attestation of the `Evidence`
   subsystem, which is registered, validated at the start, and mapped.

@@ -76,22 +76,22 @@ sign-in and finds it again by the issuer and the subject that the provider gives
 roles and project membership in ReviewCenter like any other account (see Sign In with an OpenID Connect Provider in
 the Users and Sign-in chapter).
 
-| Action                                               | Member | Auditor | Project admin | System admin |
-| ---------------------------------------------------- | ------ | ------- | ------------- | ------------ |
-| See the project, its reviews, history, and evidence  | yes    | yes     | yes           | yes          |
-| Create reviews, comment                              | yes    | no      | yes           | yes          |
-| Edit unsigned reviewer slots (not on a locked review)| yes    | no      | yes           | yes          |
-| Answer the checklist as a slot reviewer              | yes    | no      | yes           | if a member  |
-| Sign a review as the assigned reviewer               | yes    | no      | yes           | if a member  |
-| Download the attestation PDF of a concluded review   | yes    | yes     | yes           | yes          |
-| Manage the repositories and credentials of a project | no     | no      | yes           | yes          |
-| Add and remove members, change member roles          | no     | no      | yes           | yes          |
-| Create projects                                      | no     | no      | no            | yes          |
-| Manage users; read the audit page                    | no     | no      | no            | yes          |
-| Read and export the audit trail of the project       | no     | yes     | yes           | yes          |
-| Change evidence settings of a project                | no     | no      | yes           | yes          |
-| Change the review rules of a project                 | no     | no      | yes           | yes          |
-| Reopen a concluded (locked) review                   | no     | no      | yes           | yes          |
+| Action | Member | Auditor | Project admin | System admin |
+| --- | --- | --- | --- | --- |
+| See the project, its reviews, history, and evidence | yes | yes | yes | yes |
+| Create reviews, comment | yes | no | yes | yes |
+| Edit unsigned reviewer slots (not on a locked review) | yes | no | yes | yes |
+| Answer the checklist as a slot reviewer | yes | no | yes | if a member |
+| Sign a review as the assigned reviewer | yes | no | yes | if a member |
+| Download the attestation PDF of a concluded review | yes | yes | yes | yes |
+| Manage the repositories and credentials of a project | no | no | yes | yes |
+| Add and remove members, change member roles | no | no | yes | yes |
+| Create projects | no | no | no | yes |
+| Manage users; read the audit page | no | no | no | yes |
+| Read and export the audit trail of the project | no | yes | yes | yes |
+| Change evidence settings of a project | no | no | yes | yes |
+| Change the review rules of a project | no | no | yes | yes |
+| Reopen a concluded (locked) review | no | no | yes | yes |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -164,9 +164,9 @@ Accounts made by a system administrator on the Users page do not have this rule,
 administrator sets for an existing user later does (it is temporary).
 
 **Change a role or remove a member.** Use **Make project admin**, **Make member**, **Make auditor**, or **Remove** on a
-member. A project always keeps at least one project administrator: a project administrator cannot remove or demote
-the last one, not even themselves, and the page explains why. A system administrator can. The rule holds even when two people
-act at the same moment.
+member. A project always keeps at least one project administrator: a project administrator cannot remove or demote the
+last one, not even themselves, and the page explains why. A system administrator can. The rule holds even when two
+people act at the same moment.
 
 **The Auditor role.** Only a project administrator or a system administrator can assign it, when a member is added, an
 account is created, or a role is changed; each change is recorded as `project.member-added`, `project.account-created`,
@@ -290,10 +290,10 @@ without saving. The warnings and the summary notice at the top follow your choic
 Both switches are **off by default**, so by default everything needs a sign-in or a personal access token. They are
 independent of each other.
 
-| Switch                         | When on, anyone who can reach the server can...                       |
-| ------------------------------ | --------------------------------------------------------------------- |
-| **Anonymous evidence index**   | read `/api/projects/{id}/evidence/index.json`                         |
-| **Anonymous attestation PDFs** | download `/api/projects/{id}/reviews/{reviewId}/attestation.pdf`      |
+| Switch | When on, anyone who can reach the server can... |
+| --- | --- |
+| **Anonymous evidence index** | read `/api/projects/{id}/evidence/index.json` |
+| **Anonymous attestation PDFs** | download `/api/projects/{id}/reviews/{reviewId}/attestation.pdf` |
 
 Both work without signing in.
 
@@ -328,13 +328,13 @@ if that is not acceptable.
 Five content switches apply to **every** attestation PDF of the project, for signed-in and anonymous readers alike.
 All are **on by default**, so a PDF is complete unless a project administrator reduces it.
 
-| Switch                        | When off, the PDF...                                                      |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| **Review discussion threads** | leaves out the findings and their comments                                |
-| **Reviewer names**            | shows neutral labels (*Reviewer 1 (primary)*, *Participant 1*) for people |
-| **Checklist wording**         | shows the checklist outcomes only, without questions and section titles   |
-| **File list and hashes**      | leaves out the files and their hashes (the fingerprint still covers them) |
-| **Git context**               | leaves out the repository and the baseline and head revisions             |
+| Switch | When off, the PDF... |
+| --- | --- |
+| **Review discussion threads** | leaves out the findings and their comments |
+| **Reviewer names** | shows neutral labels (*Reviewer 1 (primary)*, *Participant 1*) for people |
+| **Checklist wording** | shows the checklist outcomes only, without questions and section titles |
+| **File list and hashes** | leaves out the files and their hashes (the fingerprint still covers them) |
+| **Git context** | leaves out the repository and the baseline and head revisions |
 
 Always included, whatever the settings: the review and project identifiers, the content fingerprint, the checklist
 outcomes, the conclusion, the sign-offs and signatures, the Ballots appendix (with the neutral labels and without the
@@ -349,8 +349,8 @@ switch them on for a project whose justifications are sensitive.
 
 **Regulatory warnings.** Under every content switch that is off, the page shows a warning that is specific to it, for
 example "Omitting reviewer names may not satisfy your regulatory regime. Confirm with your quality or compliance lead."
-When anything is left out, a summary notice at the top of the page lists everything that is left out of the PDFs. ReviewCenter
-cannot know your regulatory regime; the decision to reduce a PDF is yours.
+When anything is left out, a summary notice at the top of the page lists everything that is left out of the PDFs.
+ReviewCenter cannot know your regulatory regime; the decision to reduce a PDF is yours.
 
 **Content scope.** Every attestation PDF has a **Content scope** section, also when nothing is left out. It states
 whether the request was anonymous, the state of each switch (*Included* or *Omitted*), and which parts were left out of
@@ -425,8 +425,8 @@ before you use it.
 
 ## Review Rules
 
-**Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown
-only to a project administrator of the project and to a system administrator; other members do not see it. It holds three
+**Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown only
+to a project administrator of the project and to a system administrator; other members do not see it. It holds three
 switches, saved together with **Save review rules**: **Require independent reviewers** and two further switches (see
 below). ReviewCenter applies all three.
 
@@ -444,16 +444,16 @@ reason. The change is not retroactive: the rule is applied when a reviewer is ch
 signatures that exist stay valid.
 
 **Limit: only the ReviewCenter author is known.** The rule compares the user who created the review in ReviewCenter with
-the reviewer. It does not know who wrote the reviewed files and does not match the authors of git commits, so someone who
-wrote the code but did not create the review is not excluded. A review created from the command line has no recorded
+the reviewer. It does not know who wrote the reviewed files and does not match the authors of git commits, so someone
+who wrote the code but did not create the review is not excluded. A review created from the command line has no recorded
 author, so the rule excludes nobody from it.
 
 **Saving.** The page says "Independent reviewers are now required." or "Independent reviewers are no longer required."
 after a change, and "The review rules were already set this way." when nothing changed (nothing is recorded then). If
 somebody else changed the setting while your page was open, nothing is saved, the message is "The setting was changed by
-someone else. Reload the page and try again.", and the page shows the stored value. A personal access token cannot change
-the setting ("Project settings cannot be changed with an API token; sign in to the web pages."). Every change is recorded
-in the audit trail as `project.independent-reviewers-changed` with the project and the detail
+someone else. Reload the page and try again.", and the page shows the stored value. A personal access token cannot
+change the setting ("Project settings cannot be changed with an API token; sign in to the web pages."). Every change is
+recorded in the audit trail as `project.independent-reviewers-changed` with the project and the detail
 `RequireIndependentReviewers on->off` (or `off->on`).
 
 **Two further switches: authors and reopening.** The card also holds **Authors cannot answer the checklist of their own
@@ -492,9 +492,9 @@ Locked Reviews and Reopening in the Reviewing chapter). A project administrator 
 Open the review; in the locked notice, enter a **Reason for reopening** (required, 1 to 250 characters) and press
 **Reopen review**. Ordinary members do not see the form, and a personal access token cannot reopen a review.
 
-- The review is In review again, and its signatures stay as history but no longer fit the review; they cannot become current
-  again, so the reviewers must sign again. The ballots stay as they were handed in, so the reviewers need not answer
-  again; a change of an answer makes the ballot of its slot a draft until it is handed in again.
+- The review is In review again, and its signatures stay as history but no longer fit the review; they cannot become
+  current again, so the reviewers must sign again. The ballots stay as they were handed in, so the reviewers need not
+  answer again; a change of an answer makes the ballot of its slot a draft until it is handed in again.
 - The audit trail records `review.reopened` with the administrator as the actor and the detail
   `previous digest <digest>; reason: <reason>`. The review page lists the reopens in its **Reopen history**, and the
   attestation PDF of a review that was reopened and approved again has a **Reopen history** section.
@@ -534,27 +534,27 @@ environment variables (which take precedence; a nested name uses two underscores
 with a message that names the setting and never shows a password. While `Notifications:Enabled` is false, nothing in
 the section is read or checked.
 
-| Setting                             | Default        | Meaning                                                  |
-| ----------------------------------- | -------------- | -------------------------------------------------------- |
-| `Notifications:Enabled`             | `false`        | Switches e-mail notifications on                         |
-| `Notifications:Sender`              | `None`         | `None`, `Smtp`, or `File`; `Smtp` or `File` when on      |
-| `Notifications:FromAddress`         | (none)         | The one address mails come from; required when on        |
-| `Notifications:FromName`            | `ReviewCenter` | The installation name in mails, 80 characters at most    |
-| `Notifications:BaseUrl`             | (none)         | The address of this installation; required when on       |
-| `Notifications:Smtp:Host`           | (none)         | The mail server; required for the `Smtp` sender          |
-| `Notifications:Smtp:Port`           | `587`          | The port of the mail server, 1 to 65535                  |
-| `Notifications:Smtp:Tls`            | `StartTls`     | `None`, `StartTls`, or `Implicit` (see below)            |
-| `Notifications:Smtp:Username`       | (none)         | The user name; set it together with a password           |
-| `Notifications:Smtp:Password`       | (none)         | The password inline; prefer the password file            |
-| `Notifications:Smtp:PasswordFile`   | (none)         | The path of a file that holds the password               |
-| `Notifications:Smtp:TimeoutSeconds` | `30`           | How long the mail server may take to answer, 5 to 120    |
-| `Notifications:File:Directory`      | (none)         | The folder for the `File` sender; required for it        |
-| `Notifications:MaxMailsPerHour`     | `200`          | The most mails in one hour over all users, 1 to 10000    |
-| `Notifications:DigestHour`          | `8`            | The local hour of the daily summary, 0 to 23             |
-| `Notifications:TimeZone`            | `UTC`          | The time zone of the daily summary (see below)           |
-| `Notifications:BatchWindowSeconds`  | `300`          | The quiet time before an Every mail is sent, 30 to 3600  |
-| `Notifications:PollSeconds`         | `60`           | How often the server looks for news, 10 to 3600          |
-| `Notifications:IncludeTitles`       | `true`         | Whether a mail names the review titles                   |
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Notifications:Enabled` | `false` | Switches e-mail notifications on |
+| `Notifications:Sender` | `None` | `None`, `Smtp`, or `File`; `Smtp` or `File` when on |
+| `Notifications:FromAddress` | (none) | The one address mails come from; required when on |
+| `Notifications:FromName` | `ReviewCenter` | The installation name in mails, 80 characters at most |
+| `Notifications:BaseUrl` | (none) | The address of this installation; required when on |
+| `Notifications:Smtp:Host` | (none) | The mail server; required for the `Smtp` sender |
+| `Notifications:Smtp:Port` | `587` | The port of the mail server, 1 to 65535 |
+| `Notifications:Smtp:Tls` | `StartTls` | `None`, `StartTls`, or `Implicit` (see below) |
+| `Notifications:Smtp:Username` | (none) | The user name; set it together with a password |
+| `Notifications:Smtp:Password` | (none) | The password inline; prefer the password file |
+| `Notifications:Smtp:PasswordFile` | (none) | The path of a file that holds the password |
+| `Notifications:Smtp:TimeoutSeconds` | `30` | How long the mail server may take to answer, 5 to 120 |
+| `Notifications:File:Directory` | (none) | The folder for the `File` sender; required for it |
+| `Notifications:MaxMailsPerHour` | `200` | The most mails in one hour over all users, 1 to 10000 |
+| `Notifications:DigestHour` | `8` | The local hour of the daily summary, 0 to 23 |
+| `Notifications:TimeZone` | `UTC` | The time zone of the daily summary (see below) |
+| `Notifications:BatchWindowSeconds` | `300` | The quiet time before an Every mail is sent, 30 to 3600 |
+| `Notifications:PollSeconds` | `60` | How often the server looks for news, 10 to 3600 |
+| `Notifications:IncludeTitles` | `true` | Whether a mail names the review titles |
 
 `BaseUrl` must start with `https`, or with `http` for a loopback address only. The server uses it for the links in
 the notification mails; the confirmation mail holds no link. `TimeZone` must be a time zone that the operating system
@@ -799,11 +799,11 @@ matches every field that is filled in:
   always limited to that project; entries that belong to no project (sign-ins, user administration) are shown only on
   the audit page, which only system administrators can open.
 
-**Apply** shows the result, and **Clear filters** (shown while something is set) returns to the whole trail. The
-filter is part of the address, so a filtered view can be bookmarked or shared with someone who may read the same
-page, and the **Older** and **Newer** buttons keep the filter and the page size. A page always holds at most 200
-entries, whatever the address says. A filter value of the address that is not usable (a date that is not `yyyy-MM-dd`, an
-unknown action, another page size) is ignored. When nothing matches, the page says "No entry matches the filters."
+**Apply** shows the result, and **Clear filters** (shown while something is set) returns to the whole trail. The filter
+is part of the address, so a filtered view can be bookmarked or shared with someone who may read the same page, and the
+**Older** and **Newer** buttons keep the filter and the page size. A page always holds at most 200 entries, whatever the
+address says. A filter value of the address that is not usable (a date that is not `yyyy-MM-dd`, an unknown action,
+another page size) is ignored. When nothing matches, the page says "No entry matches the filters."
 
 ### Exporting the Audit Trail
 
@@ -876,40 +876,40 @@ head hash is a manual step, and it is most useful after important events such as
 
 ### Recorded Actions
 
-| Group     | Action codes                                                                         |
-| --------- | ------------------------------------------------------------------------------------ |
-| Projects  | `project.created`, `review.created`                                                  |
-| Members   | `project.member-added`, `project.member-role-changed`, `project.member-removed`      |
-| Members   | `project.account-created`, `project.member-add-failed`                               |
-| Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                      |
-| Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
-| Threads   | `thread.kind-changed`, `thread.comment-report-changed` (promote, demote, include)    |
-| Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
-| Ballots   | `ballot.submitted`, `ballot.reopened`, `ballot.reassigned` (slot and counts only)    |
-| Users     | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed`                |
-| Users     | `user.unlocked` (a system administrator ended the lockout of a user)                 |
-| Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
-| Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
-| Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
-| Sign-in   | `auth.oidc-sign-in`, `auth.oidc-sign-in-failed` (with a short class of the reason)   |
-| TOTP      | `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset`                        |
-| TOTP      | `auth.totp-recovery-used`, `auth.totp-recovery-regenerated`, `auth.totp-failed`      |
-| Users     | `account.oidc-created` (an account was created at the first sign-in at a provider)   |
-| Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
-| Auditing  | `audit.exported` (the audit trail was exported; format, filter, and number of rows)  |
-| Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
-| Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
-| Project   | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
-| Project   | `project.checklist-changed` (the checklist of a project was replaced or reset)       |
-| Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
-| Project   | `project.review-rule-changed` (a further review rule was switched)                   |
-| Reopening | `review.reopened` (an administrator reopened a concluded review)                     |
-| Repo      | `repository.created`, `repository.updated` (a repository was added or changed)       |
-| Repo      | `repository.enabled`, `repository.disabled` (a repository was switched on or off)    |
-| Due date  | `review.due-date-changed` (the due date of a review was set, changed, or cleared)    |
-| Record    | `review.conclusion-changed` (conclusion text changed; lengths only, never the text)  |
-| Tokens    | `token.created`, `token.revoked`                                                     |
-| Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
+| Group | Action codes |
+| --- | --- |
+| Projects | `project.created`, `review.created` |
+| Members | `project.member-added`, `project.member-role-changed`, `project.member-removed` |
+| Members | `project.account-created`, `project.member-add-failed` |
+| Slots | `slot.added`, `slot.updated`, `slot.removed`, `signature.added` |
+| Threads | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened` |
+| Threads | `thread.kind-changed`, `thread.comment-report-changed` (promote, demote, include) |
+| Checklist | `checklist.answered`, `checklist.applicability-changed` |
+| Ballots | `ballot.submitted`, `ballot.reopened`, `ballot.reassigned` (slot and counts only) |
+| Users | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed` |
+| Users | `user.unlocked` (a system administrator ended the lockout of a user) |
+| Passwords | `user.password-set-by-admin`, `user.password-changed` |
+| Sign-in | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out` |
+| Sign-in | `auth.sign-in-locked`, `auth.sign-in-throttled` |
+| Sign-in | `auth.oidc-sign-in`, `auth.oidc-sign-in-failed` (with a short class of the reason) |
+| TOTP | `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset` |
+| TOTP | `auth.totp-recovery-used`, `auth.totp-recovery-regenerated`, `auth.totp-failed` |
+| Users | `account.oidc-created` (an account was created at the first sign-in at a provider) |
+| Auditing | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
+| Auditing | `audit.exported` (the audit trail was exported; format, filter, and number of rows) |
+| Signing | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider) |
+| Evidence | `attestation.generated` (a signed attestation PDF was downloaded) |
+| Project | `project.evidence-settings-changed` (the evidence settings of a project were saved) |
+| Project | `project.checklist-changed` (the checklist of a project was replaced or reset) |
+| Project | `project.independent-reviewers-changed` (the independence rule was switched) |
+| Project | `project.review-rule-changed` (a further review rule was switched) |
+| Reopening | `review.reopened` (an administrator reopened a concluded review) |
+| Repo | `repository.created`, `repository.updated` (a repository was added or changed) |
+| Repo | `repository.enabled`, `repository.disabled` (a repository was switched on or off) |
+| Due date | `review.due-date-changed` (the due date of a review was set, changed, or cleared) |
+| Record | `review.conclusion-changed` (conclusion text changed; lengths only, never the text) |
+| Tokens | `token.created`, `token.revoked` |
+| Tokens | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token) |
 
 ### Limitations of the Audit Trail
 
@@ -954,10 +954,10 @@ the data, stop the server and copy the file.
 Configure the database in the `Database` section of the `appsettings.json` file that sits beside the executable, or
 with environment variables (which take precedence):
 
-| Setting                     | Environment variable         | Meaning                                                 |
-| --------------------------- | ---------------------------- | ------------------------------------------------------- |
-| `Database:Provider`         | `Database__Provider`         | Database provider; only `Sqlite` is supported           |
-| `Database:ConnectionString` | `Database__ConnectionString` | Database file path or SQLite connection string          |
+| Setting | Environment variable | Meaning |
+| --- | --- | --- |
+| `Database:Provider` | `Database__Provider` | Database provider; only `Sqlite` is supported |
+| `Database:ConnectionString` | `Database__ConnectionString` | Database file path or SQLite connection string |
 
 A value without an `=` sign is treated as a file path; an empty value selects the default file. An in-memory
 SQLite database (`:memory:`) is not supported and is refused at startup. For example:
@@ -1039,35 +1039,35 @@ encoded forms are removed from every error message and log line. Git never asks 
 - The server checks at start that the key folder can be written; if it cannot, it refuses to start and names the
   folder.
 
-| Setting                   | Environment variable       | Meaning                                                 |
-| ------------------------- | -------------------------- | ------------------------------------------------------- |
-| `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
-| `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
-| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Git call time limit in seconds (default 120; 1 to 3600) |
+| Setting | Environment variable | Meaning |
+| --- | --- | --- |
+| `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database) |
+| `Git:CachePath` | `Git__CachePath` | Mirror folder (default `git-cache` beside the database) |
+| `Git:TimeoutSeconds` | `Git__TimeoutSeconds` | Git call time limit in seconds (default 120; 1 to 3600) |
 
 ### Key Ring Protection
 
 The key ring decrypts every stored token, so the server protects its key files at rest. `DataProtection:Protection`
 chooses how (the names are not case sensitive):
 
-| Value             | Meaning                                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------- |
-| `Auto` (default)  | The certificate if `CertificatePath` is set; else DPAPI on Windows, permissions elsewhere   |
-| `Dpapi`           | Windows DPAPI for the account (`CurrentUser`) or the machine (`LocalMachine`); Windows only |
-| `Certificate`     | The key files are encrypted with the public key of an RSA certificate that you supply       |
-| `PermissionsOnly` | No encryption: owner-only permissions on the folder and the key files (see below)           |
+| Value | Meaning |
+| --- | --- |
+| `Auto` (default) | The certificate if `CertificatePath` is set; else DPAPI on Windows, permissions elsewhere |
+| `Dpapi` | Windows DPAPI for the account (`CurrentUser`) or the machine (`LocalMachine`); Windows only |
+| `Certificate` | The key files are encrypted with the public key of an RSA certificate that you supply |
+| `PermissionsOnly` | No encryption: owner-only permissions on the folder and the key files (see below) |
 
-| Setting                                   | Meaning                                                            |
-| ----------------------------------------- | ------------------------------------------------------------------ |
-| `DataProtection:Protection`               | `Auto`, `Dpapi`, `Certificate`, or `PermissionsOnly`               |
-| `DataProtection:DpapiScope`               | `CurrentUser` (default) or `LocalMachine`; DPAPI on Windows only   |
-| `DataProtection:CertificatePath`          | A PFX, PKCS#12, or PEM file with the certificate and an RSA key    |
-| `DataProtection:CertificateKeyPath`       | A PEM file with the private key, if not in the certificate file    |
-| `DataProtection:CertificatePassword`      | Password of the certificate or key file (prefer the file setting)  |
-| `DataProtection:CertificatePasswordFile`  | A file that holds the password; set only one of the two            |
-| `DataProtection:PreviousCertificatePaths` | A list of earlier certificates that can still decrypt the ring     |
-| `DataProtection:RequireEncryptedKeys`     | When true, the server refuses a ring that is not encrypted at rest |
-| `DataProtection:AllowNewKeyRing`          | One-start escape hatch: accept a new, empty ring (default false)   |
+| Setting | Meaning |
+| --- | --- |
+| `DataProtection:Protection` | `Auto`, `Dpapi`, `Certificate`, or `PermissionsOnly` |
+| `DataProtection:DpapiScope` | `CurrentUser` (default) or `LocalMachine`; DPAPI on Windows only |
+| `DataProtection:CertificatePath` | A PFX, PKCS#12, or PEM file with the certificate and an RSA key |
+| `DataProtection:CertificateKeyPath` | A PEM file with the private key, if not in the certificate file |
+| `DataProtection:CertificatePassword` | Password of the certificate or key file (prefer the file setting) |
+| `DataProtection:CertificatePasswordFile` | A file that holds the password; set only one of the two |
+| `DataProtection:PreviousCertificatePaths` | A list of earlier certificates that can still decrypt the ring |
+| `DataProtection:RequireEncryptedKeys` | When true, the server refuses a ring that is not encrypted at rest |
+| `DataProtection:AllowNewKeyRing` | One-start escape hatch: accept a new, empty ring (default false) |
 
 `AllowNewKeyRing` accepts only the loss of stored secrets; it does not delete or replace the protected attestation key.
 

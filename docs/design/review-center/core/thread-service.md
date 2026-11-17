@@ -130,13 +130,12 @@ by `ReviewActorRoles` and decided by the internal `ThreadKindRules`.
 **Approval lock and conclusion**: while the review is concluded it is locked (see the `SigningService` unit), so every
 change of a thread is refused with `ReviewLocked` ("This review is concluded and locked. A project administrator must
 reopen it before it can change."): `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`, `PromoteAsync`,
-`DemoteAsync`, and `SetCommentIncludedAsync` each call
-`ReviewLock.EnsureUnlockedAsync` after the access check and the checks of the input, and before the store write, so
-nothing can change what the signatures cover. The store repeats the
+`DemoteAsync`, and `SetCommentIncludedAsync` each call `ReviewLock.EnsureUnlockedAsync` after the access check and the
+checks of the input, and before the store write, so nothing can change what the signatures cover. The store repeats the
 check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
-change again. A review is concluded (approved or rejected) when every slot (at least one) is signed for the current record
-with the outcome the record has now and no thread is
-open; a signed review with an open thread is therefore not locked, and its threads can still be resolved.
+change again. A review is concluded (approved or rejected) when every slot (at least one) is signed for the current
+record with the outcome the record has now and no thread is open; a signed review with an open thread is therefore not
+locked, and its threads can still be resolved.
 
 **Signature impact**: only a change of the digest makes a current signature out of date (see "Signature impact" in
 the `SigningService` unit). The methods that can change the digest take an optional argument
@@ -267,15 +266,13 @@ same as before signing existed.
 thread's `Created` when it has none). It is not stored, so the database is unchanged.
 
 **Audit**: Starting a thread, replying, resolving, reopening, promoting, demoting, and setting the flag of a reply take
-the `Actor` and record `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`,
-`thread.kind-changed`, and `thread.comment-report-changed`. The draft is saved by the store in the same transaction as
-the change, and only when the change took effect (a thread that does not exist, and a request that changes nothing,
-record nothing). The text of a comment or note
-is never written to the trail: the detail holds the identifiers, the anchor (a line anchor on the `Baseline` side
-carries the suffix `(baseline)`; a head anchor is worded as before), and the first 8 hex characters of the SHA-256 of the
-text, so that a later edit of the text would be noticed without copying the text into a second place. A comment that is
-included in the report says `in report`. See the
-`AuditService` unit for the detail formats.
+the `Actor` and record `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`, `thread.kind-changed`,
+and `thread.comment-report-changed`. The draft is saved by the store in the same transaction as the change, and only
+when the change took effect (a thread that does not exist, and a request that changes nothing, record nothing). The text
+of a comment or note is never written to the trail: the detail holds the identifiers, the anchor (a line anchor on the
+`Baseline` side carries the suffix `(baseline)`; a head anchor is worded as before), and the first 8 hex characters of
+the SHA-256 of the text, so that a later edit of the text would be noticed without copying the text into a second place.
+A comment that is included in the report says `in report`. See the `AuditService` unit for the detail formats.
 
 #### Error Handling
 

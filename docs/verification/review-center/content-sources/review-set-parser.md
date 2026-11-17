@@ -38,8 +38,8 @@ gives the two sets in file order with their ordered paths. This scenario is test
 `ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored`.
 
 **ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood**: A file with a byte order mark, Windows line endings, flow
-style, quoting, a folded block scalar, and padded values gives the values as YAML defines them, trimmed. This scenario is
-tested by `ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood`.
+style, quoting, a folded block scalar, and padded values gives the values as YAML defines them, trimmed. This scenario
+is tested by `ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood`.
 
 **ReviewMarkConfigParser_Parse_BlockStyle_IsRead**: A file in block style with two sets gives both sets with their
 titles and paths. This scenario is tested by `ReviewMarkConfigParser_Parse_BlockStyle_IsRead`.
@@ -49,8 +49,8 @@ and brackets) gives the set with its title and both paths. This scenario is test
 `ReviewMarkConfigParser_Parse_FlowStyle_IsRead`.
 
 **ReviewMarkConfigParser_Parse_QuotedStrings_AreRead**: A file with single-quoted and double-quoted values, including a
-colon and an escaped quote in a title, gives the values without the quotes and with the escapes applied. This scenario is
-tested by `ReviewMarkConfigParser_Parse_QuotedStrings_AreRead`.
+colon and an escaped quote in a title, gives the values without the quotes and with the escapes applied. This scenario
+is tested by `ReviewMarkConfigParser_Parse_QuotedStrings_AreRead`.
 
 **ReviewMarkConfigParser_Parse_FoldedText_IsRead**: A title written as a folded block scalar over two lines is read as
 one line, with the lines joined by one space. This scenario is tested by
@@ -75,11 +75,11 @@ review-set and path have the expected values. This scenario is tested by
 **ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid**: A theory over files that are empty, have no `reviews`
 list, an empty list, an entry without an identifier or a title, a repeated identifier, broken YAML, entries of the wrong
 shape, and empty or control-character paths, identifiers, or titles; each gives the rule `ReviewSetConfigInvalid` and a
-message with the expected
-part that shows no library text. This scenario is tested by `ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid`.
+message with the expected part that shows no library text. This scenario is tested by
+`ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid`.
 
-**ReviewMarkConfigParser_Parse_Limits_AreEnforced**: Files exactly at the identifier, title, path count, path length, and
-set count limits are read; files one past each limit are refused with the rule. This scenario is tested by
+**ReviewMarkConfigParser_Parse_Limits_AreEnforced**: Files exactly at the identifier, title, path count, path length,
+and set count limits are read; files one past each limit are refused with the rule. This scenario is tested by
 `ReviewMarkConfigParser_Parse_Limits_AreEnforced`.
 
 **ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead**: A file with exactly 500 review-sets is read and gives all of
@@ -128,8 +128,9 @@ refused with the rule and a message that names the review-set that holds the pat
 **ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead**: A valid file that is exactly 256 KiB is read and gives its
 review-set. This scenario is tested by `ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead`.
 
-**ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid**: A file one byte over 256 KiB is refused with the rule,
-and the message gives the limit. This scenario is tested by `ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid`.
+**ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid**: A file one byte over 256 KiB is refused with the
+rule, and the message gives the limit. This scenario is tested by
+`ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid`.
 
 **ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid**: A file that repeats a list through an alias is refused with
 the rule and a message that names the alias. This scenario is tested by

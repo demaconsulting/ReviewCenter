@@ -148,7 +148,7 @@ after a pause of about a second). Crop each picture to its content and shrink it
 afterward. No script is kept for this: the data is small, and the pictures change only when the pages do.
 
 | Picture | Page |
-| ------- | ---- |
+| --- | --- |
 | `review-inbox.png` | Inbox of a reviewer |
 | `review-status-panel.png` | Review with open threads and a dispute |
 | `review-diff-thread.png`, `review-diff-dark.png` | Diff with a Question and a Finding |

@@ -17,10 +17,10 @@ review) only for a viewer who may see the answers of the other reviewers (see *B
 not see them yet it lists no disputed check, no answer, no failed check and no outcome, counts no discussion about a
 check, and names no answer in a change.
 
-The unit is a small family of types. `ReviewStatusService` builds the status. `ReviewStatus` and the records it holds are
-the result. `ReviewNextAction` is the pure rule that decides the one next action. `ReviewChangeRules` is the internal,
-pure rule that turns audit entries into the plain-language changes since a signature. All of them are stateless and
-thread-safe.
+The unit is a small family of types. `ReviewStatusService` builds the status. `ReviewStatus` and the records it holds
+are the result. `ReviewNextAction` is the pure rule that decides the one next action. `ReviewChangeRules` is the
+internal, pure rule that turns audit entries into the plain-language changes since a signature. All of them are
+stateless and thread-safe.
 
 #### Data Model
 
@@ -40,11 +40,11 @@ a masked viewer too: a draft shows that work has started and says nothing about 
 content, not progress).
 
 **DisputedCheck** (record): **ItemId**, **Text**, **CanDiscuss** (the viewer may start a discussion about the check and
-none is open), and **Answers** (`IReadOnlyList<BallotAnswerView>`, never `null`): the answer of every submitted ballot to
-the check in slot order, including the viewer's own, each as `BallotAnswerView(SlotNumber, ReviewerName, Outcome,
-Justification)`, where `Justification` is `null` when none was written. It is the same data as the differing answers of
-the ballot view, so it exists only for a viewer who may see the answers of the others; a masked viewer gets no
-`DisputedCheck` at all.
+none is open), and **Answers** (`IReadOnlyList<BallotAnswerView>`, never `null`): the answer of every submitted ballot
+to the check in slot order, including the viewer's own, each as
+`BallotAnswerView(SlotNumber, ReviewerName, Outcome, Justification)`, where `Justification` is `null` when none was
+written. It is the same data as the differing answers of the ballot view, so it exists only for a viewer who may see the
+answers of the others; a masked viewer gets no `DisputedCheck` at all.
 
 **SignatureChanges** (record): **SlotId**, **Number**, **SignerName**, **SignedAt**, and **Changes**
 (`IReadOnlyList<ReviewChange>`, oldest first). **ReviewChange** (record): **At**, **By**, and **Reason**, a fixed
@@ -86,8 +86,8 @@ has already read, so the review page does not read them a second time.
     (the latest comment of the question is not by the viewer).
   - Decide the next action with `ReviewNextAction.Decide` and the facts about the viewer, including the names of the
     other reviewers and of those who have not signed.
-  - Word the caution for a viewer whose next action is to sign when another reviewer has not handed in a ballot, and take
-    the outcome note from the approval; both are left out for a masked viewer.
+  - Word the caution for a viewer whose next action is to sign when another reviewer has not handed in a ballot, and
+    take the outcome note from the approval; both are left out for a masked viewer.
   - Derive the changes since signing for every slot whose signature is out of date.
 - *Preconditions*: The viewer may see the project; otherwise `ProjectNotFound` is raised. The values passed in were
   read for the same viewer.

@@ -4,38 +4,35 @@
 
 `SigningService` is verified with unit tests defined in eight files in the `Core` test folder: `SigningServiceTests.cs`
 (slots, signing, re-authentication with a password, the out-of-date logic, the lock, and the reopening),
-`SigningServiceExternalTests.cs` (the signature of a user of an external identity provider), `SigningServiceTotpTests.cs`
-(the second factor), `AuditEventTests.cs` (the audit entries), `SigningServiceBallotTests.cs` (signing and approval
-with ballots), `SigningServiceRejectedTests.cs` (the Rejected outcome and its conclusion text), `ReviewLockBallotTests.cs`
-(the ballot conditions of a concluded review, approved or rejected), and
-`SignatureImpactBallotTests.cs` (the impact check for changes of ballots), with the counting user store of
-`CountingUserStore.cs`
-as a helper of the first. The service depends on a review
-store, on `UserService`, and on `IProjectAccess`; the tests use the in-memory fake store (`FakeReviewStore`), the real
-`UserService` over the
-in-memory user store and a trivial password hasher (`FakePasswordHasher`), so that the re-authentication goes through
-the real login path and its lockout without the cost of the real hasher, and a clock the test can move
-(`MovableTimeProvider`). The real services for threads and checklists are used to change the record: a review is
-answered by the reviewers of its slots, each answering every check in the own ballot and handing the ballot in, which
-is what the consolidated record, and so the digest and the approval, are made of. The ballot tests use the signed
-review of the test world (`SignedReviewWorld`: three slots, with rita, sam, and tess, whose ballots are submitted and
-agree). The real store is
+`SigningServiceExternalTests.cs` (the signature of a user of an external identity provider),
+`SigningServiceTotpTests.cs` (the second factor), `AuditEventTests.cs` (the audit entries),
+`SigningServiceBallotTests.cs` (signing and approval with ballots), `SigningServiceRejectedTests.cs` (the Rejected
+outcome and its conclusion text), `ReviewLockBallotTests.cs` (the ballot conditions of a concluded review, approved or
+rejected), and `SignatureImpactBallotTests.cs` (the impact check for changes of ballots), with the counting user store
+of `CountingUserStore.cs` as a helper of the first. The service depends on a review store, on `UserService`, and on
+`IProjectAccess`; the tests use the in-memory fake store (`FakeReviewStore`), the real `UserService` over the in-memory
+user store and a trivial password hasher (`FakePasswordHasher`), so that the re-authentication goes through the real
+login path and its lockout without the cost of the real hasher, and a clock the test can move (`MovableTimeProvider`).
+The real services for threads and checklists are used to change the record: a review is answered by the reviewers of its
+slots, each answering every check in the own ballot and handing the ballot in, which is what the consolidated record,
+and so the digest and the approval, are made of. The ballot tests use the signed review of the test world
+(`SignedReviewWorld`: three slots, with rita, sam, and tess, whose ballots are submitted and agree). The real store is
 verified by its own unit and by the `Storage` subsystem; the digest is verified by the `RecordDigest` unit. Most tests
 use the test double `AllowAllProjectAccess` as project access, which lets every actor see the project that exists and
 administer it, but decides membership from the memberships stored in the fake store; the access rules themselves are
 verified by the `ProjectAccess` unit. The tests of the rules that depend on who the actor is (who may reopen a review,
 and that whoever may work in the project may change its slots, also a system administrator who is not a member) use the
 real `ProjectAccess` over the fake stores. The rules are checked through the `DomainRuleException` that names the broken
-rule, and through the state of the fake store, so
-that a refused request is shown to store nothing. The fake store does not re-check the approval lock inside a write
-(the real store does, and its tests are in the `ReviewStore` unit), so these tests show the lock decided by the
-service. The fake store records the audit drafts it is given, which shows that the service passes each draft with the
-change; it cannot show that the real store saves the two in one transaction, which is verified in the `ReviewStore` unit.
-The attempt that is spent when the store refuses a signature with `RecordChanged` after the password, the
-authenticator code, or the proof was already checked is a design property that is not verified by a unit test of this
-unit, because the fake store recomputes the digest in the same call and so offers no point between the two to change
-the record. The review is created by a user (`author`) who is not a test user, so the many tests that sign with the other
-users are not affected by the rule of independent reviewers; the tests of that rule use a review created by a member.
+rule, and through the state of the fake store, so that a refused request is shown to store nothing. The fake store does
+not re-check the approval lock inside a write (the real store does, and its tests are in the `ReviewStore` unit), so
+these tests show the lock decided by the service. The fake store records the audit drafts it is given, which shows that
+the service passes each draft with the change; it cannot show that the real store saves the two in one transaction,
+which is verified in the `ReviewStore` unit. The attempt that is spent when the store refuses a signature with
+`RecordChanged` after the password, the authenticator code, or the proof was already checked is a design property that
+is not verified by a unit test of this unit, because the fake store recomputes the digest in the same call and so offers
+no point between the two to change the record. The review is created by a user (`author`) who is not a test user, so the
+many tests that sign with the other users are not affected by the rule of independent reviewers; the tests of that rule
+use a review created by a member.
 
 #### Test Environment
 
@@ -44,9 +41,9 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- Any actor who may work in the project adds slots (a member, and also a system administrator who is not a member), which
-  are numbered in creation order; a slot has a primary and an optional alternate reviewer, and a review may have no
-  slot. A user who cannot see the project, and a project that does not exist, are refused with `ProjectNotFound`.
+- Any actor who may work in the project adds slots (a member, and also a system administrator who is not a member),
+  which are numbered in creation order; a slot has a primary and an optional alternate reviewer, and a review may have
+  no slot. A user who cannot see the project, and a project that does not exist, are refused with `ProjectNotFound`.
 - The reviewers of a slot must be enabled members of the project (a system administrator who is not a member is
   refused), must differ, and must not sit in another slot of the review.
 - A change of slots by an unknown or disabled user, or for a missing review or slot, is refused; so is the removal of a
@@ -185,7 +182,8 @@ no reopen is stored. This scenario is tested by
 
 **SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound**: Adding, changing, and removing a slot,
 signing, reopening, and the check before a confirmation, each for a project that does not exist, are refused with
-`ProjectNotFound`. This scenario is tested by `SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound`.
+`ProjectNotFound`. This scenario is tested by
+`SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound`.
 
 **SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly**: With the real access rules, a user outside the
 project is refused adding, changing, and removing a slot with `ProjectNotFound`, and a system administrator who is not a
@@ -197,9 +195,10 @@ the project arranges its slots, while only a member can be a reviewer and sign. 
 and then the slot is removed; the status shows the change and then no slot. This scenario is tested by
 `SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed`.
 
-**SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned**: A theory over a slot with a current signature and
-a slot whose signature is out of date, each next to a second slot nobody has signed so that the review is not locked;
-changing and removing each is refused with `SlotSigned` and the slot is unchanged. This scenario is tested by `SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned`.
+**SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned**: A theory over a slot with a current signature and a
+slot whose signature is out of date, each next to a second slot nobody has signed so that the review is not locked;
+changing and removing each is refused with `SlotSigned` and the slot is unchanged. This scenario is tested by
+`SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned`.
 
 **SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound**: Changing or removing a slot that is not
 part of the review is refused with `SlotNotFound`. This scenario is tested by
@@ -223,7 +222,8 @@ even with the right password, is refused with `ActorNotAllowed` and nothing is s
 `SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed`.
 
 **SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed**: A reviewer of the slot who has been disabled is
-refused with `ActorNotAllowed`. This scenario is tested by `SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed`.
+refused with `ActorNotAllowed`. This scenario is tested by
+`SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed`.
 
 **SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed**: A theory over a wrong, an empty, and a missing
 password; each is refused with `ReauthenticationFailed` and nothing is signed. This scenario is tested by
@@ -295,10 +295,10 @@ the status of a review equals the single read, and the user list was read once. 
 `SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce`.
 
 **SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots**: A project holds a review that
-was approved and reopened and a second review. Reading the two reviews, one of them twice, and a missing one in one batch
-makes one store batch read and no single snapshot read (counted by the in-memory store). The batch has the two existing
-reviews, the reopen history of the reopened review is present and that of the other is null, and each status equals the
-single read. This scenario is tested by
+was approved and reopened and a second review. Reading the two reviews, one of them twice, and a missing one in one
+batch makes one store batch read and no single snapshot read (counted by the in-memory store). The batch has the two
+existing reviews, the reopen history of the reopened review is present and that of the other is null, and each status
+equals the single read. This scenario is tested by
 `SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots`.
 
 **SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers**: An empty sequence of review
@@ -348,10 +348,10 @@ then tries to sign; the signing is refused with `ActorNotAllowed` and nothing is
 
 **SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck**: A review that can be signed is prepared, and the
 primary reviewer's identity arrives through a token. Signing with the right password, slot, and digest is refused with
-`ActorNotAllowed` and the message that names the API token. Signing six times, more than the lockout allows, with a wrong
-password, a missing review, an unknown slot, and a stale digest gives the same refusal each time, which shows that
-nothing else is checked first. The slot stays unsigned, nothing is recorded in the audit trail, and the real person
-can then sign with the right password, which shows that no wrong password was counted. This scenario is tested by
+`ActorNotAllowed` and the message that names the API token. Signing six times, more than the lockout allows, with a
+wrong password, a missing review, an unknown slot, and a stale digest gives the same refusal each time, which shows that
+nothing else is checked first. The slot stays unsigned, nothing is recorded in the audit trail, and the real person can
+then sign with the right password, which shows that no wrong password was counted. This scenario is tested by
 `SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck`.
 
 **SigningService_SignAsync_RefusedBeforePassword_DoesNotCountWrongPasswords**: A theory over a stale digest, an open
@@ -428,10 +428,9 @@ an empty or null list. These scenarios are tested by
 
 **SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences**: A review has one Fail answer, the other
 checks unanswered, and one open thread; an approved review is arranged too. The structured counts of the status
-(`OpenThreads`, `UnansweredChecks`, `FailedChecks`) equal the numbers in the blocker sentences, in the single read and in
-the batch read, and are zero for the approved review; the Fail answer is counted but has no blocker sentence. This
-scenario is tested by
-`SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences`.
+(`OpenThreads`, `UnansweredChecks`, `FailedChecks`) equal the numbers in the blocker sentences, in the single read and
+in the batch read, and are zero for the approved review; the Fail answer is counted but has no blocker sentence. This
+scenario is tested by `SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences`.
 
 **SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence**: A review is stored without a
 checklist next to a review with the default checklist. In the single read and in the batch read the first has
@@ -445,26 +444,26 @@ review is still approved with the same digest. This scenario is tested by
 `SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked`.
 
 **SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked**: Signing an approved review again is refused with
-`ReviewLocked` (not with the "already signed" message), and the signatures are unchanged. This scenario is tested by `SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked`.
+`ReviewLocked` (not with the "already signed" message), and the signatures are unchanged. This scenario is tested by
+`SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked`.
 
 **Signature impact**: `SignatureImpact` is used through `ChecklistService`, `ThreadService`, and `SigningService`, so
-its scenarios run in
-the tests of those units, with the signed review of the test world (three slots, slot 1 with a primary reviewer and an
-alternate). A draft ballot leaves the consolidated standing, and so the digest, alone, so the refusal comes when a
-ballot is handed in, not when an answer is saved. They are tested by
-`ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`
-(slot numbers and the people who signed, the alternate included, refused at the hand-in of the changed ballot),
+its scenarios run in the tests of those units, with the signed review of the test world (three slots, slot 1 with a
+primary reviewer and an alternate). A draft ballot leaves the consolidated standing, and so the digest, alone, so the
+refusal comes when a ballot is handed in, not when an answer is saved. They are tested by
+`ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners` (slot numbers and the people who
+signed, the alternate included, refused at the hand-in of the changed ballot),
 `ChecklistService_SetAnswerAsync_PartialAcknowledgment_ThrowsWithRemainingSlots` (only the slots that remain),
 `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow` (no signature, and a change that leaves the digest as it is),
-and `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment` (a new thread that is included in the
-report counts, while chat does not). The unit tests of the helper itself show that a ballot that differs lists the
-signed slot of another reviewer (`SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot`), that the
-slot of the person who changes the own ballot is left out when it is excluded
-(`SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgment`), and that a change that leaves the
-agreed standing as it is warns nobody (`SignatureImpact_RequireAcknowledged_SameStanding_NoWarning`). The effect on
-signatures
-that already went out of date is checked by `SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable`,
-which acknowledges the signed slot before it changes the content.
+and `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgment` (a new thread that is included in the report
+counts, while chat does not). The unit tests of the helper itself show that a ballot that differs lists the signed slot
+of another reviewer (`SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot`), that the slot of the
+person who changes the own ballot is left out when it is excluded
+(`SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgment`), and that a change that leaves the agreed
+standing as it is warns nobody (`SignatureImpact_RequireAcknowledged_SameStanding_NoWarning`). The effect on signatures
+that already went out of date is checked by
+`SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable`, which acknowledges the signed slot
+before it changes the content.
 
 **SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed**: A member of the project who does not administer it
 asks to reopen an approved review; the request is refused with `ActorNotAllowed`, and the review is still approved with
@@ -475,8 +474,8 @@ reason (more than 250 characters) are each refused with `ReopenReasonInvalid` an
 scenario is tested by `SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid`.
 
 **SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked**: Reopening a review that is not approved (one
-without a current signature in every slot) is refused with `ReviewNotLocked` and nothing is stored. This scenario is tested
-by `SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked`.
+without a current signature in every slot) is refused with `ReviewNotLocked` and nothing is stored. This scenario is
+tested by `SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked`.
 
 **SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed**: An administrator whose identity arrives through a
 token asks to reopen an approved review with a valid reason; the request is refused with `ActorNotAllowed` and the
@@ -588,8 +587,9 @@ user signs with the password alone, which is tested by `SigningService_SignAsync
 
 **SigningService follow-up scenarios**: The review of a follow-up that carried answers and threads is verified in
 `ReviewServiceFollowUpTests.cs` with the real `SigningService`: the carried answers do not block approval and the
-carried open thread does, which is tested by `ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`;
-the creator of the follow-up is still the author for the rule of independent reviewers, which is tested by
+carried open thread does, which is tested by
+`ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`; the creator of the follow-up is still the
+author for the rule of independent reviewers, which is tested by
 `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`; and a follow-up is locked when approved and can be
 reopened like any review, which is tested by `ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened`.
 
@@ -704,12 +704,13 @@ disputed between the ballots." This scenario is tested by
 `SigningService_SignAsync_Disputed_MessageNamesTheNumberOfDisputedChecks`.
 
 **SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered**: Two reviewers answer one check
-differently and hand in. The next step names "1 check disputed between the ballots" once and does not count the same check
-as unanswered. This scenario is tested by `SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered`.
+differently and hand in. The next step names "1 check disputed between the ballots" once and does not count the same
+check as unanswered. This scenario is tested by
+`SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered`.
 
 **SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots**: Rita has signed while sam and tess
-have not. The next step reads "Signed by Rita. Waiting for the signatures of Sam and Tess." and, after sam signs too, "Signed
-by Rita and Sam. Waiting for the signature of Tess.". This scenario is tested by
+have not. The next step reads "Signed by Rita. Waiting for the signatures of Sam and Tess." and, after sam signs too,
+"Signed by Rita and Sam. Waiting for the signature of Tess.". This scenario is tested by
 `SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots`.
 
 **SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt**: A signature that went out of date because the
@@ -717,10 +718,10 @@ conclusion text changed is named: "X's signature no longer counts because the re
 scenario is tested by `SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt`. The slot of that test was
 signed by its primary, and `LapsedSignerName` is the primary, "Rita".
 
-**SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate**: Alex, the alternate of slot 1,
-signs it and the conclusion text then changes the record. The next step is "Alex's signature no longer counts because
-the review changed. Waiting for Rita, Sam and Tess." and `LapsedSignerName` of the slot is "Alex"; the primary of the slot
-is not named as the signer of the lapsed signature. This scenario is tested by
+**SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate**: Alex, the alternate of slot
+1, signs it and the conclusion text then changes the record. The next step is "Alex's signature no longer counts because
+the review changed. Waiting for Rita, Sam and Tess." and `LapsedSignerName` of the slot is "Alex"; the primary of the
+slot is not named as the signer of the lapsed signature. This scenario is tested by
 `SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate`.
 
 **SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners**: Alex signs slot 1 and sam signs
@@ -746,16 +747,16 @@ no identifiers and no note
 **ReviewApproval_RejectionNote_WordsReviewersAndChecks**: The wording for one, two and several slots, for slots that
 have not handed in, for one, two, three and more than five failed checks. This scenario is tested by
 `ReviewApproval_RejectionNote_WordsReviewersAndChecks` and, for the cases without a note,
-`ReviewApproval_RejectionNote_MaskedConcludedOtherOutcomeOrNoIds_IsNull`. The sentence about missing ballots is tested by
-`ReviewApproval_MissingBallotsText_WordsTheNames` and `ReviewApproval_MissingBallotsText_NullNames_Throws`.
+`ReviewApproval_RejectionNote_MaskedConcludedOtherOutcomeOrNoIds_IsNull`. The sentence about missing ballots is tested
+by `ReviewApproval_MissingBallotsText_WordsTheNames` and `ReviewApproval_MissingBallotsText_NullNames_Throws`.
 
 **SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote**: Every ballot fails a check.
 A reviewer who has not handed in, a draft owner, a user without a slot, no viewer and the API token of a lead or of a
-reviewer without a ballot get an approval with no failed check identifier, no rejection note and no word "Rejected" in the
-next step, for the single and the batch read; the lead and a reviewer who handed in get the named rejection. This scenario
-is tested by `SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote`,
-`SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures` (the masked next step does not change when
-a reviewer signs), `ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote` and
+reviewer without a ballot get an approval with no failed check identifier, no rejection note and no word "Rejected" in
+the next step, for the single and the batch read; the lead and a reviewer who handed in get the named rejection. This
+scenario is tested by `SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote`,
+`SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures` (the masked next step does not change when a
+reviewer signs), `ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote` and
 `ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome`.
 
 **SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgment**: Sam disagrees, and a signature
@@ -803,15 +804,15 @@ unanswered checks, not "Add a reviewer slot.", because blockers decide the hint 
 
 **ReviewLock concluded rules with ballots**: The unit tests in `ReviewLockBallotTests.cs` store a current signature for
 every slot of the signed review and read `ReviewLock.IsConcluded`. It is false while a ballot has been sent back to a
-draft, although every slot is signed and the digest is unchanged
-(`ReviewLock_IsConcluded_UnsubmittedBallot_False`); false when sam disagrees and hands in
-(`ReviewLock_IsConcluded_Disputed_False`); true when every ballot is handed in, the ballots agree, and every slot is
-signed (`ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True`); false when the ballots are handed in and agree but one
-slot has no signature (`ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False`); false when they are handed in,
-agree and are signed but a thread is open (`ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False`); true when every
-slot answers the first check Fail, hands in, a conclusion text is present and every slot is signed for the rejection
-(`ReviewLock_IsConcluded_RejectedAllSignedWithText_True`, which also reads the concluded outcome Rejected); false when the
-conclusion text is blank (`ReviewLock_IsConcluded_RejectedNoText_False`, concluded outcome None); false when every
+draft, although every slot is signed and the digest is unchanged (`ReviewLock_IsConcluded_UnsubmittedBallot_False`);
+false when sam disagrees and hands in (`ReviewLock_IsConcluded_Disputed_False`); true when every ballot is handed in,
+the ballots agree, and every slot is signed (`ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True`); false when the
+ballots are handed in and agree but one slot has no signature
+(`ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False`); false when they are handed in, agree and are signed but a
+thread is open (`ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False`); true when every slot answers the first
+check Fail, hands in, a conclusion text is present and every slot is signed for the rejection
+(`ReviewLock_IsConcluded_RejectedAllSignedWithText_True`, which also reads the concluded outcome Rejected); false when
+the conclusion text is blank (`ReviewLock_IsConcluded_RejectedNoText_False`, concluded outcome None); false when every
 signature says approved although the ballots agree on a rejection
 (`ReviewLock_IsConcluded_RejectedSignedForApproval_False`); and false when one slot of the rejection is unsigned
 (`ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False`). The concluded outcome itself is Approved for agreed, signed
@@ -846,10 +847,10 @@ missing and a thread is open. Signing is refused with `SigningNotAllowed`, and t
 blocker and the open thread. This scenario is tested by
 `SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth`.
 
-**SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved**: Two of three slots sign the rejection
-and the review is not concluded; after the last signs, the conclusion is Rejected, the review is concluded and not
-approved, the next step starts with "Rejected.", and a change of the conclusion text is refused with `ReviewLocked`. This
-scenario is tested by `SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved`.
+**SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved**: Two of three slots sign the rejection and
+the review is not concluded; after the last signs, the conclusion is Rejected, the review is concluded and not approved,
+the next step starts with "Rejected.", and a change of the conclusion text is refused with `ReviewLocked`. This scenario
+is tested by `SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved`.
 
 **SigningService_ReopenReviewAsync_Rejected_ReopensTheReview**: An administrator reopens a rejected, concluded review;
 afterwards it is not concluded, the conclusion is None, and the reopen is listed. This scenario is tested by
@@ -865,5 +866,5 @@ a draft and one handed in, reports `NotStarted`, `Draft` and `Submitted` on the 
 reports no ballot state. This scenario is tested by `SigningService_GetApprovalAsync_ReportsBallotStatePerSlot`.
 
 **SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState**: The approval of a viewer who may not see the other
-ballots still reports the ballot state of each slot, because it is progress and not a verdict. This scenario is tested by
-`SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState`, defined in `BallotMaskingServiceTests.cs`.
+ballots still reports the ballot state of each slot, because it is progress and not a verdict. This scenario is tested
+by `SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState`, defined in `BallotMaskingServiceTests.cs`.

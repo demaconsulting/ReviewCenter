@@ -15,11 +15,11 @@ token rules of `DomainRule`, and the token limits of `ReviewLimits`.
 
 **PersonalAccessToken**: a data class of `Id` (assigned by the store), `UserId` and `User` (the owner, loaded only when
 a lookup asks for it), `Name` (the label the owner chose), `DisplayId`, `TokenHash`, `Created`, `Expires`, `LastUsed`
-(`null` until first use), and `Revoked` (`null` while the token is not revoked). `IsActive(now)` is true when the
-token is neither revoked nor expired at the time given. The value of a token is never a property: only its hash is stored.
+(`null` until first use), and `Revoked` (`null` while the token is not revoked). `IsActive(now)` is true when the token
+is neither revoked nor expired at the time given. The value of a token is never a property: only its hash is stored.
 
-**The value**: `rcpat_` followed by the base64url text without padding of 32 random bytes (43 characters, 49 in all). The
-random bytes come from the cryptographic random generator. The value is returned once, by `CreateAsync`, in a
+**The value**: `rcpat_` followed by the base64url text without padding of 32 random bytes (43 characters, 49 in all).
+The random bytes come from the cryptographic random generator. The value is returned once, by `CreateAsync`, in a
 `CreatedPersonalAccessToken` together with the stored token, and exists nowhere else.
 
 **The hash and the display id**: The stored hash is the lowercase hexadecimal SHA-256 of the whole value. A token has a
@@ -55,8 +55,8 @@ passed by two requests racing. This holds for one instance, so the service is a 
 
 - *Parameters*: `Actor actor`, `string? name`, `int expiryDays`, and a cancellation token.
 - *Returns*: `Task<CreatedPersonalAccessToken>` — the stored token and its value.
-- *Postconditions*: The token and a `token.created` audit entry (detail: the name, the display id, and the expiry time in
-  UTC) are stored together. Nothing is stored when a rule fails.
+- *Postconditions*: The token and a `token.created` audit entry (detail: the name, the display id, and the expiry time
+  in UTC) are stored together. Nothing is stored when a rule fails.
 
 The checks are in this order, and the first violation is reported: an actor that came in with an API token is refused
 (`ActorNotAllowed`, so a token cannot mint another token); the name is trimmed and must have 1 to 100 characters without

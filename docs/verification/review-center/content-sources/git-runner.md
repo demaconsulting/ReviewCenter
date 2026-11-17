@@ -36,13 +36,13 @@ local server on the loopback address and the installed git).
 
 #### Test Scenarios
 
-**GitRunner_BuildStartInfo_TokenOnlyInEnvironment**: The start information for a call with a user name and token uses the
-argument list and no shell; no argument holds the token or the user name; the token reaches the child only through the
-numbered configuration variables as an authorization header for the location. This scenario is tested by
+**GitRunner_BuildStartInfo_TokenOnlyInEnvironment**: The start information for a call with a user name and token uses
+the argument list and no shell; no argument holds the token or the user name; the token reaches the child only through
+the numbered configuration variables as an authorization header for the location. This scenario is tested by
 `GitRunner_BuildStartInfo_TokenOnlyInEnvironment`.
 
-**GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment**: For a call without credentials no configuration variable is
-set; the environment cannot read the system or user configuration, cannot prompt, and runs no askpass program. This
+**GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment**: For a call without credentials no configuration variable
+is set; the environment cannot read the system or user configuration, cannot prompt, and runs no askpass program. This
 scenario is tested by `GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment`.
 
 **GitRunner_BuildStartInfo_UnlistedServerVariable_IsNotPassedToGit**: A variable of the server process that git does not
@@ -77,8 +77,8 @@ tested by `GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment`.
 the bounded buffer, leaves only masks and separators even though the buffer starts inside a token. This scenario is
 tested by `GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment`.
 
-**GitRunner_FailureFor_DescribesFailuresClearly**: A failure is described with the repository name and the redacted first
-line of the error, and an authentication failure says access was denied and what an administrator must check. This
+**GitRunner_FailureFor_DescribesFailuresClearly**: A failure is described with the repository name and the redacted
+first line of the error, and an authentication failure says access was denied and what an administrator must check. This
 scenario is tested by `GitRunner_FailureFor_DescribesFailuresClearly`.
 
 **GitRunner_FailureFor_NeverContainsLocation**: For a URL and for a local path, and for a denied access, an error text

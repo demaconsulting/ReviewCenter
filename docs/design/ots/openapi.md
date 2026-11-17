@@ -5,20 +5,20 @@ This document describes the integration and usage design for the `Microsoft.AspN
 
 ### Purpose
 
-Microsoft.AspNetCore.OpenApi is the package of Microsoft that builds an OpenAPI document from the endpoints of an ASP.NET
-Core application, using the metadata of the endpoints (route patterns, methods, parameters, the types of requests and
-answers, and the declared status codes). ReviewCenter uses it in the distributed application to describe the JSON API
-under `/api`, so that scripts and tools can learn the routes, the bodies, and the bearer security scheme from the running
-server. The package is not part of the shared framework of ASP.NET Core, so it is a reference of the application
-project, and its document model (`Microsoft.OpenApi`) comes with it.
+Microsoft.AspNetCore.OpenApi is the package of Microsoft that builds an OpenAPI document from the endpoints of an
+ASP.NET Core application, using the metadata of the endpoints (route patterns, methods, parameters, the types of
+requests and answers, and the declared status codes). ReviewCenter uses it in the distributed application to describe
+the JSON API under `/api`, so that scripts and tools can learn the routes, the bodies, and the bearer security scheme
+from the running server. The package is not part of the shared framework of ASP.NET Core, so it is a reference of the
+application project, and its document model (`Microsoft.OpenApi`) comes with it.
 
 ### Features Used
 
 - `AddOpenApi` with an `OpenApiOptions` object whose `ShouldInclude` filter limits the document to the routes that
   start with `api/`, and with a document transformer that writes the fixed parts of the document
 - `MapOpenApi` at `/api/openapi.json`, to serve the generated document
-- The document model (`OpenApiDocument`, `OpenApiInfo`, `OpenApiSecurityScheme`, `OpenApiSecurityRequirement`), to set the
-  title, a fixed version, no servers, the HTTP bearer scheme, and the security requirement of every operation
+- The document model (`OpenApiDocument`, `OpenApiInfo`, `OpenApiSecurityScheme`, `OpenApiSecurityRequirement`), to set
+  the title, a fixed version, no servers, the HTTP bearer scheme, and the security requirement of every operation
 - The endpoint metadata that the generator reads (names, summaries, declared results, and the exclusion of an endpoint
   from the description)
 

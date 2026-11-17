@@ -6,7 +6,7 @@
 
 `TotpLoginPage` is the second page of a sign-in with a second factor, at `/login/totp`. After the password was right,
 the person types the current code of the authenticator app, or a recovery code, and the form posts it to the sign-in
-endpoint (see _TotpSignIn_). The page decides nothing about the sign-in: it only shows the form and the outcome that the
+endpoint (see *TotpSignIn*). The page decides nothing about the sign-in: it only shows the form and the outcome that the
 endpoint reports.
 
 #### Data Model
@@ -28,7 +28,7 @@ never used.
 #### Error Handling
 
 The page shows no detail of why a code failed and never shows a code or a token. An expired challenge is shown on the
-login page (see _LoginPage_).
+login page (see *LoginPage*).
 
 #### Dependencies
 

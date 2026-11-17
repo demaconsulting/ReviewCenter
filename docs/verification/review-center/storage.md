@@ -179,9 +179,9 @@ the disabled state, and no repository is offered for selection. This scenario is
 `StorageSubsystem_Repositories_PersistAcrossReopen`.
 
 **StorageSubsystem_AccessTokens_PersistAcrossReopen**: A user and two tokens are created through the services over a new
-database and one token is revoked; the database is closed and opened again. The kept token still authenticates its owner,
-the revoked token is refused, both are listed, the revoked one with its revocation time, and no row holds a token value.
-This scenario is tested by `StorageSubsystem_AccessTokens_PersistAcrossReopen`.
+database and one token is revoked; the database is closed and opened again. The kept token still authenticates its
+owner, the revoked token is refused, both are listed, the revoked one with its revocation time, and no row holds a token
+value. This scenario is tested by `StorageSubsystem_AccessTokens_PersistAcrossReopen`.
 
 **StorageSubsystem_AccessTokens_RevokeByOtherUser_IsRefusedAndChangesNothing**: Two users and a token of the first
 are created through the services over a new database. The second user tries to revoke that token and is refused as
@@ -229,14 +229,14 @@ The last project administrator rule, including two removals made at the same tim
 `ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused`, and the atomic storing of an account with its
 membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether` and
 `UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
-audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
-in the same file. The filter of the listing (each field, the literal matching of `%`, `_`, and `\`, the day range, the
-stored form of the time, the paging with a filter, and the speed on a larger trail) is tested in `AuditStoreFilterTests.cs`
-(see `AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive` and
+audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies` in
+the same file. The filter of the listing (each field, the literal matching of `%`, `_`, and `\`, the day range, the
+stored form of the time, the paging with a filter, and the speed on a larger trail) is tested in
+`AuditStoreFilterTests.cs` (see `AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive` and
 `AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable`), and the indexes of the audit table by
-`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`. The time of the newest audit entry of each review of a
-project (the last activity) is tested by
-`AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`, defined in `AuditStoreTests.cs`.
+`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`. The time of the newest audit entry of each review of a project
+(the last activity) is tested by `AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`, defined in
+`AuditStoreTests.cs`.
 
 **External identity**: An account of an identity provider is found only by the exact pair of issuer and subject, and a
 second account with the same pair is refused, while any number of local accounts (no pair) are stored; these are tested
@@ -260,8 +260,8 @@ wins; these are tested by `ReviewStore_AddProjectAsync_ChecklistDefinition_IsNul
 `ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins`, all defined in
 `ProjectChecklistStoreTests.cs`.
 
-**Review due date**: A review keeps its optional due date as the same calendar day, a change is a compare-and-set that is
-stored together with its audit entry (the chain verifies), a change based on a date that is no longer stored changes
+**Review due date**: A review keeps its optional due date as the same calendar day, a change is a compare-and-set that
+is stored together with its audit entry (the chain verifies), a change based on a date that is no longer stored changes
 nothing, and of two writers from the same date exactly one wins; these are tested by
 `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`,
 `ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited`,
@@ -293,17 +293,18 @@ process-wide gate; the sequence numbers are consecutive and the chain is intact.
 method that updates or deletes an entry, which is tested by `AuditStore_PublicSurface_OffersNoUpdateOrDelete`. The
 reading and verification of stored entries is verified in the unit tests of `AuditStore`.
 
-**Second factor**: The race of the step is tested by `TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner`
-and the race of a recovery code by `TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner`, both
-defined in `TotpStoreTests.cs` and run on a real SQLite file.
+**Second factor**: The race of the step is tested by
+`TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner` and the race of a recovery code by
+`TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner`, both defined in `TotpStoreTests.cs` and
+run on a real SQLite file.
 
 **E-mail notification address**: The confirmation of an address by exactly one of several parallel requests is tested by
-`NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner`, and the change of the address with its audit entry
-by `NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit`. The reservation of a confirmation mail by exactly
-one of several parallel requests is tested by `NotificationStore_ReserveConfirmationAsync_Concurrent_HasExactlyOneWinner`,
+`NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner`, and the change of the address with its audit entry by
+`NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit`. The reservation of a confirmation mail by exactly one
+of several parallel requests is tested by `NotificationStore_ReserveConfirmationAsync_Concurrent_HasExactlyOneWinner`,
 and the limit of the attempts at a code under parallel requests by
-`NotificationStore_TryCountAttemptAsync_Concurrent_NeverExceedsTheLimit`; all are defined in
-`NotificationStoreTests.cs` and run on a real SQLite file.
+`NotificationStore_TryCountAttemptAsync_Concurrent_NeverExceedsTheLimit`; all are defined in `NotificationStoreTests.cs`
+and run on a real SQLite file.
 
 **Notification mode and dispatch state**: The mode, the notified items, and the dispatch state of a user (the baseline
 flag, the batch window, the retry state, and the daily slot) are still there, identical, after the database is closed

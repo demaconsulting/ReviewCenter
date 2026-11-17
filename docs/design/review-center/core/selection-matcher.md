@@ -4,9 +4,9 @@
 
 #### Purpose
 
-`SelectionMatcher` decides which paths of a repository revision belong to a review. Its single responsibility is to parse
-the file patterns that a user enters and to test a path against them. It is a pure, static unit with no state, no file
-system access, and no dependency on a glob library, so its behavior is fully defined and tested here.
+`SelectionMatcher` decides which paths of a repository revision belong to a review. Its single responsibility is to
+parse the file patterns that a user enters and to test a path against them. It is a pure, static unit with no state, no
+file system access, and no dependency on a glob library, so its behavior is fully defined and tested here.
 
 #### Data Model
 
@@ -78,13 +78,13 @@ so it must be strict.
 The behaviors that are the same: patterns are evaluated in order; `!` excludes; a later include adds a path back; a bare
 name is an exact path; a trailing `/` is a directory prefix; a trailing `**` needs at least one more segment; a leading
 `./` or `/` is dropped; `*` stays within a segment; `**` as a segment spans directories; and only the path strings are
-matched, never the files, so a path that was deleted in the head revision still matches. A differential test compares the
-two implementations over a corpus of common syntax (without `?`) and requires them to agree.
+matched, never the files, so a path that was deleted in the head revision still matches. A differential test compares
+the two implementations over a corpus of common syntax (without `?`) and requires them to agree.
 
 #### Error Handling
 
-An invalid selection raises `DomainRuleException` for `SelectionInvalid` with a message that names the cause, for example
-that the separator must be `/`. `IsMatch` raises none. Null arguments raise `ArgumentNullException`.
+An invalid selection raises `DomainRuleException` for `SelectionInvalid` with a message that names the cause, for
+example that the separator must be `/`. `IsMatch` raises none. Null arguments raise `ArgumentNullException`.
 
 #### Dependencies
 

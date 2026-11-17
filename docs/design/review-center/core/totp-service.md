@@ -17,8 +17,8 @@ rules of `DomainRule`. The service is a singleton.
 
 **Algorithm**: HMAC-SHA-1 with 6 digits and 30 second steps, which every authenticator app supports. The secret has 160
 bits. A code is accepted for the current step and one step before and after (a window of plus or minus one). Core uses
-the algorithm only through `ITotpAlgorithm`, implemented in the `Identity` subsystem (see `TotpAlgorithm`), so Core stays
-free of libraries.
+the algorithm only through `ITotpAlgorithm`, implemented in the `Identity` subsystem (see `TotpAlgorithm`), so Core
+stays free of libraries.
 
 **UserTotp**: the enrollment of one user: `UserId`, `ProtectedSecret` (encrypted, never the secret), `Created`,
 `ConfirmedAt` (null while the enrollment is pending), and `LastAcceptedStep` (the replay state). `IsActive` is true when
@@ -144,10 +144,9 @@ step.
   again: a missing, disabled, or external user, an inactive row, or a feature that is off gives `ChallengeInvalid`. A
   locked account gives `LockedOut` without counting. A wrong code is counted through
   `UserService.RegisterSecondFactorFailureAsync` and recorded as `auth.totp-failed` (sign-in); when it starts the
-  lockout the result is `LockedOut`, otherwise the challenge is returned (`Failed`) unless the user was invalidated while
-  the code was checked (see `TotpChallengeStore.Return`). A right code clears the failure
-  counter, stores the time of the sign-in (`UserService.RecordSignInAsync`, one store update with the counter), and
-  gives `Success`.
+  lockout the result is `LockedOut`, otherwise the challenge is returned (`Failed`) unless the user was invalidated
+  while the code was checked (see `TotpChallengeStore.Return`). A right code clears the failure counter, stores the time
+  of the sign-in (`UserService.RecordSignInAsync`, one store update with the counter), and gives `Success`.
 
 **Checking a code** (private): a code of exactly six digits is an authenticator code: the secret is decrypted, checked
 with `TryVerify`, and the matched step is recorded with `TryAdvanceStepAsync`; the secret array is cleared afterwards.

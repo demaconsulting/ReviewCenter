@@ -176,9 +176,10 @@ scenario is tested by `Context_Create_InvalidUrls_ThrowsArgumentException`.
 name are recorded, and `SystemAdmin` is true. This scenario is tested by
 `Context_Create_UserAddVerb_SetsUserAddAndOptions`.
 
-**Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser**: `Context.Create` is called with `user add` and
-both names but without the switch; `SystemAdmin` is false, so the user is an ordinary user. A context created without
-arguments has `UserAdd` false. This scenario is tested by `Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser`.
+**Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser**: `Context.Create` is called with `user add` and both
+names but without the switch; `SystemAdmin` is false, so the user is an ordinary user. A context created without
+arguments has `UserAdd` false. This scenario is tested by
+`Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser`.
 
 **Context_Create_UserAddMisuse_ThrowsArgumentException**: A theory over `user add` with only the display name and
 with only the user name; an `ArgumentException` whose message says that `--username` and `--display-name` are

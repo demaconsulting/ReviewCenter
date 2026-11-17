@@ -338,18 +338,19 @@ from the target design, an implementation note says so:
   or repository source choice, and the review page shows the change kind of each file and a Head or Baseline view of a
   modified file (no diff highlighting). The 7a-1 note that reviews do not use the repository registry no longer
   applies. Development databases created before this slice must be recreated (no migrations).
-- **Implemented, slice 7b-1 (planning core)**: the Core `ReviewPlanner` plans the reviews that a head revision needs from
-  the `reviews:` list of the repository's `.reviewmark.yaml` (read by the ContentSources `ReviewMarkConfigParser`, with
-  the single new OTS dependency YamlDotNet): a full review, the changes since a given revision, or the changes since the
-  last approved review of the same review-set, with a fallback to a full review when that baseline is not an ancestor
-  (a new `IsAncestorAsync` on the git session) or the selection changed. A review records its review-set id, and the
-  record digest also binds it. The plan page is slice 7b-2.
-- **Implemented, slice 7b-2 (plan page)**: the Web `PlanPage` at `/projects/{id}/plan` (linked from the project page when
-  a repository is enabled) takes a repository, a head revision, and a baseline choice (none, a given revision, or the
-  last approved review), shows one summary sentence, the sets that need a review first (ticked), the sets that cannot be
-  planned and those already filed only when present, and the empty sets collapsed, and creates the ticked reviews with a
-  result for each. The review page shows the review-set of a planned review. The planner now turns an unexpected fault
-  of one review into a failed result with a generic message, so the other reviews of the batch are kept.
+- **Implemented, slice 7b-1 (planning core)**: the Core `ReviewPlanner` plans the reviews that a head revision needs
+  from the `reviews:` list of the repository's `.reviewmark.yaml` (read by the ContentSources `ReviewMarkConfigParser`,
+  with the single new OTS dependency YamlDotNet): a full review, the changes since a given revision, or the changes
+  since the last approved review of the same review-set, with a fallback to a full review when that baseline is not an
+  ancestor (a new `IsAncestorAsync` on the git session) or the selection changed. A review records its review-set id,
+  and the record digest also binds it. The plan page is slice 7b-2.
+- **Implemented, slice 7b-2 (plan page)**: the Web `PlanPage` at `/projects/{id}/plan` (linked from the project page
+  when a repository is enabled) takes a repository, a head revision, and a baseline choice (none, a given revision, or
+  the last approved review), shows one summary sentence, the sets that need a review first (ticked), the sets that
+  cannot be planned and those already filed only when present, and the empty sets collapsed, and creates the ticked
+  reviews with a result for each. The review page shows the review-set of a planned review. The planner now turns an
+  unexpected fault of one review into a failed result with a generic message, so the other reviews of the batch are
+  kept.
 - **Implemented, slice 7c (diff viewer and deep links)**: the Core `LineDiff` (Myers line diff, bounded by 10,000 lines
   per side and 2,000 changed lines) and `ReviewService.GetDiffAsync` give the review page a side-by-side Diff view for a
   changed file, with unchanged lines collapsed and a plain "too large" fallback. A thread is anchored to the Head or the
@@ -366,18 +367,17 @@ from the target design, an implementation note says so:
   included is never printed.
   Azure Key Vault and an RFC 3161 time stamp authority are planned, not implemented.
 - **Implemented, slice 9a (personal access tokens and /api)**: any signed-in user creates, lists and revokes personal
-  access tokens on the account page (a name, 30, 90 or 365 days, at most 20 active tokens, the value shown once, only its
-  hash stored; the Core `PersonalAccessTokenService` and the Storage `PersonalAccessTokenStore`). The new Api subsystem
-  (`ApiTokenAuthentication`, `ApiEndpoints`, `ApiDocument`) serves a JSON API under `/api` that accepts a token and
-  nothing else: it lists projects and reviews, reads a review, creates a Draft review from files or from the changes
-  of a registered repository (flagged on the review as created through the API, with its creator), and downloads the
-  attestation of a complete review. The OpenAPI document is served at `/api/openapi.json` and a committed snapshot
+  access tokens on the account page (a name, 30, 90 or 365 days, at most 20 active tokens, the value shown once, only
+  its hash stored; the Core `PersonalAccessTokenService` and the Storage `PersonalAccessTokenStore`). The new Api
+  subsystem (`ApiTokenAuthentication`, `ApiEndpoints`, `ApiDocument`) serves a JSON API under `/api` that accepts a
+  token and nothing else: it lists projects and reviews, reads a review, creates a Draft review from files or from the
+  changes of a registered repository (flagged on the review as created through the API, with its creator), and downloads
+  the attestation of a complete review. The OpenAPI document is served at `/api/openapi.json` and a committed snapshot
   (`docs/api/openapi.json`) is compared with it in a test. A token never signs and never opens a page; the former is
-  enforced in the Core `SigningService`, not only in the routes. The API masks the details of a review for the actor
-  of a token like the UI does (a token is never the lead or an auditor, so it sees the standing only after its owner
-  has submitted a ballot, or when the review has a single slot or is concluded), and the review resource carries the
-  outcome and the thread counts per kind. Development databases created before this slice must be recreated (no
-  migrations).
+  enforced in the Core `SigningService`, not only in the routes. The API masks the details of a review for the actor of
+  a token like the UI does (a token is never the lead or an auditor, so it sees the standing only after its owner has
+  submitted a ballot, or when the review has a single slot or is concluded), and the review resource carries the outcome
+  and the thread counts per kind. Development databases created before this slice must be recreated (no migrations).
 - **Implemented, slice 9b (evidence index for ReviewMark)**: `GET /api/projects/{projectId}/evidence/index.json` serves
   the completed reviews of a project as the ReviewMark evidence index (the new Evidence unit `EvidenceIndexService`):
   only `pass` entries, only reviews planned from a review-set, one entry for each id and fingerprint, in a fixed order,

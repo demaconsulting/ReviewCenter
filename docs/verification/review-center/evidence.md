@@ -156,18 +156,18 @@ for another. These scenarios are tested by `ReviewMarkContract_Index_HasTheSchem
 `ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm`, and
 `ReviewMarkContract_Index_FollowsReviewMarkSemantics`.
 
-**Visibility**: The attestation and the evidence index are guarded by the project rules of `Core`
-(`AttestationService` answers `NotFound` and `EvidenceIndexService.BuildAsync` refuses the project for a user who
-cannot see it). The units have non-member cases of their own
+**Visibility**: The attestation and the evidence index are guarded by the project rules of `Core` (`AttestationService`
+answers `NotFound` and `EvidenceIndexService.BuildAsync` refuses the project for a user who cannot see it). The units
+have non-member cases of their own
 (`AttestationService_GenerateAsync_ActorMayNotViewProject_ReturnsNotFoundLikeMissingReview`,
 `EvidenceIndexService_Build_NonMemberActor_ThrowsProjectNotFound`, and
 `AttestationEndpoint_Get_NonMemberSession_Answers404AndRecordsNothing`), and the guard is also verified over HTTP,
 through the real application, by the tests of the `Api` subsystem:
-`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
-(the attestation and the evidence index route, with a bearer token and with Basic credentials),
-`ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` (a member and a system administrator are served),
-and `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` (the web route answers an empty 404 for a signed-in
-non-member). An anonymous request to the web route is redirected to the login page, which is tested by
+`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` (the attestation and the evidence index
+route, with a bearer token and with Basic credentials),
+`ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` (a member and a system administrator are
+served), and `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` (the web route answers an empty 404 for a
+signed-in non-member). An anonymous request to the web route is redirected to the login page, which is tested by
 `AttestationEndpoint_Get_SignedOut_RedirectsToLogin`. A request without an actor is refused like a missing project
 unless the project has switched on the matching anonymous setting, which is tested in the units
 (`AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound` and
@@ -184,9 +184,10 @@ tests print every switch, the Content scope section, and each omission
 tests of `AttestationContentSettingsTests.cs` run the service with each switch off, check the neutral labels, and verify
 the signature of the reduced PDF (`AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies`),
 the audit actor `anonymous` (`AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous`), and the
-check of the settings before the signing (`AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged`).
-The same PDF is downloaded without credentials by `AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous`
-in the `Api` subsystem. The page that changes the settings is verified in the `Web` subsystem.
+check of the settings before the signing
+(`AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged`). The same PDF is downloaded without
+credentials by `AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous` in the `Api` subsystem.
+The page that changes the settings is verified in the `Web` subsystem.
 
 **Follow-up review**: The attestation of a review that follows another names the followed review and the numbers of
 carried answers and threads in the Review section and marks the carried checks, sections, and threads, while the

@@ -33,20 +33,20 @@ affected (see Frozen copy below). The default passes `ChecklistValidator`.
 reads a JSON text and reports every violation, each with the path of the value in the definition (for example
 `sections[2].items[1].id: duplicate "code-03"`; indexes start at zero), in the lists of a `ChecklistValidationResult`
 (`Errors`, and the parsed `Definition` when there are none), not only the first. The rules: the text is JSON and at most
-`ReviewLimits.MaxChecklistBytes` (256 KiB; a larger text is not parsed and only the size is reported); the version is not
-empty and at most 64 characters; there are 1 to 50 sections and 1 to 500 checks in all; a section has at least one
+`ReviewLimits.MaxChecklistBytes` (256 KiB; a larger text is not parsed and only the size is reported); the version is
+not empty and at most 64 characters; there are 1 to 50 sections and 1 to 500 checks in all; a section has at least one
 check; every identifier of a section or a check has 1 to 32 letters, digits, dots, underscores, and hyphens and starts
 with a letter or digit; identifiers are unique across the whole definition, sections and checks together, and compared
 without regard to case (the default's own identifiers use upper case, so the rule allows it); a section title and a
 check title are not empty and at most 200 characters; the wording of a check is not empty and at most 1000 characters;
 the applicability hint has at most 500 characters. The names of the members are read without regard to case, because
-`ToJson` writes them in Pascal case; the paths use the lower-case names. A duplicate is reported at its later use.
-An error that the reader finds (a value of the wrong type) is reported at the same kind of path: the parser's path
+`ToJson` writes them in Pascal case; the paths use the lower-case names. A duplicate is reported at its later use. An
+error that the reader finds (a value of the wrong type) is reported at the same kind of path: the parser's path
 (`$.Sections[0].Items[1].Id`) is converted by removing the `$` prefix and spelling the known member names in their
-canonical form, so every consumer sees one path format; a path that names no member is `json`.
-`ParseOrThrow` returns the definition or raises `ChecklistDefinitionInvalid`, with the first ten errors in the message.
-The limits are in `ReviewLimits`. `FromJson` stays lenient: it is the reader of frozen copies and of stored text, and
-the strict rules apply only where a definition enters the system or is taken for a new review.
+canonical form, so every consumer sees one path format; a path that names no member is `json`. `ParseOrThrow` returns
+the definition or raises `ChecklistDefinitionInvalid`, with the first ten errors in the message. The limits are in
+`ReviewLimits`. `FromJson` stays lenient: it is the reader of frozen copies and of stored text, and the strict rules
+apply only where a definition enters the system or is taken for a new review.
 
 **ReviewChecklist**: the frozen copy stored for a review: `ProjectId`, `ReviewId`, `Version`, and `Definition`
 (the JSON text of the definition). `Parse` returns the definition.

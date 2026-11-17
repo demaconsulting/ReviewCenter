@@ -5,33 +5,31 @@
 #### Purpose
 
 `ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`, which also answers the file, line and thread addresses
-described under Deep links below. Its responsibility is to show one review, with the reader's work first. From the top it
-shows a breadcrumb (muted, with "/" separators, leading to the projects list and the owning project, and ending in the
-review identifier as text instead of a link), the title with an approval badge (Approved, Rejected, or In review) and a
-History
-button, and a one-sentence next step, which is the single hint of the page about what to do next. For an approved
-review a line below the title offers the download of the signed attestation (see Attestation download below). Below it
-is a
-compact summary strip (`review-summary`) of up to three cells: the checklist (the progress summary such as "37 of 58
-checks answered", a progress bar of the answered checks over all checks, and a link to the checklist page; absent when
-the review has no checklist), the reviewers ("No reviewer slots yet", or "N of M signed"), and the threads ("N open
-· M resolved"). Then come the files with the size and number of open threads of each, the thread index of all files, the
-selected file as a diff against its baseline (or as numbered lines), the comment threads on that file, which a reader
-can answer, resolve, and reopen (a resolved thread is a one-line header until expanded), and the form that starts a new
-thread. After the reading come the Reviewers and signing card (the reviewer slots with their signature status, the
-form that adds a slot, collapsed until a reviewer asks for it unless the review has no slot yet or the last attempt
-was refused, and, for a reviewer, the form that signs) and, last, in a native `<details>` element that is collapsed by
-default, the review's identifier, state, content fingerprint, record digest, and the hash of each file; for a review
-from a repository it also shows the repository name, the baseline and head commits, and the selection; for a review that
-was planned from a review-set it also shows the identifier of that set (`review-set-id`, the "Review set" row). Each card
-has one primary action; navigation buttons such as History, Open checklist, and the way back after an address that names
-nothing are outline buttons. The page uses the wide page container, because it shows tables and code. It is a Razor
-component split into presentation (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through
-`ReviewService` and works with threads only through `ThreadService`, so every comment rule is applied there. It works
-with reviewer slots, signatures, and the approval status only through `SigningService`, so the page contains no signing
-rules. It requires a signed-in user, and every comment, slot change, and signature is made on behalf of that user. The
-History button (`history-link`) leads to the history page of the review, where the audit entries of the review are
-listed.
+described under Deep links below. Its responsibility is to show one review, with the reader's work first. From the top
+it shows a breadcrumb (muted, with "/" separators, leading to the projects list and the owning project, and ending in
+the review identifier as text instead of a link), the title with an approval badge (Approved, Rejected, or In review)
+and a History button, and a one-sentence next step, which is the single hint of the page about what to do next. For an
+approved review a line below the title offers the download of the signed attestation (see Attestation download below).
+Below it is a compact summary strip (`review-summary`) of up to three cells: the checklist (the progress summary such as
+"37 of 58 checks answered", a progress bar of the answered checks over all checks, and a link to the checklist page;
+absent when the review has no checklist), the reviewers ("No reviewer slots yet", or "N of M signed"), and the threads
+("N open · M resolved"). Then come the files with the size and number of open threads of each, the thread index of all
+files, the selected file as a diff against its baseline (or as numbered lines), the comment threads on that file, which
+a reader can answer, resolve, and reopen (a resolved thread is a one-line header until expanded), and the form that
+starts a new thread. After the reading come the Reviewers and signing card (the reviewer slots with their signature
+status, the form that adds a slot, collapsed until a reviewer asks for it unless the review has no slot yet or the last
+attempt was refused, and, for a reviewer, the form that signs) and, last, in a native `<details>` element that is
+collapsed by default, the review's identifier, state, content fingerprint, record digest, and the hash of each file; for
+a review from a repository it also shows the repository name, the baseline and head commits, and the selection; for a
+review that was planned from a review-set it also shows the identifier of that set (`review-set-id`, the "Review set"
+row). Each card has one primary action; navigation buttons such as History, Open checklist, and the way back after an
+address that names nothing are outline buttons. The page uses the wide page container, because it shows tables and code.
+It is a Razor component split into presentation (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads
+reviews through `ReviewService` and works with threads only through `ThreadService`, so every comment rule is applied
+there. It works with reviewer slots, signatures, and the approval status only through `SigningService`, so the page
+contains no signing rules. It requires a signed-in user, and every comment, slot change, and signature is made on behalf
+of that user. The History button (`history-link`) leads to the history page of the review, where the audit entries of
+the review are listed.
 
 An approved or rejected (concluded) review is locked. The page shows a Locked badge (`review-locked`) next to the
 approval badge and, above the
@@ -103,17 +101,17 @@ button always agree with Core.
 - **Reviewers table** (`status-reviewers`): one row for each slot with the ballot state (Not started, Draft, Handed in)
   and the signature state (Signed, Not signed, or "Signed, then the review changed"). A review with one slot shows one
   row, so the panel stays coherent there.
-- **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with who answered
-  what (`status-disputed-answers-{id}`, for example "Ann (you): Pass / Bob: Fail"), the justification that another
-  reviewer wrote (`status-disputed-why-{id}-{slot}`, plain text, never the viewer's own), and a Discuss button
+- **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with who answered what
+  (`status-disputed-answers-{id}`, for example "Ann (you): Pass / Bob: Fail"), the justification that another reviewer
+  wrote (`status-disputed-why-{id}-{slot}`, plain text, never the viewer's own), and a Discuss button
   (`status-discuss-{id}`) that opens the same `ThreadComposer` as the checklist page for the check thread. A viewer who
-  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count, no answer and
-  no justification. When
-  starting the discussion would make a signature stale, the signature warning is shown in its own render region next to
-  the form, which keeps the text typed and stores nothing until the person confirms.
+  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count, no answer
+  and no justification. When starting the discussion would make a signature stale, the signature warning is shown in its
+  own render region next to the form, which keeps the text typed and stores nothing until the person confirms.
 - **Outcome note** (`status-outcome`): the plain statement from `ReviewStatus.OutcomeNote` that the review will be
   Rejected and which check the reviewers failed; absent while masked.
-- **Open threads**: the open Questions and Findings from `ThreadCounts`, drawn like `ThreadKindBadge` with icon and text.
+- **Open threads**: the open Questions and Findings from `ThreadCounts`, drawn like `ThreadKindBadge` with icon and
+  text.
 - **Signature note** (`status-signature-lost`): shown to a reviewer whose own signature no longer counts: "The review
   changed, your signature no longer counts." (the words of the inbox, `ReviewNextAction.SignatureLostText`).
 - **Next step** (`next-action`): exactly one primary button; the target is a link to the checklist, a check, a thread,
@@ -173,58 +171,54 @@ user may not do.
 strip; the answers are made on `ChecklistPage`.
 
 **Approval**: the `ReviewApproval` of the review from `SigningService.GetApprovalAsync`: how it is concluded
-(`Conclusion`: approved, rejected, or none), the outcome a signature given now would attest (`Outcome`), the
-record digest, the slots with their signature state, the blockers that prevent signing, and the next-step sentence.
-It is `null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values
-from
+(`Conclusion`: approved, rejected, or none), the outcome a signature given now would attest (`Outcome`), the record
+digest, the slots with their signature state, the blockers that prevent signing, and the next-step sentence. It is
+`null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values from
 `SigningService.ListCandidatesAsync(actor, projectId)`, so a user who is no member is never offered, and no password
 hash ever reaches the page). **ReadOnly**: true for a member who may not contribute (the Auditor role); the page then
-shows a `readonly-notice` and none of the controls that change the review (the slot and signing forms, the new
-comment form, the reply box, the resolve toggle, and the line comment controls); the reopening and due date forms
-stay hidden by their own rights. The diff gets `ReadOnlyAccess` so that it says "read-only access" instead of "review
-is locked", the inline composer is never selected while `ReadOnly`, and a reload that finds `ReadOnly` clears the
-new comment form and its draft. Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether
-that user is still a member of the project; the page shows a badge "No longer a project member" next to a primary or
-alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
-The candidate lists offer enabled members only, so a primary or alternate who is disabled or no longer a member would
-have no matching option and the select would show blank; in the change fields the page therefore adds one extra option
-for the stored choice (`UnavailableLabel`: "{display name} ({user name}), disabled or no longer a member", or, for an
-enabled member who is left out only because of the independence rule, that is, the review author who holds a slot
-(the rule is not retroactive), "{display name} ({user name}), not offered for a new choice (review author)"), with the
-test ids `slot-primary-unavailable-{id}` and `slot-alternate-unavailable-{id}`, and offers no extra option when the
-stored choice is among the candidates.
-**CurrentUsername**: the user name
-of the signed-in user, from the authentication state, used to tell which slots the user occupies.
-**IsLocked**: whether the review is locked, which is `Approval.IsConcluded` (approved or rejected); **ConclusionLabel**
-and **ConclusionBadgeClass**: the text ("Approved", "Rejected", or "In review") and the style of the status badge;
-**SigningOutcome** and **SigningOutcomeLabel**: the outcome a signature given now attests (`Approval.Outcome`, approved
-when there is none) and its words ("APPROVED" or "REJECTED"); **LockedMarker**: the text `true` or `false`
-written to the `data-locked` attribute of the disabled controls, so that tests can tell a locked control.
-**CanSetDueDate**: whether the signed-in user may change the due date, asked with `ReviewService.CanSetDueDateAsync` in
-`RefreshAsync` (a project or system administrator, or the user who created the review, never an API token);
-**CanEditDueDate**: `CanSetDueDate` and not `IsLocked`, which decides whether the form is drawn; **IsOverdue**: the
-answer of `ReviewService.IsOverdue` for the review and `IsLocked`; **DueDateInput**, **DueDateError**: the text of the
-date field (`yyyy-MM-dd`) and the message of a refusal.
-**CanWriteConclusion**: whether the signed-in user may write the review conclusion text, asked with
+shows a `readonly-notice` and none of the controls that change the review (the slot and signing forms, the new comment
+form, the reply box, the resolve toggle, and the line comment controls); the reopening and due date forms stay hidden by
+their own rights. The diff gets `ReadOnlyAccess` so that it says "read-only access" instead of "review is locked", the
+inline composer is never selected while `ReadOnly`, and a reload that finds `ReadOnly` clears the new comment form and
+its draft. Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether that user is still
+a member of the project; the page shows a badge "No longer a project member" next to a primary or alternate who is not,
+with a hint under the names that such a reviewer cannot sign until added to the project again. The candidate lists offer
+enabled members only, so a primary or alternate who is disabled or no longer a member would have no matching option and
+the select would show blank; in the change fields the page therefore adds one extra option for the stored choice
+(`UnavailableLabel`: "{display name} ({user name}), disabled or no longer a member", or, for an enabled member who is
+left out only because of the independence rule, that is, the review author who holds a slot (the rule is not
+retroactive), "{display name} ({user name}), not offered for a new choice (review author)"), with the test ids
+`slot-primary-unavailable-{id}` and `slot-alternate-unavailable-{id}`, and offers no extra option when the stored choice
+is among the candidates. **CurrentUsername**: the user name of the signed-in user, from the authentication state, used
+to tell which slots the user occupies. **IsLocked**: whether the review is locked, which is `Approval.IsConcluded`
+(approved or rejected); **ConclusionLabel** and **ConclusionBadgeClass**: the text ("Approved", "Rejected", or "In
+review") and the style of the status badge; **SigningOutcome** and **SigningOutcomeLabel**: the outcome a signature
+given now attests (`Approval.Outcome`, approved when there is none) and its words ("APPROVED" or "REJECTED");
+**LockedMarker**: the text `true` or `false` written to the `data-locked` attribute of the disabled controls, so that
+tests can tell a locked control. **CanSetDueDate**: whether the signed-in user may change the due date, asked with
+`ReviewService.CanSetDueDateAsync` in `RefreshAsync` (a project or system administrator, or the user who created the
+review, never an API token); **CanEditDueDate**: `CanSetDueDate` and not `IsLocked`, which decides whether the form is
+drawn; **IsOverdue**: the answer of `ReviewService.IsOverdue` for the review and `IsLocked`; **DueDateInput**,
+**DueDateError**: the text of the date field (`yyyy-MM-dd`) and the message of a refusal. **CanWriteConclusion**:
+whether the signed-in user may write the review conclusion text, asked with
 `ChecklistService.CanSetReviewConclusionTextAsync` in `RefreshAsync` (a primary or alternate reviewer of a slot, or the
 lead of the review: the creator or a project administrator; never an auditor, a non-member, or an API token);
 **ShowConclusionEditor**: `CanWriteConclusion` and not `ReadOnly` and not `IsLocked`, which decides whether the editor
 is drawn; **ConclusionInput**, **ConclusionError**: the text of the conclusion field and the message of a refusal.
-**RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project
-in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
-`RequireIndependent` is on. **RequireNonReopener**: the `RequireNonReopenerSigning` setting of the project, read in
-the same place; **ReopenerBlocked**: whether the signed-in user is in the reopen history of the approval while that
-setting is on (a fact about the viewer, so it is not one of the blockers of the approval). **CanReopen**: whether the
-signed-in user is a project administrator of the project or
-a system administrator, asked with `IProjectAccess.CanAdministerAsync` in `RefreshAsync`. **ReopenReason**,
-**ReopenError**: the text typed into the reopen form and its message.
+**RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project in
+`RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
+`RequireIndependent` is on. **RequireNonReopener**: the `RequireNonReopenerSigning` setting of the project, read in the
+same place; **ReopenerBlocked**: whether the signed-in user is in the reopen history of the approval while that setting
+is on (a fact about the viewer, so it is not one of the blockers of the approval). **CanReopen**: whether the signed-in
+user is a project administrator of the project or a system administrator, asked with `IProjectAccess.CanAdministerAsync`
+in `RefreshAsync`. **ReopenReason**, **ReopenError**: the text typed into the reopen form and its message.
 
 **Warning**: the pending `PendingSignatureWarning` (`null` when there is none): which form or thread it belongs to, the
 affected slots, and the call to repeat when the person confirms. Only one exists at a time. It is cleared when the route
 parameters change, when the review is found locked, and when the new-thread form is cleared.
 
-**AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for the
-status of the signing key (`Describe`) without ever reading the key.
+**AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for
+the status of the signing key (`Describe`) without ever reading the key.
 
 **NewSlotPrimary**, **NewSlotAlternate**, **NewSlotError**: the add-slot form choices (user identities as text, blank
 for nobody) and its message. **SlotPrimaryChoices**, **SlotAlternateChoices**, **SlotErrors**: the choices made in
@@ -261,74 +255,63 @@ keeps the test id to scroll to after the next render and the test id to focus af
 field, set when a `+` or Comment button opens the composer); the focus goes through `reviewCenter.focusTestId`, defined
 by `App`, and a closed circuit during that call is ignored. All of these are cleared when the route parameters change.
 
-The comment fields (`thread-text-input` and every `reply-text-{id}`) carry the attribute `data-ctrl-enter-submits`, which
-names the test id of their submit button (`start-thread-button` or `reply-button-{id}`); a listener defined by `App`
-presses that button when Ctrl+Enter (or Cmd+Enter) is pressed in the field and the button is enabled, so the shortcut
-costs no server round trip per key. A hint "Ctrl+Enter to submit" (`thread-submit-hint`, `reply-submit-hint-{id}`)
-stands next to the button. In a locked review the whole-file form, the form under a diff row, and the reply box of
-every thread are not rendered at all (they could never be sent), the `+` and Comment buttons stay and are disabled with
-`data-locked="true"`, and the diff hint reads "This review is locked; comments are read-only."
+The comment fields (`thread-text-input` and every `reply-text-{id}`) carry the attribute `data-ctrl-enter-submits`,
+which names the test id of their submit button (`start-thread-button` or `reply-button-{id}`); a listener defined by
+`App` presses that button when Ctrl+Enter (or Cmd+Enter) is pressed in the field and the button is enabled, so the
+shortcut costs no server round trip per key. A hint "Ctrl+Enter to submit" (`thread-submit-hint`,
+`reply-submit-hint-{id}`) stands next to the button. In a locked review the whole-file form, the form under a diff row,
+and the reply box of every thread are not rendered at all (they could never be sent), the `+` and Comment buttons stay
+and are disabled with `data-locked="true"`, and the diff hint reads "This review is locked; comments are read-only."
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
 `review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `review-due-section`,
 `review-conclusion`, `review-conclusion-text`, `review-conclusion-empty`, `review-conclusion-form`,
-`review-conclusion-input`,
-`review-conclusion-save`, `review-conclusion-error`,
-`review-due-date`, `review-overdue`, `review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`,
-`review-due-clear`, `review-due-error`, `reopen-form`,
-`reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
-`reopen-time-{n}`, `reopen-reason-{n}`, `reopen-digest-{n}` (by the position of the reopen, starting at 0),
-`author-independence-hint`, `slots-locked-hint`, `slot-edit-hint-{id}`, `next-step`, `review-summary` (the summary strip),
-`checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
+`review-conclusion-input`, `review-conclusion-save`, `review-conclusion-error`, `review-due-date`, `review-overdue`,
+`review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`, `review-due-clear`, `review-due-error`,
+`reopen-form`, `reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`,
+`reopen-by-{n}`, `reopen-time-{n}`, `reopen-reason-{n}`, `reopen-digest-{n}` (by the position of the reopen, starting at
+0), `author-independence-hint`, `slots-locked-hint`, `slot-edit-hint-{id}`, `next-step`, `review-summary` (the summary
+strip), `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
-`slot-primary-unavailable-{id}`, `slot-alternate-unavailable-{id}`,
-`slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
-`slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `reopener-cannot-sign-{id}`,
-`sign-form-{id}`, `sign-outcome-{id}`, `sign-meaning-{id}`,
-`sign-password-{id}`, `sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}`
-(all by slot identity), and for an external user
-`sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`, and `sign-confirmed-{id}`,
-`slot-add-form`,
-`new-slot-primary-select`, `new-slot-alternate-select`, `new-slot-add-button`, `new-slot-error`,
-`review-details`, `review-details-summary`, `review-id`,
-`review-fingerprint`, `record-digest`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`,
-`thread-summary` (the filter group), `index-filter-all`, `index-filter-open`, `index-filter-resolved`,
-`threads-all-count`, `threads-open-count`, `threads-resolved-count`, `thread-index-list`, `thread-index-empty`,
-`index-row-{id}`, `index-file-{id}`, `index-anchor-{id}`, `index-state-{id}`, `index-count-{id}`,
-`index-author-{id}`, `index-activity-{id}`, `files-list`, `file-row-{index}`, `file-path-{index}`,
-`file-size-{index}`, `file-open-threads-{index}`, `file-select-{index}`,
-`selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
-`thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
-`start-thread-button`, `thread-submit-hint`, `thread-cancel-button` and `thread-whole-file-button` (only in the form
-under a diff row), `signature-warning`, `signature-warning-slots`, `signature-warning-confirm` and
-`signature-warning-cancel` (while a refusal is pending; one banner at a time),
-`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
-`thread-link-{id}`,
-`thread-copy-link-{id}`, `thread-copy-status-{id}`,
-`line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
-reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown when the file can be compared),
-`view-diff-button`, `view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`,
-`baseline-line-{n}`, `baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`,
-`deleted-comment-note`, `diff-too-large`, `diff-too-large-head`, `diff-too-large-baseline`, and, from
-`DiffView`, `diff-view`, `diff-summary`, `diff-hint`, `diff-content`, `diff-gap-{start}` (by the index of the first
-collapsed row), `diff-pair-{i}` (a side-by-side row, by the index of its first line), `diff-row-{i}` (a cell, with
-`data-kind` of `context`, `added`, or `removed`; the cell of a removed line, of an added line and the right cell of an
-unchanged line), `diff-row-old-{i}` (the left cell of an unchanged line), `diff-comment-{i}`, `diff-comment-old-{i}`,
-`diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`, `diff-text-old-{i}`, `diff-threads-{i}`,
-`diff-empty-left-{i}`, `diff-empty-right-{i}` (the empty placeholders), and `diff-composer` (all by row index),
-`review-repository`, `review-set-id` (only for a review planned from a review-set), `review-baseline-sha`,
-`review-follows`, `review-follows-link`, `review-carried-counts`, `review-followed-by`, `review-followed-by-link-{id}`
-(only for a follow-up, or a review that has follow-ups), `thread-carried-{id}` and `thread-carried-link-{id}` (a thread
-carried over from another review),
-`review-head-sha`, `review-selection` (in the details of a review from
-a repository), `threads-empty`, `threads-list`, `thread-{id}`,
-`thread-anchor-{id}`, `thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only),
-`thread-toggle-{id}`, `comment-{id}-{n}`, `comment-author-{id}-{n}`,
-`comment-time-{id}-{n}`, `comment-text-{id}-{n}` (by thread identity and the position of the comment in the
-thread), `reply-text-{id}`, `reply-button-{id}`, `reply-submit-hint-{id}`, and `reply-error-{id}`. The comments,
-`thread-toggle-{id}` and the
-reply controls of a resolved thread exist only while it is expanded.
+`slot-primary-unavailable-{id}`, `slot-alternate-unavailable-{id}`, `slot-status-{id}`, `slot-primary-select-{id}`,
+`slot-alternate-select-{id}`, `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`,
+`reopener-cannot-sign-{id}`, `sign-form-{id}`, `sign-outcome-{id}`, `sign-meaning-{id}`, `sign-password-{id}`,
+`sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}` (all by slot identity),
+and for an external user `sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`,
+and `sign-confirmed-{id}`, `slot-add-form`, `new-slot-primary-select`, `new-slot-alternate-select`,
+`new-slot-add-button`, `new-slot-error`, `review-details`, `review-details-summary`, `review-id`, `review-fingerprint`,
+`record-digest`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`, `thread-summary` (the filter group),
+`index-filter-all`, `index-filter-open`, `index-filter-resolved`, `threads-all-count`, `threads-open-count`,
+`threads-resolved-count`, `thread-index-list`, `thread-index-empty`, `index-row-{id}`, `index-file-{id}`,
+`index-anchor-{id}`, `index-state-{id}`, `index-count-{id}`, `index-author-{id}`, `index-activity-{id}`, `files-list`,
+`file-row-{index}`, `file-path-{index}`, `file-size-{index}`, `file-open-threads-{index}`, `file-select-{index}`,
+`selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`, `thread-start-line-input`,
+`thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`, `start-thread-button`,
+`thread-submit-hint`, `thread-cancel-button` and `thread-whole-file-button` (only in the form under a diff row),
+`signature-warning`, `signature-warning-slots`, `signature-warning-confirm` and `signature-warning-cancel` (while a
+refusal is pending; one banner at a time), `file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`,
+`line-marker-{n}`, `thread-link-{id}`, `thread-copy-link-{id}`, `thread-copy-status-{id}`, `line-text-{n}` (all by
+1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for reviews from a repository
+only), `selected-file-kind`, `file-version-toggle` (shown when the file can be compared), `view-diff-button`,
+`view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`, `baseline-line-{n}`,
+`baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`, `deleted-comment-note`, `diff-too-large`,
+`diff-too-large-head`, `diff-too-large-baseline`, and, from `DiffView`, `diff-view`, `diff-summary`, `diff-hint`,
+`diff-content`, `diff-gap-{start}` (by the index of the first collapsed row), `diff-pair-{i}` (a side-by-side row, by
+the index of its first line), `diff-row-{i}` (a cell, with `data-kind` of `context`, `added`, or `removed`; the cell of
+a removed line, of an added line and the right cell of an unchanged line), `diff-row-old-{i}` (the left cell of an
+unchanged line), `diff-comment-{i}`, `diff-comment-old-{i}`, `diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`,
+`diff-text-old-{i}`, `diff-threads-{i}`, `diff-empty-left-{i}`, `diff-empty-right-{i}` (the empty placeholders), and
+`diff-composer` (all by row index), `review-repository`, `review-set-id` (only for a review planned from a review-set),
+`review-baseline-sha`, `review-follows`, `review-follows-link`, `review-carried-counts`, `review-followed-by`,
+`review-followed-by-link-{id}` (only for a follow-up, or a review that has follow-ups), `thread-carried-{id}` and
+`thread-carried-link-{id}` (a thread carried over from another review), `review-head-sha`, `review-selection` (in the
+details of a review from a repository), `threads-empty`, `threads-list`, `thread-{id}`, `thread-anchor-{id}`,
+`thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only), `thread-toggle-{id}`,
+`comment-{id}-{n}`, `comment-author-{id}-{n}`, `comment-time-{id}-{n}`, `comment-text-{id}-{n}` (by thread identity and
+the position of the comment in the thread), `reply-text-{id}`, `reply-button-{id}`, `reply-submit-hint-{id}`, and
+`reply-error-{id}`. The comments, `thread-toggle-{id}` and the reply controls of a resolved thread exist only while it
+is expanded.
 
 #### Key Methods
 
@@ -344,13 +327,12 @@ viewer who may not see the answers of the other reviewers, see *BallotVisibility
 note "Hidden until you answer" in place of the standing, and the conclusion area replaced by a note that the conclusion
 stays hidden until the own ballot is handed in), the approval (with the reopen history), the status panel (built from
 the threads, the thread capabilities and the approval just loaded, so they are not read a second time), the candidates
-for a slot, the review rule and the administrator right for the reopen form, and the user name
-of the signed-in user. The user name is read straight from the authentication
-state, not through `GetActorAsync`, so that a reload that meets an ended sign-in state does not fail; the page is replaced
-by the session-ended message instead. It runs when the page loads and after every change
-made on the page (starting, replying, resolving, reopening, and every slot or signing action), and when a file is
-selected, so the badge, the next-step sentence, the slot status, and the digest always describe the record as it
-now is.
+for a slot, the review rule and the administrator right for the reopen form, and the user name of the signed-in user.
+The user name is read straight from the authentication state, not through `GetActorAsync`, so that a reload that meets
+an ended sign-in state does not fail; the page is replaced by the session-ended message instead. It runs when the page
+loads and after every change made on the page (starting, replying, resolving, reopening, and every slot or signing
+action), and when a file is selected, so the badge, the next-step sentence, the slot status, and the digest always
+describe the record as it now is.
 
 **SelectFileAsync**: Shows one file.
 
@@ -406,21 +388,19 @@ large to compare line by line." and offers the Head and the Baseline view that t
 Head view); a binary file shows the binary notice.
 
 `DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
-`SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
-controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), `CanReveal`
-(a check that the page runs before a collapsed run is expanded, so a user who lost the access is not shown loaded
-lines), `CommentsDisabled` (true while the review is locked: the line-comment buttons are drawn disabled, with
-`data-locked`), and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left
-cell asks for the
-Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
+`SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen controls
+are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), `CanReveal` (a check
+that the page runs before a collapsed run is expanded, so a user who lost the access is not shown loaded lines),
+`CommentsDisabled` (true while the review is locked: the line-comment buttons are drawn disabled, with `data-locked`),
+and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for
+the Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
 of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
 that is revealed by the stylesheet when the row is hovered, has keyboard focus inside it (`:focus-within`), or is the
 selected row, and is always shown on a device without hover (`@media (hover: none)`). It is hidden with `opacity`, not
-`display` or `visibility`, so it keeps its place and its tab stop and a browser driver can still click it
-(hover `diff-row-{i}`, then click `diff-comment-{i}`). The Head view keeps its always visible
-`line-comment-{n}` button. A thread is drawn under the row of the last line of
-its anchor, across the full width, and the cell of its side is marked. The component holds only which collapsed runs
-the reader has expanded; every other state is the page's.
+`display` or `visibility`, so it keeps its place and its tab stop and a browser driver can still click it (hover
+`diff-row-{i}`, then click `diff-comment-{i}`). The Head view keeps its always visible `line-comment-{n}` button. A
+thread is drawn under the row of the last line of its anchor, across the full width, and the cell of its side is marked.
+The component holds only which collapsed runs the reader has expanded; every other state is the page's.
 
 **CommentOnDiffLine**: Handles an `OnComment` request. A plain click selects the line on its side and opens the
 new-thread form under its row; Shift-click, or the "Through line (optional)" field, extends the selection to a
@@ -488,37 +468,34 @@ thread.
 **Check discussions**: when the review has threads about a check, a card with the heading "Check discussions"
 (`check-discussions`) lists them with the same thread card as the threads of a file (the card is one render fragment
 that both places use), with the anchor worded `Check {id}`, the state, and the comments as plain text. Replying and
-resolving work as for any thread, with the same acknowledgment handling. The index row of such a thread shows
-"Check discussion" in place of a file path, and choosing it (or a deep link to it) focuses the thread without selecting
-a file (`SelectThreadAsync` and the address handling skip the file selection for a thread about a check). The page has no
-form to start one yet; the entry comes with the ballot screen. The card is absent when the review has none.
+resolving work as for any thread, with the same acknowledgment handling. The index row of such a thread shows "Check
+discussion" in place of a file path, and choosing it (or a deep link to it) focuses the thread without selecting a file
+(`SelectThreadAsync` and the address handling skip the file selection for a thread about a check). The page has no form
+to start one yet; the entry comes with the ballot screen. The card is absent when the review has none.
 
-**SelectThreadAsync**: Shows a thread chosen in the index. The thread's file is selected through `SelectFileAsync`
-only when it is not already shown, so text typed in the new-thread form is kept. A file that has a diff is shown in
-the Diff view; a too-large file is shown in the Baseline or the Head view, whichever the thread's side names. The
-thread becomes the focused
-thread, a resolved thread is expanded, and the first line of its anchor (a row of the diff, a baseline line, a head
-line, or the thread card for a whole-file thread) becomes the scroll target. A file that can be compared words the
-anchor of a thread and of an index row as "Before: line N" or "After: lines N-M" (the side is the thread's
-`ThreadSide`; this applies to every file of a review with a baseline commit, an added file included); other files
-keep "Line N". Each thread card has a `thread-link-{id}` anchor (class `thread-link action outline small`, so it is
+**SelectThreadAsync**: Shows a thread chosen in the index. The thread's file is selected through `SelectFileAsync` only
+when it is not already shown, so text typed in the new-thread form is kept. A file that has a diff is shown in the Diff
+view; a too-large file is shown in the Baseline or the Head view, whichever the thread's side names. The thread becomes
+the focused thread, a resolved thread is expanded, and the first line of its anchor (a row of the diff, a baseline line,
+a head line, or the thread card for a whole-file thread) becomes the scroll target. A file that can be compared words
+the anchor of a thread and of an index row as "Before: line N" or "After: lines N-M" (the side is the thread's
+`ThreadSide`; this applies to every file of a review with a baseline commit, an added file included); other files keep
+"Line N". Each thread card has a `thread-link-{id}` anchor (class `thread-link action outline small`, so it is
 button-styled like the buttons beside it) to the thread's address, and a `thread-copy-link-{id}` button ("Copy link")
 that copies the absolute address, with a `thread-copy-status-{id}` live region for the feedback. The index rows come
-from `ThreadService.BuildIndex` and the next-step line from
-`Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
-number of checks answered Fail, the number of disputed checks, and whether a conclusion text is needed, and words itself
-for missing slots and signatures), so the page holds no ordering or
-wording rules of its own.
-The summary of the checklist cell is "{answered} of {total} checks answered", or "Checklist complete" when nothing
-is left to answer, followed by ", 1 check failed" or ", N checks failed" when the approval holds a count of failed checks,
-which it does only for a viewer who may see the answers of the others (the count is zero while masked), and its
-progress bar shows the answered checks over all checks. The next-step line is `Approval.NextStep`; for a viewer who
-has not handed in a ballot the approval appends the notice that the answers of the others stay hidden, which the status
-panel says already, so `NextStepText` leaves that one sentence out and the notice is shown once. The reviewers cell
-reads "No reviewer
-slots yet" when the review has no slot, and otherwise "{signed} of {slots} signed", where a slot counts as signed only
-while its signature is current; the threads cell counts the open and the resolved threads from `Threads`. The strip is
-drawn from the data the page already holds, so it changes after every change made on the page.
+from `ThreadService.BuildIndex` and the next-step line from `Approval.NextStep` (which `SigningService` builds with
+`ThreadService.NextStep`, given the checklist progress and the number of checks answered Fail, the number of disputed
+checks, and whether a conclusion text is needed, and words itself for missing slots and signatures), so the page holds
+no ordering or wording rules of its own. The summary of the checklist cell is "{answered} of {total} checks answered",
+or "Checklist complete" when nothing is left to answer, followed by ", 1 check failed" or ", N checks failed" when the
+approval holds a count of failed checks, which it does only for a viewer who may see the answers of the others (the
+count is zero while masked), and its progress bar shows the answered checks over all checks. The next-step line is
+`Approval.NextStep`; for a viewer who has not handed in a ballot the approval appends the notice that the answers of the
+others stay hidden, which the status panel says already, so `NextStepText` leaves that one sentence out and the notice
+is shown once. The reviewers cell reads "No reviewer slots yet" when the review has no slot, and otherwise "{signed} of
+{slots} signed", where a slot counts as signed only while its signature is current; the threads cell counts the open and
+the resolved threads from `Threads`. The strip is drawn from the data the page already holds, so it changes after every
+change made on the page.
 
 **AddSlotAsync**, **SaveSlotAsync**, **RemoveSlotAsync**: Add a slot from the add-slot form, save the primary and
 alternate chosen for a slot, and remove a slot, on behalf of the signed-in user through `SigningService`. The select
@@ -668,33 +645,31 @@ connection that is already gone is ignored.
 optional query values `line` and `side`, `head` or `baseline`), and `/projects/{id}/reviews/{reviewId}/threads/{id}`.
 `OnParametersSetAsync` applies the address after the load and before `Loaded` becomes true, so the first response (and
 therefore a reload) already shows the file, the highlight and, on a live connection, the scroll. `ApplyAddressAsync`
-selects the file (or the file of the thread) through the ordinary `SelectFileAsync` or `SelectThreadAsync`. For a
-line it parses `line` as digits only, reads `side` (anything but `baseline` is the head), checks that a baseline line
-is asked only of a file that has a baseline version (never an added file), and checks that the line exists; the diff
-row of the line is pinned so it
-is not hidden in a collapsed run, and `DiffView` gets `HighlightSide` and `HighlightLine`. A file that has no diff is
-shown in the Head or the Baseline view, with the line marked there. The router decodes the file path once, so the page
-never decodes it again; the one exception is that the router also turns a literal `%2F` of a file name into a slash,
-so a file path is also matched with `%2F` in the names read as `/` when that matches exactly one file. An address that
-names nothing (an unknown file or thread, a thread of another review, a baseline line of a file without a baseline, a
-line that is not a number or does not exist) sets `DeepLinkMessage`, shown above the file list with the link
-`deep-link-back` to the plain review address; nothing is selected and the page works as usual. Choosing a file
-(`ViewFileAsync`) or a thread in the index (`ViewThreadAsync`) selects as before and sets the pending address to the
-link of the file or thread; the page replaces the address of the browser by it with `history.replaceState`, so the
-address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with
-replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
-Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the anchor
+selects the file (or the file of the thread) through the ordinary `SelectFileAsync` or `SelectThreadAsync`. For a line
+it parses `line` as digits only, reads `side` (anything but `baseline` is the head), checks that a baseline line is
+asked only of a file that has a baseline version (never an added file), and checks that the line exists; the diff row of
+the line is pinned so it is not hidden in a collapsed run, and `DiffView` gets `HighlightSide` and `HighlightLine`. A
+file that has no diff is shown in the Head or the Baseline view, with the line marked there. The router decodes the file
+path once, so the page never decodes it again; the one exception is that the router also turns a literal `%2F` of a file
+name into a slash, so a file path is also matched with `%2F` in the names read as `/` when that matches exactly one
+file. An address that names nothing (an unknown file or thread, a thread of another review, a baseline line of a file
+without a baseline, a line that is not a number or does not exist) sets `DeepLinkMessage`, shown above the file list
+with the link `deep-link-back` to the plain review address; nothing is selected and the page works as usual. Choosing a
+file (`ViewFileAsync`) or a thread in the index (`ViewThreadAsync`) selects as before and sets the pending address to
+the link of the file or thread; the page replaces the address of the browser by it with `history.replaceState`, so the
+address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with replacement
+is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff, Head,
+Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the anchor
 `thread-link-{id}` with the link of the thread (class `thread-link action outline small`) and the button
-`thread-copy-link-{id}` (the label stays "Copy link"). **CopyThreadLinkAsync** makes the address absolute with `NavigationManager.ToAbsoluteUri`,
-calls the browser function `reviewCenter.copyText` (defined in `App`) and shows "Copied" in the status region next to
-the button, or "Copy failed" when the browser answers false, throws, or is gone. The feedback is cleared two seconds
-after the latest click on that thread: each thread has its own timer (a `CancellationTokenSource` used with
-`Task.Delay` on the injected `TimeProvider`), a new click cancels and replaces the previous timer, and the page cancels
-all timers when it is disposed. The timer runs in a continuation that does not block the click handler and ignores a
-page that no longer exists. **ReviewLinks**
-builds all of these addresses: it escapes the review
-identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
-only when a line is given.
+`thread-copy-link-{id}` (the label stays "Copy link"). **CopyThreadLinkAsync** makes the address absolute with
+`NavigationManager.ToAbsoluteUri`, calls the browser function `reviewCenter.copyText` (defined in `App`) and shows
+"Copied" in the status region next to the button, or "Copy failed" when the browser answers false, throws, or is gone.
+The feedback is cleared two seconds after the latest click on that thread: each thread has its own timer (a
+`CancellationTokenSource` used with `Task.Delay` on the injected `TimeProvider`), a new click cancels and replaces the
+previous timer, and the page cancels all timers when it is disposed. The timer runs in a continuation that does not
+block the click handler and ignores a page that no longer exists. **ReviewLinks** builds all of these addresses: it
+escapes the review identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes
+`?line=N&side=...` only when a line is given.
 
 Comments, approval, and slots are read when the page loads and after each change made on the page. A comment or
 signature made in another browser appears when this page is next loaded or changed; nothing is pushed. The page

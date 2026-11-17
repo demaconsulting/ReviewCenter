@@ -87,13 +87,13 @@ page that was loaded before the last signature stops offering the controls at it
 own ballot (`State.IsOwnBallot` is false: the viewer holds no slot). `State` comes from
 `ChecklistService.GetAsync(projectId, reviewId, viewerUsername: ...)` with the user name of the signed-in user, every
 time the page reads the checklist; for a slot owner it is the own ballot (`IsOwnBallot`, `BallotState`, `SlotId`), for
-every other viewer the consolidated standing of the submitted ballots, or, when the viewer may not see the others yet
-(a review with several slots that is not concluded), a state without a standing (`IsMasked`; `NoSlot` is true for a
-viewer without a slot). The page never reads the checklist without the viewer: the read without a viewer is for tests
-and internal reads that need no verdict, and the API uses the viewer-requiring `GetConsolidatedAsync`. `AuthorBlocked` is
-computed in the same call; a page loaded before the project switched the rule on shows the refusal message of
-the rule (`AuthorCannotAnswer`) in the error line of the check or section, stores nothing, and shows the notice after
-the next read. A page loaded before the user lost the slot shows the refusal `NoReviewerSlot` in the same way.
+every other viewer the consolidated standing of the submitted ballots, or, when the viewer may not see the others yet (a
+review with several slots that is not concluded), a state without a standing (`IsMasked`; `NoSlot` is true for a viewer
+without a slot). The page never reads the checklist without the viewer: the read without a viewer is for tests and
+internal reads that need no verdict, and the API uses the viewer-requiring `GetConsolidatedAsync`. `AuthorBlocked` is
+computed in the same call; a page loaded before the project switched the rule on shows the refusal message of the rule
+(`AuthorCannotAnswer`) in the error line of the check or section, stores nothing, and shows the notice after the next
+read. A page loaded before the user lost the slot shows the refusal `NoReviewerSlot` in the same way.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review (`null` when it does not exist or its
 project is not visible to the user), and
@@ -137,14 +137,13 @@ check identifiers are written in lower case (`section-req-toggle`,
 they are needed.
 
 **Ballots**: the `BallotView` of the viewer, read from `ChecklistService.GetBallotViewAsync` whenever the checklist is
-read (`IsMasked`, the differing checks with the answers and justifications of every slot, `OwnSlotNumber`, `FailedChecks`,
-`MissingNames`, the counts of handed-in ballots,
-`CanSubmitAndSign`, and `CanAssignMe`). **Capabilities**: the `ThreadCapabilities` of the viewer, which decide whether
-Discuss is offered.
+read (`IsMasked`, the differing checks with the answers and justifications of every slot, `OwnSlotNumber`,
+`FailedChecks`, `MissingNames`, the counts of handed-in ballots, `CanSubmitAndSign`, and `CanAssignMe`).
+**Capabilities**: the `ThreadCapabilities` of the viewer, which decide whether Discuss is offered.
 **CurrentIsExternal**, **CurrentHasTotp**: the kind of account of the viewer, which decide the entries of Submit and
-sign. **DiscussOpen**, **DiscussTexts**, **DiscussErrors**, **DiscussStarted**: the state of the Discuss forms, by check.
-**SignNotice**, **SignError**, **AssignError**, **ReauthPending**: the messages and the pending confirmation at the
-identity provider of the actions above.
+sign. **DiscussOpen**, **DiscussTexts**, **DiscussErrors**, **DiscussStarted**: the state of the Discuss forms, by
+check. **SignNotice**, **SignError**, **AssignError**, **ReauthPending**: the messages and the pending confirmation at
+the identity provider of the actions above.
 
 #### Key Methods
 
@@ -171,8 +170,8 @@ which a name could be typed. The answer goes into the ballot of the slot of that
 **SubmitBallotAsync**: Handles **Submit ballot**, which is offered only while `State.IsOwnBallot`, the ballot is a
 `Draft`, `State.IsComplete` is true, and the controls are not disabled (`CanSubmitBallot`); in a single-slot review an
 answer or an edit that completes the ballot has already handed it in, so the button shows there only for a complete
-draft that no such answer produced (carried answers only, or no checks). It calls `ChecklistService.SubmitBallotAsync` on
-behalf of the signed-in user, with the same warning, retry, and error pattern as an answer (a refusal is shown in
+draft that no such answer produced (carried answers only, or no checks). It calls `ChecklistService.SubmitBallotAsync`
+on behalf of the signed-in user, with the same warning, retry, and error pattern as an answer (a refusal is shown in
 `ballot-error`), and reads the state again, so the status line then says that the ballot is submitted.
 
 **Signature warning**: What the page stores does not always change what the signatures cover. An answer or section
@@ -301,13 +300,12 @@ in" message on this page.
   provider or has a second factor, so that Submit and sign asks for the right entries.
 - **ChecklistService** — reads the checklist (the own ballot for a slot owner, the consolidated standing for a viewer
   who may see it, and a state without a standing for one who may not; and tells, for the signed-in user, whether the
-  author rule blocks them,
-  `AuthorBlocked`) and records answers, section decisions, and the hand-in of the ballot; it refuses a change of a
-  locked review with `ReviewLocked`, the change of the author with `AuthorCannotAnswer`, and an answer or hand-in of a
-  user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`; its ballot view
-  (`GetBallotViewAsync`) says whether the answers of the others are hidden from the viewer, which checks differ (with the
-  justifications), how many checks failed, who has not handed in, how
-  many ballots are handed in, and whether Assign me and Submit and sign are offered.
+  author rule blocks them, `AuthorBlocked`) and records answers, section decisions, and the hand-in of the ballot; it
+  refuses a change of a locked review with `ReviewLocked`, the change of the author with `AuthorCannotAnswer`, and an
+  answer or hand-in of a user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`;
+  its ballot view (`GetBallotViewAsync`) says whether the answers of the others are hidden from the viewer, which checks
+  differ (with the justifications), how many checks failed, who has not handed in, how many ballots are handed in, and
+  whether Assign me and Submit and sign are offered.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.

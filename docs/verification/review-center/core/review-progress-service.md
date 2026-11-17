@@ -5,15 +5,15 @@
 `ReviewProgressService` is verified with unit tests defined in `ReviewProgressServiceTests.cs`. The tests use the real
 `ReviewProgressService`, `ReviewService`, `SigningService`, `ChecklistService`, `ThreadService`, `UserService`, and
 `ProjectAccess` over the in-memory fakes `FakeReviewStore`, `FakeUserStore`, and `FakeAuditStore`, with a movable clock
-(`MovableTimeProvider`, set to 4 March 2025) so that no database is needed. The helper `AnswerAllAsync` marks a review as
-answered the way a person does: the primary reviewer of each slot answers every check Pass into the own ballot and hands
-it in. One arranged world has a project with the
-users `root` (a system administrator), `padm` (a project administrator), `creator`, `member`, `reviewer1`, `reviewer2`,
-and `auditor` (a read-only member), and a user `stranger` outside the project. The blocker counts are compared with the
-numbers in the blocker sentences of the approval status read from `SigningService`. The audit store behind the last
-activity is the fake one; the grouped query itself is verified in the `AuditStore` unit against a real database
-(`AuditStoreTests.cs`), and the counts and the sentences in the `SigningService` unit (`SigningServiceTests.cs`). The
-project page and the API list that show the answer are verified in their own units.
+(`MovableTimeProvider`, set to 4 March 2025) so that no database is needed. The helper `AnswerAllAsync` marks a review
+as answered the way a person does: the primary reviewer of each slot answers every check Pass into the own ballot and
+hands it in. One arranged world has a project with the users `root` (a system administrator), `padm` (a project
+administrator), `creator`, `member`, `reviewer1`, `reviewer2`, and `auditor` (a read-only member), and a user `stranger`
+outside the project. The blocker counts are compared with the numbers in the blocker sentences of the approval status
+read from `SigningService`. The audit store behind the last activity is the fake one; the grouped query itself is
+verified in the `AuditStore` unit against a real database (`AuditStoreTests.cs`), and the counts and the sentences in
+the `SigningService` unit (`SigningServiceTests.cs`). The project page and the API list that show the answer are
+verified in their own units.
 
 #### Test Environment
 
@@ -22,14 +22,14 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- A review without a slot is `Setup`, one with an unsigned or out-of-date slot is `InReview`, and one whose every slot has
-  a valid signature and nothing blocks it is `Approved`; a project without reviews gives an empty list; a reopened review
-  is `InReview` and flagged as reopened.
+- A review without a slot is `Setup`, one with an unsigned or out-of-date slot is `InReview`, and one whose every slot
+  has a valid signature and nothing blocks it is `Approved`; a project without reviews gives an empty list; a reopened
+  review is `InReview` and flagged as reopened.
 - A review is `Approved` only when every slot has a valid signature, nothing blocks it, and no thread is open; a
   review whose slots are all signed but that has an open thread is `InReview` and blocked.
 - A review whose ballots agree on a Fail, with a conclusion text and every slot signed for the rejection, has the stage
-  `Rejected`, a conclusion of Rejected, is not approved, is not blocked, and waits on nobody. A Fail that is agreed is no
-  blocker: the failed count is kept, no blocker names it, and the review is blocked only while the conclusion text is
+  `Rejected`, a conclusion of Rejected, is not approved, is not blocked, and waits on nobody. A Fail that is agreed is
+  no blocker: the failed count is kept, no blocker names it, and the review is blocked only while the conclusion text is
   missing (`ConclusionRequired`).
 - The signature counts equal the slots of the approval status; a comment that is included in the report, added after a
   signature, turns that signature from signed into out of date, while chat does not.
@@ -43,8 +43,8 @@ N/A - standard test environment.
 - A review is overdue from the day after its due date and not on it, never without a date, and never when concluded.
 - The last activity is the time of the newest audit entry of the review, the creation time when there is none, and
   entries of another review, of another project, and without a review do not count.
-- Members, read-only members, project administrators, and system administrators may read the progress; a user outside the
-  project, a user whose account is disabled, and no actor at all get `ProjectNotFound`.
+- Members, read-only members, project administrators, and system administrators may read the progress; a user outside
+  the project, a user whose account is disabled, and no actor at all get `ProjectNotFound`.
 - The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose
   time bound of ten seconds (a guard against one query per review, not a benchmark); the approvals of all reviews are
   read with one batch read and no single read.
@@ -73,15 +73,16 @@ progress text and the blocker sentence name both kinds ("2 open findings, 1 open
 counts words the open threads as threads. This scenario is tested by
 `ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads`.
 
-**ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads**: A discussion about a check that was promoted
-to a Finding is not counted for a viewer who may not see the other ballots (progress, approval, and capabilities), while
-the lead's progress counts it. This scenario is tested by `ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads`,
-defined in `BallotMaskingServiceTests.cs`.
+**ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads**: A discussion about a check that was
+promoted to a Finding is not counted for a viewer who may not see the other ballots (progress, approval, and
+capabilities), while the lead's progress counts it. This scenario is tested by
+`ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads`, defined in `BallotMaskingServiceTests.cs`.
 
-**ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage**: Three reviews: one without a slot, one with
-an unsigned slot, and one signed by its only reviewer after the checklist was answered. The list is ordered by identifier
-and the stages are Setup, In review, and Approved, with 0, 1, and 1 slots required and 0, 0, and 1 signed; the approved
-review waits on nobody. This scenario is tested by `ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`.
+**ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage**: Three reviews: one without a slot, one
+with an unsigned slot, and one signed by its only reviewer after the checklist was answered. The list is ordered by
+identifier and the stages are Setup, In review, and Approved, with 0, 1, and 1 slots required and 0, 0, and 1 signed;
+the approved review waits on nobody. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`.
 
 **ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty**: A project without reviews gives an empty list.
 This scenario is tested by `ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty`.
@@ -99,9 +100,9 @@ approved and not blocked, nobody is waited on, and one slot is signed. This scen
 `ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked`.
 
 **ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired**: One slot whose ballot is a Fail,
-without the conclusion text. The stage is In review, `ConclusionRequired` is set, the review is blocked, the failed count
-is one, the approval blockers hold `SigningService.ConclusionRequiredText`, and no blocker names Fail. This scenario is
-tested by `ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired`.
+without the conclusion text. The stage is In review, `ConclusionRequired` is set, the review is blocked, the failed
+count is one, the approval blockers hold `SigningService.ConclusionRequiredText`, and no blocker names Fail. This
+scenario is tested by `ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired`.
 
 **ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked**: One slot whose ballot is a Fail, with the
 conclusion text, not yet signed. The stage is In review, no conclusion is needed, the review is not blocked, the failed
@@ -130,9 +131,9 @@ other is still approved and not flagged. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved`.
 
 **ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots**: A review has one slot with a
-primary and an alternate and one slot with another primary. The names are the primary and the alternate of the first slot
-and then the primary of the second; after the first reviewer signs, only the second is named; after the account of the
-second is disabled, the name carries the suffix. This scenario is tested by
+primary and an alternate and one slot with another primary. The names are the primary and the alternate of the first
+slot and then the primary of the second; after the first reviewer signs, only the second is named; after the account of
+the second is disabled, the name carries the suffix. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_WaitingOn_NamesPrimaryAndAlternateOfOpenSlots`.
 
 **ReviewProgressService_GetProgressAsync_WaitingOn_OutOfDateSlot_IsNamed**: A review has two slots and the first is
@@ -145,15 +146,15 @@ slot rules of the signing service do not allow one person in two slots): the fir
 reviewer2 as alternate, the second has reviewer2 as primary. The person reviewer2 is named once, after reviewer1. This
 scenario is tested by `ReviewProgressService_GetProgressAsync_WaitingOn_SamePersonTwice_IsNamedOnce`.
 
-**ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter**: Reviews due today, due tomorrow and then moved
-to yesterday, without a date, and approved with a date of yesterday. Only the one that was moved to yesterday is overdue;
-the dates are carried. This scenario is tested by
+**ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter**: Reviews due today, due tomorrow and then
+moved to yesterday, without a date, and approved with a date of yesterday. Only the one that was moved to yesterday is
+overdue; the dates are carried. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_DueDate_OverdueFromTheDayAfter`.
 
 **ReviewProgressService_GetProgressAsync_LastActivity_ComesFromTheAuditTrail**: The audit trail gets two entries of the
-first review an hour apart, an entry without a review, and an entry of the same review identifier in another project; the
-last activity of the first review is the time of its second entry, and that of the second review, which has no entry, is
-its creation time. This scenario is tested by
+first review an hour apart, an entry without a review, and an entry of the same review identifier in another project;
+the last activity of the first review is the time of its second entry, and that of the second review, which has no
+entry, is its creation time. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_LastActivity_ComesFromTheAuditTrail`.
 
 **ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound**: A theory over a member, a read-only
@@ -166,9 +167,9 @@ single row, the last two get `ProjectNotFound`. This scenario is tested by
 asks for the progress and gets `ProjectNotFound`, like a user outside the project. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound`.
 
-**ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast**: 300 reviews, a third with a slot, over
-an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, the audit trail was
-read once, and the call finished within ten seconds. This scenario is tested by
+**ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast**: 300 reviews, a third with a slot,
+over an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, the audit trail
+was read once, and the call finished within ten seconds. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
 
 **ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch**: 30 reviews, a third with a slot, over a
@@ -176,10 +177,10 @@ read once, and the call finished within ten seconds. This scenario is tested by
 no single snapshot read was made. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch`.
 
-**ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList**: Three reviews (one with a due date, one
-with a primary and an alternate, one signed) are read with the overload that lists them and then with the one that is
-given the list, over a `FakeReviewStore` that counts the list reads. The two answers are equal field by field, the first
-made one list read and the second none. This scenario is tested by
+**ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList**: Three reviews (one with a due date,
+one with a primary and an alternate, one signed) are read with the overload that lists them and then with the one that
+is given the list, over a `FakeReviewStore` that counts the list reads. The two answers are equal field by field, the
+first made one list read and the second none. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList`.
 
 **ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList**: Two reviews with two slots each are
@@ -193,23 +194,24 @@ This scenario is tested by `ReviewProgressService_GetProgressAsync_GivenListMask
 later one first, gives exactly those two in that order. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder`.
 
-**ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse**: An empty list gives an empty answer
-and the audit store counts no read of the last activity. This scenario is tested by
+**ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse**: An empty list gives an empty
+answer and the audit store counts no read of the last activity. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse`.
 
-**ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList**: With a valid list a user outside the
-project and no actor get `ProjectNotFound`, a member gets the row, and a null list raises `ArgumentNullException`. This
-scenario is tested by `ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList`.
+**ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList**: With a valid list a user outside
+the project and no actor get `ProjectNotFound`, a member gets the row, and a null list raises `ArgumentNullException`.
+This scenario is tested by `ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList`.
 
-**ReviewProgressService_Constructor_NullArgument_Throws**: A null review service, signing service, audit store, or access
-rule each raise `ArgumentNullException`. This scenario is tested by `ReviewProgressService_Constructor_NullArgument_Throws`.
+**ReviewProgressService_Constructor_NullArgument_Throws**: A null review service, signing service, audit store, or
+access rule each raise `ArgumentNullException`. This scenario is tested by
+`ReviewProgressService_Constructor_NullArgument_Throws`.
 
 **ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal**: A review with three slots, of which one ballot
 is handed in and one is a draft, reports 1 of 3 and names the two people who have not handed in. This scenario is tested
 by `ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal`.
 
-**ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix**: The name of a person with a disabled
-account in the list of the ballots that are not in carries the disabled suffix. This scenario is tested by
+**ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix**: The name of a person with a
+disabled account in the list of the ballots that are not in carries the disabled suffix. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix`.
 
 **ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked**: For a viewer who has
@@ -221,23 +223,24 @@ is true. This scenario is tested by
 people who have not handed in. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots`.
 
-**ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne**: A review with one slot reports 1 of 1 once the ballot
-is handed in (a single slot hands in with its last answer). This scenario is tested by
+**ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne**: A review with one slot reports 1 of 1 once the
+ballot is handed in (a single slot hands in with its last answer). This scenario is tested by
 `ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne`.
 
 **ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired**: A review without a checklist requires no
-ballots and has no names. This scenario is tested by `ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired`.
+ballots and has no names. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired`.
 
-**ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked**: Over the real services, a masked viewer
-sees the ballot progress and the masked flag and no dispute. This scenario is tested by
+**ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked**: Over the real services, a masked
+viewer sees the ballot progress and the masked flag and no dispute. This scenario is tested by
 `ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`, defined in
 `BallotMaskingServiceTests.cs`.
 
-**ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer**: The lead reads the progress of a review whose two
-ballots are handed in and differ, once as an API token actor and once as the person. The token is masked like any
+**ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer**: The lead reads the progress of a review whose
+two ballots are handed in and differ, once as an API token actor and once as the person. The token is masked like any
 viewer: `IsMasked` is true, the disputed and failed counts are 0, and the ballots show 2 of 2; the person is not masked
-and sees one disputed check. This scenario is tested by `ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`,
-defined in `BallotMaskingServiceTests.cs`.
+and sees one disputed check. This scenario is tested by
+`ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`, defined in `BallotMaskingServiceTests.cs`.
 
 **ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding**: Two ballots are handed in and
 differ. The token of one of the two reviewers (a token acts as its owner, who holds a slot whose ballot is handed in)

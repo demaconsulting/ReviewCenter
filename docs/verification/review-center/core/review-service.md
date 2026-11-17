@@ -319,15 +319,15 @@ its version label, and the checklist service shows its wording. This scenario is
 and one that was reset to the default, give the built-in default to reviews created from files and from a repository.
 This scenario is tested by `ReviewService_Create_NoProjectChecklist_FreezesTheDefaultAtBothCreatePaths`.
 
-**ReviewService_Create_UnusableProjectChecklist_FailsClosed**: A theory over a stored definition that is not JSON and one
-that has no sections, at both create paths; each raises `ChecklistDefinitionInvalid` with a message that names the
+**ReviewService_Create_UnusableProjectChecklist_FailsClosed**: A theory over a stored definition that is not JSON and
+one that has no sections, at both create paths; each raises `ChecklistDefinitionInvalid` with a message that names the
 project, stores no review and no entry, and never falls back to the default. This scenario is tested by
 `ReviewService_Create_UnusableProjectChecklist_FailsClosed`.
 
 **ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected**: A review from files and a review from a
 repository are created; the project then changes its checklist, goes back to the default, and changes it again. The two
-reviews keep their version, their wording, and their record digest; a review created afterwards has the newest definition.
-This scenario is tested by `ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected`.
+reviews keep their version, their wording, and their record digest; a review created afterwards has the newest
+definition. This scenario is tested by `ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected`.
 
 **ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected**: An approved review is made under the default;
 the project then replaces its checklist. The record digest, the checklist version, and the answers are unchanged, and
@@ -342,7 +342,8 @@ digest, and the `review.created` entry ends with `, due yyyy-MM-dd`. This scenar
 `ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt`.
 
 **ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText**: A review without a due date has none, and its
-audit entry has no due text. This scenario is tested by `ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText`.
+audit entry has no due text. This scenario is tested by
+`ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText`.
 
 **ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing**: A due date of yesterday, and one a day
 beyond two years ahead, are refused with `DueDateInvalid`; no review and no entry is stored. This scenario is tested by
@@ -353,8 +354,8 @@ the date; the review shows it and each change is one entry `review.due-date-chan
 written with the change. A date in the past is accepted. This scenario is tested by
 `ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew`.
 
-**ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed**: The creator of the review and a system
-administrator may set the date. This scenario is tested by `ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed`.
+**ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed**: The creator of the review and a system administrator
+may set the date. This scenario is tested by `ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed`.
 
 **ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing**: A member who did not create the
 review, and a person outside the project, are refused (`ActorNotAllowed`, `ProjectNotFound`) and nothing changes. This
@@ -505,9 +506,8 @@ changed the wording of a check, the answer to that check is not carried and the 
 tested by `ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried`.
 
 **ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts**: Open threads are carried; the entry
-`review.created` ends the review text with `, follows 'X'; carried N answers, M threads` (`X` is the whole identifier) and
-names the resolved threads
-that were not carried. This scenario is tested by
+`review.created` ends the review text with `, follows 'X'; carried N answers, M threads` (`X` is the whole identifier)
+and names the resolved threads that were not carried. This scenario is tested by
 `ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts`.
 
 **ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId**: Four earlier reviews have 100-character identifiers
@@ -536,9 +536,9 @@ common file the follow-up is refused with `FollowUpInvalid`. This scenario is te
 review and the reverse, and a review from one repository cannot follow one from another; each is `FollowUpInvalid`.
 This scenario is tested by `ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused`.
 
-**ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors**: A repository follow-up keeps the line anchor of
-a thread whose file is unchanged and moves the thread of a changed file to the whole file with the note. This scenario
-is tested by `ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors`.
+**ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors**: A repository follow-up keeps the line anchor
+of a thread whose file is unchanged and moves the thread of a changed file to the whole file with the note. This
+scenario is tested by `ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors`.
 
 **ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor**: When the file has the same content
 in both reviews, the line anchor and the comments are kept without a note. This scenario is tested by
@@ -593,9 +593,9 @@ not change it. This scenario is tested by
 `ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange`.
 
 **ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence**: The creator of a follow-up that carried another
-person's answers still cannot be seated as a reviewer while independent reviewers are required (`ReviewerNotIndependent`),
-while the person who gave the carried answers can be. This
-scenario is tested by `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`.
+person's answers still cannot be seated as a reviewer while independent reviewers are required
+(`ReviewerNotIndependent`), while the person who gave the carried answers can be. This scenario is tested by
+`ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`.
 
 **ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot**: With every answer carried and one
 reviewer in the only slot, the review has no blocker for the checklist; a carried open thread blocks with "1 thread is

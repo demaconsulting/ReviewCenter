@@ -40,14 +40,14 @@ checksum, and extract the archive. The archive holds one folder, named like the 
 files that must stay beside it. The commands are in the Installation chapter; the files in the folder are (leave
 them all in place):
 
-| File                                                         | Purpose                                          |
-| ------------------------------------------------------------ | ------------------------------------------------ |
-| `reviewcenter.exe` (`reviewcenter` on Linux)                 | The server and the command-line tool             |
-| `e_sqlite3.dll` (`libe_sqlite3.so` on Linux)                 | The native SQLite library; keep it in the folder |
-| `appsettings.json`                                           | The default settings (see Configuration)         |
-| `wwwroot` folder                                             | The static web assets                            |
-| `DemaConsulting.ReviewCenter.staticwebassets.endpoints.json` | Endpoint map of the static web assets            |
-| `aspnetcorev2_inprocess.dll` (Windows only)                  | IIS hosting module; not used by `serve`          |
+| File | Purpose |
+| --- | --- |
+| `reviewcenter.exe` (`reviewcenter` on Linux) | The server and the command-line tool |
+| `e_sqlite3.dll` (`libe_sqlite3.so` on Linux) | The native SQLite library; keep it in the folder |
+| `appsettings.json` | The default settings (see Configuration) |
+| `wwwroot` folder | The static web assets |
+| `DemaConsulting.ReviewCenter.staticwebassets.endpoints.json` | Endpoint map of the static web assets |
+| `aspnetcorev2_inprocess.dll` (Windows only) | IIS hosting module; not used by `serve` |
 
 The native SQLite library and the endpoint map must stay beside the executable. The `aspnetcorev2_inprocess.dll` file
 is the ASP.NET Core module for hosting under IIS; `reviewcenter serve` does not use it, and it is safe to ignore.
@@ -68,14 +68,14 @@ executable to `reviewcenter.exe` (`reviewcenter` on Linux). A build from source 
 All state is in one data folder. Nothing is written beside the executable unless the account has no application data
 folder (see below). The folder holds these items:
 
-| Item                             | Default location                         | Setting that moves it          |
-| -------------------------------- | ---------------------------------------- | ------------------------------ |
-| Database `reviewcenter.db`       | The `ReviewCenter` folder of the account | `Database:ConnectionString`    |
-| Write-ahead log (`-wal`, `-shm`) | Beside the database file                 | Moves with the database        |
-| Data Protection key ring         | `keys` folder beside the database        | `DataProtection:KeysPath`      |
-| Protection of the key ring       | DPAPI, certificate, or permissions       | `DataProtection:Protection`    |
-| Self-signed attestation key      | `keys/attestation-selfsigned` folder     | `Attestation:SelfSignedFolder` |
-| Git mirrors                      | `git-cache` folder beside the database   | `Git:CachePath`                |
+| Item | Default location | Setting that moves it |
+| --- | --- | --- |
+| Database `reviewcenter.db` | The `ReviewCenter` folder of the account | `Database:ConnectionString` |
+| Write-ahead log (`-wal`, `-shm`) | Beside the database file | Moves with the database |
+| Data Protection key ring | `keys` folder beside the database | `DataProtection:KeysPath` |
+| Protection of the key ring | DPAPI, certificate, or permissions | `DataProtection:Protection` |
+| Self-signed attestation key | `keys/attestation-selfsigned` folder | `Attestation:SelfSignedFolder` |
+| Git mirrors | `git-cache` folder beside the database | `Git:CachePath` |
 
 The self-signed attestation key is the file `attestation-selfsigned.pfx.protected` in its folder. It is encrypted with
 the Data Protection key ring, so it can only be read with the key ring that is in the `keys` folder.
@@ -128,36 +128,36 @@ Edit `appsettings.json` only for values that stay the same for the installation;
 Put the settings of an installation in environment variables of the service, or in an `appsettings.Production.json`
 that is not part of the release archive. The defaults are:
 
-| Setting                                   | Default                        | Described in                            |
-| ----------------------------------------- | ------------------------------ | --------------------------------------- |
-| `Database:Provider`                       | `Sqlite`                       | Database (Administration)               |
-| `Database:ConnectionString`               | empty (the default location)   | Database (Administration)               |
-| `Auth:SessionHours`                       | 8 hours                        | Users and Sign-in                       |
-| `Auth:RevalidationSeconds`                | 30 seconds (at least 5)        | Users and Sign-in                       |
-| `Identity:Throttle:MaxFailuresPerName`    | 5 attempts for one user name   | Password Rules and Lockout (Sign-in)    |
-| `Identity:Throttle:MaxFailuresPerAddress` | 20 attempts for all user names | Password Rules and Lockout (Sign-in)    |
-| `Identity:Throttle:WindowSeconds`         | 300 seconds (1 to 86400)       | Password Rules and Lockout (Sign-in)    |
-| `Identity:Totp:Enabled`                   | true                           | Two-Factor Sign-in (Sign-in)            |
-| `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
-| `Identity:Oidc:ClientSecretFile`          | empty (use `ClientSecret`)     | Identity Providers                      |
-| `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
-| `DataProtection:Protection`               | `Auto`                         | Key Ring Protection (Administration)    |
-| `DataProtection:DpapiScope`               | `CurrentUser` (Windows only)   | Key Ring Protection (Administration)    |
-| `DataProtection:CertificatePath`          | empty (no certificate)         | Key Ring Protection (Administration)    |
-| `DataProtection:CertificateKeyPath`       | empty (key in the certificate) | Key Ring Protection (Administration)    |
-| `DataProtection:CertificatePasswordFile`  | empty (no password file)       | Key Ring Protection (Administration)    |
-| `DataProtection:PreviousCertificatePaths` | empty list                     | Key Ring Protection (Administration)    |
-| `DataProtection:RequireEncryptedKeys`     | false                          | Key Ring Protection (Administration)    |
-| `DataProtection:AllowNewKeyRing`          | false                          | Back Up and Restore (Deployment)        |
-| `Attestation:*`                           | a self-signed key              | The Attestation Signing Key (below)     |
-| `Attestation:CertificatePath`             | empty (File provider only)     | The Attestation Signing Key (below)     |
-| `Attestation:PrivateKeyPath`              | empty (key in the certificate) | The Attestation Signing Key (below)     |
-| `Attestation:CertificatePasswordFile`     | empty (use the setting)        | The Attestation Signing Key (below)     |
-| `Attestation:ExpiryWarningDays`           | 30 (0 for no warning)          | The Attestation Signing Key (below)     |
-| `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
-| `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
-| `Notifications:Enabled`                   | false (no e-mail)              | E-mail Notifications (Administration)   |
-| `Notifications:Smtp:PasswordFile`         | empty (no password file)       | E-mail Notifications (Administration)   |
+| Setting | Default | Described in |
+| --- | --- | --- |
+| `Database:Provider` | `Sqlite` | Database (Administration) |
+| `Database:ConnectionString` | empty (the default location) | Database (Administration) |
+| `Auth:SessionHours` | 8 hours | Users and Sign-in |
+| `Auth:RevalidationSeconds` | 30 seconds (at least 5) | Users and Sign-in |
+| `Identity:Throttle:MaxFailuresPerName` | 5 attempts for one user name | Password Rules and Lockout (Sign-in) |
+| `Identity:Throttle:MaxFailuresPerAddress` | 20 attempts for all user names | Password Rules and Lockout (Sign-in) |
+| `Identity:Throttle:WindowSeconds` | 300 seconds (1 to 86400) | Password Rules and Lockout (Sign-in) |
+| `Identity:Totp:Enabled` | true | Two-Factor Sign-in (Sign-in) |
+| `Identity:Oidc:*` | off | Sign In with an OpenID Connect Provider |
+| `Identity:Oidc:ClientSecretFile` | empty (use `ClientSecret`) | Identity Providers |
+| `DataProtection:KeysPath` | `keys` in the data folder | Repositories and Credentials |
+| `DataProtection:Protection` | `Auto` | Key Ring Protection (Administration) |
+| `DataProtection:DpapiScope` | `CurrentUser` (Windows only) | Key Ring Protection (Administration) |
+| `DataProtection:CertificatePath` | empty (no certificate) | Key Ring Protection (Administration) |
+| `DataProtection:CertificateKeyPath` | empty (key in the certificate) | Key Ring Protection (Administration) |
+| `DataProtection:CertificatePasswordFile` | empty (no password file) | Key Ring Protection (Administration) |
+| `DataProtection:PreviousCertificatePaths` | empty list | Key Ring Protection (Administration) |
+| `DataProtection:RequireEncryptedKeys` | false | Key Ring Protection (Administration) |
+| `DataProtection:AllowNewKeyRing` | false | Back Up and Restore (Deployment) |
+| `Attestation:*` | a self-signed key | The Attestation Signing Key (below) |
+| `Attestation:CertificatePath` | empty (File provider only) | The Attestation Signing Key (below) |
+| `Attestation:PrivateKeyPath` | empty (key in the certificate) | The Attestation Signing Key (below) |
+| `Attestation:CertificatePasswordFile` | empty (use the setting) | The Attestation Signing Key (below) |
+| `Attestation:ExpiryWarningDays` | 30 (0 for no warning) | The Attestation Signing Key (below) |
+| `Git:CachePath` | `git-cache` in the data folder | Repositories and Credentials |
+| `Git:TimeoutSeconds` | 120 seconds (1 to 3600) | Repositories and Credentials |
+| `Notifications:Enabled` | false (no e-mail) | E-mail Notifications (Administration) |
+| `Notifications:Smtp:PasswordFile` | empty (no password file) | E-mail Notifications (Administration) |
 
 The two attempt limits and the window belong together: one client address may make at most the given number of
 sign-in attempts (a successful sign-in gives its attempt back) within one window.
@@ -206,11 +206,11 @@ The Linux command was not run by the project; the Windows form was.
 By default the server listens on `http://localhost:5000`, which only the same machine can reach. Choose the address
 with the option `--urls`, which takes an absolute `http` or `https` URL:
 
-| Goal                                                | Option                          |
-| --------------------------------------------------- | ------------------------------- |
-| Only this machine (behind a reverse proxy)          | `--urls http://127.0.0.1:5000`  |
-| Another port, only this machine                     | `--urls http://localhost:8080`  |
-| Every network interface of the machine (all IPv4)   | `--urls http://0.0.0.0:8080`    |
+| Goal | Option |
+| --- | --- |
+| Only this machine (behind a reverse proxy) | `--urls http://127.0.0.1:5000` |
+| Another port, only this machine | `--urls http://localhost:8080` |
+| Every network interface of the machine (all IPv4) | `--urls http://0.0.0.0:8080` |
 
 Use only `--urls` for this. **The environment variable `ASPNETCORE_URLS` is ignored**: with it set to another port,
 the server still listened on `http://localhost:5000` (the server always applies the `--urls` value or its default).
@@ -465,18 +465,18 @@ Four things belong together, and a backup that misses one of them is not a backu
 2. **The key ring folder** (`keys`, or `DataProtection:KeysPath`). It holds the keys that encrypt the stored repository
    tokens and the second-factor secrets of the database, and, by default, the self-signed attestation key
    (`attestation-selfsigned`; the key file in it is encrypted with this ring, so it is useless without the ring). If you
-   moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up
-   too. If the signing key is in the certificate store of the machine (`Attestation:Provider` set to `CertificateStore`),
-   back up that certificate and its private key by the means of your organization. If the signing key is a file
-   (`Attestation:Provider` set to `File`), back up the certificate file, the key file (`Attestation:PrivateKeyPath`), and
-   **its password source** (the password file, or the secret that sets `Attestation__CertificatePassword`) apart from
-   each other, as for the certificate of the key ring. The key ring does not protect these files, and a restore that
-   misses them stops the start with the messages of Troubleshooting. After a certificate was replaced, keep the public
-   part of the retired certificate with the backups (see The Attestation Signing Key below).
-3. **The secret that protects the key ring**, which is not in the folder: for DPAPI, the Windows account (and the machine,
-   or only the machine with `DpapiScope` `LocalMachine`) that wrote the keys; for a certificate, the certificate file
-   (`DataProtection:CertificatePath`, and any `PreviousCertificatePaths`) **and its password** (or the password file).
-   Back them up apart from the keys, so that one lost backup does not give an attacker both.
+   moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up too. If the signing key is in the
+   certificate store of the machine (`Attestation:Provider` set to `CertificateStore`), back up that certificate and its
+   private key by the means of your organization. If the signing key is a file (`Attestation:Provider` set to `File`),
+   back up the certificate file, the key file (`Attestation:PrivateKeyPath`), and **its password source** (the password
+   file, or the secret that sets `Attestation__CertificatePassword`) apart from each other, as for the certificate of
+   the key ring. The key ring does not protect these files, and a restore that misses them stops the start with the
+   messages of Troubleshooting. After a certificate was replaced, keep the public part of the retired certificate with
+   the backups (see The Attestation Signing Key below).
+3. **The secret that protects the key ring**, which is not in the folder: for DPAPI, the Windows account (and the
+   machine, or only the machine with `DpapiScope` `LocalMachine`) that wrote the keys; for a certificate, the
+   certificate file (`DataProtection:CertificatePath`, and any `PreviousCertificatePaths`) **and its password** (or the
+   password file). Back them up apart from the keys, so that one lost backup does not give an attacker both.
 4. **The settings** of the installation: the environment variables or `appsettings.Production.json` that name these
    locations and the protection.
 
@@ -558,8 +558,8 @@ ring needs the certificate and its password:
 1. Restore the database file (with its `-wal` and `-shm` files if the backup has them) and the key ring folder to a
    scratch folder, and the certificate to where the settings expect it.
 2. Point the settings at the scratch folder (`Database__ConnectionString`, and `DataProtection__KeysPath` and
-   `Attestation__SelfSignedFolder` when the backup does not use the default places beside the database), and set the same
-   protection settings and certificate password as the installation.
+   `Attestation__SelfSignedFolder` when the backup does not use the default places beside the database), and set the
+   same protection settings and certificate password as the installation.
 3. Run `reviewcenter --validate --check-config`. The `ReviewCenter_ConfiguredKeys` line must pass with `unreadable 0`.
    It fails, without creating anything, when the key ring does not belong to the database, when the ring is empty, or
    when the certificate does not open it; it does not start the server and changes nothing in the scratch folder.
@@ -626,19 +626,19 @@ key, which an administrator chooses in the `Attestation` section of `appsettings
 `Provider` is `SelfSigned`, `CertificateStore` or `File`; the settings marked "Store" apply to `CertificateStore` only,
 and the settings marked "File" to `File` only.
 
-| Setting                               | Meaning                                                              |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| `Attestation:Provider`                | Key source; default `SelfSigned`                                     |
-| `Attestation:RequireTrustedKey`       | Refuse unsuitable keys; default false                                |
-| `Attestation:ExpiryWarningDays`       | Warn this many days before the end; default 30, 0 for no warning     |
-| `Attestation:CertificateThumbprint`   | Store: certificate thumbprint                                        |
-| `Attestation:StoreLocation`           | Store: `CurrentUser` or `LocalMachine`                               |
-| `Attestation:StoreName`               | Store: store name; default `My`                                      |
-| `Attestation:CertificatePath`         | File: PFX/PKCS #12 or PEM certificate file                           |
-| `Attestation:PrivateKeyPath`          | File: PEM file with the private key, when it is not in the other     |
-| `Attestation:CertificatePassword`     | File: password of the PFX or of the encrypted PEM key (a secret)     |
-| `Attestation:CertificatePasswordFile` | File: file holding the password (not with the one above)             |
-| `Attestation:SelfSignedFolder`        | Folder of the self-signed key file                                   |
+| Setting | Meaning |
+| --- | --- |
+| `Attestation:Provider` | Key source; default `SelfSigned` |
+| `Attestation:RequireTrustedKey` | Refuse unsuitable keys; default false |
+| `Attestation:ExpiryWarningDays` | Warn this many days before the end; default 30, 0 for no warning |
+| `Attestation:CertificateThumbprint` | Store: certificate thumbprint |
+| `Attestation:StoreLocation` | Store: `CurrentUser` or `LocalMachine` |
+| `Attestation:StoreName` | Store: store name; default `My` |
+| `Attestation:CertificatePath` | File: PFX/PKCS #12 or PEM certificate file |
+| `Attestation:PrivateKeyPath` | File: PEM file with the private key, when it is not in the other |
+| `Attestation:CertificatePassword` | File: password of the PFX or of the encrypted PEM key (a secret) |
+| `Attestation:CertificatePasswordFile` | File: file holding the password (not with the one above) |
+| `Attestation:SelfSignedFolder` | Folder of the self-signed key file |
 
 `Attestation:CertificatePassword` is a secret: prefer `Attestation:CertificatePasswordFile`, or the environment
 variable, and never write the password into `appsettings.json` in a folder that others can read.
@@ -883,11 +883,11 @@ the project produced on purpose with a wrong setting, and what to do:
   holds the password.
 - `The key ring is not encrypted at rest and DataProtection:RequireEncryptedKeys is true.`: set
   `DataProtection:CertificatePath` (or, on Windows, leave `Protection` at `Auto`), or turn `RequireEncryptedKeys` off.
-- `The key ring '<folder>' holds key files that are not encrypted (...) and DataProtection:RequireEncryptedKeys is
-  true.`: the ring was made before encryption was set, and a key stays plain until you replace it. Set the encrypting
+- `The key ring '<folder>' holds key files that are not encrypted (...) and DataProtection:RequireEncryptedKeys is true.`:
+  the ring was made before encryption was set, and a key stays plain until you replace it. Set the encrypting
   protection, stop the server, run `reviewcenter keys reprotect`, and delete the plain key files (see Rotate the Key
-  Ring Protection above); `reviewcenter keys reprotect` does not refuse because of these files. Moving the plain key files
-  away without that loses what they protected (the stored tokens and second-factor secrets).
+  Ring Protection above); `reviewcenter keys reprotect` does not refuse because of these files. Moving the plain key
+  files away without that loses what they protected (the stored tokens and second-factor secrets).
 - `The key ring '<folder>' holds N key(s), but the newest key cannot be decrypted: ...`: the ring was made with another
   certificate, or with none, or by DPAPI for another account or machine. Set the right certificate in
   `DataProtection:CertificatePath`, or list the old certificate in `DataProtection:PreviousCertificatePaths`. The
@@ -923,8 +923,8 @@ the project produced on purpose with a wrong setting, and what to do:
   CertificateStore or File.`: correct `Attestation:Provider` (see The Attestation Signing Key).
 - `The attestation signing key is not usable: Attestation:CertificatePath is not set; it is required for the File
   provider.`: set `Attestation:CertificatePath`, or choose another provider.
-- `... Attestation:CertificatePath '<file>' could not be loaded: the file does not exist.` (or `Attestation:PrivateKeyPath
-  '<file>' ...`): correct the path, and let the account of the server read the file.
+- `... Attestation:CertificatePath '<file>' could not be loaded: the file does not exist.` (or
+  `Attestation:PrivateKeyPath '<file>' ...`): correct the path, and let the account of the server read the file.
 - `... The certificate file '<file>' needs a password. Set Attestation:CertificatePassword or
   Attestation:CertificatePasswordFile.`: the PFX, or the encrypted PEM key, is protected and no password is set. Set one
   of the two settings.

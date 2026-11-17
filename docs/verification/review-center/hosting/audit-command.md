@@ -70,4 +70,5 @@ holds text); the output says the trail could not be read and the exit code is 1.
 `AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne`.
 
 **AuditCommand_Run_NullContext_ThrowsArgumentNullException**: `Run` is called with a null context; an
-`ArgumentNullException` is thrown. This scenario is tested by `AuditCommand_Run_NullContext_ThrowsArgumentNullException`.
+`ArgumentNullException` is thrown. This scenario is tested by
+`AuditCommand_Run_NullContext_ThrowsArgumentNullException`.

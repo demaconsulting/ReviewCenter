@@ -79,8 +79,8 @@ N/A - standard test environment.
   password; with notifications off the same garbage is not checked; valid settings build the application and log one
   warning for an inline password that holds no password; a database without the notification tables stops the start
   while notifications are on and does not while they are off.
-- The notification worker is part of the web host only: with notifications enabled and the file or the SMTP transport the
-  application has the worker; with notifications off, with the transport `None` (which stops the start before any
+- The notification worker is part of the web host only: with notifications enabled and the file or the SMTP transport
+  the application has the worker; with notifications off, with the transport `None` (which stops the start before any
   worker exists), with the self-test settings, and in the shared service registration of the commands it has none; the
   worker runs while the host runs and has stopped when the host has stopped.
 
@@ -228,10 +228,10 @@ existing secret file and an inline secret both set, the start of the application
 `Identity:Oidc:ClientSecretFile` and contains neither secret. This scenario is tested by
 `ServerHost_CreateApplication_ClientSecretFileWithInlineSecret_ThrowsClearErrorWithoutSecret`.
 
-**ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
-with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting
-is thrown. **ServerHost_CreateApplication_GitTimeoutAtLimits_Starts**: a theory over 1 and 3600: the pipeline is built
-and the configured value is in effect. These scenarios are tested by the tests of those names.
+**ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is
+built with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the
+setting is thrown. **ServerHost_CreateApplication_GitTimeoutAtLimits_Starts**: a theory over 1 and 3600: the pipeline is
+built and the configured value is in effect. These scenarios are tested by the tests of those names.
 
 **ServerHost_AddServices_Configured_RegistersUserService**: The real pipeline is started on an in-memory server and
 a user is created through the `UserService` taken from the application services; the user is stored with a database
@@ -309,8 +309,8 @@ instance, and the service answers zero for a user who is not known. This scenari
 `ServerHost_AddServices_Configured_RegistersInboxService`.
 
 **ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError**: The pipeline is built with
-`DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and the
-path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.
+`DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and
+the path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.
 
 **ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder**: A missing or blank `DataProtection:KeysPath`
 gives a `keys` folder beside the database. The name of the test is kept from the time when it also checked a
@@ -383,8 +383,8 @@ theory; the message of the error does not contain the stored token. This scenari
 `ServerHost_CreateApplication_LostRing_ErrorShowsNoSecret`.
 
 **ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning**: The same lost ring is started with
-`DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of
-secrets is logged. This scenario is tested by `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`.
+`DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of secrets
+is logged. This scenario is tested by `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`.
 
 **ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey**: A database file is
 created that opens and holds a table (so the schema is not created again) but whose `Repositories` view reads a table
@@ -407,9 +407,9 @@ stored, and a second start over the same database and ring succeeds without a wa
 and the key folder still holds exactly one key file.
 This scenario is tested by `ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint`.
 
-**ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts**: The database holds secrets that another
-ring protected and the ring in the folder has a key; the build succeeds and an error is logged that gives the counts
-per kind and the remedy. This scenario is tested by `ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts`.
+**ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts**: The database holds secrets that another ring
+protected and the ring in the folder has a key; the build succeeds and an error is logged that gives the counts per kind
+and the remedy. This scenario is tested by `ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts`.
 
 **KeyRingSettings_AllowNewKeyRing_DefaultsToFalse**: The setting that accepts a new ring is off unless it is set. This
 scenario is tested by `KeyRingSettings_AllowNewKeyRing_DefaultsToFalse`.
@@ -464,7 +464,8 @@ folder; the key file is created there and the provider reports an available key.
 **ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry**: The File provider is chosen with a
 protected PFX that ends in 30 days and its password. The application is created, the status of the key is available and
 names the File provider, a warning that the certificate expires is logged and shown in the status, and the password is
-not in any log entry. This scenario is tested by `ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry`.
+not in any log entry. This scenario is tested by
+`ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry`.
 
 **ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedWithRequireEncryptedKeys**: The key ring is
 protected by a certificate and the attestation key is a PFX without a password. With
@@ -611,11 +612,12 @@ services in its container. The application has the worker when notifications are
 SMTP, which is tested by `ServerHost_CreateApplication_NotificationsFile_HasWorker` and
 `ServerHost_CreateApplication_NotificationsSmtp_HasWorker`; it has none while notifications are off, which is tested by
 `ServerHost_CreateApplication_NotificationsOff_NoWorker`; enabled notifications without a transport are refused at
-start-up, so no worker exists, which is tested by `ServerHost_CreateApplication_EnabledSenderNone_RefusedBeforeAnyWorker`.
-The shared service registration of the commands adds no hosted service even when notifications are enabled, which is
-tested by `ServerHost_AddServices_NotificationsEnabled_NoHostedService`, and the host of the self-test start check has no
-worker, which is tested by `ServerHost_CreateApplication_SelfTestSettings_NoWorker`. The worker runs while the host runs
-and has stopped when the host has stopped, which is tested by `ServerHost_RunAsync_Stop_WorkerStopped`.
+start-up, so no worker exists, which is tested by
+`ServerHost_CreateApplication_EnabledSenderNone_RefusedBeforeAnyWorker`. The shared service registration of the commands
+adds no hosted service even when notifications are enabled, which is tested by
+`ServerHost_AddServices_NotificationsEnabled_NoHostedService`, and the host of the self-test start check has no worker,
+which is tested by `ServerHost_CreateApplication_SelfTestSettings_NoWorker`. The worker runs while the host runs and has
+stopped when the host has stopped, which is tested by `ServerHost_RunAsync_Stop_WorkerStopped`.
 
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real

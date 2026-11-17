@@ -118,14 +118,14 @@ Constants:
 
 An item is new when `NotificationComposer.IsNew` says so for the stored state: nothing is stored, the state differs, or,
 for waiting replies, the count rose. A key that is not in the inbox any more is forgotten, so an item that returns is
-mailed again. When the count of waiting replies of an item is lower than the stored one (`NotificationComposer.IsLowered`),
-the item is not new and is never mailed, but the stored state follows it down, keeping `GaveUp` as stored, so that a
-later rise is measured from the count the item has now. The lowered items are part of the comparison of the pass and
-are written in every commit that also forgets the stale items (the paths of the mode Every and of the mode Daily that
-mail nothing, and the commits after a mail and after the give-up); a pass in which nothing was lowered, forgotten, or
-recorded writes nothing. In the mode Daily the stored count is lowered only at the digest slot, because that is when
-the dispatcher reads the inbox of the recipient; a fall and a rise of the count within one day are therefore compared
-with the count of the previous slot.
+mailed again. When the count of waiting replies of an item is lower than the stored one
+(`NotificationComposer.IsLowered`), the item is not new and is never mailed, but the stored state follows it down,
+keeping `GaveUp` as stored, so that a later rise is measured from the count the item has now. The lowered items are part
+of the comparison of the pass and are written in every commit that also forgets the stale items (the paths of the mode
+Every and of the mode Daily that mail nothing, and the commits after a mail and after the give-up); a pass in which
+nothing was lowered, forgotten, or recorded writes nothing. In the mode Daily the stored count is lowered only at the
+digest slot, because that is when the dispatcher reads the inbox of the recipient; a fall and a rise of the count within
+one day are therefore compared with the count of the previous slot.
 
 **Design constraint: one host per database.** The server is a single instance by design (see the hosting decision in
 the architecture document), and the services that must remain singletons keep state in memory. The dispatcher is not

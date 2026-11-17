@@ -3,33 +3,27 @@
 #### Verification Approach
 
 `ProjectPage`, `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, `EvidenceSettingsPage`, and
-`ProjectChecklistPage` are verified with
-component tests defined
-in `ProjectPageTests.cs`, which holds the tests of the first two pages (including the follow-up tag in the list of
-reviews) and the member changes of the project page,
+`ProjectChecklistPage` are verified with component tests defined in `ProjectPageTests.cs`, which holds the tests of the
+first two pages (including the follow-up tag in the list of reviews) and the member changes of the project page,
 `NewReviewPageRepositoryTests.cs`, `NewReviewPageFollowUpTests.cs` (the choice of an earlier review, with its preview
-and confirmation), `ProjectAccessPageTests.cs` (what a member, a non-member,
-and a system administrator see and do), `NewMemberPageTests.cs`, `NewMemberAccountPageTests.cs`,
-`EvidenceSettingsPageTests.cs`, `ProjectChecklistPageTests.cs`, and `ChecklistDiffTests.cs` (the pure comparison of two
-definitions), which use the
-bUnit test context
-to render the real components over real Core services and an in-memory fake store (`FakeReviewStore`, `FakeUserStore`
-connected to it, and `FakeAuditStore`, with `FakePasswordHasher` for the passwords of the created accounts). The
-evidence settings page runs over the real `EvidenceSettingsService` with the real access rules, so who gets the page and
-what a save does are the product's; a second service that allows everything (`PageTestBase.SettingsService`) only
-arranges stored settings. The audit entry of a save is read back from the fake store. The checklist template page runs
-over the real `ProjectChecklistService` with the real access rules (`PageTestBase.ChecklistTemplates`, a second service
-that allows everything, only arranges stored checklists and the change of a checklist by someone else); the download of
-an export is read from the calls that bUnit's JavaScript interop recorded for `reviewCenter.downloadText`, and the file
-input is driven with the upload helper of the test context. The whole journey in a browser (import, replace, a new
-review that has the new checklist while an older review keeps the default, and reset) is verified by the system test
-`ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault` in the `SystemTests` test project.
-File
-selection is simulated the
-way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their
-`data-testid` attributes (the page units share the helper `PageTestBase`) and wait for the asynchronous file
-reading with bUnit's wait helpers. The real database is covered by the `Storage` subsystem and the integration
-tests of the `Web` subsystem.
+and confirmation), `ProjectAccessPageTests.cs` (what a member, a non-member, and a system administrator see and do),
+`NewMemberPageTests.cs`, `NewMemberAccountPageTests.cs`, `EvidenceSettingsPageTests.cs`, `ProjectChecklistPageTests.cs`,
+and `ChecklistDiffTests.cs` (the pure comparison of two definitions), which use the bUnit test context to render the
+real components over real Core services and an in-memory fake store (`FakeReviewStore`, `FakeUserStore` connected to it,
+and `FakeAuditStore`, with `FakePasswordHasher` for the passwords of the created accounts). The evidence settings page
+runs over the real `EvidenceSettingsService` with the real access rules, so who gets the page and what a save does are
+the product's; a second service that allows everything (`PageTestBase.SettingsService`) only arranges stored settings.
+The audit entry of a save is read back from the fake store. The checklist template page runs over the real
+`ProjectChecklistService` with the real access rules (`PageTestBase.ChecklistTemplates`, a second service that allows
+everything, only arranges stored checklists and the change of a checklist by someone else); the download of an export is
+read from the calls that bUnit's JavaScript interop recorded for `reviewCenter.downloadText`, and the file input is
+driven with the upload helper of the test context. The whole journey in a browser (import, replace, a new review that
+has the new checklist while an older review keeps the default, and reset) is verified by the system test
+`ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault` in the `SystemTests` test
+project. File selection is simulated the way a browser does it, by setting the files of the file input in the test
+context. Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`) and
+wait for the asynchronous file reading with bUnit's wait helpers. The real database is covered by the `Storage`
+subsystem and the integration tests of the `Web` subsystem.
 
 #### Test Environment
 
@@ -40,10 +34,9 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - An unknown project shows a not-found message and no form, and so does a project the user is no member of (the same
   message, `project-not-found`, and nothing of the project, on the project page and on the page for a new review); a
-  known project shows its name and description and
-  its reviews as rows with link, title, and a stage badge (Setup, In review, Approved, or Rejected), or an empty message.
-  A review whose every slot has a current signature of the same outcome is Approved or Rejected; a review without slots
-  is in Setup; a review with an unsigned slot is In review.
+  known project shows its name and description and its reviews as rows with link, title, and a stage badge (Setup, In
+  review, Approved, or Rejected), or an empty message. A review whose every slot has a current signature of the same
+  outcome is Approved or Rejected; a review without slots is in Setup; a review with an unsigned slot is In review.
 - The reviews table shows, for each review, its signatures, its blockers, the people it waits on, its last activity, and
   its due date with the Overdue badge; a summary strip counts the reviews per stage (including "N rejected") and the
   overdue ones; the filters
@@ -105,8 +98,8 @@ N/A - standard test environment.
 - Saving stores all the switches, confirms with "Evidence settings saved.", stays on the page, and records one audit
   entry of the project, `project.evidence-settings-changed`, with the changed keys, their old and new values, and the
   user; saving unchanged settings says that there is nothing to save and records nothing.
-- A save over settings that someone else changed in the meantime stores nothing, shows the message that they were changed
-  by someone else, and shows the stored settings.
+- A save over settings that someone else changed in the meantime stores nothing, shows the message that they were
+  changed by someone else, and shows the stored settings.
 - A save after the membership was revoked, after a demotion to plain member, or after the sign-in state ended stores
   nothing, records nothing, and shows the not-found message and none of the settings or messages; reusing the page for
   another project drops the choices and the project.
@@ -497,10 +490,10 @@ so that applying a filter keeps the order. This scenario is tested by
 and the previous and next links, which keep the filters and the sort of the query string. This scenario is tested by
 `ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`.
 
-**ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState**: Thirty reviews are filtered by stage and text and sorted
-by signatures descending, and shown 25 to a page. The next and previous links keep the stage, the text, the sort column
-and the direction. A column header link keeps the stage and the text but not the page, so it starts at the first page.
-This scenario is tested by `ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState`.
+**ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState**: Thirty reviews are filtered by stage and text and
+sorted by signatures descending, and shown 25 to a page. The next and previous links keep the stage, the text, the sort
+column and the direction. A column header link keeps the stage and the text but not the page, so it starts at the first
+page. This scenario is tested by `ProjectPage_Render_FilteredAndSorted_LinksKeepTheOtherState`.
 
 **ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView**: The page is opened with an unknown stage, an
 unknown sort, an unknown direction, overdue and blocked values other than `1`, and a page that is text; each is ignored
@@ -519,7 +512,8 @@ element, and the markup appears only as encoded text. This scenario is tested by
 
 **ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing**: A read-only auditor of the project sees
 the same table as a member, without the New review and Plan controls; a user outside the project sees the not-found
-message and no table. This scenario is tested by `ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
+message and no table. This scenario is tested by
+`ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
 
 **ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories**: An Auditor opens the page; it shows the
 `readonly-notice`, the table, and the audit trail link, no New review, Plan, or Checklist edit control, and the
@@ -678,8 +672,8 @@ real access rules behind the page.
 
 **ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons** and
 **ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink**: The project page of a project admin has the Evidence
-settings button with the address `/projects/{id}/evidence-settings`; the page of a plain member has none. These scenarios
-are tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
+settings button with the address `/projects/{id}/evidence-settings`; the page of a plain member has none. These
+scenarios are tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
 
 **ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls**: The system administrator opens the
@@ -753,23 +747,25 @@ switch is turned off; the page shows the not-found message and no form, no file 
 error or status, does not contain the project name, the stored file list setting is unchanged, and no audit entry
 exists. This scenario is tested by `EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange`.
 
-**EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject**: With a switch changed for the first project, the
-page is given the identity of a second project that the user does not administer; it shows the not-found message and
+**EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject**: With a switch changed for the first project,
+the page is given the identity of a second project that the user does not administer; it shows the not-found message and
 neither project name. This scenario is tested by `EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject`.
 
-**EvidenceSettingsPage_AfterRender_Interactive_SetsMarker**: The evidence settings page is rendered; its root element has
-`data-interactive` equal to `true`. This scenario is tested by `EvidenceSettingsPage_AfterRender_Interactive_SetsMarker`.
+**EvidenceSettingsPage_AfterRender_Interactive_SetsMarker**: The evidence settings page is rendered; its root element
+has `data-interactive` equal to `true`. This scenario is tested by
+`EvidenceSettingsPage_AfterRender_Interactive_SetsMarker`.
 
 **Checklist template** is verified in `ProjectChecklistPageTests.cs`, with the real `ProjectChecklistService` and the
 real access rules, in `ChecklistDiffTests.cs`, and in `ProjectPageTests.cs` for the link and the summary.
 
 **ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary**: A project administrator sees the Checklist button and
-the link of the card, both leading to `/projects/{id}/checklist`, and the summary line, first for the built-in default and
-then, after the project's own checklist was stored, with its label, counts, and "custom". This scenario is tested by
+the link of the card, both leading to `/projects/{id}/checklist`, and the summary line, first for the built-in default
+and then, after the project's own checklist was stored, with its label, counts, and "custom". This scenario is tested by
 `ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary`.
 
 **ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary**: A plain member sees neither link nor summary, and the
-page does not contain the label. This scenario is tested by `ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary`.
+page does not contain the label. This scenario is tested by
+`ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary`.
 
 **ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary**: A project admin and a system administrator see the
 label, the counts, and the badge of the built-in default, enabled export and validate buttons, a disabled reset, and the
@@ -804,12 +800,12 @@ changed, and offers neither preview nor replace. This scenario is tested by
 **ProjectChecklistPage_Validate_NothingImported_ShowsOneError**: Validating with nothing pasted or chosen shows one
 error and no replace. This scenario is tested by `ProjectChecklistPage_Validate_NothingImported_ShowsOneError`.
 
-**ProjectChecklistPage_Validate_NotJson_ShowsOneError**: Text that is not JSON shows one error with the path `json`. This
-scenario is tested by `ProjectChecklistPage_Validate_NotJson_ShowsOneError`.
+**ProjectChecklistPage_Validate_NotJson_ShowsOneError**: Text that is not JSON shows one error with the path `json`.
+This scenario is tested by `ProjectChecklistPage_Validate_NotJson_ShowsOneError`.
 
-**ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing**: A valid definition shows its
-label and size, the preview of every section and check, the differences from the default, and an enabled replace; the
-stored checklist is still the default and no audit entry exists. This scenario is tested by
+**ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing**: A valid definition shows
+its label and size, the preview of every section and check, the differences from the default, and an enabled replace;
+the stored checklist is still the default and no audit entry exists. This scenario is tested by
 `ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing`.
 
 **ProjectChecklistPage_Validate_SameAsCurrent_SaysNothingToReplaceAndDisablesReplace**: The default, exported and
@@ -824,17 +820,17 @@ current label shows the label warning and the changed check. This scenario is te
 shown as the source, and validating shows its preview. This scenario is tested by
 `ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed`.
 
-**ProjectChecklistPage_Import_FileTooLarge_IsRefused**: A definition is pasted and validated, then a file of one byte more
-than 256 KiB is chosen; it is refused with a message and is not kept, and the earlier import (its source, preview, and
-the replace) is dropped, so the page does not offer to replace the checklist with the old definition. This scenario is
-tested by `ProjectChecklistPage_Import_FileTooLarge_IsRefused`.
+**ProjectChecklistPage_Import_FileTooLarge_IsRefused**: A definition is pasted and validated, then a file of one byte
+more than 256 KiB is chosen; it is refused with a message and is not kept, and the earlier import (its source, preview,
+and the replace) is dropped, so the page does not offer to replace the checklist with the old definition. This scenario
+is tested by `ProjectChecklistPage_Import_FileTooLarge_IsRefused`.
 
 **ProjectChecklistPage_Replace_Cancelled_ChangesNothing**: The confirmation states that existing reviews keep their
 checklist and only later reviews use the new one; canceling stores nothing and records nothing. This scenario is
 tested by `ProjectChecklistPage_Replace_Cancelled_ChangesNothing`.
 
-**ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits**: A confirmed replace stores the definition, shows the new
-label and counts without the badge, confirms in words, clears the import, and records one audit entry of the project
+**ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits**: A confirmed replace stores the definition, shows the
+new label and counts without the badge, confirms in words, clears the import, and records one audit entry of the project
 by the actor. This scenario is tested by `ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits`.
 
 **ProjectChecklistPage_Replace_SameLabelOtherWording_ShowsTheRefusalAndStoresNothing**: Other wording under the same
@@ -863,16 +859,17 @@ candidate, and a pending replace, the membership is revoked, the user is demoted
 validating, replacing, and resetting then each drop the page to the not-found state and change nothing. This scenario
 is tested by `ProjectChecklistPage_Action_RightLostWhileOpen_DropsThePageAndChangesNothing`.
 
-**ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject**: With a definition validated for the first project,
-the page is given a second project that the user does not administer; it shows the not-found message and no project
-name. This scenario is tested by `ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject`.
+**ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject**: With a definition validated for the first
+project, the page is given a second project that the user does not administer; it shows the not-found message and no
+project name. This scenario is tested by `ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject`.
 
 **ProjectChecklistPage_Sample_Iec62304ExampleIsValid**: The sample file of the user guide is read from the repository,
 passes the validator, has six sections of four to six checks, and does not claim compliance. This scenario is tested by
 `ProjectChecklistPage_Sample_Iec62304ExampleIsValid`.
 
 **ProjectChecklistPage_AfterRender_Interactive_SetsMarker**: The checklist template page is rendered; its root element
-has `data-interactive` equal to `true`. This scenario is tested by `ProjectChecklistPage_AfterRender_Interactive_SetsMarker`.
+has `data-interactive` equal to `true`. This scenario is tested by
+`ProjectChecklistPage_AfterRender_Interactive_SetsMarker`.
 
 **ChecklistDiff_Compare_Identical_FindsNoChange**: Comparing a definition with itself finds no version change and no
 content change. This scenario is tested by `ChecklistDiff_Compare_Identical_FindsNoChange`.
@@ -883,8 +880,9 @@ changes. This scenario is tested by `ChecklistDiff_Compare_OnlyVersion_ReportsVe
 **ChecklistDiff_Compare_AddedAndRemoved_ListsIdentifiers**: Sections and checks added and removed are listed by
 identifier. This scenario is tested by `ChecklistDiff_Compare_AddedAndRemoved_ListsIdentifiers`.
 
-**ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems**: Another title or hint changes a section, and another
-wording changes a check. This scenario is tested by `ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems`.
+**ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems**: Another title or hint changes a section, and
+another wording changes a check. This scenario is tested by
+`ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems`.
 
 **ChecklistDiff_Compare_MovedItem_IsChangedNotAddedOrRemoved**: A check that moved to another section is changed, not
 added and removed. This scenario is tested by `ChecklistDiff_Compare_MovedItem_IsChangedNotAddedOrRemoved`.
@@ -895,8 +893,8 @@ differences. This scenario is tested by `ChecklistDiff_Compare_CaseOrderAndMissi
 **ChecklistDiff_Compare_NullArgument_Throws**: A missing argument is refused. This scenario is tested by
 `ChecklistDiff_Compare_NullArgument_Throws`.
 
-**ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator**: The exported text is indented, ends with a line break, and
-reads back as the same valid definition, also for the built-in default. This scenario is tested by
+**ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator**: The exported text is indented, ends with a line break,
+and reads back as the same valid definition, also for the built-in default. This scenario is tested by
 `ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator`.
 
 **NewReviewPage_FollowUp_NoEligibleReview_HidesSelectorOrShowsEmptyHint**: A project without a review shows no follow-up

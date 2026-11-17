@@ -45,8 +45,8 @@ most five suffixes are tried when a create is refused as a duplicate.
      not found); open one session;
      resolve the head and, for `Explicit`, the baseline to commits.
   2. List the head commit as a full listing. It is the change list of every full review and is where the configuration
-     is found: the file `.reviewmark.yaml` at the root. A missing file is `ReviewSetConfigMissing`; a file over the limit
-     (the size is read before the bytes) or one that the parser refuses is `ReviewSetConfigInvalid`.
+     is found: the file `.reviewmark.yaml` at the root. A missing file is `ReviewSetConfigMissing`; a file over the
+     limit (the size is read before the bytes) or one that the parser refuses is `ReviewSetConfigInvalid`.
   3. List the reviews of the project that belong to the repository.
   4. For every set, normalize its paths into a selection text (a set whose paths are invalid, or select too many files,
      becomes a `CannotPlan` row with the problem and does not stop the plan) and choose its baseline (below).
@@ -82,14 +82,14 @@ most five suffixes are tried when a create is refused as a duplicate.
 - *Algorithm*: Open one session for the batch. For each request, build the id (below) and the title, and call
   `ReviewService.CreateFromSessionAsync` with the head commit and the baseline commit of the request, never a branch
   name. A domain rule violation of a request becomes a `Failed` result with its message, except that the text of a git
-  access failure (which may carry what git printed) is replaced by the fixed sentence `GitAccessFailedMessage`, which the
-  page shares; an unexpected fault (any
-  other exception except a cancellation) becomes a `Failed` result with a generic message; neither stops the others. A
-  duplicate id (someone took it a moment ago) is retried with the next suffix, up to five times. The same range and
-  selection that already exists is an `AlreadyFiled` result. Each review gets the due date of its own request or, when
-  that is null, `defaultDueDate`; the date is passed to `CreateFromSessionAsync` in the `SessionReviewRequest`, so the
-  rule of `ReviewService` (not before today, not more than two years ahead, `DueDateInvalid`) applies, and a refused
-  date fails that request only, with the message of the rule.
+  access failure (which may carry what git printed) is replaced by the fixed sentence `GitAccessFailedMessage`, which
+  the page shares; an unexpected fault (any other exception except a cancellation) becomes a `Failed` result with a
+  generic message; neither stops the others. A duplicate id (someone took it a moment ago) is retried with the next
+  suffix, up to five times. The same range and selection that already exists is an `AlreadyFiled` result. Each review
+  gets the due date of its own request or, when that is null, `defaultDueDate`; the date is passed to
+  `CreateFromSessionAsync` in the `SessionReviewRequest`, so the rule of `ReviewService` (not before today, not more
+  than two years ahead, `DueDateInvalid`) applies, and a refused date fails that request only, with the message of the
+  rule.
 
 **GenerateId** (internal): Makes the review id of a set: characters other than letters, digits, `.`, and `_` become `-`,
 runs of `-` collapse, a leading character that is not a letter or a digit and trailing `-`, `.`, and `_` are removed, an
@@ -106,14 +106,14 @@ Problems that stop a plan are `DomainRuleException` values: `ProjectNotFound`, `
 `RepositoryDisabled`, `RevisionInvalid`, `RevisionNotFound`, the git rules, `ReviewSetConfigMissing`, and
 `ReviewSetConfigInvalid`. A problem with one set is a `CannotPlan` row; a problem with one request of a batch is a
 `Failed` result. Domain rule violations are turned into rows and results with their message, except a git access failure
-of a request: its message may carry the first line git printed (a location, for example), so the result carries the fixed
-sentence `GitAccessFailedMessage` ("The repository could not be read.") instead; the other rules, such as a git timeout,
-keep their fixed messages. Any other exception that
-is not a cancellation, for example a database error, becomes a `Failed` result of that request with a generic message
-that carries no exception text; nothing is created for that request, and the results of the other requests stay.
-A cancellation propagates. A null argument is `ArgumentNullException`, a baseline mode that is not defined is
-`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-reviewed mode), and
-a batch with too many requests is `ArgumentException`.
+of a request: its message may carry the first line git printed (a location, for example), so the result carries the
+fixed sentence `GitAccessFailedMessage` ("The repository could not be read.") instead; the other rules, such as a git
+timeout, keep their fixed messages. Any other exception that is not a cancellation, for example a database error,
+becomes a `Failed` result of that request with a generic message that carries no exception text; nothing is created for
+that request, and the results of the other requests stay. A cancellation propagates. A null argument is
+`ArgumentNullException`, a baseline mode that is not defined is `ArgumentOutOfRangeException` (checked before anything
+is read, so it can never be taken for the last-reviewed mode), and a batch with too many requests is
+`ArgumentException`.
 
 #### Limitations
 

@@ -37,7 +37,7 @@ keeps state and is not thread-safe; one instance verifies one chain.
 **AuditEntry**: one entry of the trail; immutable once created.
 
 | Field | Type | Meaning |
-| ----- | ---- | ------- |
+| --- | --- | --- |
 | `Sequence` | `long` | Position in the chain; the first entry is 1; there are no gaps |
 | `TimestampUtc` | `DateTimeOffset` | When the entry was recorded, in UTC |
 | `ActorUserId` | `int?` | The acting user when the actor is a known user; otherwise `null` |
@@ -73,7 +73,7 @@ The hash is SHA-256 over a canonical byte encoding of the entry, written as 64 l
 encoding (version 1) writes these fields in this fixed order:
 
 | No. | Field | Encoding |
-| --- | ----- | -------- |
+| --- | --- | --- |
 | 1 | Domain separator | string `ReviewCenter.Audit.v1` |
 | 2 | `Sequence` | 8 bytes, signed, big-endian |
 | 3 | `TimestampUtc` | its UTC ticks, 8 bytes, signed, big-endian |
