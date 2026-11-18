@@ -67,7 +67,8 @@ command, but the variable is easier because it applies to `start` and to all the
 - `check <sel>`, `uncheck <sel>`: set a checkbox.
 - `upload <sel> <file>`: attach a file to a file input.
 - `mouse-move <x> <y>`, `mouse-click <x> <y>`: mouse by page coordinates.
-- `wait <sel or text=...> [--timeout <ms>]`: wait for an element or text (default 5000 ms).
+- `wait <sel or text=...> [--timeout <ms>]`: wait for an element or text, then until the Blazor circuit is
+  interactive (default 5000 ms each).
 - `text [sel]`: text of an element, or of the whole page.
 - `snapshot`: visible interactive elements with tag, role, name, test id, and enabled/checked state (max 200).
 - `screenshot <file.png> [--full] [--selector <sel>]`: PNG of the viewport, the full page, or one element.

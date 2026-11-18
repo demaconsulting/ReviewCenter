@@ -23,7 +23,7 @@ using Microsoft.Playwright;
 namespace DemaConsulting.ReviewCenter.Puppeting.Tests;
 
 /// <summary>
-///     Unit tests for the launch-failure message and URL resolution of <see cref="PuppetBrowser"/>.
+///     Unit tests for the launch-failure message, URL resolution, timeout, and waits of <see cref="PuppetBrowser"/>.
 /// </summary>
 public class PuppetBrowserTests
 {
@@ -61,5 +61,77 @@ public class PuppetBrowserTests
         Assert.Equal("http://127.0.0.1:5199/about", PuppetBrowser.ResolveUrl("about", baseUrl + "/"));
         Assert.Equal("https://example.com/x", PuppetBrowser.ResolveUrl("https://example.com/x", baseUrl));
         Assert.Throws<PuppetingException>(() => PuppetBrowser.ResolveUrl("/about", null));
+    }
+
+    /// <summary>
+    ///     Test that a wait for an element that is already on a page whose live connection is not up yet also waits
+    ///     for the page's interactive marker, because the live connection renders that element again.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task PuppetBrowser_WaitForAsync_ElementOnPageNotYetInteractive_WaitsForTheMarker()
+    {
+        // Arrange: a page with the element and a marker that becomes true a moment later
+        await using var browser = await StartOrSkipAsync(PuppetBrowser.DefaultTimeoutMs);
+        await browser.EvalAsync(
+            "document.body.innerHTML = '<main data-interactive=\"false\"><p data-testid=\"item\">x</p></main>';" +
+            "setTimeout(() => document.querySelector('main').setAttribute('data-interactive', 'true'), 500)");
+
+        // Act
+        await browser.WaitForAsync("item");
+
+        // Assert: the wait returned only once the page was interactive
+        Assert.Equal("\"true\"", await browser.EvalAsync("document.querySelector('main').getAttribute('data-interactive')"));
+    }
+
+    /// <summary>
+    ///     Test that the timeout given at the start applies to a wait for an element that never appears.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task PuppetBrowser_WaitForAsync_StartTimeoutAndMissingElement_FailsAfterThatTimeout()
+    {
+        // Arrange: a browser with a short timeout
+        await using var browser = await StartOrSkipAsync(300);
+
+        // Act
+        var failure = await Assert.ThrowsAsync<PuppetingException>(() => browser.WaitForAsync("missing"));
+
+        // Assert: the message names the timeout of the start and the selector
+        Assert.Equal("wait timed out after 300ms (selector not found or not actionable): missing", failure.Message);
+    }
+
+    /// <summary>
+    ///     Test that a timeout that is not a positive number is refused before a browser is launched.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task PuppetBrowser_StartAsync_TimeoutNotPositive_Throws()
+    {
+        // Act and assert: zero and a negative timeout are refused with a message that names the timeout
+        var zero = await Assert.ThrowsAsync<PuppetingException>(() => PuppetBrowser.StartAsync(null, timeoutMs: 0));
+        Assert.Contains("timeout", zero.Message, StringComparison.Ordinal);
+        await Assert.ThrowsAsync<PuppetingException>(() => PuppetBrowser.StartAsync(null, timeoutMs: -1));
+    }
+
+    /// <summary>
+    ///     Starts a browser without a base URL; a missing Chromium is a skip locally and a failure where it is required.
+    /// </summary>
+    /// <param name="timeoutMs">The timeout of the browser.</param>
+    /// <returns>The browser.</returns>
+    private static async Task<PuppetBrowser> StartOrSkipAsync(float timeoutMs)
+    {
+        try
+        {
+            return await PuppetBrowser.StartAsync(null, timeoutMs: timeoutMs);
+        }
+        catch (PuppetingException ex) when (ex.Message.Contains("Chromium", StringComparison.Ordinal))
+        {
+            Assert.False(
+                string.Equals(Environment.GetEnvironmentVariable("REVIEWCENTER_REQUIRE_CHROMIUM"), "true", StringComparison.OrdinalIgnoreCase),
+                $"REVIEWCENTER_REQUIRE_CHROMIUM is true but Chromium is unavailable: {ex.Message}");
+            Assert.Skip(ex.Message);
+            throw;
+        }
     }
 }

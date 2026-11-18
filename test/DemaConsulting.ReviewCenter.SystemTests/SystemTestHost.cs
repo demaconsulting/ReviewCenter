@@ -54,6 +54,13 @@ internal static class SystemTestHost
     internal const string UserPassword = "correct horse battery";
 
     /// <summary>
+    ///     The timeout of a browser action or wait in milliseconds. A step waits for the server, for example a save
+    ///     followed by the next page and its live connection, which on a busy CI runner can take longer than the
+    ///     library's fail-fast default.
+    /// </summary>
+    internal const float BrowserTimeoutMs = 15000;
+
+    /// <summary>
     ///     Starts a browser for a server; a missing Chromium is a skip locally and a failure where Chromium is required.
     /// </summary>
     /// <param name="url">The base URL of the server.</param>
@@ -62,7 +69,7 @@ internal static class SystemTestHost
     {
         try
         {
-            return await PuppetBrowser.StartAsync(url, "1280x800");
+            return await PuppetBrowser.StartAsync(url, "1280x800", timeoutMs: BrowserTimeoutMs);
         }
         catch (PuppetingException ex) when (ex.Message.Contains("Chromium", StringComparison.Ordinal))
         {
