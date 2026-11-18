@@ -31,8 +31,9 @@ namespace DemaConsulting.ReviewCenter.Puppeting;
 ///     resolved by <see cref="SelectorResolver"/>, so a plain name means a <c>data-testid</c>. Playwright keeps the
 ///     mouse position on the page, so a hover stays in effect until the next mouse operation. There are no fixed
 ///     sleeps: after a navigation the page's own <c>data-interactive</c> marker is awaited, and the caller uses
-///     <see cref="WaitForAsync"/> after asynchronous updates. Every anticipated failure (a missing element, a timeout,
-///     a browser that cannot start) is a <see cref="PuppetingException"/> with a one-line message.
+///     <see cref="WaitForAsync"/> after asynchronous updates, which also awaits the marker, because the element can be
+///     on the server-rendered snapshot that the live connection replaces. Every anticipated failure (a missing
+///     element, a timeout, a browser that cannot start) is a <see cref="PuppetingException"/> with a one-line message.
 /// </remarks>
 public sealed class PuppetBrowser : IAsyncDisposable
 {
@@ -44,7 +45,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <summary>
     ///     The default timeout of an action in milliseconds; short so a bad selector fails fast.
     /// </summary>
-    private const float ActionTimeoutMs = 5000;
+    public const float DefaultTimeoutMs = 5000;
 
     /// <summary>
     ///     The most buffered console/page/request events; the oldest are dropped.
@@ -86,6 +87,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     private readonly IPlaywright _playwright;
     private readonly IBrowser _browser;
     private readonly string? _baseUrl;
+    private readonly float _timeoutMs;
     private readonly List<string> _events = [];
 
     /// <summary>
@@ -99,12 +101,13 @@ public sealed class PuppetBrowser : IAsyncDisposable
     private IBrowserContext _context = null!;
     private IPage _page = null!;
 
-    private PuppetBrowser(IPlaywright playwright, IBrowser browser, string? baseUrl, ViewportSize viewport)
+    private PuppetBrowser(IPlaywright playwright, IBrowser browser, string? baseUrl, ViewportSize viewport, float timeoutMs)
     {
         _playwright = playwright;
         _browser = browser;
         _baseUrl = baseUrl;
         _viewport = viewport;
+        _timeoutMs = timeoutMs;
     }
 
     /// <summary>
@@ -113,17 +116,37 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <param name="baseUrl">The base URL for relative <see cref="GotoAsync"/> paths, or <c>null</c>.</param>
     /// <param name="viewport">The viewport as <c>WxH</c>.</param>
     /// <param name="headed">Whether to show the browser window.</param>
+    /// <param name="timeoutMs">
+    ///     The timeout of every action, wait, and interactive-marker wait in milliseconds; a slow machine needs a longer
+    ///     one than the default, which favors failing fast.
+    /// </param>
     /// <returns>The browser; disposing it closes Chromium.</returns>
-    /// <exception cref="PuppetingException">Thrown when the viewport is not valid or the browser cannot be launched.</exception>
-    public static async Task<PuppetBrowser> StartAsync(string? baseUrl, string viewport = DefaultViewport, bool headed = false)
+    /// <exception cref="PuppetingException">
+    ///     Thrown when the viewport or timeout is not valid or the browser cannot be launched.
+    /// </exception>
+    public static async Task<PuppetBrowser> StartAsync(
+        string? baseUrl,
+        string viewport = DefaultViewport,
+        bool headed = false,
+        float timeoutMs = DefaultTimeoutMs)
     {
         var (width, height) = ParseViewport(viewport);
+        if (!(timeoutMs > 0))
+        {
+            throw new PuppetingException($"The timeout must be a positive number of milliseconds, not {Text(timeoutMs)}.");
+        }
+
         var playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
         try
         {
             browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = !headed });
-            var result = new PuppetBrowser(playwright, browser, baseUrl?.TrimEnd('/'), new ViewportSize { Width = width, Height = height });
+            var result = new PuppetBrowser(
+                playwright,
+                browser,
+                baseUrl?.TrimEnd('/'),
+                new ViewportSize { Width = width, Height = height },
+                timeoutMs);
             await result.NewPageAsync();
             return result;
         }
@@ -366,15 +389,29 @@ public sealed class PuppetBrowser : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Waits until an element is on the page.
+    ///     Waits until an element is on the page and the page, when it has a <c>data-interactive</c> marker, is
+    ///     interactive.
     /// </summary>
+    /// <remarks>
+    ///     After a click that leads to another page, the element can first appear on the server-rendered snapshot,
+    ///     which the live connection then renders again; waiting for the marker as well means that the element found
+    ///     afterwards is the live one, so an action on it is not lost and its handle is not detached by that render.
+    /// </remarks>
     /// <param name="selector">The selector; a plain name is a test identifier.</param>
-    /// <param name="timeoutMs">The longest wait in milliseconds, or <c>null</c> for the default action timeout.</param>
-    /// <returns>A task that completes when the element is there.</returns>
+    /// <param name="timeoutMs">The longest wait in milliseconds for each, or <c>null</c> for the default action timeout.</param>
+    /// <returns>A task that completes when the element is there and the page is interactive.</returns>
     public Task WaitForAsync(string selector, float? timeoutMs = null)
     {
-        var timeout = timeoutMs ?? ActionTimeoutMs;
-        return ActAsync("wait", [selector], () => Find(selector).First.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }), timeout);
+        var timeout = timeoutMs ?? _timeoutMs;
+        return ActAsync(
+            "wait",
+            [selector],
+            async () =>
+            {
+                await Find(selector).First.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
+                await WaitInteractiveAsync(timeout);
+            },
+            timeout);
     }
 
     /// <summary>
@@ -384,7 +421,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The text, truncated after 8000 characters.</returns>
     public Task<string> TextAsync(string? selector = null)
     {
-        return RunAsync("text", selector is null ? [] : [selector], ActionTimeoutMs, async () =>
+        return RunAsync("text", selector is null ? [] : [selector], _timeoutMs, async () =>
         {
             var text = selector is null ? await _page.InnerTextAsync("body") : await Find(selector).InnerTextAsync();
             return text.Length > MaxText ? $"{text[..MaxText]}\n... truncated at {MaxText} characters" : text;
@@ -397,7 +434,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The list.</returns>
     public Task<string> SnapshotAsync()
     {
-        return RunAsync("snapshot", [], ActionTimeoutMs, () => _page.EvaluateAsync<string>(SnapshotScript));
+        return RunAsync("snapshot", [], _timeoutMs, () => _page.EvaluateAsync<string>(SnapshotScript));
     }
 
     /// <summary>
@@ -409,7 +446,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The path and size.</returns>
     public Task<string> ScreenshotAsync(string file, bool fullPage = false, string? selector = null)
     {
-        return RunAsync("screenshot", [file], ActionTimeoutMs, async () =>
+        return RunAsync("screenshot", [file], _timeoutMs, async () =>
         {
             if (selector is not null)
             {
@@ -460,7 +497,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The JSON text of the value; <c>null</c> for undefined.</returns>
     public Task<string> EvalAsync(string expression)
     {
-        return RunAsync("eval", [expression], ActionTimeoutMs, async () =>
+        return RunAsync("eval", [expression], _timeoutMs, async () =>
             await _page.EvaluateAsync<string?>("e => JSON.stringify(window.eval(e))", expression) ?? "null");
     }
 
@@ -592,12 +629,14 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <summary>
     ///     Waits for a Blazor Server page's live connection, so a click is not lost on static HTML.
     /// </summary>
+    /// <param name="timeoutMs">The longest wait in milliseconds, or <c>null</c> for the default action timeout.</param>
     /// <returns>A task that completes when the page is interactive (or has no such marker).</returns>
-    private async Task WaitInteractiveAsync()
+    private async Task WaitInteractiveAsync(float? timeoutMs = null)
     {
         if (await _page.Locator("[data-interactive]").CountAsync() > 0)
         {
-            await _page.Locator("[data-interactive='true']").First.WaitForAsync();
+            await _page.Locator("[data-interactive='true']").First.WaitForAsync(
+                new LocatorWaitForOptions { Timeout = timeoutMs ?? _timeoutMs });
         }
     }
 
@@ -636,11 +675,11 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <param name="operation">The name of the operation, for the message.</param>
     /// <param name="args">The arguments of the operation, for the message.</param>
     /// <param name="action">The operation.</param>
-    /// <param name="timeoutMs">The timeout of the operation, for the message.</param>
+    /// <param name="timeoutMs">The timeout of the operation, for the message, or <c>null</c> for the default action timeout.</param>
     /// <returns>A task that completes when the operation has finished.</returns>
-    private static Task ActAsync(string operation, string[] args, Func<Task> action, float timeoutMs = ActionTimeoutMs)
+    private Task ActAsync(string operation, string[] args, Func<Task> action, float? timeoutMs = null)
     {
-        return RunAsync(operation, args, timeoutMs, async () =>
+        return RunAsync(operation, args, timeoutMs ?? _timeoutMs, async () =>
         {
             await action();
             return true;
@@ -683,7 +722,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     /// <returns>The result.</returns>
     private Task<T> QueryAsync<T>(string function, string argument)
     {
-        return RunAsync("eval", [argument], ActionTimeoutMs, () => _page.EvaluateAsync<T>(function, argument));
+        return RunAsync("eval", [argument], _timeoutMs, () => _page.EvaluateAsync<T>(function, argument));
     }
     private void Record(string text)
     {
@@ -705,7 +744,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
         _events.Clear();
         _reported = 0;
         _context = await _browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = _viewport, ColorScheme = _scheme });
-        _context.SetDefaultTimeout(ActionTimeoutMs);
+        _context.SetDefaultTimeout(_timeoutMs);
         _context.SetDefaultNavigationTimeout(30000);
         _page = await _context.NewPageAsync();
         _page.Console += (_, m) => { if (m.Type == "error") { Record($"console.error: {m.Text}"); } };
