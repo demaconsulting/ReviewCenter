@@ -120,6 +120,12 @@ internal sealed class GitRunner
     ///     The git executable: <c>git</c>, found through <c>PATH</c>, unless a test names another.
     /// </summary>
     private readonly string _executable;
+
+    /// <summary>
+    ///     The clock that the time limit of a call runs on; the system clock unless a test supplies its own.
+    /// </summary>
+    private readonly TimeProvider _time;
+
     /// <summary>
     ///     Whether the git version was checked successfully.
     /// </summary>
@@ -143,11 +149,26 @@ internal sealed class GitRunner
     /// <param name="executable">The name or path of the git executable. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
     internal GitRunner(GitOptions options, string executable)
+        : this(options, executable, TimeProvider.System)
+    {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="GitRunner"/> class that starts another executable and runs
+    ///     the time limit of a call on another clock, so tests can pass the limit at a moment of their choosing.
+    /// </summary>
+    /// <param name="options">The git settings. Must not be null.</param>
+    /// <param name="executable">The name or path of the git executable. Must not be null.</param>
+    /// <param name="time">The clock of the time limit. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    internal GitRunner(GitOptions options, string executable, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(executable);
+        ArgumentNullException.ThrowIfNull(time);
         _options = options;
         _executable = executable;
+        _time = time;
     }
 
     /// <summary>
@@ -474,8 +495,8 @@ internal sealed class GitRunner
         }
 
         process.StandardInput.Close();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(_options.Timeout);
+        using var limit = new CancellationTokenSource(_options.Timeout, _time);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, limit.Token);
         var exceeded = false;
         var outputTask = ReadOutputAsync(process.StandardOutput.BaseStream, maxOutputBytes, () =>
         {

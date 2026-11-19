@@ -15,6 +15,8 @@ and by the non-shipping Puppet tool only and is not part of the distributed Revi
 - Navigation to a URL and waiting for load
 - Locator-based actions: click, hover, fill, and reading element text, with a configurable timeout
 - Mouse movement and clicks by coordinates, key presses, and color-scheme emulation
+- Viewport sizes and touch-screen emulation (a browser context with touch and mobile emulation, whose CSS `hover`
+  media feature is `none`), and evaluating JavaScript in the page to read computed styles and the layout
 - Page screenshots, including full-page and single-element screenshots
 - The `playwright.ps1` installation script that downloads the Chromium build once per machine
 

@@ -56,8 +56,9 @@ most five suffixes are tried when a create is refused as a duplicate.
      a review made when the paths of the set were different does not count);
      `NothingToReview` when no selected file changed, or none matches; otherwise `WillCreate`. The head listing serves
      the full reviews and is released first; then the group of each baseline is classified before the next list is
-     loaded, so only one change list (up to the size limit of a listing) is held at a time. The rows keep the order
-     of the file.
+     loaded, so only one change list (up to the size limit of a listing) is held at a time. This bounds the memory of
+     a plan that spans many baselines; it is a design property, not a requirement, and no test inspects what the
+     garbage collector still holds. The rows keep the order of the file.
 - *Baseline choice*: With `None` there is no baseline, and with `Explicit` it is the given commit, for every set. With
   `LastReviewed` the planner looks, among the reviews of the same repository and set, for the approved ones and takes
   the one signed last (latest signature time; ties go to the later creation). A review is approved when

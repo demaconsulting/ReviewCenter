@@ -22,7 +22,6 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -545,7 +544,7 @@ public class AppTests : InboxWebTestBase
     }
 
     /// <summary>
-    ///     Test that a navigation that still reaches a layout that was disposed does nothing.
+    ///     Test that a navigation after the layout was disposed does nothing.
     /// </summary>
     [Fact]
     public async Task MainLayout_Navigate_DisposedLayout_DoesNothing()
@@ -557,12 +556,10 @@ public class AppTests : InboxWebTestBase
         var layout = Render<MainLayout>();
         layout.Instance.Dispose();
         Time.Advance(TimeSpan.FromSeconds(31));
-        var handler = typeof(MainLayout).GetMethod(
-            "OnLocationChanged",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
 
-        // Act: the navigation event is raised on the disposed layout anyway
-        handler.Invoke(layout.Instance, [null, new LocationChangedEventArgs("http://localhost/projects", false)]);
+        // Act: the user navigates after the layout is gone
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/projects");
+        await layout.InvokeAsync(() => { });
 
         // Assert: nothing was read
         Assert.Equal(1, users.Lookups);
@@ -581,11 +578,9 @@ public class AppTests : InboxWebTestBase
         SignInAs("ann", "Ann", false);
         var layout = Render<MainLayout>();
         Time.Advance(TimeSpan.FromSeconds(31));
-        var handler = typeof(MainLayout).GetMethod(
-            "OnLocationChanged",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var navigation = Services.GetRequiredService<NavigationManager>();
 
-        // Act: the renderer is busy while the navigation arrives, so the refresh is queued; the layout is disposed before
+        // Act: the renderer is busy while the user navigates, so the refresh is queued; the layout is disposed before
         // the queue runs
         using var started = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -597,7 +592,7 @@ public class AppTests : InboxWebTestBase
             }),
             TestContext.Current.CancellationToken);
         started.Wait(TestContext.Current.CancellationToken);
-        handler.Invoke(layout.Instance, [null, new LocationChangedEventArgs("http://localhost/projects", false)]);
+        navigation.NavigateTo("/projects");
         layout.Instance.Dispose();
         release.Set();
         await busy;

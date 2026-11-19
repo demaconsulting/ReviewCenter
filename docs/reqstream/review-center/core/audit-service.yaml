@@ -511,12 +511,14 @@ sections:
 
       - id: ReviewCenter-AuditService-Filter-ActionList
         title: >-
-          The AuditService class shall keep a list of the known actions that matches the actions the code records.
+          The AuditService class shall keep one list of the known actions, from which the audit filter offers its
+          choices and accepts its values.
         justification: |
-          The list of actions lets the page offer the choices, and the test that scans the sources keeps the list
-          from drifting away from what is really recorded.
+          The list of actions lets the page offer the choices. That the list matches the actions the code records is
+          a property of the source, kept by a lint check of the product sources (lint.ps1) rather than by a test.
         tests:
-          - AuditActions_All_MatchesTheActionsTheSourcesRecord
+          - AuditActions_Prefixes_AreTheGroupsOfTheActions
+          - AuditActions_IsKnown_AcceptsOnlyListedValues
 
       - id: ReviewCenter-AuditService-Filter-ActionListOrder
         title: >-

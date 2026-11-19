@@ -236,13 +236,14 @@ sections:
 
       - id: ReviewCenter-SelectionMatcher-Bounded
         title: >-
-          The SelectionMatcher class shall decide a path of 60 segments against a pattern of 40 double-star segments in
-          at most five seconds.
+          The SelectionMatcher class shall decide whether a path of 60 segments matches a pattern of 40 double-star
+          segments.
         justification: |
           Patterns are typed by users. A pattern that makes matching take exponential time would let one request
-          stop the server.
+          stop the server, and would never give an answer. How the work grows with the number of segments is a
+          design property, recorded in the SelectionMatcher design and measured by the opt-in benchmarks.
         tests:
-          - SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly
+          - SelectionMatcher_IsMatch_ManyDoubleStars_DecidesNoMatch
 
       - id: ReviewCenter-SelectionMatcher-Compatibility
         title: >-

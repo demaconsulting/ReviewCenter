@@ -42,8 +42,9 @@ N/A - standard test environment (a temporary database and key folder are created
 - A review's details are built for the actor of the token with the same masking rule as the pages: a token that is
   neither the owner of a handed-in slot nor in a review with a single slot or a concluded review gets `masked` true, no
   failed or answered count, no check threads in the counts, no disputed or failed wording, no `outcome`, and no
-  `conclusionText`; the thread kind appears only as counts, and the allow list and the source scan of
-  `ApiEndpointsMaskingTests.cs` pin the shape and that no read is made without the actor.
+  `conclusionText`; the thread kind appears only as counts, and the allow list of `ApiEndpointsMaskingTests.cs` pins
+  the shape. That no read is made without the actor is a property of the source, checked by `lint.ps1` and not by a
+  test.
 - A review in the details and the list shows `outcome` (`Approved` or `Rejected`) only when it is concluded; the
   details show `conclusionText` only when the review is concluded and not masked, even though a text can be stored
   earlier.
@@ -212,12 +213,6 @@ can appear without a deliberate change. This scenario is tested by
 **ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged**: A request without a token is a 401 and the token of a user
 who is no member of the project is a 404, as before. This scenario is tested by
 `ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged`.
-
-**ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail**: An allow-list scan of the source of the endpoints finds
-that every read of the approval, the threads, and the consolidated checklist passes the actor as its first argument,
-and that the removed viewer-less checklist read does not come back. It guards the masking requirement of the unit: a
-read without an actor could not mask. This scenario is tested by
-`ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail`.
 
 **ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote**: Both ballots fail the first check. The
 token of a member who has not handed in a ballot gets a body with no check identifier and no word "Rejected", a next

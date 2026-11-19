@@ -301,7 +301,7 @@ the blocker sentences), the people a review waits on, the overdue rule, the last
 grouped read), the access of members, auditors, and strangers, and the constant number of reads for 300 reviews. They
 are tested by `ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`,
 `ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`, and
-`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
+`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce`.
 
 **Follow-up review**: The unit tests of `ReviewService`, `FollowUpCarry`, `RecordDigest`, `ChecklistService`, and
 `SigningService` verify the subsystem requirement for the follow-up review: the Pass and not-applicable answers, the

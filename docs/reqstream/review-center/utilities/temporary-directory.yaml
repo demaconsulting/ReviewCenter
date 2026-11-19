@@ -119,13 +119,14 @@ sections:
 
       - id: ReviewCenter-TemporaryDirectory-BoundedRetry-Default
         title: >-
-          The TemporaryDirectory class shall by default keep retrying a delete that fails for at least a quarter of a
-          second and for less than three seconds before it gives up.
+          The TemporaryDirectory class shall by default try a delete that keeps failing five times, with a pause of
+          75 milliseconds between two attempts, before it gives up.
         justification: |
           The default pause and number of attempts are small, so that the total wait is long enough for a scanner to
-          let go and short enough that a cleanup never holds up a run noticeably.
+          let go and short enough that a cleanup never holds up a run noticeably. The resulting total wait (about
+          0.3 seconds) is a design property recorded in the TemporaryDirectory design.
         tests:
-          - TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime
+          - TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_TriesFiveTimesWithShortPauses
 
       - id: ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
         title: >-
@@ -136,7 +137,7 @@ sections:
           folder into a leftover for the operating system's temporary cleanup instead of a failure of work that was
           already done.
         tests:
-          - TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime
+          - TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingAfterTheAttempts
 
       - id: ReviewCenter-TemporaryDirectory-BoundedRetry-NoFinalPause
         title: >-

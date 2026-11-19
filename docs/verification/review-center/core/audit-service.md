@@ -33,8 +33,9 @@ N/A - standard test environment.
   never returns an entry without a project; an invalid filter (a text that is too long, From after To) is refused with
   `AuditFilterInvalid` before the store is called; texts are trimmed and an empty text means no condition; the day
   range starts at the start of the From day and ends at the start of the day after To.
-- The vocabulary of `AuditActions` is sorted, has no duplicates, every action has a known group, and the list equals the
-  set of action codes that the product sources record, so a new action that is not added to the list fails a test.
+- The vocabulary of `AuditActions` is sorted, has no duplicates, every action has a known group, and the lookups accept
+  only the listed actions and groups. That the list equals the set of action codes that the product sources record is
+  a property of the source, checked by the lint gate (`lint.ps1`, "source rules") and not by a test.
 - Verification of an untouched trail is intact and reads in batches; an empty trail is intact; a tampered entry in a
   later batch is reported with its sequence.
 - The export writes the entries that match the filter once, in ascending sequence order, in batches of 500 (a trail of
@@ -192,11 +193,6 @@ the start of the day after the To day, so the end day is included. This scenario
 **AuditActions_All_IsSortedUniqueAndWellFormed**: The list of actions is sorted, has no duplicate, and every action is
 written as a group, a dot, and a name. This scenario is tested by `AuditActions_All_IsSortedUniqueAndWellFormed`,
 `AuditActions_Prefixes_AreTheGroupsOfTheActions`, and `AuditActions_IsKnown_AcceptsOnlyListedValues`.
-
-**AuditActions_All_MatchesTheActionsTheSourcesRecord**: The action codes found in the product sources equal the list,
-so a
-new action that is not listed fails the test. This scenario is tested by
-`AuditActions_All_MatchesTheActionsTheSourcesRecord`.
 
 **AuditService_VerifyAsync_UntouchedTrail_IsIntactAndReadInBatches**: A trail larger than a batch verifies and the store
 was read in more than one batch. This scenario is tested by

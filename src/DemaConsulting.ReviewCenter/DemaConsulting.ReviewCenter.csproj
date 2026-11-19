@@ -92,6 +92,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Tests" />
+    <!-- The opt-in benchmarks measure the internal storage units directly (see benchmarks/README.md) -->
+    <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Benchmarks" />
   </ItemGroup>
 
 </Project>

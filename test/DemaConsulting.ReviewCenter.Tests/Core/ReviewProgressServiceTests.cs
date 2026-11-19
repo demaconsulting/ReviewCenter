@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 
@@ -1070,11 +1069,12 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
-    ///     Test that the progress of a project with many reviews reads the audit trail once and finishes in a loose
-    ///     time bound, so the overview does not grow into one query per review.
+    ///     Test that the progress of a project with many reviews reads the audit trail once, so the overview does not
+    ///     grow into one query per review. How long the answer takes is a design property measured by the opt-in
+    ///     benchmarks, not by this test.
     /// </summary>
     [Fact]
-    public async Task ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast()
+    public async Task ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce()
     {
         // Arrange: 300 reviews, a third with a slot, over an audit store that counts the last activity reads
         CountingAuditStore? counting = null;
@@ -1089,16 +1089,13 @@ public partial class ReviewProgressServiceTests
             }
         }
 
-        // Act: read the progress and time it
-        var watch = Stopwatch.StartNew();
+        // Act: read the progress
         var all = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, TestContext.Current.CancellationToken);
-        watch.Stop();
 
-        // Assert: every review is there, one read of the activity, and a loose time bound (not a benchmark)
+        // Assert: every review is there, and the activity was read once for all of them
         Assert.Equal(300, all.Count);
         Assert.Equal(100, all.Count(p => p.Stage == ReviewStage.InReview));
         Assert.Equal(1, counting!.LastActivityCalls);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"Took {watch.Elapsed}");
     }
 
     /// <summary>

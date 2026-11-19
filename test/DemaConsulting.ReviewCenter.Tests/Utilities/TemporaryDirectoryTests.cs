@@ -64,29 +64,28 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
-    ///     Test that a directory created with the parameterless constructor keeps retrying a delete that fails for at
-    ///     least a quarter of a second and for less than three seconds before it gives up.
+    ///     Test that a directory created with the default retry policy tries a delete that keeps failing five times,
+    ///     with a pause of 75 ms between two attempts and none after the last, and then gives up.
     /// </summary>
     [Fact]
-    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime()
+    public void TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_TriesFiveTimesWithShortPauses()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for the whole test in a directory with the default policy
-        using var directory = new TemporaryDirectory();
+        // Arrange: a file that stays open for the whole test in a directory with the default policy, whose pauses
+        // are recorded instead of waited for
+        var pauses = new PauseRecorder();
+        using var directory = new TemporaryDirectory(pauses.Pause);
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
-        // Act: dispose and measure how long it takes
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        // Act: dispose while the file is held
         var exception = Record.Exception(directory.Dispose);
-        watch.Stop();
 
-        // Assert: nothing is thrown, the wait lasted at least a quarter of a second and is bounded below three seconds
+        // Assert: nothing is thrown, the directory is left, and five attempts were made with four pauses of 75 ms
         Assert.Null(exception);
         Assert.True(Directory.Exists(directory.DirectoryPath));
-        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(250), $"Gave up too early: {watch.Elapsed}");
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+        Assert.Equal(Enumerable.Repeat(TimeSpan.FromMilliseconds(75), 4), pauses.Pauses);
 
         // Cleanup: release the file and remove what is left
         stream.Dispose();
@@ -209,66 +208,53 @@ public class TemporaryDirectoryTests
     }
 
     /// <summary>
-    ///     Test that Dispose retries while a file is locked for a short time and then removes the directory. Without
-    ///     the retry the single attempt fails, the directory stays and this test fails.
+    ///     Test that Dispose retries while a file is locked and then removes the directory. The file is released
+    ///     during the first pause, so the first attempt always fails and only a retry can remove the directory.
     /// </summary>
     [Fact]
-    public async Task TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory()
+    public void TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for about 100 ms, while the directory retries every 50 ms for up to 2 s; the
-        // generous bound keeps the test stable on a machine that is busy, and only a delete that never retries fails it.
-        // A dedicated thread releases the file, so a starved thread pool cannot delay the release past the retries
-        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50));
-        var path = directory.GetFilePath("locked.txt");
-        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        // Arrange: a file that stays open until the first pause between two delete attempts
+        FileStream? locked = null;
+        var pauses = new PauseRecorder(onFirstPause: () => locked!.Dispose(), wait: true);
+        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50), pauses.Pause);
         var directoryPath = directory.DirectoryPath;
-        var release = Task.Factory.StartNew(
-            () =>
-            {
-                // A timed wait on a gate that is never set pauses this dedicated thread for about 100 ms
-                using var gate = new ManualResetEventSlim(false);
-                gate.Wait(TimeSpan.FromMilliseconds(100));
-                stream.Dispose();
-            },
-            TestContext.Current.CancellationToken,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
+        locked = new FileStream(directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
         // Act: dispose while the file is still open
         var exception = Record.Exception(directory.Dispose);
-        await release;
+        locked.Dispose();
 
-        // Assert: the retry outlasted the lock and the whole directory is gone
+        // Assert: the first attempt failed, a retry followed the pause, and the whole directory is gone
         Assert.Null(exception);
+        Assert.NotEmpty(pauses.Pauses);
         Assert.False(Directory.Exists(directoryPath));
     }
 
     /// <summary>
-    ///     Test that a file that stays locked makes Dispose give up after the configured attempts, without throwing
-    ///     and without waiting longer than the attempts and pauses allow.
+    ///     Test that a file that stays locked makes Dispose give up after the configured attempts, without throwing,
+    ///     with one pause between two attempts.
     /// </summary>
     [Fact]
-    public void TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime()
+    public void TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingAfterTheAttempts()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a file that stays open for the whole test and an explicit policy of 3 attempts, 50 ms apart
-        using var directory = new TemporaryDirectory(3, TimeSpan.FromMilliseconds(50));
+        var pauses = new PauseRecorder();
+        using var directory = new TemporaryDirectory(3, TimeSpan.FromMilliseconds(50), pauses.Pause);
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
-        // Act: dispose and measure how long it takes
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        // Act: dispose while the file is held
         var exception = Record.Exception(directory.Dispose);
-        watch.Stop();
 
-        // Assert: nothing is thrown, the pauses were really taken (2 x 50 ms) and the wait stays bounded
+        // Assert: nothing is thrown, the directory is left, and the three attempts had two pauses between them
         Assert.Null(exception);
         Assert.True(Directory.Exists(directory.DirectoryPath));
-        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(80), $"Gave up too early: {watch.Elapsed}");
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+        Assert.Equal([TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(50)], pauses.Pauses);
 
         // Cleanup: release the file and remove what is left
         stream.Dispose();
@@ -304,18 +290,18 @@ public class TemporaryDirectoryTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a locked file and a policy of one attempt with a long pause that must never be taken
-        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
+        var pauses = new PauseRecorder();
+        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30), pauses.Pause);
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
         // Act: dispose
-        var watch = System.Diagnostics.Stopwatch.StartNew();
         var exception = Record.Exception(directory.Dispose);
-        watch.Stop();
 
-        // Assert: it returned at once
+        // Assert: the one attempt failed quietly and no pause was asked for
         Assert.Null(exception);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Paused after the last attempt: {watch.Elapsed}");
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+        Assert.Empty(pauses.Pauses);
 
         // Cleanup
         stream.Dispose();

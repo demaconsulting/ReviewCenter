@@ -171,6 +171,17 @@ dotnet run --project src/DemaConsulting.ReviewCenter \
   --configuration Release --framework net10.0 --no-build -- --validate
 ```
 
+#### Benchmarks
+
+Performance and memory properties are design properties: the design documents record them and the opt-in benchmarks
+in `benchmarks/` measure them; no requirement-linked test asserts a wall-clock time. The benchmarks never run as part
+of `dotnet test` or the CI build; see `benchmarks/README.md`:
+
+```bash
+# Run all benchmarks (Release mode is required)
+dotnet run -c Release --project benchmarks/DemaConsulting.ReviewCenter.Benchmarks -- --filter '*'
+```
+
 ### Regenerating the API snapshot
 
 The OpenAPI description of the API is kept in `docs/api/openapi.json`, and a test fails when the generated description

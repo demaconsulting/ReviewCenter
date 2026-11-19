@@ -142,23 +142,22 @@ public class SelectionMatcherTests
     }
 
     /// <summary>
-    ///     Test that a pattern with many double stars is matched in bounded time (no exponential backtracking).
+    ///     Test that a pattern with many double stars is decided against a deep path that it does not match. Matching
+    ///     with exponential backtracking would not end; the test timeout turns that into a failure.
     /// </summary>
-    [Fact]
-    public void SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly()
+    [Fact(Timeout = 60000)]
+    public async Task SelectionMatcher_IsMatch_ManyDoubleStars_DecidesNoMatch()
     {
         // Arrange: a worst-case pattern against a deep path that does not match
         var patterns = SelectionMatcher.Parse(string.Join("/", Enumerable.Repeat("**", 40)) + "/never.cs");
         var path = string.Join("/", Enumerable.Repeat("d", 60)) + "/x.cs";
 
-        // Act: match under a time limit
-        var timer = System.Diagnostics.Stopwatch.StartNew();
-        var matched = SelectionMatcher.IsMatch(path, patterns);
-        timer.Stop();
+        // Act: match on a worker, so that a match that never ends cannot block the test past its timeout
+        var matched = await Task.Run(() => SelectionMatcher.IsMatch(path, patterns), TestContext.Current.CancellationToken)
+            .WaitAsync(TestContext.Current.CancellationToken);
 
-        // Assert: no match, found quickly
+        // Assert: the path is decided, and does not match
         Assert.False(matched);
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(5), $"Matching took {timer.Elapsed}.");
     }
 
     /// <summary>

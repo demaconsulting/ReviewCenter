@@ -54,6 +54,9 @@ The following topics are out of scope:
   configuration
 - The Puppet command-line tool (`tools/puppet/`) is a non-shipping tool that lets AI agents drive the web interface;
   like other test tooling it is verified by its automated tests and is not part of the system design
+- The opt-in benchmarks (`benchmarks/`) measure design properties (how the time of an operation grows with its input)
+  that the design documents record; they are developer tooling, not requirement evidence, and not part of the system
+  design
 - Subsystems of the target architecture that are not implemented yet have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
@@ -150,6 +153,7 @@ implemented.
     - **SelfTest/** - self-validation subsystem
     - **Utilities/** - shared utilities subsystem
   - **DemaConsulting.ReviewCenter.Core/** - source of the Core subsystem, in a project of its own (see below)
+- **benchmarks/** - opt-in BenchmarkDotNet benchmarks of design properties, never run by the tests (see its README)
 - **tools/** - development tools that are not distributed
   - **puppet/** - source of the Puppet command-line tool for AI agents (not part of the system design)
   - **puppet.Tests/** - tests of the Puppet command-line tool

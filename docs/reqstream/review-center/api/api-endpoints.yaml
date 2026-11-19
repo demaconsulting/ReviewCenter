@@ -94,10 +94,10 @@ sections:
           The pages hide the answers of the other reviewers until a reviewer has handed in their own ballot, so that a
           reviewer is not swayed. A script with a token is a second way to read the same review, and a token that is
           not masked would hand the standing to anyone who can create a token, so the API follows the rules of the
-          pages and fails closed, and a scan of the source that every read names the actor guards this.
+          pages and fails closed. A lint check of the source (lint.ps1) also keeps every read of the endpoints naming
+          the actor.
         tests:
           - ApiEndpoints_GetReview_TokenNonSubmitterMultiSlot_HidesFailedDisputeBlockersAndCheckThreads
-          - ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail
 
       - id: ReviewCenter-ApiEndpoints-Masking-LeadOrOwner
         title: >-

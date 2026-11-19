@@ -54,6 +54,11 @@ internal sealed class TemporaryDirectory : IDisposable
     private readonly TimeSpan _retryDelay;
 
     /// <summary>
+    ///     Waits between two attempts; <see cref="Thread.Sleep(TimeSpan)"/> unless a test supplies its own.
+    /// </summary>
+    private readonly Action<TimeSpan> _pause;
+
+    /// <summary>
     ///     Gets the full path of the temporary directory.
     /// </summary>
     public string DirectoryPath { get; }
@@ -66,7 +71,22 @@ internal sealed class TemporaryDirectory : IDisposable
     ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
     /// </exception>
     public TemporaryDirectory()
-        : this(DefaultDeleteAttempts, DefaultRetryDelay)
+        : this(Thread.Sleep)
+    {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="TemporaryDirectory"/> class with the default retry policy and
+    ///     its own way of pausing between attempts; it exists so that tests can observe the default pauses.
+    /// </summary>
+    /// <param name="pause">Called with <see cref="DefaultRetryDelay"/> for every pause. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="pause"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the directory cannot be created because of an <see cref="IOException"/>,
+    ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
+    /// </exception>
+    internal TemporaryDirectory(Action<TimeSpan> pause)
+        : this(DefaultDeleteAttempts, DefaultRetryDelay, pause)
     {
     }
 
@@ -84,11 +104,34 @@ internal sealed class TemporaryDirectory : IDisposable
     ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
     /// </exception>
     internal TemporaryDirectory(int deleteAttempts, TimeSpan retryDelay)
+        : this(deleteAttempts, retryDelay, Thread.Sleep)
+    {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="TemporaryDirectory"/> class with its own retry policy and its
+    ///     own way of pausing between attempts; it exists so that tests can observe the pauses, and act during them,
+    ///     instead of measuring the time a disposal takes.
+    /// </summary>
+    /// <param name="deleteAttempts">How many times <see cref="Dispose"/> tries to delete the directory; at least 1.</param>
+    /// <param name="retryDelay">The pause between two attempts; not negative.</param>
+    /// <param name="pause">Called with <paramref name="retryDelay"/> for every pause. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="pause"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     Thrown when <paramref name="deleteAttempts"/> is less than 1 or <paramref name="retryDelay"/> is negative.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the directory cannot be created because of an <see cref="IOException"/>,
+    ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
+    /// </exception>
+    internal TemporaryDirectory(int deleteAttempts, TimeSpan retryDelay, Action<TimeSpan> pause)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(deleteAttempts, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(retryDelay, TimeSpan.Zero);
+        ArgumentNullException.ThrowIfNull(pause);
         _deleteAttempts = deleteAttempts;
         _retryDelay = retryDelay;
+        _pause = pause;
         DirectoryPath = PathHelpers.SafePathCombine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
         try
@@ -169,7 +212,7 @@ internal sealed class TemporaryDirectory : IDisposable
                 // Wait for the lock to go away, except after the last attempt, which gives up quietly
                 if (attempt < _deleteAttempts)
                 {
-                    Thread.Sleep(_retryDelay);
+                    _pause(_retryDelay);
                 }
             }
         }

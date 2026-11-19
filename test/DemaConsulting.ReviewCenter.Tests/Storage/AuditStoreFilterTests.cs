@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Diagnostics;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.Data.Sqlite;
@@ -382,11 +381,12 @@ public class AuditStoreFilterTests
     }
 
     /// <summary>
-    ///     Test that a filtered page of a larger trail is read quickly and that the page size bounds the rows
-    ///     returned (the read never needs a count).
+    ///     Test that a filtered page of a larger trail holds only matching entries, newest first, and never more than
+    ///     the page size (the read never needs a count). How long the read takes is a design property measured by the
+    ///     opt-in benchmarks, not by this test.
     /// </summary>
     [Fact]
-    public async Task AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded()
+    public async Task AuditStore_ListAsync_LargeTrail_FilteredPagesAreBounded()
     {
         // Arrange: 3,000 entries over 3 projects, 5 actors and 4 actions, each a minute apart
         using var db = new TestStore();
@@ -402,19 +402,16 @@ public class AuditStoreFilterTests
             ProjectId: 2, ActorText: "actor 1", ActionPrefix: "review.", From: new DateOnly(2025, 3, 4), To: new DateOnly(2025, 3, 6));
 
         // Act
-        var watch = Stopwatch.StartNew();
         var page = await db.Audit.ListAsync(filter, null, null, 50, TestContext.Current.CancellationToken);
         var older = await db.Audit.ListAsync(filter, page[^1].Sequence, null, 1, TestContext.Current.CancellationToken);
         var action = await db.Audit.ListAsync(
             new AuditFilter(Action: "user.created"), null, null, 200, TestContext.Current.CancellationToken);
-        watch.Stop();
 
-        // Assert: a loose bound, only to catch a read that scans and sorts the whole trail repeatedly
+        // Assert: each page holds only matching entries, newest first, and no more than its size
         Assert.True(page.Count is > 0 and <= 50);
         Assert.All(page, e => Assert.True(e.ProjectId == 2 && e.ActorName == "Actor 1"));
         Assert.True(page.Zip(page.Skip(1)).All(pair => pair.First.Sequence > pair.Second.Sequence));
         Assert.True(older.Count <= 1);
         Assert.Equal(200, action.Count);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(15), $"Reads took {watch.Elapsed}.");
     }
 }

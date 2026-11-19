@@ -39,40 +39,105 @@ public class ReviewMarkConfigParserTests
         new ReviewMarkConfigParser().Parse(Encoding.UTF8.GetBytes(text));
 
     /// <summary>
-    ///     Finds the root of the repository by looking for the solution file above the test output folder.
+    ///     A complete ReviewMark configuration in the shape that repositories use: comments, the needs-review,
+    ///     evidence-source and context keys, per-set context with exclusions, and paths quoted and plain.
     /// </summary>
-    /// <returns>The root folder.</returns>
-    private static string FindRoot()
-    {
-        var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "DemaConsulting.ReviewCenter.slnx")))
-        {
-            folder = folder.Parent;
-        }
-
-        return folder?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
-    }
+    private const string FullConfiguration = """
+        ---
+        # ReviewMark Configuration File
+        needs-review:
+          - "README.md"                   # Root README file
+          - "**/*.cs"                     # All C# source and test files
+          - "docs/reqstream/**/*.yaml"
+          - "!**/obj/**"                  # Exclude build output
+        evidence-source:
+          type: url
+          location: https://example.com/reviews/index.json
+        context:
+          - docs/design/introduction.md
+        reviews:
+          # Purpose
+          - id: Purpose
+            title: Review of user-facing capabilities and system promises
+            context:
+              - "!docs/design/introduction.md"
+            paths:
+              - "README.md"
+              - "docs/user_guide/**/*.md"
+          - id: Decomposition
+            title: Review that the Decomposition Addresses the Stated Purpose
+            context:
+              - README.md
+            paths:
+              - requirements.yaml
+              - docs/design/introduction.md
+          - id: Tool-Architecture
+            title: Review of the tool architecture
+            paths: ["docs/design/tool.md", "docs/reqstream/tool.yaml"]
+          - id: Tool-Design
+            title: 'Review of the tool design: every subsystem'
+            paths:
+              - "docs/design/tool/**/*.md"
+          - id: Tool-Verification
+            title: Review of the tool verification
+            paths:
+              - "docs/verification/**/*.md"
+          - id: Tool-Core
+            title: Review of the Core subsystem
+            context:
+              - docs/design/tool.md
+            paths:
+              - "src/**/Core/*.cs"
+              - "test/**/Core/*Tests.cs"
+          - id: Tool-Core-Parser
+            title: Review of the Parser unit
+            paths:
+              - "src/**/Core/Parser.cs"
+              - "!src/**/Core/Parser.Generated.cs"
+          - id: Tool-Storage
+            title: Review of the Storage subsystem
+            paths:
+              - src/**/Storage/*.cs
+          - id: Tool-Web
+            title: "Review of the Web subsystem"
+            paths:
+              - "src/**/Web/**/*.razor"
+              - "src/**/Web/**/*.cs"
+          - id: Tool-Cli
+            title: Review of the command line
+            paths:
+              - "src/**/Cli/*.cs"
+          - id: OTS-Software
+            title: Review of the OTS software
+            paths:
+              - "docs/reqstream/ots/*.yaml"
+        """;
 
     /// <summary>
-    ///     Test that the review-sets of this repository's own ReviewMark configuration are read, each with a selection
-    ///     that the selection matcher accepts, in file order with unique ids.
+    ///     Test that the review-sets of a complete ReviewMark configuration are read, each with a selection that the
+    ///     selection matcher accepts, in file order with unique ids, while its other keys are ignored.
     /// </summary>
     [Fact]
-    public void ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet()
+    public void ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet()
     {
-        // Arrange: the real file, which also has needs-review, evidence-source and context keys
-        var bytes = File.ReadAllBytes(Path.Combine(FindRoot(), ".reviewmark.yaml"));
+        // Arrange: a complete configuration, which also has needs-review, evidence-source and context keys
+        var bytes = Encoding.UTF8.GetBytes(FullConfiguration);
 
         // Act: parse it
         var sets = new ReviewMarkConfigParser().Parse(bytes);
 
-        // Assert: many sets, unique ids, usable selections, and the first set as written in the file
-        Assert.True(sets.Count > 10);
-        Assert.Equal(sets.Count, sets.Select(set => set.Id).Distinct(StringComparer.Ordinal).Count());
+        // Assert: every set in file order, unique ids, usable selections, and the sets as written in the file
+        Assert.Equal(
+            ["Purpose", "Decomposition", "Tool-Architecture", "Tool-Design", "Tool-Verification", "Tool-Core",
+                "Tool-Core-Parser", "Tool-Storage", "Tool-Web", "Tool-Cli", "OTS-Software"],
+            sets.Select(set => set.Id));
         Assert.All(sets, set => Assert.NotEmpty(SelectionMatcher.Parse(string.Join('\n', set.Paths))));
-        Assert.Equal("Purpose", sets[0].Id);
         Assert.Equal("Review of user-facing capabilities and system promises", sets[0].Title);
         Assert.Equal(["README.md", "docs/user_guide/**/*.md"], sets[0].Paths);
+        Assert.Equal(["docs/design/tool.md", "docs/reqstream/tool.yaml"], sets[2].Paths);
+        Assert.Equal("Review of the tool design: every subsystem", sets[3].Title);
+        Assert.Equal(["src/**/Core/Parser.cs", "!src/**/Core/Parser.Generated.cs"], sets[6].Paths);
+        Assert.Equal("Review of the Web subsystem", sets[8].Title);
     }
 
     /// <summary>

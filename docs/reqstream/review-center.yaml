@@ -645,7 +645,6 @@ sections:
           - ReviewCenter-Core-Progress
           - ReviewCenter-Core-Progress-Reopened
           - ReviewCenter-Core-Progress-Performance
-          - ReviewCenter-Core-Progress-Bound
           - ReviewCenter-Core-Progress-GivenList
           - ReviewCenter-Core-Progress-Arguments
           - ReviewCenter-Web-Progress

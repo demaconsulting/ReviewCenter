@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -677,9 +676,10 @@ public class GitRunnerTests
     }
 
     /// <summary>
-    ///     Test that a call that never finishes is stopped at the time limit with the timeout error.
+    ///     Test that a call that never finishes is stopped at the time limit with the timeout error, and returns: the
+    ///     test fails at its own timeout if the call keeps waiting for git after the limit.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 120000)]
     public async Task GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit()
     {
         // Arrange: a server that accepts connections and never answers, and a one-second limit
@@ -708,12 +708,10 @@ public class GitRunnerTests
             CancellationToken.None);
         var runner = new GitRunner(Options(cache.Path, 1));
         var access = new RepositoryAccess(1, "slow", $"http://127.0.0.1:{port}/r.git", null, null);
-        var timer = Stopwatch.StartNew();
 
         // Act: list the remote refs
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => runner.RunAsync(["ls-remote", access.Location], access, 1024, TestContext.Current.CancellationToken));
-        timer.Stop();
         await stop.CancelAsync();
         listener.Stop();
         await acceptLoop;
@@ -722,23 +720,24 @@ public class GitRunnerTests
             client.Dispose();
         }
 
-        // Assert: the timeout rule is named and the call ended soon after the limit
+        // Assert: the call returned with the timeout rule, which only the time limit raises
         Assert.Equal(DomainRule.GitTimeout, exception.Rule);
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(30), $"The call took {timer.Elapsed}.");
     }
 
     /// <summary>
     ///     Writes a fake git into a folder that answers <c>--version</c> like a supported git until a flag file
-    ///     exists. After that every call writes a line to <c>parent.beat</c> every second, and starts a child program
-    ///     that writes a line to <c>child.beat</c> every second, and never ends by itself.
+    ///     exists. After that every call starts a child program and never ends by itself; the fake git holds
+    ///     <c>parent.lock</c> open and the child holds <c>child.lock</c> open for as long as they run, so a test sees
+    ///     from the lock files that each has started and that each has ended.
     /// </summary>
-    /// <param name="folder">The folder for the scripts and the beat files.</param>
+    /// <param name="folder">The folder for the scripts and the lock files.</param>
     /// <returns>The path of the fake git program.</returns>
     private static async Task<string> WriteHangingFakeGitAsync(string folder)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         if (OperatingSystem.IsWindows())
         {
+            // A redirected call keeps its output file open until the call returns, which it never does
             var git = Path.Combine(folder, "hanging-git.cmd");
             await File.WriteAllTextAsync(
                 git,
@@ -748,22 +747,25 @@ public class GitRunnerTests
                 + "exit /b 0\r\n"
                 + ")\r\n"
                 + "start \"\" /b \"%~dp0child.cmd\"\r\n"
-                + ":loop\r\n"
-                + "echo x>>\"%~dp0parent.beat\"\r\n"
+                + "call :hold >\"%~dp0parent.lock\"\r\n"
+                + "exit /b 0\r\n"
+                + ":hold\r\n"
                 + "ping -n 2 127.0.0.1 >nul\r\n"
-                + "goto loop\r\n",
+                + "goto hold\r\n",
                 cancellationToken);
             await File.WriteAllTextAsync(
                 Path.Combine(folder, "child.cmd"),
                 "@echo off\r\n"
-                + ":loop\r\n"
-                + "echo x>>\"%~dp0child.beat\"\r\n"
+                + "call :hold >\"%~dp0child.lock\"\r\n"
+                + "exit /b 0\r\n"
+                + ":hold\r\n"
                 + "ping -n 2 127.0.0.1 >nul\r\n"
-                + "goto loop\r\n",
+                + "goto hold\r\n",
                 cancellationToken);
             return git;
         }
 
+        // flock takes the same lock that a .NET FileShare.None open asks for, and keeps it until the shell ends
         var script = Path.Combine(folder, "hanging-git.sh");
         await File.WriteAllTextAsync(
             script,
@@ -774,20 +776,18 @@ public class GitRunnerTests
             + "exit 0\n"
             + "fi\n"
             + "\"$d/child.sh\" &\n"
-            + "while true; do\n"
-            + "echo x >> \"$d/parent.beat\"\n"
-            + "sleep 1\n"
-            + "done\n",
+            + "exec 9>\"$d/parent.lock\"\n"
+            + "flock 9\n"
+            + "while true; do sleep 1; done\n",
             cancellationToken);
         var child = Path.Combine(folder, "child.sh");
         await File.WriteAllTextAsync(
             child,
             "#!/bin/sh\n"
             + "d=\"$(dirname \"$0\")\"\n"
-            + "while true; do\n"
-            + "echo x >> \"$d/child.beat\"\n"
-            + "sleep 1\n"
-            + "done\n",
+            + "exec 9>\"$d/child.lock\"\n"
+            + "flock 9\n"
+            + "while true; do sleep 1; done\n",
             cancellationToken);
         var mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
         File.SetUnixFileMode(script, mode);
@@ -796,57 +796,103 @@ public class GitRunnerTests
     }
 
     /// <summary>
-    ///     Runs a call over the hanging fake git until the time limit stops it, then shows that the program that
-    ///     writes the given beat file is gone: it had written before the stop, and it writes nothing afterwards.
+    ///     Tells whether a running program holds a lock file of the fake git.
     /// </summary>
-    /// <param name="beatFile">The name of the beat file of the program that must be gone.</param>
-    /// <returns>A task that completes when the check is done.</returns>
-    private static async Task AssertStoppedAfterTimeoutAsync(string beatFile)
+    /// <param name="path">The lock file.</param>
+    /// <returns><c>true</c> when the file exists and cannot be opened exclusively.</returns>
+    private static bool IsHeld(string path)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Polls a condition until it holds. The limit only ends a test that fails; a passing test returns as soon
+    ///     as the condition holds.
+    /// </summary>
+    /// <param name="condition">The condition.</param>
+    /// <returns><c>true</c> when the condition held before the limit.</returns>
+    private static async Task<bool> EventuallyAsync(Func<bool> condition)
+    {
+        var limit = DateTime.UtcNow.AddMinutes(1);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > limit)
+            {
+                return false;
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Runs a call over the hanging fake git, waits until the fake git and its child have both started, passes
+    ///     the time limit on the clock of the runner, and shows that the program that holds the given lock file is
+    ///     gone afterwards.
+    /// </summary>
+    /// <param name="lockFile">The name of the lock file of the program that must be gone.</param>
+    /// <param name="cancellationToken">The token of the test, cancelled at its timeout.</param>
+    /// <returns>A task that completes when the check is done.</returns>
+    private static async Task AssertStoppedAfterTimeoutAsync(string lockFile, CancellationToken cancellationToken)
+    {
+        // Arrange: the fake git behind a runner whose time limit runs on a clock that only the test moves
         using var folder = new TempFolder();
         var git = await WriteHangingFakeGitAsync(folder.Path);
-        var runner = new GitRunner(Options(folder.Path, 2), git);
+        var clock = new Messaging.StepClock();
+        var runner = new GitRunner(Options(folder.Path, 2), git, clock);
         await runner.CheckVersionAsync(cancellationToken);
         await File.WriteAllTextAsync(Path.Combine(folder.Path, "hang.flag"), "hang", cancellationToken);
+        var parentLock = Path.Combine(folder.Path, "parent.lock");
+        var childLock = Path.Combine(folder.Path, "child.lock");
+        var timers = clock.TimersCreated;
 
-        // Act: run a call that never ends, so that the time limit stops it
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => runner.RunAsync(["status"], null, 1024, cancellationToken));
-        var beat = new FileInfo(Path.Combine(folder.Path, beatFile));
-        await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        beat.Refresh();
-        var afterStop = beat.Exists ? beat.Length : -1;
-        await Task.Delay(TimeSpan.FromMilliseconds(2500), cancellationToken);
-        beat.Refresh();
-        var later = beat.Exists ? beat.Length : -1;
+        // Act: start a call that never ends, wait until both programs run, then pass the time limit
+        var call = runner.RunAsync(["status"], null, 1024, cancellationToken);
+        Assert.True(await EventuallyAsync(() => IsHeld(parentLock) && IsHeld(childLock)), "The fake git did not start.");
+        await clock.WaitForTimersAsync(timers + 1);
+        await clock.AdvanceAsync(TimeSpan.FromSeconds(2), expectPass: false);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => call);
 
-        // Assert: the call ended with the timeout rule, the program was running before the stop and writes no more
+        // Assert: the call ended with the timeout rule, and the program released its lock because it ended
         Assert.Equal(DomainRule.GitTimeout, exception.Rule);
-        Assert.True(afterStop > 0, $"The program of {beatFile} did not run before the stop.");
-        Assert.Equal(afterStop, later);
+        var path = Path.Combine(folder.Path, lockFile);
+        Assert.True(await EventuallyAsync(() => !IsHeld(path)), $"The program that holds {lockFile} is still running.");
     }
 
     /// <summary>
-    ///     Test that the git program of a call that exceeds the time limit is really gone afterwards: a fake git
-    ///     that writes a line every second writes nothing more after the call was stopped.
+    ///     Test that the git program of a call that exceeds the time limit is really gone afterwards: the lock file
+    ///     that the fake git holds while it runs is released after the call was stopped.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 180000)]
     public async Task GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself()
     {
-        // Arrange, act and assert: the call ends with the timeout rule and the fake git writes nothing more
-        await AssertStoppedAfterTimeoutAsync("parent.beat");
+        // Arrange, act and assert: the call ends with the timeout rule and the fake git no longer runs
+        await AssertStoppedAfterTimeoutAsync("parent.lock", TestContext.Current.CancellationToken);
     }
 
     /// <summary>
-    ///     Test that a process that git started is also gone after a call exceeds the time limit: a child program
-    ///     of the fake git that writes a line every second writes nothing more after the call was stopped.
+    ///     Test that a process that git started is also gone after a call exceeds the time limit: the lock file that
+    ///     the child of the fake git holds while it runs is released after the call was stopped.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 180000)]
     public async Task GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess()
     {
-        // Arrange, act and assert: the call ends with the timeout rule and the child of the fake git writes nothing more
-        await AssertStoppedAfterTimeoutAsync("child.beat");
+        // Arrange, act and assert: the call ends with the timeout rule and the child of the fake git no longer runs
+        await AssertStoppedAfterTimeoutAsync("child.lock", TestContext.Current.CancellationToken);
     }
 
     /// <summary>

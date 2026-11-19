@@ -4429,7 +4429,8 @@ sections:
           The Web subsystem shall let a signed-in user comment on a line of either version of a diff.
         justification: |
           A comment belongs to the line that it is about, whether the line is in the old or the new version. The
-          subsystem tests guard the stylesheet rules that show the comment control.
+          subsystem tests check in a real browser that the comment control shows when it is needed and stays
+          readable.
         children:
           - ReviewCenter-ReviewPage-DiffComment
           - ReviewCenter-ReviewPage-DiffComment-Baseline
@@ -4440,8 +4441,8 @@ sections:
           - ReviewCenter-ReviewPage-DiffComment-Focus
           - ReviewCenter-ReviewPage-Diff-Hint
         tests:
-          - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
-          - WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill
+          - WebSubsystem_DiffView_LineCommentControl_ShowsOnHoverFocusAndTouch
+          - WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent
 
       - id: ReviewCenter-Web-DiffReview-CommentForm
         title: >-
@@ -4505,10 +4506,10 @@ sections:
         title: >-
           The Web subsystem shall keep a diff inside the width of a phone by stacking its two sides.
         justification: |
-          A page that scrolls sideways is hard to read on a phone. The subsystem test guards the stylesheet rules that
-          keep the code scrolling inside itself.
+          A page that scrolls sideways is hard to read on a phone. The subsystem test measures the rendered page at
+          the width of a phone in a real browser.
         tests:
-          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+          - WebSubsystem_DiffView_PhoneWidth_StacksSidesAndPageDoesNotScrollSideways
 
       - id: ReviewCenter-Web-DeepLinks
         title: >-
@@ -4516,7 +4517,7 @@ sections:
           page at that place.
         justification: |
           Review is a conversation between people, so a reviewer must be able to point a colleague at one file, one
-          line, or one thread by sending a link. The subsystem test guards the style of the link to a thread.
+          line, or one thread by sending a link. The subsystem test opens the addresses through the real pipeline.
         children:
           - ReviewCenter-ReviewPage-DeepLinks
           - ReviewCenter-ReviewPage-DeepLinks-Line
@@ -4533,7 +4534,8 @@ sections:
           - ReviewCenter-ReviewPage-DeepLinks-RoundTrip
           - ReviewCenter-ReviewPage-DeepLinks-LocalOnly
         tests:
-          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
+          - WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves
+          - WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt
 
       - id: ReviewCenter-Web-DeepLinks-AddressBar
         title: >-
@@ -4556,12 +4558,13 @@ sections:
         title: >-
           The Web subsystem shall show on every thread a link to its address.
         justification: |
-          A reviewer who wants to point a colleague at one thread needs the address at hand. The subsystem test guards
-          the style of the link to a thread.
+          A reviewer who wants to point a colleague at one thread needs the address at hand, as a control that looks
+          like the other actions of the thread.
         children:
           - ReviewCenter-ReviewPage-DeepLinks-ThreadLink
         tests:
-          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
+          - WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves
+          - WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt
 
       - id: ReviewCenter-Web-DeepLinks-ThreadLinkCopy
         title: >-

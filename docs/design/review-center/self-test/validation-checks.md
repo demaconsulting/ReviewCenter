@@ -7,7 +7,9 @@
 `ValidationChecks` is the set of checks that the self-validation runs. Each check proves one thing about the
 deployed tool by calling the real production code, on data that it creates itself in a temporary folder, so the
 default run is hermetic and fast: it never reads or changes the configured database or configuration, never binds
-the configured port, uses no network beyond the loopback interface, and needs neither Docker nor a browser.
+the configured port, uses no network beyond the loopback interface, and needs neither Docker nor a browser. Being fast
+is a design property, not a requirement: the whole default run is meant to take a few seconds, far below the
+60 second deadline of a single check, so that it can run on every build; this is not measured by a test.
 
 #### Data Model
 

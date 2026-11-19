@@ -32,8 +32,9 @@ N/A - standard test environment (the integration tests need git, and skip themse
   mode a set uses the head of the review that was approved last (a signed review that concluded as Rejected is not
   approved) when it is an ancestor of the new head and the selection is
   the same, and otherwise gets a full review with a note that says why.
-- Change lists are loaded once per distinct baseline and one at a time: the earlier list is no longer held when the
-  next one is requested, and the rows keep the order of the file.
+- Change lists are loaded once per distinct baseline, and the rows keep the order of the file. That only one list is
+  held at a time is a design property; it is not asserted, because what the garbage collector still holds is not
+  behavior of the planner.
 - A set with a review of the same head and baseline is `AlreadyFiled`; a set with no changed file, or at the head of its
   last approved review, is `NothingToReview`.
 - Creation uses one session, creates each review through the review service with its set identifier and the range title,
@@ -77,10 +78,10 @@ the set yet. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedOnl
 Rejected was signed after an approved review of the same set, the approved review is still the baseline. This scenario
 is tested by `ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline`.
 
-**ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder**: Four sets alternate between two
-last-approved baselines and the full head; the head and each baseline are listed once, no earlier change list is still
-alive when the next is requested, and the rows are in the order of the file with the changes of their own baseline. This
-scenario is tested by `ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder`.
+**ReviewPlanner_PlanAsync_SeveralBaselines_ListsOncePerBaselineAndKeepsRowOrder**: Four sets alternate between two
+last-approved baselines and the full head; the head and each baseline are listed once, and the rows are in the order of
+the file with the changes of their own baseline. This scenario is tested by
+`ReviewPlanner_PlanAsync_SeveralBaselines_ListsOncePerBaselineAndKeepsRowOrder`.
 
 **ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote**: A signed review whose head is not an ancestor
 gives a full review and a note about the rewritten history. This scenario is tested by

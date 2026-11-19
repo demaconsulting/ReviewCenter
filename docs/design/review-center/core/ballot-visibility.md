@@ -147,8 +147,8 @@ null list of entries. A viewer that is not known fails closed: the overloads tha
 as one who has not handed in, so that a caller that forgets the viewer hides more and never less. The checklist has no
 read without a viewer for the API: `GetConsolidatedAsync` requires one. The viewer-less overloads of the approval read
 (`SigningService.GetApprovalAsync` and `GetApprovalsAsync` without an actor) remain for system use that needs only
-verdict-free facts (concluded, approved, the digest, signature times), and the API never calls them (a source scan test
-pins that the endpoints pass the actor).
+verdict-free facts (concluded, approved, the digest, signature times), and the API never calls them (a lint check of
+the source, `lint.ps1`, pins that the endpoints pass the actor).
 Every other
 combination of arguments has a defined answer, and the services add no error of their own for masking.
 

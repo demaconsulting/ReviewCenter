@@ -1170,37 +1170,43 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the review page shows an auditor a diff with the read-only hint, offers no comment form even when
-    ///     a line selection is left in the page state, and that the page drops such a selection on a reload.
+    ///     Test that a line selection that a reviewer made with the enabled controls does not bring back a comment
+    ///     form once the reviewer has become an auditor: after the next reload of the page state the diff shows the
+    ///     read-only hint, disabled line controls, no selected line, and no comment form.
     /// </summary>
     [Fact]
     public async Task ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection()
     {
-        // Arrange: an auditor opens the modified file
+        // Arrange: a member with a reviewer slot (who answered the checklist, so the page offers a signature) opens
+        // the modified file and selects line 10 with its enabled + control
         var cancellationToken = TestContext.Current.CancellationToken;
         var projectId = await CreateReviewAsync();
-        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
-        await Store.AddMembershipAsync(auditor.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        var member = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        var slotId = await SeatAsync(projectId, "REV-1", "aud");
+        var memberActor = new Actor("aud", "Aud");
+        await AuditTestExtensions.AnswerAllAsync(Checklists, projectId, "REV-1", memberActor, cancellationToken);
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", memberActor, cancellationToken);
         SignInAs("aud", "Aud", UserRole.Reviewer);
         var cut = RenderPage(projectId);
         await SelectFileAsync(cut, ModPath);
+        await cut.Find("[data-testid='diff-comment-10']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.NotEmpty(cut.FindAll(".diff-row.selected"));
 
-        // Act: a line selection is left in the state (as a restored selection would), then the page renders
-        var start = typeof(ReviewPage).GetProperty("NewStartLine", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-        await cut.InvokeAsync(() =>
-        {
-            start.SetValue(cut.Instance, "10");
-            typeof(Microsoft.AspNetCore.Components.ComponentBase)
-                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                .Invoke(cut.Instance, null);
-        });
+        // Act: the member becomes an auditor, and the next action on the open page (a signature attempt with a wrong
+        // password) reloads the page state while the old selection is still there
+        await ChangeMemberRoleAsync(projectId, "aud", ProjectRole.Auditor);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync("not the password");
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
-        // Assert
+        // Assert: read-only hint, every line control disabled, the stale selection is no longer shown, and no form
         Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
-        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
-        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
         Assert.NotEmpty(cut.FindAll("[data-testid^='diff-comment-']"));
         Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+        Assert.Empty(cut.FindAll(".diff-row.selected"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
     }
 
     /// <summary>
@@ -1230,16 +1236,21 @@ public class ReviewPageDiffTests : PageTestBase
 
     /// <summary>
     ///     Test that a member whose role changes to auditor under the open page loses the comment form and the
-    ///     half-made comment as soon as the page reloads its state.
+    ///     half-made comment as soon as the page reloads its state after the next action, and that the comment does not
+    ///     come back when the role is restored and the same line is chosen again.
     /// </summary>
     [Fact]
     public async Task ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft()
     {
-        // Arrange: a member has the composer open on a line with a typed text
+        // Arrange: a member with a reviewer slot has the composer open on a line with a typed text
         var cancellationToken = TestContext.Current.CancellationToken;
         var projectId = await CreateReviewAsync();
         var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", cancellationToken);
         await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        var slotId = await SeatAsync(projectId, "REV-1", "mem");
+        var memberActor = new Actor("mem", "Mem");
+        await AuditTestExtensions.AnswerAllAsync(Checklists, projectId, "REV-1", memberActor, cancellationToken);
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", memberActor, cancellationToken);
         SignInAs("mem", "Mem", UserRole.Reviewer);
         var cut = RenderPage(projectId);
         await SelectFileAsync(cut, ModPath);
@@ -1248,32 +1259,18 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer']"));
         await ChangeMemberRoleAsync(projectId, "mem", ProjectRole.Auditor);
 
-        // Act: a reload of the page state (the refresh that follows every successful change)
-        var refresh = typeof(ReviewPage).GetMethod("RefreshAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-        await cut.InvokeAsync(async () =>
-        {
-            await (Task)refresh.Invoke(cut.Instance, null)!;
-            typeof(Microsoft.AspNetCore.Components.ComponentBase)
-                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                .Invoke(cut.Instance, null);
-        });
+        // Act: the member's next action on the open page (a signature attempt with a wrong password) reloads its state
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync("not the password");
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
-        // Assert: no form, no draft, and the hint is the read-only one
+        // Assert: no form, and the hint is the read-only one
         Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
         Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
         Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
-        var text = typeof(ReviewPage).GetProperty("NewText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-        Assert.Equal(string.Empty, text.GetValue(cut.Instance));
 
-        // Act: the role is restored, the page reloads again and the reader chooses the same line
+        // Act: the role is restored, the reader opens the file again and chooses the same line
         await ChangeMemberRoleAsync(projectId, "mem", ProjectRole.User);
-        await cut.InvokeAsync(async () =>
-        {
-            await (Task)refresh.Invoke(cut.Instance, null)!;
-            typeof(Microsoft.AspNetCore.Components.ComponentBase)
-                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                .Invoke(cut.Instance, null);
-        });
+        await SelectFileAsync(cut, ModPath);
         await cut.Find("[data-testid='diff-comment-9']").ClickAsync();
 
         // Assert: the form shows no text of the dropped draft

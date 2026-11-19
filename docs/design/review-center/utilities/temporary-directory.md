@@ -35,8 +35,11 @@ object files read-only and Windows refuses to delete such files. If a file is st
 a bounded number of times: by default 5 attempts with a pause of about 75 ms between two attempts, so a `Dispose`
 that cannot succeed returns after about 0.3 s. `IOException` and `UnauthorizedAccessException` of the last attempt
 are swallowed, because a cleanup failure must not turn finished work into a failure; calling it more than once is
-safe. An internal constructor takes the number of attempts (at least 1) and the pause (not negative) so that tests
-can use a short policy. The caller must stop everything that uses the directory (a web host, a database
+safe. Internal constructors take the number of attempts (at least 1), the pause (not negative), and the way to
+pause (`Thread.Sleep` in production), so that tests can use a short policy and observe the pauses that are asked for
+instead of measuring time. The total wait of about 0.3 s is a design property: it is long enough for a scanner to let
+go of a file and short enough not to hold up a run; it follows from the policy and is not measured by a test. The
+caller must stop everything that uses the directory (a web host, a database
 connection, a child process) before it disposes the directory; the retry only covers a lock that is released a
 moment later, such as the one of a virus scanner.
 

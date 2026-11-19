@@ -35,7 +35,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   matches `%`, `_`, and `\` literally; an action prefix matches literally; the day range includes the first instant of
   the From day and the last instant of the To day and excludes the instant before and the next day; the filtered
   pages follow the cursors over the matches only; a filter with a project never returns an entry without one; and a
-  filtered page of a trail of 3,000 entries is read within a loose time bound.
+  filtered page of a trail of 3,000 entries holds no more entries than requested.
 - The time of an entry is stored as fixed-width UTC text, whatever offset it was written with, and the chain still
   verifies; a database created now has the four indexes of the table.
 - The listing for a project returns only that project's entries, none of another project or without a project, and the
@@ -128,9 +128,10 @@ stored as fixed-width UTC text, read back as the same instants, and the chain ve
 the matching entries are visited, each once. This scenario is tested by
 `AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly`.
 
-**AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded**: A trail of 3,000 entries is filtered by project,
-actor, action, and dates; each page is no larger than requested and the read takes well under the loose bound. This
-scenario is tested by `AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded`.
+**AuditStore_ListAsync_LargeTrail_FilteredPagesAreBounded**: A trail of 3,000 entries is filtered by project,
+actor, action, and dates; each page holds only matching entries, newest first, and is no larger than requested. How
+long a page read takes is not measured here; it is a design property measured by the opt-in benchmarks. This scenario
+is tested by `AuditStore_ListAsync_LargeTrail_FilteredPagesAreBounded`.
 
 **AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence**: A database that is created now has the
 indexes on project and sequence, actor and sequence, and action and sequence. This scenario is tested by

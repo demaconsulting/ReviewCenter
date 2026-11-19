@@ -20,7 +20,6 @@
 
 using System.Net;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Evidence;
 using Microsoft.AspNetCore.Builder;
@@ -480,33 +479,6 @@ public class ApiEndpointsMaskingTests
     }
 
     /// <summary>
-    ///     Test that the endpoint code reads the approval, the check threads and the consolidated checklist only for
-    ///     the actor, never through a viewer-less overload (an allow-list scan of the source): every call of those
-    ///     reads passes the actor as its first argument, and the removed viewer-less checklist read does not come back.
-    /// </summary>
-    [Fact]
-    public void ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail()
-    {
-        // Arrange: the source of the API and the pattern of a call of a read that decides what a viewer may see
-        var root = FindRepositoryRoot();
-        var calls = new Regex(
-            @"\b(?<name>GetApprovalAsync|GetApprovalsAsync|GetConsolidatedAsync|GetForSystemAsync|Threads\.ListAsync|threads\.ListAsync)\(\s*(?<first>[^,)\s]+)",
-            RegexOptions.CultureInvariant);
-
-        // Act: find every call in the files of the API
-        var found = Directory.EnumerateFiles(Path.Combine(root, "src", "DemaConsulting.ReviewCenter", "Api"), "*.cs", SearchOption.AllDirectories)
-            .SelectMany(file => calls.Matches(File.ReadAllText(file)).Select(m => (File: Path.GetFileName(file), Name: m.Groups["name"].Value, First: m.Groups["first"].Value)))
-            .ToList();
-
-        // Assert: the reads are there, each for the actor; the removed system read is nowhere in the source
-        Assert.True(found.Count >= 3, "The scan found too few calls; the pattern is out of date.");
-        Assert.All(found, call => Assert.True(call.First == "actor", $"{call.File}: {call.Name} is called without the actor."));
-        var sources = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
-        Assert.DoesNotContain(sources, file => File.ReadAllText(file).Contains("GetForSystemAsync", StringComparison.Ordinal));
-    }
-
-    /// <summary>
     ///     Asserts that the blockers and the next step of a review mention no dispute, failure or rejection.
     /// </summary>
     /// <param name="review">The review details.</param>
@@ -659,20 +631,5 @@ public class ApiEndpointsMaskingTests
             await signing.SignAsync(
                 new Actor(user, user), projectId, ReviewId, slot.SlotId, approval.Digest, TestBrowser.Password, cancellationToken);
         }
-    }
-
-    /// <summary>
-    ///     Finds the root of the repository by its solution file.
-    /// </summary>
-    /// <returns>The folder of the repository.</returns>
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DemaConsulting.ReviewCenter.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
     }
 }

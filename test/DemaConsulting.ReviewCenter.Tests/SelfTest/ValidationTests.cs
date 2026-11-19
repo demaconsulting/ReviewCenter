@@ -362,7 +362,6 @@ public partial class ValidationTests
             Assert.Equal(DemaConsulting.TestResults.TestOutcome.Failed, outcome.Result.Outcome);
             Assert.Equal("Timed out after 0.1 s", outcome.Result.ErrorMessage);
             Assert.Contains("✗ ReviewCenter_Blocked - Failed", outcome.Line);
-            Assert.True(outcome.Result.Duration < TimeSpan.FromSeconds(5), $"Took {outcome.Result.Duration}");
         }
         finally
         {

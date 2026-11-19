@@ -360,7 +360,7 @@ sections:
         justification: |
           A read per review would make the overview slow exactly for the projects that most need one.
         tests:
-          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce
 
       # ---------------------------------------------------------------------------------------------------------------
       # ViewerRights: who may see the progress of a project, and in what standing
@@ -439,14 +439,6 @@ sections:
           projects that most need an overview.
         tests:
           - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch
-
-      - id: ReviewCenter-ReviewProgressService-Performance-Bound
-        title: >-
-          The ReviewProgressService class shall answer for a project with 300 reviews within ten seconds.
-        justification: |
-          The bound guards against one query per review and is not a benchmark.
-        tests:
-          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
 
       - id: ReviewCenter-ReviewProgressService-Performance-ReviewList
         title: >-

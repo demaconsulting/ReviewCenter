@@ -335,33 +335,25 @@ public class UtilitiesSubsystemTests
     ///     Test that a file that is released while the removal retries lets the whole directory be removed.
     /// </summary>
     [Fact]
-    public async Task UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved()
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file in a nested folder that stays open for about 100 ms, while the removal retries every 50 ms
-        // for up to 2 s; a dedicated thread releases the file so that a busy thread pool cannot delay the release
-        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50));
+        // Arrange: a file in a nested folder that stays open until the first pause between two removal attempts
+        FileStream? locked = null;
+        var pauses = new PauseRecorder(onFirstPause: () => locked!.Dispose(), wait: true);
+        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50), pauses.Pause);
         var directoryPath = directory.DirectoryPath;
-        var stream = new FileStream(
+        locked = new FileStream(
             directory.GetFilePath("nested/locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-        var release = Task.Factory.StartNew(
-            () =>
-            {
-                using var gate = new ManualResetEventSlim(false);
-                gate.Wait(TimeSpan.FromMilliseconds(100));
-                stream.Dispose();
-            },
-            TestContext.Current.CancellationToken,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
 
         // Act: dispose while the file is open
         var exception = Record.Exception(directory.Dispose);
-        await release;
+        locked.Dispose();
 
-        // Assert: the retry outlasted the lock and the whole directory is gone
+        // Assert: the removal was retried after the file was released and the whole directory is gone
         Assert.Null(exception);
+        Assert.NotEmpty(pauses.Pauses);
         Assert.False(Directory.Exists(directoryPath));
     }
 
@@ -392,25 +384,28 @@ public class UtilitiesSubsystemTests
     }
 
     /// <summary>
-    ///     Test that disposing a temporary directory while a file stays open stops waiting in less than three seconds.
+    ///     Test that disposing a temporary directory while a file stays open gives up after the bounded number of
+    ///     attempts of the default policy, without an error.
     /// </summary>
     [Fact]
-    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime()
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeGivesUpAfterBoundedAttempts()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
-        // Arrange: a file that stays open for the whole test
-        using var directory = new TemporaryDirectory();
+        // Arrange: a file that stays open for the whole test, in a directory with the default policy whose pauses
+        // are recorded instead of waited for
+        var pauses = new PauseRecorder();
+        using var directory = new TemporaryDirectory(pauses.Pause);
         using var stream = new FileStream(
             directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
-        // Act: dispose and measure how long it takes
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        directory.Dispose();
-        watch.Stop();
+        // Act: dispose while the file is held
+        var exception = Record.Exception(directory.Dispose);
 
-        // Assert: the wait is bounded
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+        // Assert: the removal stopped after the default attempts (one pause fewer than attempts), without an error
+        Assert.Null(exception);
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+        Assert.Equal(TemporaryDirectory.DefaultDeleteAttempts - 1, pauses.Pauses.Count);
 
         // Cleanup: release the file and remove what is left
         stream.Dispose();
@@ -426,17 +421,16 @@ public class UtilitiesSubsystemTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a file that stays open and a policy of one attempt with a pause that must never be taken
-        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
+        var pauses = new PauseRecorder();
+        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30), pauses.Pause);
         using var stream = new FileStream(
             directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
-        // Act: dispose and measure how long it takes
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        // Act: dispose
         directory.Dispose();
-        watch.Stop();
 
-        // Assert: it returned long before the pause
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Paused after the last attempt: {watch.Elapsed}");
+        // Assert: no pause was asked for after the only attempt
+        Assert.Empty(pauses.Pauses);
 
         // Cleanup: release the file and remove what is left
         stream.Dispose();

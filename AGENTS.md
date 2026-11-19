@@ -24,6 +24,7 @@
 │   ├── sysml2/
 │   ├── user_guide/
 │   └── verification/
+├── benchmarks/
 ├── src/
 │   └── DemaConsulting.ReviewCenter/
 ├── test/
@@ -113,22 +114,22 @@ Load only the standards relevant to your specific task scope.
 The files in `.github/standards/` are shared verbatim across repositories. This repository applies these accepted
 exceptions on top of them:
 
-## Existing Internals-Based Tests (`testing-principles.md`, "Assert Observable Behavior")
+## Tests Whose Contract Is a Runtime or Timing Observation (`testing-principles.md`, "Assert Observable Behavior")
 
-Some existing requirement-linked tests predate the "Assert Observable Behavior" rule and assert on things it now
-lists as off-limits:
+The rule lists garbage-collector reachability and timing among the things a test must not assert. These
+requirement-linked tests remain, because the observation is the contract itself and not a construction detail:
 
-- Wall-clock budgets and timing bounds (for example the retry/back-off tests in `Utilities/`, the elapsed-time
-  check in `SelfTest/ValidationTests.cs`, and the "completes within N seconds" checks in `GitRunnerTests`,
-  `AuditStoreFilterTests`, `ReviewProgressServiceTests`, `SelectionMatcherTests`, and `SelfTestSubsystemTests`)
-- Garbage-collector reachability (weak references and finalizers via `ForcedGarbageCollection`)
-- Private state through reflection (`Web/AppTests.cs` and `Web/ReviewPageDiffTests.cs`)
-- Text of checked-in repository files (source scans in `AuditActionsTests` and `ApiEndpointsMaskingTests`, the
-  repository `.reviewmark.yaml` in `ReviewMarkConfigParserTests`, and `wwwroot/app.css` in `WebSubsystemTests`)
+- `ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved` (`SelfTest/ValidationTests.cs`) forces
+  a collection through `ForcedGarbageCollection`: an unobserved task exception is only raised, through the public
+  `TaskScheduler.UnobservedTaskException` event, when the finalizer of the task runs, so the requirement that the
+  runner observes the exception of an abandoned check cannot be seen any other way. It can only miss a regression
+  (if the collector does not finalize the task), never fail on a correct runner.
+- `Validation_Run_SlowCheck_ReportsElapsedTime` and `Validation_Run_SlowCheck_RecordsDurationInResults`
+  (`SelfTest/ValidationTests.cs`) check that the reported time of a check that waits 150 ms is at least 140 ms: the
+  elapsed time is the output under test, and only a lower bound is asserted, which a slow machine cannot break.
 
-These tests are accepted as they are: do not rewrite them just to satisfy the rule, and do not weaken the shared
-standard. New tests MUST follow the rule; when one of these tests is next changed for another reason, prefer moving
-it to observable behavior.
+Everything else follows the rule: performance and memory properties are design properties, recorded in the design
+documents and measured by the opt-in benchmarks in `benchmarks/`. New tests MUST follow the rule.
 
 # Agent Delegation Guidelines
 

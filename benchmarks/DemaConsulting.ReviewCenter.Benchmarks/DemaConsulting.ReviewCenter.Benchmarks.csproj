@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Opt-in benchmarks of the design properties of ReviewCenter (how the time of an operation grows with its input).
+       They are developer tooling, not requirement evidence: not a test project, never run by 'dotnet test' or the CI
+       build, and excluded from ReviewMark. README.md beside this file says how to run them. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DemaConsulting.ReviewCenter.Benchmarks</AssemblyName>
+    <RootNamespace>DemaConsulting.ReviewCenter.Benchmarks</RootNamespace>
+
+    <!-- Developer tool only: never packed as a NuGet package -->
+    <IsPackable>false</IsPackable>
+
+    <!-- Code Quality Configuration -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Runtime Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj" />
+  </ItemGroup>
+
+  <!-- Code Analysis Dependencies -->
+  <ItemGroup>
+    <!-- Child-element form configures both PrivateAssets and IncludeAssets so the analyzers are fully
+         activated during the build without becoming transitive dependencies. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="11.0.100">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.36.0.15337">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

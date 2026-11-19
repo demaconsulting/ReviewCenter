@@ -83,6 +83,11 @@ for an actor and `(Action, Sequence)` for an action; each ends with `Sequence` s
 actor text and the date range are residual conditions on the entries that the other conditions and the cursor leave,
 and the page ends as soon as it is full.
 
+**Performance (design property).** Because the read walks an index in keyset order and stops when the page is full,
+the time of a page read does not grow with the length of the trail. This property is not a requirement and is not
+asserted by a test, whose timing would depend on the machine; it is measured by the opt-in `AuditStoreBenchmarks` in
+`benchmarks/DemaConsulting.ReviewCenter.Benchmarks`, which reads a filtered page from trails of different lengths.
+
 **Decision on the date range (the spike).** `AuditEntry.TimestampUtc` is a `DateTimeOffset`, which the EF Core SQLite
 provider stores as text with the offset, and it cannot translate a comparison of such a value (the query raises an
 `InvalidOperationException`); text with offsets would not sort or compare correctly in any case. The design therefore

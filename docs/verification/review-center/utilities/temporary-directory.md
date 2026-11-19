@@ -3,8 +3,11 @@
 #### Verification Approach
 
 `TemporaryDirectory` is verified with unit tests defined in `TemporaryDirectoryTests.cs`. The tests
-use the real file system under the system temporary path and the real `PathHelpers`; nothing is
-mocked. Each test disposes the directory it creates, so the tests leave nothing behind.
+use the real file system under the system temporary path and the real `PathHelpers`. The only
+stand-in is the pause between two delete attempts: the retry tests pass a recorder (`PauseRecorder`)
+through the internal constructor, so they observe the pauses that the policy asks for, and release a
+locked file during the first pause, instead of measuring how long a disposal takes. Each test
+disposes the directory it creates, so the tests leave nothing behind.
 
 #### Test Environment
 
@@ -26,9 +29,9 @@ the test still confirms that disposal never throws.
 - `Dispose` can be called twice without an exception (`Dispose-Repeated`).
 - `Dispose` retries a locked directory and removes it when the lock is released within the retry time
   (`BoundedRetry`).
-- The default retry policy keeps retrying a failing delete for at least 250 ms and less than 3 seconds before giving
-  up (`BoundedRetry-Default`).
-- A permanent lock is given up quietly after the bounded attempts, in bounded time (`BoundedRetry-GiveUp`).
+- The default retry policy tries a failing delete five times, with a pause of 75 ms between two attempts, before
+  giving up (`BoundedRetry-Default`).
+- A permanent lock is given up quietly after the bounded attempts (`BoundedRetry-GiveUp`).
 - No pause is taken after the last attempt (`BoundedRetry-NoFinalPause`).
 - A retry policy with fewer than one attempt or a negative pause is refused (`BoundedRetry-InvalidPolicy`).
 
@@ -43,11 +46,10 @@ GUID. This scenario is tested by
 created at the same time; their paths differ. This scenario is tested by
 `TemporaryDirectory_Constructor_TwoInstances_UseDifferentDirectories`.
 
-**TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime**: On Windows a file
-stays held open for the whole disposal of a directory created with the constructor without arguments; no exception is
-thrown, the directory stays, and the call takes at least 250 ms and less than 3 seconds. The test measures only this
-time window, not the number of attempts or the length of each pause. This scenario is tested by
-`TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_RetriesForBoundedTime`.
+**TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_TriesFiveTimesWithShortPauses**: On Windows a file
+stays held open for the whole disposal of a directory with the default policy; no exception is thrown, the directory
+stays, and exactly four pauses of 75 ms were asked for between the five attempts. This scenario is tested by
+`TemporaryDirectory_Dispose_DefaultPolicyFileLockedPermanently_TriesFiveTimesWithShortPauses`.
 
 **TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents**: A file
 two folders down is requested; the returned path is the full path of that file inside the directory, its
@@ -77,20 +79,20 @@ released a second disposal removes what is left. This scenario is tested by
 `TemporaryDirectory_Dispose_FileInUse_DoesNotThrow`.
 
 **TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory**: On Windows a file is
-held open and released about 100 ms later while the directory is disposed with a short retry
-policy; the single `Dispose` call removes the whole directory, which a single attempt could not.
+held open while the directory is disposed and released during the first pause, so the first attempt
+always fails; the single `Dispose` call still removes the whole directory, which a single attempt could not.
 This scenario is tested by `TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory`.
 
-**TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime**: On
+**TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingAfterTheAttempts**: On
 Windows a file stays held open for the whole disposal of a directory with an explicit policy of three attempts 50 ms
-apart; no exception is thrown, the directory stays, the call takes at least 80 ms (the retries happened) and returns
-well within the bound. This scenario is tested by
-`TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime`.
+apart; no exception is thrown, the directory stays, and exactly two pauses of 50 ms were asked for. This scenario is
+tested by `TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingAfterTheAttempts`.
 
 **TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException**: Zero
 attempts and a negative pause are refused. This scenario is tested by
 `TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException`.
 
 **TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause**: With one attempt and a long pause
-a locked directory is given up at once, so the pause is only used between attempts. This scenario is
+a locked directory is given up without any pause being asked for, so the pause is only used between attempts. This
+scenario is
 tested by `TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause`.

@@ -45,9 +45,9 @@ N/A - standard test environment.
   entries of another review, of another project, and without a review do not count.
 - Members, read-only members, project administrators, and system administrators may read the progress; a user outside
   the project, a user whose account is disabled, and no actor at all get `ProjectNotFound`.
-- The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose
-  time bound of ten seconds (a guard against one query per review, not a benchmark); the approvals of all reviews are
-  read with one batch read and no single read.
+- The progress of a project with 300 reviews reads the audit trail once and is complete; the approvals of all reviews
+  are read with one batch read and no single read. How long the answer takes is not measured by a test; it is a design
+  property measured by the opt-in benchmarks.
 - The overload that is given the review list returns the same progress as the one that lists the reviews, makes no
   further read of the review list (also for a masked viewer, whose creator check uses the given list), uses exactly the
   given list (a subset, in the given order; an empty list gives an
@@ -167,10 +167,10 @@ single row, the last two get `ProjectNotFound`. This scenario is tested by
 asks for the progress and gets `ProjectNotFound`, like a user outside the project. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_DisabledUser_IsNotFound`.
 
-**ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast**: 300 reviews, a third with a slot,
-over an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, the audit trail
-was read once, and the call finished within ten seconds. This scenario is tested by
-`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
+**ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce**: 300 reviews, a third with a slot,
+over an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, and the audit
+trail was read once. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce`.
 
 **ReviewProgressService_GetProgressAsync_ManyReviews_ReadsSnapshotsInOneBatch**: 30 reviews, a third with a slot, over a
 `FakeReviewStore` that counts the snapshot reads. All 30 are returned, the approvals were read with one batch read, and

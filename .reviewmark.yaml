@@ -20,6 +20,7 @@ needs-review:
   - "!**/bin/**"                  # Exclude build output
   - "!node_modules/**"            # Exclude npm dependencies
   - "!**/.venv/**"                # Exclude Python virtual environment
+  - "!benchmarks/**"              # Exclude the opt-in benchmarks (developer tooling, not a software item)
 
 # Evidence source: review data and index.json are located in the 'reviews' branch
 # of this repository, accessed through the GitHub public HTTPS raw content access.
@@ -190,6 +191,7 @@ reviews:
       - "docs/design/review-center/utilities.md"
       - "docs/verification/review-center/utilities.md"
       - "test/**/Utilities/UtilitiesSubsystemTests.cs"
+      - "test/**/Utilities/PauseRecorder.cs"
 
   - id: ReviewCenter-Utilities-PathHelpers
     title: Review of ReviewCenter PathHelpers unit implementation
@@ -218,6 +220,7 @@ reviews:
       - "docs/verification/review-center/utilities/temporary-directory.md"
       - "src/**/Utilities/TemporaryDirectory.cs"
       - "test/**/Utilities/TemporaryDirectoryTests.cs"
+      - "test/**/Utilities/PauseRecorder.cs"
 
   - id: ReviewCenter-Utilities-SecretSource
     title: Review of ReviewCenter SecretSource unit implementation
@@ -490,6 +493,7 @@ reviews:
       - "docs/design/review-center/web.md"
       - "docs/verification/review-center/web.md"
       - "test/**/Web/WebSubsystemTests.cs"
+      - "test/DemaConsulting.ReviewCenter.SystemTests/WebSubsystemBrowserTests.cs"
       - "src/**/Web/ProjectViewGuard.cs"
       - "test/**/Web/ProjectViewGuardTests.cs"
       - "test/**/TestWebApp.cs"
@@ -884,7 +888,6 @@ reviews:
       - "test/**/Core/TestServices.cs"
       - "test/**/Core/TestContent.cs"
       - "test/**/UserRole.cs"
-      - "test/**/ForcedGarbageCollection.cs"
 
   - id: ReviewCenter-Core-Fingerprint
     title: Review of ReviewCenter Fingerprint unit implementation
@@ -1847,6 +1850,7 @@ reviews:
       - "src/**/ContentSources/GitRunner.cs"
       - "src/**/ContentSources/GitOptions.cs"
       - "test/**/ContentSources/GitRunnerTests.cs"
+      - "test/**/Messaging/StepClock.cs"
 
   - id: ReviewCenter-ContentSources-GitSource
     title: Review of ReviewCenter GitSource unit implementation

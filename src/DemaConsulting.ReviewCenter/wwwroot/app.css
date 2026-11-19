@@ -784,9 +784,10 @@ a.action:active {
     margin: 0 0 0.5rem;
 }
 
-/* The Link anchor and the thread buttons share one compact size */
+/* The Link anchor and the thread buttons share one compact size (also over the generic a.action.small rule below) */
 .thread-head button,
-.thread-head a.action {
+.thread-head a.action,
+.thread-head a.action.small {
     margin: 0;
     padding: 0.25rem 0.75rem;
     box-sizing: border-box;
