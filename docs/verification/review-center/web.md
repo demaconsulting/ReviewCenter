@@ -2,17 +2,16 @@
 
 ### Verification Approach
 
-The `Web` subsystem is verified by integration tests defined in `WebSubsystemTests.cs`. Each
-test starts the real server pipeline on an in-memory test server, with a temporary database, through
-`ServerHost.CreateApplication` and requests routes over HTTP (the pages behind the sign-in are requested by a user
-signed in through the test helper `TestBrowser`), so the `App` and the page units run together with
-the Core services and the Storage database exactly as they do in production. Tests assert on the returned
-HTML. Behavior that needs a live browser connection (typing, selecting files, submitting forms, and the switch of
-the `data-interactive` marker from `false` to `true`) is outside what plain HTTP requests can exercise. It is
-verified at unit level by the component tests of the page units (see the children of the requirements in
-`web.yaml`), not by these subsystem tests; the browser system tests drive a real browser against a real server over the
-live connection (sign in, open Projects from the header, create a project). What a page looks like needs a layout engine,
-which the in-memory server does not have (it serves no static files), so the subsystem tests in
+The `Web` subsystem is verified by integration tests defined in `WebSubsystemTests.cs`. Each test starts the real server
+pipeline on an in-memory test server, with a temporary database, through `ServerHost.CreateApplication` and requests
+routes over HTTP (the pages behind the sign-in are requested by a user signed in through the test helper `TestBrowser`),
+so the `App` and the page units run together with the Core services and the Storage database exactly as they do in
+production. Tests assert on the returned HTML. Behavior that needs a live browser connection (typing, selecting files,
+submitting forms, and the switch of the `data-interactive` marker from `false` to `true`) is outside what plain HTTP
+requests can exercise. It is verified at unit level by the component tests of the page units (see the children of the
+requirements in `web.yaml`), not by these subsystem tests; the browser system tests drive a real browser against a real
+server over the live connection (sign in, open Projects from the header, create a project). What a page looks like needs
+a layout engine, which the in-memory server does not have (it serves no static files), so the subsystem tests in
 `WebSubsystemBrowserTests.cs` of the system test project measure the rendered pages of a real server in a real browser
 through the Puppeting library: the width of a diff on a phone, the line comment control on hover, keyboard focus, and a
 touch screen, and the hover fill of the transparent buttons in the dark theme. No test reads the stylesheet source.

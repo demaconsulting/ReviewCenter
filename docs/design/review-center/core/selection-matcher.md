@@ -52,10 +52,10 @@ A `SelectionPattern` is created only by `Parse`, so every instance is valid.
   pattern segments with the path segments, memoized on the pair of positions so that many `**` segments cannot cause
   exponential work: each pair of a pattern position and a path position is decided once, so the work grows with the
   product of the two segment counts. This is a design property, not asserted by a test; it is measured by the opt-in
-  `SelectionMatcherBenchmarks` in `benchmarks/DemaConsulting.ReviewCenter.Benchmarks`. A `**` segment matches zero or more path segments, except as the last segment, where it needs at
-  least one. Inside a segment `*` matches any run of characters (not crossing `/`), `**` behaves like `*`, and `?`
-  matches exactly one character. Comparison is ordinal and case-sensitive; every other character, including `[`, `]`,
-  `{`, and `}`, matches itself.
+  `SelectionMatcherBenchmarks` in `benchmarks/DemaConsulting.ReviewCenter.Benchmarks`. A `**` segment matches zero or
+  more path segments, except as the last segment, where it needs at least one. Inside a segment `*` matches any run of
+  characters (not crossing `/`), `**` behaves like `*`, and `?` matches exactly one character. Comparison is ordinal and
+  case-sensitive; every other character, including `[`, `]`, `{`, and `}`, matches itself.
 
 #### Semantics Compared With Other Glob Libraries
 

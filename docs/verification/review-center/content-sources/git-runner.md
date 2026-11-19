@@ -7,11 +7,11 @@ inspecting the process start information that `BuildStartInfo` returns: the argu
 absence of the token anywhere but its one variable. Redaction and failure descriptions are verified as pure functions
 with known secrets in every form git might print them. The behavior of the process (output, exit code, the output limit,
 the time limit, and the version check) is verified against a real git, against an executable name that does not exist,
-and against a script that reports an old version, using the test-only constructor that takes the executable. The
-time limit is verified with a local server on the loopback address that accepts a connection and never answers, so that
-the runner must stop git itself, and with a fake git script on a clock that only the test moves, so that the limit
-passes only once the fake git has started; the credential header and the redaction of a refusal are verified with a local server
-that answers `401` and records the request. Tests that need git skip themselves when git is not installed.
+and against a script that reports an old version, using the test-only constructor that takes the executable. The time
+limit is verified with a local server on the loopback address that accepts a connection and never answers, so that the
+runner must stop git itself, and with a fake git script on a clock that only the test moves, so that the limit passes
+only once the fake git has started; the credential header and the redaction of a refusal are verified with a local
+server that answers `401` and records the request. Tests that need git skip themselves when git is not installed.
 
 #### Test Environment
 
