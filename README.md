@@ -11,6 +11,12 @@
 [![Quality Gate][badge-quality]][link-quality]
 [![Security][badge-security]][link-security]
 
+![ReviewCenter banner: the ReviewCenter name with the tagline 'Every review, signed. Every step, audited.' and the
+command 'reviewcenter serve --urls http://localhost:8080'. Git revisions, review-sets, a project checklist, and the
+reviewers flow on curved arrows into the ReviewCenter web app, and arrows lead out to a signed attestation PDF, the
+agreed checklist answers, a hash-chained audit trail with CSV and JSON export, and the evidence index in JSON, which
+ReviewMark reads downstream][hero]
+
 Web service and command-line tool for formal code reviews with a tamper-evident audit trail
 
 ![A reviewer's inbox with the reviews to answer and the reviews ready to sign][image-review-inbox]
@@ -145,6 +151,7 @@ By contributing to this project, you agree that your contributions will be licen
 [badge-build]: https://img.shields.io/github/actions/workflow/status/demaconsulting/ReviewCenter/build_on_push.yaml?style=plastic
 [badge-quality]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=alert_status
 [badge-security]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=security_rating
+[hero]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/images/hero.png
 
 <!-- Image References -->
 [image-review-workflow]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/images/review-workflow.png
