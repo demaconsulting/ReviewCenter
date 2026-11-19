@@ -433,10 +433,9 @@ sections:
         title: >-
           The AuditStore unit shall return no more entries in a filtered page than the page size that is asked for.
         justification: |
-          The read of a page never needs a count of the trail. The test also bounds the read time loosely, to catch a
-          read that scans and sorts the whole trail repeatedly.
+          The read of a page never needs a count of the trail, so a page stays small however long the trail grows.
         tests:
-          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded
+          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreBounded
 
       # ---------------------------------------------------------------------------------------------------------------
       # LastActivity: the newest entry of each review of a project

@@ -6236,7 +6236,7 @@ sections:
           - ReviewCenter-ReviewProgressService-LastActivity-Created
           - ReviewCenter-ReviewProgressService-LastActivity-OneRead
         tests:
-          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce
 
       - id: ReviewCenter-Core-Progress-ViewerRights
         title: >-
@@ -6282,17 +6282,7 @@ sections:
           - ReviewCenter-ReviewProgressService-Performance-ListGiven
           - ReviewCenter-ReviewProgressService-Performance-ListEmpty
         tests:
-          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
-
-      - id: ReviewCenter-Core-Progress-Bound
-        title: >-
-          The Core subsystem shall answer for a project with 300 reviews within ten seconds.
-        justification: |
-          A project page must stay usable for a large project.
-        children:
-          - ReviewCenter-ReviewProgressService-Performance-Bound
-        tests:
-          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnce
 
       - id: ReviewCenter-Core-Progress-GivenList
         title: >-

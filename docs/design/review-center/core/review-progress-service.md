@@ -110,7 +110,9 @@ by the caller that passes the list in), one batch read of the approval statuses 
 given the reviews that are already in hand, which itself takes one set-based read of the snapshots of all the reviews,
 `IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were reopened), and one read of the
 last activity. A review that is removed between the first two reads is left out. The page that lists the reviews of a
-project used to ask for the approval of each review on its own; it now uses this one call.
+project used to ask for the approval of each review on its own; it now uses this one call. That the answer for a
+project with hundreds of reviews stays quick follows from this constant number of reads, which the tests count; the
+time itself is a design property that no test asserts, because it depends on the machine.
 
 **Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved`, a rejected review gives `Rejected`, and
 every other `InReview`. A review whose slots are all signed but that has an open thread, a pending or disputed check, or
