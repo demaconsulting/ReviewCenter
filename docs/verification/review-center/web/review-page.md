@@ -981,12 +981,15 @@ and gets no sign form. This scenario is tested by `ReviewPage_Render_SlotOccupan
 hint says that the access is read-only and does not say that the review is locked. This scenario is tested by
 `ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked`.
 
-**ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection**: An Auditor's page holds a stale
-new-comment line selection; the page still renders no `new-thread-form`. This scenario is tested by
+**ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection**: An Auditor opens the diff, and a
+click on the disabled `+` of a line still reaches the page (as a stale or restored selection would); the page shows the
+read-only hint, every line control stays disabled, and no `new-thread-form` is rendered. This scenario is tested by
 `ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection`.
 
-**ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member has a comment draft open, the
-role changes to Auditor, and the page reloads; the composer and the draft are gone. This scenario is tested by
+**ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member with a reviewer slot has a
+comment draft open, the role changes to Auditor, and the member's next action on the page (a signature attempt with a
+wrong password) reloads its state; the composer is gone and the hint is the read-only one. When the role is restored and
+the member chooses the same line again, the form shows none of the dropped draft. This scenario is tested by
 `ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft`.
 
 **ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton**: An Auditor opens the modified file and

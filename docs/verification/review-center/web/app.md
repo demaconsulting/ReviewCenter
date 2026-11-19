@@ -211,11 +211,12 @@ count is read; 15 seconds after the read finished (35 after it started) the layo
 number with no second look-up. This scenario is tested by `MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead`.
 
 **MainLayout_Navigate_DisposedLayout_DoesNothing**: A layout is rendered and disposed, the cache is expired, and the
-navigation handler is invoked on it anyway; no look-up is made. This scenario is tested by
+user navigates through the navigation manager afterwards; no look-up is made. This scenario is tested by
 `MainLayout_Navigate_DisposedLayout_DoesNothing`.
 
 **MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose**: The cache is expired and the renderer is
-kept busy on another thread, so the refresh that a navigation starts is queued and not yet run; the layout is disposed
+kept busy on another thread, so the refresh that a navigation (through the navigation manager) starts is queued and not
+yet run; the layout is disposed
 and the renderer released. The queued refresh runs after the disposal and makes no look-up. This scenario is tested by
 `MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose`.
 
