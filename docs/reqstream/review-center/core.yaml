@@ -5369,8 +5369,7 @@ sections:
 
       - id: ReviewCenter-Core-FileSelection-Bounded
         title: >-
-          The Core subsystem shall decide a path of 60 segments against a pattern of 40 double-star segments in at
-          most five seconds.
+          The Core subsystem shall decide whether a path of 60 segments matches a pattern of 40 double-star segments.
         justification: |
           A pattern typed by a user must not be able to keep the server busy without limit.
         children:

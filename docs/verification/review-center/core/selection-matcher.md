@@ -5,7 +5,7 @@
 `SelectionMatcher` is verified with tests defined in `SelectionMatcherTests.cs`. It is a pure unit, so the tests call
 it directly with patterns and paths and check the answer. Tables of inline data cover the syntax: literal paths,
 folders, wildcards, and exclusions. Separate tests check the edge cases that matter for safety: the trailing `**`, the
-star that must not cross a separator, a pattern with many `**` segments that must finish in bounded time, the
+star that must not cross a separator, a pattern with many `**` segments that must be decided at all, the
 normalization of lines, the invalid inputs, and the inclusive limits. A differential test compares the unit with
 `Microsoft.Extensions.FileSystemGlobbing`, the library that ReviewMark uses, over a corpus of the syntax that both
 support, so that the documented differences are the only ones.
@@ -21,7 +21,8 @@ N/A - standard test environment (the globbing library is a package of the test p
   pattern matches is not selected.
 - A trailing `**` needs at least one more segment, and a trailing `/` selects a folder.
 - `*` does not cross `/`, `**` as a segment does, and `?` matches exactly one character; matching is case-sensitive.
-- A pattern with many `**` segments is matched in bounded time.
+- A pattern with many `**` segments against a deep path is decided (a match that does not end fails the test at its
+  timeout); how fast is not asserted.
 - Lines are trimmed and blank lines skipped; a leading `./` or `/` is dropped.
 - A selection with no pattern, a `\`, an empty, `.`, or `..` segment, a control character, an empty exclusion, a line
   over 400 characters, or more than 100 patterns is `SelectionInvalid`; 400 characters and 100 patterns are accepted.
@@ -39,9 +40,10 @@ selects `docs/a`. This scenario is tested by `SelectionMatcher_IsMatch_TrailingD
 **SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators**: `*` matches within one segment only. This scenario is tested
 by `SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators`.
 
-**SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly**: A pattern with many `**` segments against a long path that
-does not match returns within the time limit of the test. This scenario is tested by
-`SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly`.
+**SelectionMatcher_IsMatch_ManyDoubleStars_DecidesNoMatch**: A pattern of 40 `**` segments against a path of 60
+segments that it does not match is decided as no match. Exponential backtracking would not end, and the timeout of the
+test turns that into a failure; no elapsed time is measured. This scenario is tested by
+`SelectionMatcher_IsMatch_ManyDoubleStars_DecidesNoMatch`.
 
 **SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized**: Lines are trimmed, blank lines skipped, a leading `./` or `/`
 dropped, and a trailing `/` turned into a folder prefix; writing the patterns back with `Normalize` gives one line per

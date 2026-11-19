@@ -50,7 +50,9 @@ A `SelectionPattern` is created only by `Parse`, so every instance is valid.
 - *Algorithm*: Test the patterns in order and remember the result of the last one that matches (include selects, exclude
   deselects); when none matches the path is not selected. A single pattern matches by a recursive comparison of the
   pattern segments with the path segments, memoized on the pair of positions so that many `**` segments cannot cause
-  exponential work. A `**` segment matches zero or more path segments, except as the last segment, where it needs at
+  exponential work: each pair of a pattern position and a path position is decided once, so the work grows with the
+  product of the two segment counts. This is a design property, not asserted by a test; it is measured by the opt-in
+  `SelectionMatcherBenchmarks` in `benchmarks/DemaConsulting.ReviewCenter.Benchmarks`. A `**` segment matches zero or more path segments, except as the last segment, where it needs at
   least one. Inside a segment `*` matches any run of characters (not crossing `/`), `**` behaves like `*`, and `?`
   matches exactly one character. Comparison is ordinal and case-sensitive; every other character, including `[`, `]`,
   `{`, and `}`, matches itself.
