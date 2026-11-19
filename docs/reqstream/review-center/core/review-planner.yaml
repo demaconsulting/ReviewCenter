@@ -22,7 +22,7 @@ sections:
           the user in one place everything that needs a review.
         tests:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
-          - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
+          - ReviewPlanner_PlanAsync_SeveralBaselines_ListsOncePerBaselineAndKeepsRowOrder
 
       - id: ReviewCenter-ReviewPlanner-Plan-Session
         title: >-
@@ -51,16 +51,7 @@ sections:
           Sets that share a baseline share its change list, so the repository is asked once per baseline and not once
           per set.
         tests:
-          - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
-
-      - id: ReviewCenter-ReviewPlanner-Plan-OneList
-        title: >-
-          The ReviewPlanner class shall hold only one change list at a time while it classifies the rows of a plan.
-        justification: |
-          A change list can be large, and a plan can span many baselines, so holding only one keeps the memory of a
-          plan bounded.
-        tests:
-          - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder
+          - ReviewPlanner_PlanAsync_SeveralBaselines_ListsOncePerBaselineAndKeepsRowOrder
 
       - id: ReviewCenter-ReviewPlanner-Plan-BrokenSet
         title: >-

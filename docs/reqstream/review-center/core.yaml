@@ -5648,7 +5648,6 @@ sections:
           - ReviewCenter-ReviewPlanner-Plan-Session
           - ReviewCenter-ReviewPlanner-Plan-Counts
           - ReviewCenter-ReviewPlanner-Plan-ChangeLists
-          - ReviewCenter-ReviewPlanner-Plan-OneList
         tests:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
 

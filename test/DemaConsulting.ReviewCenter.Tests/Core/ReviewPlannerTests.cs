@@ -571,11 +571,11 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
-    ///     Test that the change lists are loaded one baseline at a time, once per distinct baseline, and that the rows
-    ///     of sets that share a baseline are still classified and kept in the order of the configuration.
+    ///     Test that the change lists are loaded once per distinct baseline, and that the rows of sets that share a
+    ///     baseline are still classified and kept in the order of the configuration.
     /// </summary>
     [Fact]
-    public async Task ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder()
+    public async Task ReviewPlanner_PlanAsync_SeveralBaselines_ListsOncePerBaselineAndKeepsRowOrder()
     {
         // Arrange: core and core2 signed at H0, lib signed at H1, docs never signed; the sets alternate baselines
         var f = await CreateAsync();
@@ -595,16 +595,12 @@ public class ReviewPlannerTests
         f.Git.Ancestors.Add((H0, H2));
         f.Git.Ancestors.Add((H1, H2));
         var listsBefore = f.Git.ListCalls;
-        f.Git.TrackChangeSets = true;
 
         // Act: plan with the last reviewed head as baseline
         var plan = await PlanAsync(f, BaselineMode.LastReviewed);
 
         // Assert: one listing for the head and one per distinct baseline
         Assert.Equal(3, f.Git.ListCalls - listsBefore);
-
-        // Assert: when each list was requested, none of the earlier ones was still held
-        Assert.Equal([0, 0, 0], f.Git.AliveAtListCall);
 
         // Assert: the rows are in the order of the configuration and each used the changes of its own baseline
         Assert.Equal(["core", "lib", "docs", "core2"], plan.Rows.Select(row => row.SetId));

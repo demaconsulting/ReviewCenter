@@ -886,7 +886,6 @@ reviews:
       - "test/**/Core/TestServices.cs"
       - "test/**/Core/TestContent.cs"
       - "test/**/UserRole.cs"
-      - "test/**/ForcedGarbageCollection.cs"
 
   - id: ReviewCenter-Core-Fingerprint
     title: Review of ReviewCenter Fingerprint unit implementation
