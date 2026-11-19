@@ -310,7 +310,6 @@ internal static class RealValidationRun
     /// <param name="ExitCode">The exit code of the run.</param>
     /// <param name="Log">The text of the log file: the whole report.</param>
     /// <param name="Trx">The text of the TRX results file.</param>
-    /// <param name="Elapsed">How long the run took.</param>
     /// <param name="ConfiguredDatabaseCreated">
     ///     <c>true</c> when the database that the environment configures exists after the run but did not before.
     /// </param>
@@ -320,7 +319,6 @@ internal static class RealValidationRun
         int ExitCode,
         string Log,
         string Trx,
-        TimeSpan Elapsed,
         bool ConfiguredDatabaseCreated);
 
     /// <summary>
@@ -337,7 +335,6 @@ internal static class RealValidationRun
         {
             var trxFile = Path.Combine(folder, "results.trx");
             var logFile = Path.Combine(folder, "report.log");
-            var watch = System.Diagnostics.Stopwatch.StartNew();
             bool validate;
             int depth;
             int exitCode;
@@ -356,7 +353,6 @@ internal static class RealValidationRun
                 exitCode,
                 File.ReadAllText(logFile),
                 File.Exists(trxFile) ? File.ReadAllText(trxFile) : string.Empty,
-                watch.Elapsed,
                 configured != null && !existedBefore && File.Exists(configured));
         }
         finally

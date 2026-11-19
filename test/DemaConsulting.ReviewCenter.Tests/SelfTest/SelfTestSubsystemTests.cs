@@ -192,21 +192,6 @@ public partial class SelfTestSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the real run is fast enough to run on every build.
-    /// </summary>
-    [Fact]
-    public void SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound()
-    {
-        // Arrange: the shared real run
-
-        // Act: read how long it took
-        var run = RealValidationRun.Result;
-
-        // Assert: well inside the per-check time limit; a hung check would take a minute
-        Assert.True(run.Elapsed < TimeSpan.FromSeconds(45), $"The real run took {run.Elapsed.TotalSeconds:0.0} s");
-    }
-
-    /// <summary>
     ///     Test that self-test subsystem can run validation workflow with JUnit result file.
     /// </summary>
     [Fact]

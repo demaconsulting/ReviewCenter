@@ -110,7 +110,6 @@ sections:
           - ReviewCenter-ValidationChecks-ConfiguredKeys-NoPathInReport
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
-          - SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound
           - GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync
 
       - id: ReviewCenter-SelfTest-Hermetic

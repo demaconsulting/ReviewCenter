@@ -20,7 +20,8 @@ N/A - standard test environment. The real run needs `git` on the path, as the to
 
 - All integration tests pass with zero failures.
 - The real validation completes with exit code 0, ten tests passed, none skipped or failed, each
-  line showing its elapsed time, within a generous time bound that catches a hung check.
+  line showing its elapsed time. A hung check is caught by the per-check deadline, which the
+  `ValidationRunner` tests verify; how long the real run takes is not measured by a test.
 - The real validation never creates the configured database and never runs or records the opt-in
   `ReviewCenter_ConfiguredDatabase`, `ReviewCenter_ConfiguredKeys` and `ReviewCenter_ConfiguredNotifications` checks.
 - TRX and JUnit XML result files are generated with the correct XML root elements when valid
@@ -67,10 +68,6 @@ real process runs with a database, key ring and certificate configured in a sent
 exits with code 0, the output holds no configured-database or configured-keys check, and the
 sentinel folder is still empty. This scenario is tested by
 `SelfTestSubsystem_ValidationWorkflow_RealProcessRun_TouchesNoConfiguredDatabaseOrKeyRing`.
-
-**SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound**: The real run completes in
-well under the 60 s limit of a single check. This scenario is tested by
-`SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound`.
 
 **SelfTestSubsystem_ValidationWorkflow_WithJUnitFile_GeneratesResults**: `Validation.Run` is
 called with stand-in checks and a context whose `ResultsFile` points to a temporary `.xml` path;
