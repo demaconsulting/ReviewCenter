@@ -1170,31 +1170,43 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the review page shows an auditor a diff with the read-only hint and disabled line controls, and
-    ///     offers no comment form even when a click on the + of a line still reaches the page (as a stale or restored
-    ///     selection would).
+    ///     Test that a line selection that a reviewer made with the enabled controls does not bring back a comment
+    ///     form once the reviewer has become an auditor: after the next reload of the page state the diff shows the
+    ///     read-only hint, disabled line controls, no selected line, and no comment form.
     /// </summary>
     [Fact]
     public async Task ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection()
     {
-        // Arrange: an auditor opens the modified file
+        // Arrange: a member with a reviewer slot (who answered the checklist, so the page offers a signature) opens
+        // the modified file and selects line 10 with its enabled + control
         var cancellationToken = TestContext.Current.CancellationToken;
         var projectId = await CreateReviewAsync();
-        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
-        await Store.AddMembershipAsync(auditor.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        var member = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        var slotId = await SeatAsync(projectId, "REV-1", "aud");
+        var memberActor = new Actor("aud", "Aud");
+        await AuditTestExtensions.AnswerAllAsync(Checklists, projectId, "REV-1", memberActor, cancellationToken);
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", memberActor, cancellationToken);
         SignInAs("aud", "Aud", UserRole.Reviewer);
         var cut = RenderPage(projectId);
         await SelectFileAsync(cut, ModPath);
-
-        // Act: a click on the (disabled) + of line 10 still reaches the page and selects the line
         await cut.Find("[data-testid='diff-comment-10']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.NotEmpty(cut.FindAll(".diff-row.selected"));
 
-        // Assert
+        // Act: the member becomes an auditor, and the next action on the open page (a signature attempt with a wrong
+        // password) reloads the page state while the old selection is still there
+        await ChangeMemberRoleAsync(projectId, "aud", ProjectRole.Auditor);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync("not the password");
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: read-only hint, every line control disabled, the stale selection is no longer shown, and no form
         Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
-        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
-        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
         Assert.NotEmpty(cut.FindAll("[data-testid^='diff-comment-']"));
         Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+        Assert.Empty(cut.FindAll(".diff-row.selected"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
     }
 
     /// <summary>

@@ -14,7 +14,8 @@ server over the live connection (sign in, open Projects from the header, create 
 a layout engine, which the in-memory server does not have (it serves no static files), so the subsystem tests in
 `WebSubsystemBrowserTests.cs` of the system test project measure the rendered pages of a real server in a real browser
 through the Puppeting library: the width of a diff on a phone, the line comment control on hover, keyboard focus, and a
-touch screen, and the hover fill of the transparent buttons in the dark theme. No test reads the stylesheet source.
+touch screen, the hover fill of the transparent buttons in the dark theme, and the size of the link to a thread next to
+its buttons. No test reads the stylesheet source.
 
 ### Test Environment
 
@@ -167,6 +168,11 @@ feature is `none`. This scenario is tested by `WebSubsystem_DiffView_LineComment
 computed background of the `+` control of a diff line and of a section toggle of the checklist page, while hovered, is
 the soft accent color of the theme and not the hover accent of the other buttons, and the section toggle keeps the text
 color. This scenario is tested by `WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent`.
+
+**WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt**: In a real browser, a thread is started on a diff line
+through the page; the computed display, padding, border, font size and weight, line height, text decoration, and the
+rendered height of the link to the thread equal those of the Copy link button beside it, and the link is not
+underlined. This scenario is tested by `WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt`.
 
 **WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves**: Through the real pipeline, the
 address of a file, of a line, and of a thread each serve the review page with the file selected; the line address

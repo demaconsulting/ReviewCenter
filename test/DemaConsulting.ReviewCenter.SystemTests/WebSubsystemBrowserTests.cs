@@ -25,7 +25,8 @@ namespace DemaConsulting.ReviewCenter.SystemTests;
 /// <summary>
 ///     Subsystem tests of the Web subsystem that need a layout engine: what the pages look like in a real browser (the
 ///     width of a diff on a phone, the line comment control on hover, focus, and touch, and the hover fill of the
-///     transparent buttons in the dark theme), measured on the rendered page instead of read from the stylesheet.
+///     transparent buttons in the dark theme, and the size of the link to a thread), measured on the rendered page
+///     instead of read from the stylesheet.
 /// </summary>
 /// <remarks>
 ///     The in-memory host of the unit test project serves no static files and has no layout engine, so these tests
@@ -180,6 +181,39 @@ public class WebSubsystemBrowserTests
         Assert.Equal(softAccent, lineComment);
         Assert.Equal(softAccent, toggle);
         Assert.Equal(await ThemeColorAsync("--text", "color"), toggleText);
+    }
+
+    /// <summary>
+    ///     Test that the link to a thread is drawn as an action button of the same size as the Copy link button beside
+    ///     it, not as plain underlined text.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt()
+    {
+        // Arrange: a review of a change, open in the diff view, with a thread started on a line through the page
+        var cancellation = TestContext.Current.CancellationToken;
+        await using var fixture = await DiffFixture.StartAsync(cancellation);
+        var browser = fixture.Browser;
+        await browser.ClickAsync("diff-comment-2");
+        await browser.WaitForAsync("css=[data-testid=diff-composer] [data-testid=new-thread-form]");
+        await browser.FillAsync("thread-text-input", "Why this change?");
+        await browser.ClickAsync("start-thread-button");
+        await browser.WaitForAsync("css=[data-testid^=thread-link-]");
+
+        // The computed box and text styles of the first element that a selector names
+        const string styles =
+            "(s => { const e = document.querySelector(s); const c = getComputedStyle(e); const r = e.getBoundingClientRect();"
+            + " return [c.display, c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft, c.borderTopWidth,"
+            + " c.borderTopStyle, c.fontSize, c.fontWeight, c.lineHeight, c.textDecorationLine, Math.round(r.height)].join(' | '); })";
+
+        // Act: read the styles of the thread link and of the Copy link button of the same thread
+        var link = await browser.ValueOfAsync(styles + "('[data-testid^=thread-link-]')");
+        var button = await browser.ValueOfAsync(styles + "('[data-testid^=thread-copy-link-]')");
+
+        // Assert: the link has the box, the text, and the height of the button, without an underline
+        Assert.Equal(button, link);
+        Assert.DoesNotContain("underline", link, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -4535,6 +4535,7 @@ sections:
           - ReviewCenter-ReviewPage-DeepLinks-LocalOnly
         tests:
           - WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves
+          - WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt
 
       - id: ReviewCenter-Web-DeepLinks-AddressBar
         title: >-
@@ -4563,6 +4564,7 @@ sections:
           - ReviewCenter-ReviewPage-DeepLinks-ThreadLink
         tests:
           - WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves
+          - WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt
 
       - id: ReviewCenter-Web-DeepLinks-ThreadLinkCopy
         title: >-

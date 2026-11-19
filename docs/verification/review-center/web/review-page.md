@@ -981,9 +981,11 @@ and gets no sign form. This scenario is tested by `ReviewPage_Render_SlotOccupan
 hint says that the access is read-only and does not say that the review is locked. This scenario is tested by
 `ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked`.
 
-**ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection**: An Auditor opens the diff, and a
-click on the disabled `+` of a line still reaches the page (as a stale or restored selection would); the page shows the
-read-only hint, every line control stays disabled, and no `new-thread-form` is rendered. This scenario is tested by
+**ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection**: A member with a reviewer slot
+selects a line of the diff with its enabled `+` control, so the composer opens and the line is selected. The role then
+changes to Auditor and the member's next action (a signature attempt with a wrong password) reloads the page state
+while that selection is still there; the page shows the read-only hint and only disabled line controls, no line is
+selected any more, and no `new-thread-form` is rendered. This scenario is tested by
 `ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection`.
 
 **ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member with a reviewer slot has a
@@ -1088,6 +1090,7 @@ link is unchanged. These scenarios are tested by the tests of those names.
 The look of the thread link, the reveal of the `+` control on hover, focus, and touch, and the hover fill of the
 transparent buttons are verified on the rendered page in a real browser by the Web subsystem tests
 `WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves`,
+`WebSubsystem_ThreadLink_LooksLikeTheActionButtonBesideIt`,
 `WebSubsystem_DiffView_LineCommentControl_ShowsOnHoverFocusAndTouch`, and
 `WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent` (see *Web Verification*), and end to end by the
 browser system test `PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer`.
