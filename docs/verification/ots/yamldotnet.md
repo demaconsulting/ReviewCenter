@@ -17,9 +17,10 @@ all scenarios constitutes evidence that all four requirements are satisfied.
 
 ### Test Scenarios
 
-#### ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+#### ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet
 
-**Scenario**: The `.reviewmark.yaml` of this repository, which has many keys that the parser does not read, is read.
+**Scenario**: A complete configuration in the shape that repositories use, which has many keys that the parser does not
+read, is read.
 
 **Expected**: Every review-set is read with its identifier, title, and paths, and the other keys are left alone.
 

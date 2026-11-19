@@ -17,7 +17,7 @@ sections:
         justification: |
           The planner offers one review for each set, in the order of the file.
         tests:
-          - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+          - ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet
           - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
 
       - id: ReviewCenter-ReviewSetParser-Read-UnknownKeys
@@ -28,7 +28,7 @@ sections:
           The configuration file belongs to ReviewMark and has many keys that ReviewCenter does not need.
         tests:
           - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
-          - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+          - ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet
 
       - id: ReviewCenter-ReviewSetParser-Read-Styles
         title: >-

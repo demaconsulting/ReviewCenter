@@ -28,10 +28,12 @@ N/A - standard test environment.
 
 #### Test Scenarios
 
-**ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet**: The `.reviewmark.yaml` of this repository is
-read; there are more than ten sets, the identifiers are unique, every set has a selection that the selection matcher
-accepts, and the first set has the identifier, the title, and the paths written in the file. This scenario is tested by
-`ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet`.
+**ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet**: A complete configuration held by the test, in the
+shape that repositories use (comments, the `needs-review`, `evidence-source`, and `context` keys, context per set,
+quoted and plain paths, flow and block lists), is read; the eleven sets come in file order with unique identifiers,
+every set has a selection that the selection matcher accepts, and the sets have the titles and paths written in the
+text. The repository's own `.reviewmark.yaml` is not read, so that editing it cannot fail the test. This scenario is
+tested by `ReviewMarkConfigParser_Parse_FullConfiguration_ReadsEverySet`.
 
 **ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored**: A file with other top-level keys and extra keys inside an entry
 gives the two sets in file order with their ordered paths. This scenario is tested by
