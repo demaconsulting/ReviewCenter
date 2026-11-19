@@ -28,7 +28,6 @@ namespace DemaConsulting.ReviewCenter.Benchmarks;
 ///     those segments: the design of <see cref="SelectionMatcher"/> memoizes each pair of positions, so the time grows
 ///     with the product of the segment counts and not exponentially.
 /// </summary>
-[MemoryDiagnoser]
 public class SelectionMatcherBenchmarks
 {
     /// <summary>

@@ -31,7 +31,6 @@ namespace DemaConsulting.ReviewCenter.Benchmarks;
 ///     the design of <c>AuditStore</c> walks an index in keyset order and stops when the page is full, so the time of
 ///     a page should not grow with the length of the trail.
 /// </summary>
-[MemoryDiagnoser]
 public class AuditStoreBenchmarks
 {
     /// <summary>

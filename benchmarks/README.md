@@ -9,10 +9,10 @@ build never run it, and it is excluded from ReviewMark. The solution build compi
 
 ## Benchmarks
 
-| Benchmark | Design property | Design document |
-| :--- | :--- | :--- |
-| `AuditStoreBenchmarks` | The time of a filtered page read does not grow with the length of the audit trail | AuditStore |
-| `SelectionMatcherBenchmarks` | Matching many `**` segments grows with the product of the segment counts | SelectionMatcher |
+| Benchmark | Design property (recorded in the design of the unit) |
+| :--- | :--- |
+| `AuditStoreBenchmarks` | A filtered page read does not grow with the length of the audit trail |
+| `SelectionMatcherBenchmarks` | Matching many `**` segments grows with the product of the segment counts |
 
 ## Running
 
