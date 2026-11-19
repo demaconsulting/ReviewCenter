@@ -492,6 +492,7 @@ reviews:
       - "docs/design/review-center/web.md"
       - "docs/verification/review-center/web.md"
       - "test/**/Web/WebSubsystemTests.cs"
+      - "test/DemaConsulting.ReviewCenter.SystemTests/WebSubsystemBrowserTests.cs"
       - "src/**/Web/ProjectViewGuard.cs"
       - "test/**/Web/ProjectViewGuardTests.cs"
       - "test/**/TestWebApp.cs"

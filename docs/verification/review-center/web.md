@@ -11,11 +11,17 @@ HTML. Behavior that needs a live browser connection (typing, selecting files, su
 the `data-interactive` marker from `false` to `true`) is outside what plain HTTP requests can exercise. It is
 verified at unit level by the component tests of the page units (see the children of the requirements in
 `web.yaml`), not by these subsystem tests; the browser system tests drive a real browser against a real server over the
-live connection (sign in, open Projects from the header, create a project).
+live connection (sign in, open Projects from the header, create a project). What a page looks like needs a layout engine,
+which the in-memory server does not have (it serves no static files), so the subsystem tests in
+`WebSubsystemBrowserTests.cs` of the system test project measure the rendered pages of a real server in a real browser
+through the Puppeting library: the width of a diff on a phone, the line comment control on hover, keyboard focus, and a
+touch screen, and the hover fill of the transparent buttons in the dark theme. No test reads the stylesheet source.
 
 ### Test Environment
 
-N/A - standard test environment (temporary SQLite databases are created by the test helper).
+Standard test environment (temporary SQLite databases are created by the test helper). The tests in
+`WebSubsystemBrowserTests.cs` need Chromium (installed by Playwright) and git; they skip when either is missing, and
+fail instead where `REVIEWCENTER_REQUIRE_CHROMIUM=true`, as in CI.
 
 ### Acceptance Criteria
 
@@ -65,9 +71,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   `ReviewCenter-Web-RepositoryReviews` and `ReviewCenter-Web-RepositoryReviews-*` and their children in `web.yaml`).
 - The diff view of a review page (collapsed unchanged lines, line comments on both sides, threads under their lines,
   and the too-large state) needs a live connection, so it is verified at unit level by the component tests of
-  `ReviewPage`; the subsystem test reads the stylesheet that keeps the code area scrolling inside itself on a phone
-  (see the requirements `ReviewCenter-Web-DiffReview-PhoneLayout` and `ReviewCenter-Web-DiffReview-LineComment` in
-  `web.yaml`).
+  `ReviewPage`; the subsystem tests in a real browser measure the width of the diff on a phone and the line comment
+  control on hover, focus, and touch (see the requirements `ReviewCenter-Web-DiffReview-PhoneLayout` and
+  `ReviewCenter-Web-DiffReview-LineComment` in `web.yaml`).
 - The plan page and the planning links need a live connection for the form and the creation, so they are verified at
   unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the requirements
   `ReviewCenter-Web-PlanReviews` and `ReviewCenter-Web-PlanReviews-*` and their children in `web.yaml`); the subsystem
@@ -147,25 +153,27 @@ thread, the index lists the open thread with an activity time read back from the
 is collapsed. This scenario is tested by
 `WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
 
-**WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself**: The stylesheet source is read and checked for the
-rules that keep the diff inside the page width: each row is a grid of two equal columns, long lines wrap inside their
-cell, the code area still scrolls inside itself as a safety net, empty placeholders are muted, inline threads and
-collapsed-run buttons stick to the left edge, below 40 rem the cells stack and the placeholders and the repeated
-baseline copy of an unchanged line are hidden, and a narrower line-number gutter applies on a phone. This scenario
-is tested by
-`WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
-pixels is checked in a real browser by the acceptance walk-through.
+**WebSubsystem_DiffView_PhoneWidth_StacksSidesAndPageDoesNotScrollSideways**: In a real browser, the diff of a change
+with a line of 400 characters without a space is shown at 1280 pixels, where the two sides of the changed line are next
+to each other, and then at 390 by 844 pixels, where the head side is below the baseline side, every line ends inside
+the screen, and the page is no wider than the screen. This scenario is tested by
+`WebSubsystem_DiffView_PhoneWidth_StacksSidesAndPageDoesNotScrollSideways`.
 
-**WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled**: The stylesheet source is read and checked: no `a.thread-link`
-rule makes
-the link look like plain text, and the thread header sizes the link like the buttons beside it, so the link and the Copy
-link button of a thread look alike. This scenario is tested by `WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled`.
+**WebSubsystem_DiffView_LineCommentControl_ShowsOnHoverFocusAndTouch**: In a real browser, the computed opacity of the
+`+` control of a diff line is 0 at rest (while it stays in the layout and the tab order), 1 while its row is hovered, 0
+again after the mouse leaves, 1 with keyboard focus, and 1 at rest on an emulated touch screen, where the `hover` media
+feature is `none`. This scenario is tested by `WebSubsystem_DiffView_LineCommentControl_ShowsOnHoverFocusAndTouch`.
 
-**WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: The stylesheet source is read and the rules of
-the `+` control of a diff row are checked: it is hidden with `opacity: 0`, shown on row hover, focus within the row, a
-selected row, and keyboard focus, always shown under `@media (hover: none)`, and never taken out of the layout or the
-tab order with `display: none` or `visibility: hidden`. This scenario is tested by
-`WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch`.
+**WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent**: In a real browser with the dark theme, the
+computed background of the `+` control of a diff line and of a section toggle of the checklist page, while hovered, is
+the soft accent color of the theme and not the hover accent of the other buttons, and the section toggle keeps the text
+color. This scenario is tested by `WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent`.
+
+**WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves**: Through the real pipeline, the
+address of a file, of a line, and of a thread each serve the review page with the file selected; the line address
+focuses the line and the thread address focuses that thread only. Every thread shows a link, styled as an action button,
+whose address is its own. This scenario is tested by
+`WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves`.
 
 **Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery**: The router is rendered for a signed-out visitor at the
 address of a line link of a file whose name has a space and a hash, with a baseline side. The "Sign in required" link

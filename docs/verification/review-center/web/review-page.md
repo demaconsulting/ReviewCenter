@@ -1085,22 +1085,12 @@ a manual clock, two clicks 1.5 seconds apart and the clock advanced by another 1
 with the function answering false the status reads "Copy failed", the button still reads "Copy link", and the thread
 link is unchanged. These scenarios are tested by the tests of those names.
 
-**WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled**: the stylesheet has no `a.thread-link` rule that strips the
-button look, and the thread header gives the link and the buttons the same padding and font size. This scenario is
-tested by the test of that name.
-
-**WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: the stylesheet hides the `+` control of a diff
-row with `opacity: 0`, reveals it on row hover, focus within the row, a selected row, and keyboard focus, shows it
-always under `@media (hover: none)`, and never uses `display: none` or `visibility: hidden` for it, so it stays in the
-tab order. This scenario is tested by the test of that name. A real browser has the hover state, so the reach is also
-proven end to end by the browser system test
-`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (a hover on a row
-reveals its `+`, and a click on it opens the composer).
-
-**WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill**: the stylesheet has a hover and focus rule for
-`.section-toggle` and for `.line-comment` that fills with `var(--accent-soft)` and never with `--accent-hover`, and the
-section toggle keeps `var(--text)` as its color, so the text stays readable on a dark theme. This scenario is tested by
-the test of that name.
+The look of the thread link, the reveal of the `+` control on hover, focus, and touch, and the hover fill of the
+transparent buttons are verified on the rendered page in a real browser by the Web subsystem tests
+`WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves`,
+`WebSubsystem_DiffView_LineCommentControl_ShowsOnHoverFocusAndTouch`, and
+`WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent` (see *Web Verification*), and end to end by the
+browser system test `PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer`.
 
 **ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine**: a theory over file paths with nested directories,
 spaces, `#`, `?`, `%`, a literal `%2F`, a literal `%20`, `+`, `&` and non-ASCII letters, next to a decoy file; the link

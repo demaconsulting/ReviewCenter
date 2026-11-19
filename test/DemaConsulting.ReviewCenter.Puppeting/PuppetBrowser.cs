@@ -101,6 +101,11 @@ public sealed class PuppetBrowser : IAsyncDisposable
     private IBrowserContext _context = null!;
     private IPage _page = null!;
 
+    /// <summary>
+    ///     Whether the page emulates a touch screen; remembered so that reset keeps it.
+    /// </summary>
+    private bool _touch;
+
     private PuppetBrowser(IPlaywright playwright, IBrowser browser, string? baseUrl, ViewportSize viewport, float timeoutMs)
     {
         _playwright = playwright;
@@ -491,6 +496,23 @@ public sealed class PuppetBrowser : IAsyncDisposable
     }
 
     /// <summary>
+    ///     Emulates a touch screen (a primary pointer that cannot hover, as the CSS <c>hover</c> media feature reports
+    ///     it) or a mouse; it is kept by <see cref="ResetAsync"/>. Changing it starts a new page in a new context, like
+    ///     <see cref="ResetAsync"/>, so the caller signs in and navigates again.
+    /// </summary>
+    /// <param name="touch">Whether to emulate a touch screen.</param>
+    /// <returns>A task that completes when the new page exists.</returns>
+    public Task SetTouchAsync(bool touch)
+    {
+        return ActAsync("touch", [touch ? "on" : "off"], async () =>
+        {
+            _touch = touch;
+            await _context.CloseAsync();
+            await NewPageAsync();
+        });
+    }
+
+    /// <summary>
     ///     Evaluates a JavaScript expression in the page.
     /// </summary>
     /// <param name="expression">The expression.</param>
@@ -743,7 +765,7 @@ public sealed class PuppetBrowser : IAsyncDisposable
     {
         _events.Clear();
         _reported = 0;
-        _context = await _browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = _viewport, ColorScheme = _scheme });
+        _context = await _browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = _viewport, ColorScheme = _scheme, HasTouch = _touch, IsMobile = _touch });
         _context.SetDefaultTimeout(_timeoutMs);
         _context.SetDefaultNavigationTimeout(30000);
         _page = await _context.NewPageAsync();

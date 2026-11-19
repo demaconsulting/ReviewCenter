@@ -22,6 +22,7 @@ using System.Text.RegularExpressions;
 using AngleSharp.Html.Parser;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -599,98 +600,57 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the stylesheet of the app keeps a long line of a diff inside the code area
-    ///     and keeps the phone layout narrow, so the page itself never scrolls sideways.
-    /// </summary>
-    /// <remarks>
-    ///     The in-memory browser has no layout engine, so the rendered width at 390 pixels is measured by the
-    ///     Puppet walk-through; this test guards the rules that width depends on.
-    /// </remarks>
-    [Fact]
-    public async Task WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself()
-    {
-        // Arrange and Act: read the stylesheet the shell links to
-        var css = await ReadStylesheetAsync();
-
-        // Assert: the stylesheet lays the diff out as two columns per row, wraps long lines inside their cell, keeps the
-        // code area from widening the page, keeps inline threads and the collapsed-run button in view, stacks the
-        // cells and hides the placeholders on a narrow screen, and gives a phone a narrower gutter
-        Assert.Matches(@"\.diff-code\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;", css);
-        Assert.Matches(@"\.diff-pair\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\)\s+\w+\(0,\s*1fr\);", css);
-        Assert.Matches(@"\.diff-row\s*\{[^}]*min-width:\s*0;", css);
-        Assert.Matches(@"\.diff-row \.line-text\s*\{[^}]*white-space:\s*pre-wrap;[^}]*overflow-wrap:\s*anywhere;", css);
-        Assert.Matches(@"\.diff-row\.empty,\s*\.diff-row\.empty \.gutter\s*\{[^}]*background:", css);
-        Assert.Matches(@"\.diff-inline\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
-        Assert.Matches(@"\.diff-gap\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
-        Assert.Matches(
-            @"@media \(max-width: 39\.99rem\)\s*\{\s*\.diff-pair\s*\{[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\);\s*\}\s*\.diff-row\.empty,\s*\.diff-row\.context\.left\s*\{[^}]*display:\s*none;",
-            css);
-        Assert.Matches(@"@media \(max-width: 29\.99rem\)\s*\{\s*\.diff-row \.line-no\s*\{[^}]*min-width:", css);
-    }
-
-    /// <summary>
-    ///     Test that the stylesheet reveals the + control of a diff line on row hover and keyboard focus (and always
-    ///     on touch screens) without removing it from the layout or the tab order.
+    ///     Test that the addresses of a file, a line, and a thread of a review open the review page at that place
+    ///     through the real pipeline, and that every thread on the page shows a button-styled link to its own address.
     /// </summary>
     [Fact]
-    public async Task WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch()
+    public async Task WebSubsystem_DeepLinks_FileLineAndThread_OpenThePageThereAndThreadsLinkThemselves()
     {
-        // Arrange and Act: read the stylesheet the shell links to
-        var css = await ReadStylesheetAsync();
+        // Arrange: start the real pipeline and create a review of one file with two threads on its first line
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var client = browser.Client;
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, cancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        var threads = app.Services.GetRequiredService<ThreadService>();
+        var first = await threads.StartThreadAsync(
+            project.Id, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "First", cancellationToken);
+        var second = await threads.StartThreadAsync(
+            project.Id, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Second", cancellationToken);
 
-        // Assert: hidden by opacity by default, revealed on hover, focus within, a selected row and focus-visible
-        Assert.Matches(@"\.diff-row \.line-comment\s*\{[^}]*opacity:\s*0;", css);
-        Assert.Matches(
-            @"\.diff-row:hover \.line-comment,\s*\.diff-row:focus-within \.line-comment,[^{]*\.diff-row \.line-comment:focus-visible\s*\{[^}]*opacity:\s*1;",
-            css);
+        // Act: request the addresses of the file, of its first line, and of the second thread
+        var file = await ParseAsync(client, ReviewLinks.ForFile(project.Id, "rev-1", "a.txt"));
+        var line = await ParseAsync(client, ReviewLinks.ForFile(project.Id, "rev-1", "a.txt", 1));
+        var thread = await ParseAsync(client, ReviewLinks.ForThread(project.Id, "rev-1", second.Id));
 
-        // Assert: always visible where there is no hover
-        Assert.Matches(@"@media \(hover: none\)\s*\{\s*\.diff-row \.line-comment\s*\{[^}]*opacity:\s*1;", css);
-
-        // Assert: never taken out of the layout or the tab order
-        Assert.DoesNotMatch(@"\.line-comment[^{]*\{[^}]*display:\s*none", css);
-        Assert.DoesNotMatch(@"\.line-comment[^{]*\{[^}]*visibility:\s*hidden", css);
-    }
-
-    /// <summary>
-    ///     Test that the stylesheet shows the per-thread link as a button-styled link, not as the quiet underlined
-    ///     text link it used to be.
-    /// </summary>
-    [Fact]
-    public async Task WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled()
-    {
-        // Arrange and Act: read the stylesheet the shell links to
-        var css = await ReadStylesheetAsync();
-
-        // Assert: no dedicated rule strips the link of its button look, and the thread header sizes the link
-        // like the buttons beside it
-        Assert.DoesNotMatch(@"a\.thread-link\s*\{", css);
-        Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*padding:", css);
-        Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*font-size:", css);
-    }
-
-    /// <summary>
-    ///     Test that the stylesheet gives the checklist section toggle and the line comment button their own hover
-    ///     look instead of the global button hover fill, which left their text close to unreadable on a dark theme.
-    /// </summary>
-    [Fact]
-    public async Task WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill()
-    {
-        // Arrange and Act: read the stylesheet the shell links to
-        var css = await ReadStylesheetAsync();
-
-        // Assert: both buttons define a hover rule that fills with the soft accent and never with the hover accent
-        foreach (var selector in new[] { @"\.section-toggle", @"\.line-comment" })
+        // Assert: each address opens the review with the file selected, the line address focuses the line, and the
+        // thread address focuses that thread only
+        foreach (var page in new[] { file, line, thread })
         {
-            var match = System.Text.RegularExpressions.Regex.Match(
-                css, selector + @":hover,\s*" + selector + @":focus-visible\s*\{(?<body>[^}]*)\}");
-            Assert.True(match.Success, $"{selector} has no hover rule.");
-            Assert.Contains("background: var(--accent-soft)", match.Groups["body"].Value, StringComparison.Ordinal);
-            Assert.DoesNotContain("--accent-hover", match.Groups["body"].Value, StringComparison.Ordinal);
+            Assert.Equal("a.txt", page.QuerySelector("[data-testid='selected-file-path']")?.TextContent);
         }
 
-        // Assert: the section toggle keeps its text color on hover
-        Assert.Matches(@"\.section-toggle:hover,\s*\.section-toggle:focus-visible\s*\{[^}]*color:\s*var\(--text\)", css);
+        var focusedLine = line.QuerySelector("[data-testid='code-line-1']");
+        var focusedThread = thread.QuerySelector($"[data-testid='thread-{second.Id}']");
+        var otherThread = thread.QuerySelector($"[data-testid='thread-{first.Id}']");
+        Assert.NotNull(focusedLine);
+        Assert.NotNull(focusedThread);
+        Assert.NotNull(otherThread);
+        Assert.Contains("focused", focusedLine.ClassList);
+        Assert.Contains("focused", focusedThread.ClassList);
+        Assert.DoesNotContain("focused", otherThread.ClassList);
+
+        // Assert: every thread shows a link to its own address, styled as an action button
+        foreach (var id in new[] { first.Id, second.Id })
+        {
+            var link = thread.QuerySelector($"[data-testid='thread-link-{id}']");
+            Assert.NotNull(link);
+            Assert.Equal(ReviewLinks.ForThread(project.Id, "rev-1", id), link.GetAttribute("href"));
+            Assert.Contains("action", link.ClassList);
+        }
     }
 
     /// <summary>
@@ -734,25 +694,6 @@ public partial class WebSubsystemTests
             Assert.NotNull(document.QuerySelector($"[data-testid='{breadcrumb}']"));
             Assert.Single(ids, header);
         }
-    }
-
-    /// <summary>
-    ///     Reads the stylesheet the shell links to. The in-memory host does not serve static files, so it is read
-    ///     from the project that ships it.
-    /// </summary>
-    /// <returns>The text of <c>app.css</c>.</returns>
-    private static async Task<string> ReadStylesheetAsync()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DemaConsulting.ReviewCenter.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        Assert.NotNull(directory);
-        return await File.ReadAllTextAsync(
-            Path.Combine(directory.FullName, "src", "DemaConsulting.ReviewCenter", "wwwroot", "app.css"),
-            TestContext.Current.CancellationToken);
     }
 
     /// <summary>
