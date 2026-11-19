@@ -20,6 +20,7 @@ needs-review:
   - "!**/bin/**"                  # Exclude build output
   - "!node_modules/**"            # Exclude npm dependencies
   - "!**/.venv/**"                # Exclude Python virtual environment
+  - "!benchmarks/**"              # Exclude the opt-in benchmarks (developer tooling, not a software item)
 
 # Evidence source: review data and index.json are located in the 'reviews' branch
 # of this repository, accessed through the GitHub public HTTPS raw content access.
