@@ -224,8 +224,8 @@ sections:
 
       - id: ReviewCenter-GitRunner-Timeout-Ends
         title: >-
-          The GitRunner class shall return from a git call that never answers within 30 seconds when the configured time
-          limit is one second.
+          The GitRunner class shall return from a git call that never answers once the configured time limit has
+          passed, without waiting for git to end by itself.
         justification: |
           A run that does not return would hold the page and the lock on the repository for ever, even after the limit
           has passed.

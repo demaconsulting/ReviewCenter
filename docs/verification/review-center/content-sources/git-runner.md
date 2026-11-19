@@ -9,7 +9,8 @@ with known secrets in every form git might print them. The behavior of the proce
 the time limit, and the version check) is verified against a real git, against an executable name that does not exist,
 and against a script that reports an old version, using the test-only constructor that takes the executable. The
 time limit is verified with a local server on the loopback address that accepts a connection and never answers, so that
-the runner must stop git itself; the credential header and the redaction of a refusal are verified with a local server
+the runner must stop git itself, and with a fake git script on a clock that only the test moves, so that the limit
+passes only once the fake git has started; the credential header and the redaction of a refusal are verified with a local server
 that answers `401` and records the request. Tests that need git skip themselves when git is not installed.
 
 #### Test Environment
@@ -125,20 +126,21 @@ no output, while a valid revision resolves with the same call. This scenario is 
 `GitAccessFailed`. This scenario is tested by `GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed`.
 
 **GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit**: A call to a server that never answers is
-stopped at the time limit of one second with `GitTimeout`, and the call returns in less than 30 seconds. This scenario
-is tested by
+stopped at the time limit of one second with `GitTimeout`, a rule that only the time limit raises, so the call returned
+instead of waiting for git; a call that kept waiting would end the test at its own timeout. No elapsed time is
+measured. This scenario is tested by
 `GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit`.
 
 **GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself**: A fake git program (a script) answers the version check, and
-for the next call writes one line to a file every second and never ends. With a time limit of two seconds the call ends
-with `GitTimeout`; the file has lines from before the stop, and half a second after the stop and again two and a half
-seconds later its size is the same, so the fake git is gone. This scenario is tested by
-`GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself`.
+for the next call holds a lock file open and never ends. The time limit runs on a clock that only the test moves: the
+test waits until the fake git (and its child) hold their lock files, then moves the clock past the limit of two seconds.
+The call ends with `GitTimeout`, and the lock file of the fake git is released, which happens only when the program has
+ended. This scenario is tested by `GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself`.
 
 **GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess**: The same fake git also starts a child program that
-writes one line to its own file every second and never ends. After the call has ended with `GitTimeout`, the file of the
-child has lines from before the stop and does not grow any more, so the child of git is gone as well. This scenario is
-tested by `GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess`.
+holds its own lock file open and never ends. After the call has ended with `GitTimeout`, the lock file of the child is
+released as well, so the child of git is gone. This scenario is tested by
+`GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess`.
 
 **GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret**: Git sends the token as a basic authorization
 header to a local server that refuses it; the refusal is `GitAccessFailed` with the denied-access message, and neither

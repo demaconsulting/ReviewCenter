@@ -1849,6 +1849,7 @@ reviews:
       - "src/**/ContentSources/GitRunner.cs"
       - "src/**/ContentSources/GitOptions.cs"
       - "test/**/ContentSources/GitRunnerTests.cs"
+      - "test/**/Messaging/StepClock.cs"
 
   - id: ReviewCenter-ContentSources-GitSource
     title: Review of ReviewCenter GitSource unit implementation

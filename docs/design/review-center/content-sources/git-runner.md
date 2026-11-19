@@ -68,7 +68,9 @@ repeated at the next call.
 - *Preconditions*: `arguments` is not null.
 - *Postconditions*: The process has ended and its streams are drained.
 - *Algorithm*: Check the git version once; start the process; read standard output up to the limit and keep the tail of
-  standard error, both concurrently; wait for the exit under a time limit linked to the cancellation token.
+  standard error, both concurrently; wait for the exit under a time limit linked to the cancellation token. The limit
+  runs on a `TimeProvider` (the system clock; an internal constructor takes another one, so tests pass the limit at
+  a moment of their choosing instead of waiting for it).
   If the limit passes, kill the whole process tree and throw `GitTimeout`; if the output is larger than the limit,
   kill the process tree and throw `GitAccessFailed`; if the caller cancels, kill the process tree and rethrow the
   cancellation.
