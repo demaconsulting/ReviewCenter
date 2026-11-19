@@ -127,41 +127,55 @@ public class WebSubsystemBrowserTests
     [Fact]
     public async Task WebSubsystem_TransparentButtons_DarkThemeHover_FillWithTheSoftAccent()
     {
-        // Arrange: a review of a change, open in the diff view, in the dark theme
+        // Arrange: a review of a change, open in the diff view
         var cancellation = TestContext.Current.CancellationToken;
         await using var fixture = await DiffFixture.StartAsync(cancellation);
         var browser = fixture.Browser;
-        await browser.SetColorSchemeAsync(dark: true);
 
         // The computed value of a color variable of the theme, read through a probe element
         async Task<string> ThemeColorAsync(string variable, string property) => await browser.ValueOfAsync(
             "(() => { const p = document.createElement('span'); p.style." + property + " = 'var(" + variable + ")';"
             + " document.body.appendChild(p); const v = getComputedStyle(p)." + property + "; p.remove(); return v; })()");
+
+        // Arrange: switch to the dark theme and wait until the page has applied it
+        var lightSoftAccent = await ThemeColorAsync("--accent-soft", "backgroundColor");
+        await browser.SetColorSchemeAsync(dark: true);
+        await browser.WaitUntilAsync(
+            async () => await ThemeColorAsync("--accent-soft", "backgroundColor") != lightSoftAccent, "the dark theme");
+        var softAccent = await ThemeColorAsync("--accent-soft", "backgroundColor");
+        var hoverAccent = await ThemeColorAsync("--accent-hover", "backgroundColor");
+
+        // Hovers an element and returns its computed background once it is the soft accent of the dark theme (the
+        // fill fades in), or the last value seen when it never is
         async Task<string> HoverBackgroundAsync(string testId, string selector)
         {
             await browser.MouseMoveAsync(0, 0);
             await browser.HoverAsync(testId);
             var value = string.Empty;
-            await browser.WaitUntilAsync(
-                async () =>
+            for (var attempt = 0; attempt < 100 && value != softAccent; attempt++)
+            {
+                value = await browser.ValueOfAsync($"getComputedStyle(document.querySelector('{selector}')).backgroundColor");
+                if (value != softAccent)
                 {
-                    value = await browser.ValueOfAsync($"getComputedStyle(document.querySelector('{selector}')).backgroundColor");
-                    return value == await ThemeColorAsync("--accent-soft", "backgroundColor");
-                },
-                $"the hover fill of {testId}");
+                    await Task.Delay(100, cancellation);
+                }
+            }
+
             return value;
         }
 
         // Act: hover the + of a diff line, then the first section toggle of the checklist
-        var softAccent = await ThemeColorAsync("--accent-soft", "backgroundColor");
-        var hoverAccent = await ThemeColorAsync("--accent-hover", "backgroundColor");
         var lineComment = await HoverBackgroundAsync("diff-comment-2", "[data-testid=diff-comment-2]");
         await browser.OpenPageAsync($"/projects/1/reviews/{DiffFixture.ReviewId}/checklist", "checklist-page");
+        await browser.WaitUntilAsync(
+            async () => await ThemeColorAsync("--accent-soft", "backgroundColor") == softAccent, "the dark theme");
         var toggleId = await browser.ValueOfAsync("document.querySelector('.section-toggle').dataset.testid");
         var toggle = await HoverBackgroundAsync(toggleId, ".section-toggle");
         var toggleText = await browser.ValueOfAsync("getComputedStyle(document.querySelector('.section-toggle')).color");
 
-        // Assert: both fill with the soft accent and not the hover accent, and the toggle keeps the text color
+        // Assert: in the dark theme both fill with the soft accent and not the hover accent, and the toggle keeps the
+        // text color
+        Assert.NotEqual(lightSoftAccent, softAccent);
         Assert.NotEqual(softAccent, hoverAccent);
         Assert.Equal(softAccent, lineComment);
         Assert.Equal(softAccent, toggle);
