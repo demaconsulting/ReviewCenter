@@ -27,9 +27,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     An action code is <c>group.name</c>; a group (for example <c>review.</c>, written with its dot) is what a
 ///     person means by "all review actions". The list exists so that the audit pages offer the real codes instead
 ///     of a free text field, and it lives in one place so the pages cannot drift apart. It is not what the audit
-///     service accepts or stores (any code can be recorded and any code can be filtered by); a test scans the
-///     product sources for action codes and fails when a code is missing here or a code listed here is no longer
-///     recorded, so the list cannot silently go stale. The class is stateless and thread-safe.
+///     service accepts or stores (any code can be recorded and any code can be filtered by); a lint check
+///     (<c>lint.ps1</c>) scans the product sources for action codes and fails when a code is missing here or a code
+///     listed here is no longer recorded, so the list cannot silently go stale. The class is stateless and thread-safe.
 /// </remarks>
 public static class AuditActions
 {

@@ -260,7 +260,8 @@ to its last instant.
 `attestation.`, `audit.`, `auth.`, `checklist.`, `notification.`, `project.`, `repository.`, `review.`, `signature.`,
 `slot.`, `thread.`, `token.`, `user.`), and the lookups `InGroup`, `IsKnownAction` and `IsKnownPrefix`. The pages offer
 these as the choices of the action filter and accept no other value from an address. The list is kept in step with the
-code by a test that scans the product sources for the action codes passed to an audit draft.
+code by a lint check (`lint.ps1`, "source rules") that scans the product sources for the action codes passed to an
+audit draft; this is a property of the source, so it is checked by the lint gate of every build and not by a test.
 
 **VerifyAsync**: Verifies the whole chain.
 
