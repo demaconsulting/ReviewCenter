@@ -191,13 +191,14 @@ sections:
 
       - id: ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
         title: >-
-          The Utilities subsystem shall stop waiting for a file that stays held open in less than three seconds.
+          The Utilities subsystem shall give up removing a temporary directory whose file stays held open after a
+          bounded number of attempts, without an error.
         justification: |
           A lock that never goes away must not stall the end of a run, which is why the retry has a bound.
         children:
           - ReviewCenter-TemporaryDirectory-BoundedRetry-Default
         tests:
-          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeGivesUpAfterBoundedAttempts
 
       - id: ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
         title: >-

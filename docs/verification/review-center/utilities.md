@@ -32,8 +32,9 @@ N/A - standard test environment.
   of them is held open (`TempFiles-Removed`), and disposing a second time does not throw (`TempFiles-Removed-Repeated`).
 - On Windows, a file that is released while the removal retries lets the whole directory be removed
   (`TempFiles-Removed-Retry`); a file that stays open makes the disposal return without an exception and leave the
-  directory (`TempFiles-LockedFile`), in less than three seconds (`TempFiles-LockedFile-Bounded`), and a policy of one
-  attempt does not pause (`TempFiles-LockedFile-NoFinalPause`). These tests skip on other platforms, where an open file
+  directory (`TempFiles-LockedFile`), after a bounded number of attempts (`TempFiles-LockedFile-Bounded`), and a policy
+  of one attempt does not pause (`TempFiles-LockedFile-NoFinalPause`). The pauses between attempts are recorded by a
+  stand-in instead of being waited for and measured. These tests skip on other platforms, where an open file
   does not block a delete.
 - A retry policy with no attempt or a negative pause is rejected (`TempFiles-InvalidPolicy`).
 - A secret file written to a `TemporaryDirectory` is resolved by `SecretSource` as its trimmed contents
@@ -80,23 +81,23 @@ then disposed again; the second call does not throw and the directory is gone. T
 `UtilitiesSubsystem_TemporaryDirectoryWorkflow_DisposedTwice_DoesNotThrow`.
 
 **UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved**: On Windows, a file in a
-nested folder is held open for about 100 ms while the directory, with 40 attempts 50 ms apart, is disposed; the
-disposal does not throw and the whole directory is gone. This scenario is tested by
-`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved`.
+nested folder is held open while the directory, with 40 attempts 50 ms apart, is disposed, and is released during the
+first pause; the disposal does not throw, a retry followed the pause, and the whole directory is gone. This scenario
+is tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved`.
 
 **UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing**: On Windows, a
 file stays open while a directory with the default policy is disposed; the disposal does not throw and the directory
 is still there, and after the file is released a second disposal removes it. This scenario is tested by
 `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing`.
 
-**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime**: On Windows, a file stays
-open while a directory with the default policy is disposed; the disposal returns in less than three seconds. This
-scenario is tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime`.
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeGivesUpAfterBoundedAttempts**: On Windows, a file
+stays open while a directory with the default policy is disposed; the disposal does not throw, the directory stays,
+and one pause fewer than the default number of attempts was asked for. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeGivesUpAfterBoundedAttempts`.
 
 **UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause**: On Windows, a file stays
-open while a directory with one attempt and a 30 second pause is disposed; the disposal returns in less than five
-seconds, so the pause is never taken. This scenario is tested by
-`UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause`.
+open while a directory with one attempt and a 30 second pause is disposed; no pause is asked for. This scenario is
+tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause`.
 
 **UtilitiesSubsystem_TemporaryDirectoryWorkflow_InvalidRetryPolicy_IsRejected**: Directories are created with 0
 attempts, with -1 attempts, and with a pause of -1 ms; each creation throws `ArgumentOutOfRangeException`. This

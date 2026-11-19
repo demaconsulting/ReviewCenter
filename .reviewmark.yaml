@@ -190,6 +190,7 @@ reviews:
       - "docs/design/review-center/utilities.md"
       - "docs/verification/review-center/utilities.md"
       - "test/**/Utilities/UtilitiesSubsystemTests.cs"
+      - "test/**/Utilities/PauseRecorder.cs"
 
   - id: ReviewCenter-Utilities-PathHelpers
     title: Review of ReviewCenter PathHelpers unit implementation
@@ -218,6 +219,7 @@ reviews:
       - "docs/verification/review-center/utilities/temporary-directory.md"
       - "src/**/Utilities/TemporaryDirectory.cs"
       - "test/**/Utilities/TemporaryDirectoryTests.cs"
+      - "test/**/Utilities/PauseRecorder.cs"
 
   - id: ReviewCenter-Utilities-SecretSource
     title: Review of ReviewCenter SecretSource unit implementation
