@@ -103,9 +103,32 @@ from `.github/standards/`. Use this matrix to determine which to load:
 - **Review configuration**: `software-items.md`, `reviewmark-usage.md`
 - **Software structure**: `sysml2-modeling.md`
 - **Any documentation**: `technical-documentation.md`
+- **Reading PDF or Office documents**: the `docdown` skill
 - **Requirements wording and splitting**: also follow "Atomic Requirements" in `CONTRIBUTING.md`
 
 Load only the standards relevant to your specific task scope.
+
+# Repository-Specific Standards Exceptions
+
+The files in `.github/standards/` are shared verbatim across repositories. This repository applies these accepted
+exceptions on top of them:
+
+## Existing Internals-Based Tests (`testing-principles.md`, "Assert Observable Behavior")
+
+Some existing requirement-linked tests predate the "Assert Observable Behavior" rule and assert on things it now
+lists as off-limits:
+
+- Wall-clock budgets and timing bounds (for example the retry/back-off tests in `Utilities/`, the elapsed-time
+  check in `SelfTest/ValidationTests.cs`, and the "completes within N seconds" checks in `GitRunnerTests`,
+  `AuditStoreFilterTests`, `ReviewProgressServiceTests`, `SelectionMatcherTests`, and `SelfTestSubsystemTests`)
+- Garbage-collector reachability (weak references and finalizers via `ForcedGarbageCollection`)
+- Private state through reflection (`Web/AppTests.cs` and `Web/ReviewPageDiffTests.cs`)
+- Text of checked-in repository files (source scans in `AuditActionsTests` and `ApiEndpointsMaskingTests`, the
+  repository `.reviewmark.yaml` in `ReviewMarkConfigParserTests`, and `wwwroot/app.css` in `WebSubsystemTests`)
+
+These tests are accepted as they are: do not rewrite them just to satisfy the rule, and do not weaken the shared
+standard. New tests MUST follow the rule; when one of these tests is next changed for another reason, prefer moving
+it to observable behavior.
 
 # Agent Delegation Guidelines
 
