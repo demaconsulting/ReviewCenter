@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_NotificationStore {
     private import SoftwareItemMetadata::*;
 
     part def NotificationStore {

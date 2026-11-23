@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_OidcSignIn {
     private import SoftwareItemMetadata::*;
 
     part def OidcSignIn {

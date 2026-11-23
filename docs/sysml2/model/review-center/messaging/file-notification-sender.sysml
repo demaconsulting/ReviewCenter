@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_FileNotificationSender {
     private import SoftwareItemMetadata::*;
 
     part def FileNotificationSender {

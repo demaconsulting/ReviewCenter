@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TotpChallengeStore {
     private import SoftwareItemMetadata::*;
 
     part def TotpChallengeStore {

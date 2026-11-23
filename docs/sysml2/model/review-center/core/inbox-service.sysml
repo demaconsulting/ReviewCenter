@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_InboxService {
     private import SoftwareItemMetadata::*;
 
     part def InboxService {

@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_SignIn {
     private import SoftwareItemMetadata::*;
 
     part def SignIn {

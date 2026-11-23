@@ -1,4 +1,38 @@
-package ReviewCenter {
+package ReviewCenter_CoreSubsystem {
+    public import ReviewCenter_Fingerprint::*;
+    public import ReviewCenter_RecordDigest::*;
+    public import ReviewCenter_ProjectService::*;
+    public import ReviewCenter_ProjectAccess::*;
+    public import ReviewCenter_EvidenceSettingsService::*;
+    public import ReviewCenter_ProjectChecklistService::*;
+    public import ReviewCenter_ReviewProgressService::*;
+    public import ReviewCenter_ReviewService::*;
+    public import ReviewCenter_ThreadService::*;
+    public import ReviewCenter_ChecklistService::*;
+    public import ReviewCenter_UserService::*;
+    public import ReviewCenter_SigningService::*;
+    public import ReviewCenter_ReauthProofStore::*;
+    public import ReviewCenter_TotpService::*;
+    public import ReviewCenter_TotpChallengeStore::*;
+    public import ReviewCenter_AuditChain::*;
+    public import ReviewCenter_AuditService::*;
+    public import ReviewCenter_SelectionMatcher::*;
+    public import ReviewCenter_RevisionValidator::*;
+    public import ReviewCenter_RepositoryService::*;
+    public import ReviewCenter_ReviewPlanner::*;
+    public import ReviewCenter_LineDiff::*;
+    public import ReviewCenter_PersonalAccessTokenService::*;
+    public import ReviewCenter_InboxService::*;
+    public import ReviewCenter_UserImpactService::*;
+    public import ReviewCenter_BallotConsolidation::*;
+    public import ReviewCenter_BallotVisibility::*;
+    public import ReviewCenter_ReviewStatusService::*;
+    public import ReviewCenter_NotificationAddress::*;
+    public import ReviewCenter_NotificationMessage::*;
+    public import ReviewCenter_NotificationPreferenceService::*;
+    public import ReviewCenter_NotificationComposer::*;
+    public import ReviewCenter_DigestSchedule::*;
+    public import ReviewCenter_NotificationDispatcher::*;
     private import SoftwareItemMetadata::*;
 
     part def CoreSubsystem {

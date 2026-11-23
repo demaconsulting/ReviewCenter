@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_SelectionMatcher {
     private import SoftwareItemMetadata::*;
 
     part def SelectionMatcher {

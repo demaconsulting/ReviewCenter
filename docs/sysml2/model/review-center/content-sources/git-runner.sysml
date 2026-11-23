@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_GitRunner {
     private import SoftwareItemMetadata::*;
 
     part def GitRunner {

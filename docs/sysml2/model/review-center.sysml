@@ -1,4 +1,17 @@
 package ReviewCenter {
+    public import ReviewCenter_Program::*;
+    public import ReviewCenter_CliSubsystem::*;
+    public import ReviewCenter_SelfTestSubsystem::*;
+    public import ReviewCenter_UtilitiesSubsystem::*;
+    public import ReviewCenter_HostingSubsystem::*;
+    public import ReviewCenter_WebSubsystem::*;
+    public import ReviewCenter_IdentitySubsystem::*;
+    public import ReviewCenter_CoreSubsystem::*;
+    public import ReviewCenter_MessagingSubsystem::*;
+    public import ReviewCenter_StorageSubsystem::*;
+    public import ReviewCenter_ContentSourcesSubsystem::*;
+    public import ReviewCenter_EvidenceSubsystem::*;
+    public import ReviewCenter_ApiSubsystem::*;
     private import SoftwareItemMetadata::*;
 
     doc

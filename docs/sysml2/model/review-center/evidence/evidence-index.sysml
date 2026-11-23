@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_EvidenceIndexService {
     private import SoftwareItemMetadata::*;
 
     part def EvidenceIndexService {

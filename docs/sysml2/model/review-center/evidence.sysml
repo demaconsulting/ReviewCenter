@@ -1,4 +1,11 @@
-package ReviewCenter {
+package ReviewCenter_EvidenceSubsystem {
+    public import ReviewCenter_PdfDocumentWriter::*;
+    public import ReviewCenter_AttestationRenderer::*;
+    public import ReviewCenter_AttestationSigner::*;
+    public import ReviewCenter_AttestationKeyProvider::*;
+    public import ReviewCenter_AttestationService::*;
+    public import ReviewCenter_AttestationEndpoint::*;
+    public import ReviewCenter_EvidenceIndexService::*;
     private import SoftwareItemMetadata::*;
 
     part def EvidenceSubsystem {

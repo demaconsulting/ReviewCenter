@@ -3,11 +3,12 @@
 // its target part def directly. Per SysML2Tools syntax, 'expose' is only valid
 // inside a named 'view' usage (not a 'view def' definition), and it - not
 // 'render' - is what scopes the rendered diagram content.
-package ReviewCenter {
+package ReviewCenterDesignViews {
     private import StandardViewDefinitions::*;
+    private import ReviewCenter::*;
 
     view SoftwareStructureView : InterconnectionView {
-        expose ReviewCenter::**;
+        expose ReviewCenter::ReviewCenterSystem;
     }
 
     view ReviewCenterView {

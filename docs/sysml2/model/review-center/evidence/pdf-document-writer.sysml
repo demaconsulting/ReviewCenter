@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_PdfDocumentWriter {
     private import SoftwareItemMetadata::*;
 
     part def PdfDocumentWriter {

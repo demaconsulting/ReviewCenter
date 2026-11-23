@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_UserCommand {
     private import SoftwareItemMetadata::*;
 
     part def UserCommand {

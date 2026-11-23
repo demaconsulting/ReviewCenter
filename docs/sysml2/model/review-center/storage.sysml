@@ -1,4 +1,14 @@
-package ReviewCenter {
+package ReviewCenter_StorageSubsystem {
+    public import ReviewCenter_ReviewCenterDbContext::*;
+    public import ReviewCenter_ReviewStore::*;
+    public import ReviewCenter_UserStore::*;
+    public import ReviewCenter_AuditStore::*;
+    public import ReviewCenter_RepositoryStore::*;
+    public import ReviewCenter_PersonalAccessTokenStore::*;
+    public import ReviewCenter_TotpStore::*;
+    public import ReviewCenter_InboxStore::*;
+    public import ReviewCenter_NotificationStore::*;
+    public import ReviewCenter_DatabaseSetup::*;
     private import SoftwareItemMetadata::*;
 
     part def StorageSubsystem {

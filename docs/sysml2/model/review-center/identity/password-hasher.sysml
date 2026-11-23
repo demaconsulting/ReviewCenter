@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_PasswordHasher {
     private import SoftwareItemMetadata::*;
 
     part def PasswordHasher {

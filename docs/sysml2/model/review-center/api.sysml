@@ -1,4 +1,7 @@
-package ReviewCenter {
+package ReviewCenter_ApiSubsystem {
+    public import ReviewCenter_ApiTokenAuthentication::*;
+    public import ReviewCenter_ApiEndpoints::*;
+    public import ReviewCenter_ApiDocument::*;
     private import SoftwareItemMetadata::*;
 
     part def ApiSubsystem {

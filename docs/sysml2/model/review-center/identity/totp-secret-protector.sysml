@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TotpSecretProtector {
     private import SoftwareItemMetadata::*;
 
     part def TotpSecretProtector {
