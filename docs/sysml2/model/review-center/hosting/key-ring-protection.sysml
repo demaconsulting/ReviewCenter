@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_KeyRingProtection {
     private import SoftwareItemMetadata::*;
 
     part def KeyRingProtection {

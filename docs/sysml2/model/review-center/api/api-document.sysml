@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ApiDocument {
     private import SoftwareItemMetadata::*;
 
     part def ApiDocument {

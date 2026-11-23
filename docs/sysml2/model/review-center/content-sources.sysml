@@ -1,4 +1,8 @@
-package ReviewCenter {
+package ReviewCenter_ContentSourcesSubsystem {
+    public import ReviewCenter_GitRunner::*;
+    public import ReviewCenter_GitSource::*;
+    public import ReviewCenter_CredentialProtector::*;
+    public import ReviewCenter_ReviewSetParser::*;
     private import SoftwareItemMetadata::*;
 
     part def ContentSourcesSubsystem {

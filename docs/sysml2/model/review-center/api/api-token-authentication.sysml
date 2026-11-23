@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ApiTokenAuthentication {
     private import SoftwareItemMetadata::*;
 
     part def ApiTokenAuthentication {

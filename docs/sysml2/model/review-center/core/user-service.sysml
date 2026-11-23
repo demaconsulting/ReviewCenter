@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_UserService {
     private import SoftwareItemMetadata::*;
 
     part def UserService {

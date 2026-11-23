@@ -1,4 +1,8 @@
-package ReviewCenter {
+package ReviewCenter_MessagingSubsystem {
+    public import ReviewCenter_NotificationOptions::*;
+    public import ReviewCenter_SmtpNotificationSender::*;
+    public import ReviewCenter_FileNotificationSender::*;
+    public import ReviewCenter_NotificationWorker::*;
     private import SoftwareItemMetadata::*;
 
     part def MessagingSubsystem {

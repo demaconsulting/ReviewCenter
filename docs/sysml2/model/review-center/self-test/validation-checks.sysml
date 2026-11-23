@@ -1,4 +1,5 @@
-package ReviewCenter {
+package ReviewCenter_ValidationChecks {
+    private import ReviewCenter_TemporaryDirectory::*;
     private import SoftwareItemMetadata::*;
 
     part def ValidationChecks {

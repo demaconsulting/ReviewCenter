@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_SmtpNotificationSender {
     private import SoftwareItemMetadata::*;
 
     part def SmtpNotificationSender {

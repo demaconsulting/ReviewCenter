@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_BallotVisibility {
     private import SoftwareItemMetadata::*;
 
     part def BallotVisibility {

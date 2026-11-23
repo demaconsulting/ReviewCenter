@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_GitSource {
     private import SoftwareItemMetadata::*;
 
     part def GitSource {

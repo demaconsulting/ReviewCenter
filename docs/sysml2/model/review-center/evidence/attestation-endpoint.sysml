@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_AttestationEndpoint {
     private import SoftwareItemMetadata::*;
 
     part def AttestationEndpoint {

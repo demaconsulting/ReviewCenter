@@ -1,4 +1,10 @@
-package ReviewCenter {
+package ReviewCenter_HostingSubsystem {
+    public import ReviewCenter_ServerHost::*;
+    public import ReviewCenter_KeyRingProtection::*;
+    public import ReviewCenter_SecretScan::*;
+    public import ReviewCenter_UserCommand::*;
+    public import ReviewCenter_AuditCommand::*;
+    public import ReviewCenter_KeysCommand::*;
     private import SoftwareItemMetadata::*;
 
     part def HostingSubsystem {

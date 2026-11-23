@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_RevalidatingAuthenticationStateProvider {
     private import SoftwareItemMetadata::*;
 
     part def RevalidatingAuthenticationStateProvider {

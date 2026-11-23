@@ -1,4 +1,6 @@
-package ReviewCenter {
+package ReviewCenter_SelfTestSubsystem {
+    public import ReviewCenter_Validation::*;
+    public import ReviewCenter_ValidationChecks::*;
     private import SoftwareItemMetadata::*;
 
     part def SelfTestSubsystem {

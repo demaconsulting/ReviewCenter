@@ -1,4 +1,12 @@
-package ReviewCenter {
+package ReviewCenter_IdentitySubsystem {
+    public import ReviewCenter_PasswordHasher::*;
+    public import ReviewCenter_SignIn::*;
+    public import ReviewCenter_SignInThrottle::*;
+    public import ReviewCenter_OidcSignIn::*;
+    public import ReviewCenter_TotpAlgorithm::*;
+    public import ReviewCenter_TotpSecretProtector::*;
+    public import ReviewCenter_TotpSignIn::*;
+    public import ReviewCenter_RevalidatingAuthenticationStateProvider::*;
     private import SoftwareItemMetadata::*;
 
     part def IdentitySubsystem {

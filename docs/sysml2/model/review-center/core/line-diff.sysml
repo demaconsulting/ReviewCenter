@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_LineDiff {
     private import SoftwareItemMetadata::*;
 
     part def LineDiff {

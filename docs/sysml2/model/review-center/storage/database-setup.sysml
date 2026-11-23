@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_DatabaseSetup {
     private import SoftwareItemMetadata::*;
 
     part def DatabaseSetup {

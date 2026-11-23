@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_SecretScan {
     private import SoftwareItemMetadata::*;
 
     part def SecretScan {

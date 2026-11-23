@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ProjectAccess {
     private import SoftwareItemMetadata::*;
 
     part def ProjectAccess {

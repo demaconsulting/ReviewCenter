@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TotpAlgorithm {
     private import SoftwareItemMetadata::*;
 
     part def TotpAlgorithm {

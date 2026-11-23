@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_PlanPage {
     private import SoftwareItemMetadata::*;
 
     part def PlanPage {

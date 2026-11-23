@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_RevisionValidator {
     private import SoftwareItemMetadata::*;
 
     part def RevisionValidator {

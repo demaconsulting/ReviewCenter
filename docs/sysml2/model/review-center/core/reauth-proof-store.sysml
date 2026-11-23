@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ReauthProofStore {
     private import SoftwareItemMetadata::*;
 
     part def ReauthProofStore {

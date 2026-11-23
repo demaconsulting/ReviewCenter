@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TotpStore {
     private import SoftwareItemMetadata::*;
 
     part def TotpStore {

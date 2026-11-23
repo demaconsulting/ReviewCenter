@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_CredentialProtector {
     private import SoftwareItemMetadata::*;
 
     part def CredentialProtector {

@@ -238,6 +238,9 @@ words:
   - Zabcdefghijklmnopqrstuvwxyz
   - Zabcdefghijkmnopqrstuvwxyz
   - zhang
+  - distinguishability
+  - Sensmetry
+  - Syside
 
 # Exclude common build artifacts, dependencies, and vendored third-party code
 ignorePaths:

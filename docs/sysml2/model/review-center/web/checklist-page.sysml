@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ChecklistPage {
     private import SoftwareItemMetadata::*;
 
     part def ChecklistPage {

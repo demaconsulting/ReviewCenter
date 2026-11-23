@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ServerHost {
     private import SoftwareItemMetadata::*;
 
     part def ServerHost {

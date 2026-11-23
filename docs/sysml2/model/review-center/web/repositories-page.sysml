@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_RepositoriesPage {
     private import SoftwareItemMetadata::*;
 
     part def RepositoriesPage {

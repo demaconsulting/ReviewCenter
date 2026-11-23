@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_PersonalAccessTokenService {
     private import SoftwareItemMetadata::*;
 
     part def PersonalAccessTokenService {

@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ReviewCenterDbContext {
     private import SoftwareItemMetadata::*;
 
     part def ReviewCenterDbContext {

@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ReviewPlanner {
     private import SoftwareItemMetadata::*;
 
     part def ReviewPlanner {

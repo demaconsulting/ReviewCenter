@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_DigestSchedule {
     private import SoftwareItemMetadata::*;
 
     part def DigestSchedule {

@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_RecordDigest {
     private import SoftwareItemMetadata::*;
 
     part def RecordDigest {

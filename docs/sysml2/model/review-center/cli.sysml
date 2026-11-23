@@ -1,4 +1,5 @@
-package ReviewCenter {
+package ReviewCenter_CliSubsystem {
+    public import ReviewCenter_Context::*;
     private import SoftwareItemMetadata::*;
 
     part def CliSubsystem {

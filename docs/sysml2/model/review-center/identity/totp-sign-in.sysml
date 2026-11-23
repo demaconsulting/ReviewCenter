@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TotpSignIn {
     private import SoftwareItemMetadata::*;
 
     part def TotpSignIn {

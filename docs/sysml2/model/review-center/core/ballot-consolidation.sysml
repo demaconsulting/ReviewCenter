@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_BallotConsolidation {
     private import SoftwareItemMetadata::*;
 
     part def BallotConsolidation {

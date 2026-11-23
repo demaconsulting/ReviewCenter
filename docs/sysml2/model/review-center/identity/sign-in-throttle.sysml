@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_SignInThrottle {
     private import SoftwareItemMetadata::*;
 
     part def SignInThrottle {

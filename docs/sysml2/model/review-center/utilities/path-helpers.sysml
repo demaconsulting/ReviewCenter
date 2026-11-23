@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_PathHelpers {
     private import SoftwareItemMetadata::*;
 
     part def PathHelpers {

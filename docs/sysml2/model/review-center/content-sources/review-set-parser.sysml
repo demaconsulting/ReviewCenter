@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_ReviewSetParser {
     private import SoftwareItemMetadata::*;
 
     part def ReviewSetParser {

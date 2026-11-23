@@ -1,4 +1,7 @@
-package ReviewCenter {
+package ReviewCenter_UtilitiesSubsystem {
+    public import ReviewCenter_PathHelpers::*;
+    public import ReviewCenter_TemporaryDirectory::*;
+    public import ReviewCenter_SecretSource::*;
     private import SoftwareItemMetadata::*;
 
     part def UtilitiesSubsystem {

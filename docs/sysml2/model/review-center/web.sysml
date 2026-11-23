@@ -1,4 +1,21 @@
-package ReviewCenter {
+package ReviewCenter_WebSubsystem {
+    public import ReviewCenter_App::*;
+    public import ReviewCenter_HomePage::*;
+    public import ReviewCenter_AboutPage::*;
+    public import ReviewCenter_HelpPage::*;
+    public import ReviewCenter_ProjectsPage::*;
+    public import ReviewCenter_ProjectPage::*;
+    public import ReviewCenter_PlanPage::*;
+    public import ReviewCenter_ReviewPage::*;
+    public import ReviewCenter_ChecklistPage::*;
+    public import ReviewCenter_LoginPage::*;
+    public import ReviewCenter_TotpLoginPage::*;
+    public import ReviewCenter_AccountPage::*;
+    public import ReviewCenter_UsersPage::*;
+    public import ReviewCenter_HistoryPage::*;
+    public import ReviewCenter_AuditPage::*;
+    public import ReviewCenter_RepositoriesPage::*;
+    public import ReviewCenter_InboxPage::*;
     private import SoftwareItemMetadata::*;
 
     part def WebSubsystem {

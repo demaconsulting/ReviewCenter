@@ -1,4 +1,4 @@
-package ReviewCenter {
+package ReviewCenter_TemporaryDirectory {
     private import SoftwareItemMetadata::*;
 
     part def TemporaryDirectory {
