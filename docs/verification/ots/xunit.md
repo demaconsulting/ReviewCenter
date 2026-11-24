@@ -19,7 +19,7 @@ so a passing test shows that xUnit discovered and executed it. The test-run conf
 build, which activates the TRX report extension referenced by the test projects) writes the TRX files, and the
 ReqStream trace matrix is satisfied only when those files contain results for the tests linked to the requirements.
 The scenarios below name tests the project already has; any of them being present in the TRX satisfies the
-requirements. A local `build.ps1` run does not request TRX files and so evidences execution only; the TRX is
+requirements. A local `build.ps1 -All` run does not request TRX files and so evidences execution only; the TRX is
 produced by the CI pipeline.
 
 ### Test Scenarios

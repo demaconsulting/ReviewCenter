@@ -252,10 +252,15 @@ All tests must pass with zero warnings.
 
 ```pwsh
 # After making changes: applies dotnet format, markdown, and YAML fixes silently
-pwsh ./fix.ps1
+pwsh ./fix.ps1 -All
 
 # Before submitting a pull request: all linters must pass
-pwsh ./lint.ps1
+pwsh ./lint.ps1 -All
+
+# While iterating: only the work the change affects (run each script with -Help for its switches)
+pwsh ./fix.ps1 -Changed
+pwsh ./lint.ps1 -Changed
+pwsh ./build.ps1 -Changed
 ```
 
 ### 3. Code Coverage
@@ -384,7 +389,7 @@ behaviors is split, and nothing is lost: every old id stays, every behavior stay
 4. Add focused tests only for real gaps, plus their verification scenarios.
 5. Run `dotnet reqstream --requirements requirements.yaml --lint`, the targeted tests, and
    `--tests "artifacts/*.trx" --enforce`. No id of the unit may be unsatisfied.
-6. Run `pwsh ./fix.ps1` then `pwsh ./lint.ps1`.
+6. Run `pwsh ./fix.ps1 -Changed` then `pwsh ./lint.ps1 -All`.
 
 #### Common pitfalls
 
