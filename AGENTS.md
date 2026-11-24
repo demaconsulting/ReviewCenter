@@ -208,13 +208,14 @@ and exit 1.
 
 # Scoped Validation (ALL Agents Must Follow)
 
-`build.ps1 -Changed` (or `-Project Core,Tests`; `-Help` lists the names) selects the test projects a change affects
-through the project reference graph, which includes `benchmarks/` (built only) and `tools/` (the Puppet tests run).
-A build-wide file (solution, project, props/targets, `global.json`, `.editorconfig`, `nuget.config`, tool manifest,
-`build.ps1`, `scripts/ProjectScripts.psm1`) runs everything; documentation-only changes build nothing.
-`docs/api/openapi.json` is read by a test at run time and is listed in `$RuntimeReads` in `build.ps1`; keep it in
-step if another test starts reading a repository file. The browser system tests use headless Chromium and skip
-locally when it is missing; CI installs it and requires it.
+`build.ps1 -Changed` (or `-Project Core,SystemTests`; `-Help` lists the names) selects the test projects a change
+affects through the project reference graph (short names such as `Core` and `SystemTests` resolve by the shared module;
+`App`, the web application, is the only alias, in `$ProjectAliases`), which includes `benchmarks/` (built only) and
+`tools/` (the Puppet tests run). A build-wide file (solution, project, props/targets, `global.json`, `.editorconfig`,
+`nuget.config`, tool manifest, `build.ps1`, `scripts/ProjectScripts.psm1`) runs everything; documentation-only changes
+build nothing. `docs/api/openapi.json` is read by a test at run time and is listed in `$RuntimeReads` in `build.ps1`;
+keep it in step if another test starts reading a repository file. The browser system tests use headless Chromium and
+skip locally when it is missing; CI installs it and requires it.
 
 # Scope Discipline (ALL Agents Must Follow)
 

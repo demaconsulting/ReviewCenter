@@ -11,9 +11,9 @@
 #   pwsh ./build.ps1 -Changed [-Base <ref>]    Only the test projects affected by the changes since <ref>
 #                                              (default origin/main, else main) plus uncommitted changes
 #   pwsh ./build.ps1 -Project Core             Only the test projects affected by the named projects (full or short
-#                                              names: App is the web application, Core the core library, other short
-#                                              names are relative to the application, so Tests is
-#                                              DemaConsulting.ReviewCenter.Tests; -Help lists them)
+#                                              names: Core finds DemaConsulting.ReviewCenter.Core, SystemTests finds
+#                                              DemaConsulting.ReviewCenter.SystemTests, App is an alias for the web
+#                                              application; -Help lists this repository's names)
 #   Add -DryRun to any scope to print the selection without building anything.
 #   With no arguments the usage text is printed and the script exits 1 (a scope must be chosen).
 #
@@ -25,6 +25,11 @@
 #   this script, scripts/ProjectScripts.psm1) fall back to the full build; repository files tests read
 #   at run time select their test projects through $RuntimeReads; other changes the build does not
 #   read select nothing. This works unchanged for a solution with one project pair or many.
+#
+#   The test platform is detected from global.json: "test": { "runner": "Microsoft.Testing.Platform" } runs
+#   'dotnet test --project <path> --report-trx', anything else runs VSTest 'dotnet test <path> --logger trx';
+#   results go to artifacts/tests either way. Do not customize the arguments per repository (this repository
+#   uses Microsoft.Testing.Platform).
 #
 # EXTENSION POINTS:
 #   Search for "[PROJECT-SPECIFIC]" comments to find the designated locations
@@ -50,7 +55,7 @@ param(
     # Git reference to compare against for -Changed (default: origin/main, else main).
     [string]$Base,
 
-    # Build and test only the projects affected by these projects (full or short names, e.g. Core, Tests).
+    # Build and test only the projects affected by these projects (full or short names, e.g. Core, SystemTests).
     [string[]]$Project,
 
     # Print the selection and exit without building.
@@ -69,15 +74,12 @@ $RuntimeReads = [ordered]@{
     '^docs/api/openapi\.json$' = 'DemaConsulting.ReviewCenter.Tests'
 }
 
-# [PROJECT-SPECIFIC] Project folders outside src/, test/, and tools/ that belong to the build graph, so -Changed sees them.
-$GraphRoots = @('src', 'test', 'tools', 'benchmarks')
+# [PROJECT-SPECIFIC] Folders scanned for projects: benchmarks/ is an extra root (its projects are built only).
+$ProjectRoots = @('src', 'test', 'tools', 'benchmarks')
 
-# [PROJECT-SPECIFIC] Short -Project names that Resolve-ProjectName cannot derive: it treats the shortest src/ project (the
-# web application) as 'Core' and as the prefix of the other short names, but the core library is DemaConsulting.ReviewCenter.Core.
-$ProjectAliases = @{
-    'Core' = 'DemaConsulting.ReviewCenter.Core'
-    'App'  = 'DemaConsulting.ReviewCenter'
-}
+# [PROJECT-SPECIFIC] Short -Project names that no resolution rule can derive (exact name, unique dot-segment suffix,
+# Core), as data: alias = project name. 'App' is the web application, DemaConsulting.ReviewCenter.
+$ProjectAliases = @{ App = 'DemaConsulting.ReviewCenter' }
 
 # [PROJECT-SPECIFIC] Test projects: the projects that are run with dotnet test (the Puppet tool tests live under tools/).
 # Every other selected project under tools/ or benchmarks/ is built only; libraries under src/ and test/ are built by
@@ -87,12 +89,26 @@ function Test-TestProject {
     return $Entry.Name -match '\.(Tests|SystemTests)$'
 }
 
-# Resolves a -Project name through the aliases first, then the shared resolver
-function Resolve-ReviewCenterProject {
-    param($Graph, [string]$Name)
-    $alias = $ProjectAliases.Keys | Where-Object { $_ -ieq $Name } | Select-Object -First 1
-    if ($alias) { return $ProjectAliases[$alias] }
-    return Resolve-ProjectName $Graph $Name
+# Test platform: global.json selects Microsoft.Testing.Platform with "test": { "runner": "Microsoft.Testing.Platform" };
+# otherwise VSTest is used. The platform decides the 'dotnet test' arguments (see Invoke-DotnetTest).
+$UseTestingPlatform = $false
+if (Test-Path global.json) {
+    try { $UseTestingPlatform = (Get-Content -Raw global.json | ConvertFrom-Json).test.runner -eq 'Microsoft.Testing.Platform' }
+    catch { Write-Host "Warning: global.json could not be read; assuming VSTest." }
+}
+
+function Invoke-DotnetTest {
+    # Runs the tests of one project, or of the whole solution when no path is given, against the existing build
+    param([string]$Path)
+
+    # @(...) keeps a one-element list an array, so the splat passes the path whole and not character by character
+    if ($UseTestingPlatform) {
+        $target = @(if ($Path) { '--project'; $Path })
+        dotnet test @target --no-build --configuration Release --report-trx --results-directory artifacts/tests
+    } else {
+        $target = @(if ($Path) { $Path })
+        dotnet test @target --no-build --configuration Release --logger trx --results-directory artifacts/tests
+    }
 }
 
 # ==============================================================================
@@ -106,12 +122,12 @@ function Show-Usage {
             '-All'             = 'Full local build and all tests; cannot be combined with another scope.'
             '-Changed'         = 'Only the test projects affected by files changed since the base, plus uncommitted files.'
             '-Base <ref>'      = 'Base reference for -Changed (default origin/main, else main).'
-            '-Project <names>' = 'Only the test projects affected by these projects (full or short names, e.g. Tests).'
+            '-Project <names>' = 'Only the test projects affected by these projects (full or short names, e.g. SystemTests).'
             '-DryRun'          = 'Print what would be built, tested, and skipped, then exit 0 without running anything.'
             '-Help'            = 'Print this text and exit 0.'
         }) `
-        -ChecksLabel 'Projects (-Project names; Core is the core library, App the web application)' `
-        -Checks @((@(try { (Get-ProjectGraph -Root $GraphRoots).Keys } catch { }) + $ProjectAliases.Keys) | Sort-Object -Unique) `
+        -ChecksLabel 'Projects and aliases (-Project names; short names such as Core or SystemTests also work)' `
+        -Checks @(try { Get-ProjectNameList (Get-ProjectGraph -Root $ProjectRoots) $ProjectAliases } catch { }) `
         -Examples @('-Changed', '-Project Core', '-Changed -DryRun', '-All')
 }
 
@@ -138,19 +154,21 @@ $buildError = $false
 
 $scoped = $false
 if (-not $All) {
-    $graph = Get-ProjectGraph -Root $GraphRoots
+    $graph = Get-ProjectGraph -Root $ProjectRoots
     $selected = [System.Collections.Generic.HashSet[string]]::new()
     $fullReason = $null
 
     $names = @($Project | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $known = (Get-ProjectNameList $graph $ProjectAliases) -join ', '
     if ($Project -and $names.Count -eq 0) {
-        Write-Host "Error: no project named in '$($Project -join ' ')'. Known projects: $($graph.Keys -join ', ')"
+        Write-Host "Error: no project named in '$($Project -join ' ')'. Known projects: $known"
         exit 1
     }
     foreach ($single in $names) {
-        $resolved = Resolve-ReviewCenterProject $graph $single
+        try { $resolved = Resolve-ProjectName $graph $single $ProjectAliases }
+        catch { Write-Host "Error: $($_.Exception.Message)"; exit 1 }
         if (-not $resolved) {
-            Write-Host "Unknown project '$single'. Known projects: $($graph.Keys -join ', ')"
+            Write-Host "Unknown project '$single'. Known projects: $known"
             exit 1
         }
         [void]$selected.Add($resolved)
@@ -202,7 +220,7 @@ if (-not $All) {
         if (-not $buildError) {
             foreach ($entry in $tests) {
                 Write-Host "Running tests: $($entry.Name)..."
-                dotnet test --project $entry.Path --no-build --configuration Release
+                Invoke-DotnetTest $entry.Path
                 if ($LASTEXITCODE -ne 0) { $buildError = $true }
             }
         } else {
@@ -219,22 +237,25 @@ if ($DryRun -and -not $scoped) { Write-Host "Dry run: would run the full build a
 
 if (-not $scoped) {
     # Each step runs only if the steps before it succeeded, so tests never run against stale binaries
+    $failedStep = $null   # the step that failed first, so the skip message names the real cause
     Write-Host "Restoring dependencies..."
     dotnet restore
-    if ($LASTEXITCODE -ne 0) { $buildError = $true }
+    if ($LASTEXITCODE -ne 0) { $buildError = $true; $failedStep = 'restore' }
 
     if (-not $buildError) {
         Write-Host "Building..."
         dotnet build --no-restore --configuration Release
-        if ($LASTEXITCODE -ne 0) { $buildError = $true }
+        if ($LASTEXITCODE -ne 0) { $buildError = $true; $failedStep = 'build' }
     }
 
     if (-not $buildError) {
         Write-Host "Running tests..."
-        # Microsoft.Testing.Platform runner (global.json): no --logger trx; the browser system tests skip locally when
-        # Chromium is missing (CI installs it and sets REVIEWCENTER_REQUIRE_CHROMIUM=true)
-        dotnet test --no-build --configuration Release
+        # The browser system tests skip locally when Chromium is missing (CI installs it and sets
+        # REVIEWCENTER_REQUIRE_CHROMIUM=true)
+        Invoke-DotnetTest
         if ($LASTEXITCODE -ne 0) { $buildError = $true }
+    } elseif ($failedStep -eq 'restore') {
+        Write-Host "Skipping build and tests: restore failed."
     } else {
         Write-Host "Skipping tests: the build failed."
     }
